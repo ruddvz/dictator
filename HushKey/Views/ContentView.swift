@@ -13,6 +13,8 @@ struct ContentView: View {
                         .tag(AppModel.Screen.transforms)
                     Label(AppModel.Screen.files.rawValue, systemImage: AppModel.Screen.files.symbol)
                         .tag(AppModel.Screen.files)
+                    Label(AppModel.Screen.meetings.rawValue, systemImage: AppModel.Screen.meetings.symbol)
+                        .tag(AppModel.Screen.meetings)
                 }
                 Section("SILENT LAB") {
                     ForEach([AppModel.Screen.setup, .train, .evaluate, .use]) { screen in
@@ -33,6 +35,7 @@ struct ContentView: View {
             case .dictation: DictationView()
             case .transforms: TransformView()
             case .files: FileTranscriptionView()
+            case .meetings: MeetingNotesView()
             case .setup: SetupView()
             case .train: TrainView()
             case .evaluate: EvaluateView()

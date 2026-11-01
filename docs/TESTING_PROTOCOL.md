@@ -65,6 +65,15 @@ Run this separately from the AirPods motion study:
 4. Disconnect from the network after download and transcribe a local file with WhisperKit. Reopen HushKey to confirm the model remains available, then remove it and confirm the model files are deleted.
 5. Repeat with files of increasing length. Watch memory use and report engine, model variant, language, file duration, first-run download time, transcription time, and qualitative errors. Do not claim a model is more accurate without a representative benchmark.
 
+## Meeting notes acceptance
+
+1. Start capture explicitly and grant Microphone/Speech access only if wanted. Confirm no capture begins merely by opening the page, selecting a note, or opening the menu-bar item.
+2. Use the configured microphone for a short consented conversation. Confirm the live transcript updates, stop produces a saved note, and microphone audio is not present in HushKey's Application Support data.
+3. Edit the title and transcript, search for text in the transcript, export transcript and all notes as TXT, restart HushKey, and confirm the edited note is still available.
+4. With Apple's on-device model available, create summary and action-item drafts, edit them, and confirm they persist locally. Include a transcript longer than 12,000 characters to verify chunking. With the model unavailable, confirm the app explains that it did not send transcript text elsewhere.
+5. Start dictation and meeting capture in both orders; verify the capture gate prevents two microphone engines from starting. Test stop during speech and confirm final words are retained.
+6. Test in a call with remote participants sent to headphones. The current implementation captures the selected microphone only; report that limitation separately from local transcription quality. HushKey does not provide speaker labels.
+
 ## Build and test
 
 Run `xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build test`. Unit tests use synthetic signals and verify classifier behavior, capture segmentation, permission/connection state transitions, dataset persistence, and secure-target insertion guards. They do not emulate AirPods or prove real-world feasibility.

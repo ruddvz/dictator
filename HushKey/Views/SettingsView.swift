@@ -224,7 +224,7 @@ private struct MicrophoneCard: View {
                 if let error = audio.error ?? model.transcriber.error {
                     Text(error).font(.caption).foregroundStyle(.red)
                 }
-                Text("Choose an input here, then start dictation from the Dictation screen. Recognition stays on this Mac when on-device speech is available; dictation audio is not saved. The separate research recorder saves audio only when you explicitly start a session.")
+                Text("Choose an input for Dictation and Meeting notes. On-device recognition stays on this Mac. Dictation and meeting capture do not save microphone audio; the separate research recorder saves audio only when you explicitly start a session.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

@@ -30,19 +30,20 @@ Make ordinary voice and whispered dictation usable locally on a Mac, while keepi
 2. **Transforms** — Create an editable preview for polish, concise, professional, bullet, or action-item writing with Apple's on-device Foundation Model on macOS 26+ when available. Deterministic filler removal also works without the model. Applying requires explicit user action; undo restores the prior transcript.
 3. **Snippets & Vocabulary** — Search, add, edit, and remove personal expansions and local recognition hints.
 4. **Transcribe files** — Import one audio file, choose Apple on-device Speech or an explicitly downloaded WhisperKit model, edit the local transcript, and export TXT, SRT, or WebVTT with timestamps.
-5. **Setup** — Entered only when the user opens the Silent Lab. Motion support, permission/connection status, live sample rate, and a brief next-step guide; detailed plots stay collapsed.
-6. **Train** — Choose normal voice, whisper, or silent mouthing as an experiment condition; select a word; capture, inspect, and remove motion templates.
-7. **Evaluate** — Select a condition and feature set; check study readiness; see leave-one-out results, majority baseline, permutation result, session holdout, and confusion matrix.
-8. **Silent Use** — Experimental trained-word decoding. Hold to capture or use calibrated auto-capture after evidence passes; inspect accepted/rejected words. Threshold tuning and candidate distances stay under Advanced.
-9. **Settings & Data** — Dictation language and mode controls, spoken-correction and filler-cleanup preferences, shortcut and vocabulary hints, opt-in nearby context, transcript-history control, motion capture and insertion shortcuts, microphone input, synchronized session recording, local data, export, and deletion.
+5. **Meeting notes** — Start microphone capture explicitly; stream only to on-device recognition, save a local transcript at stop, and create reviewable on-device summaries and action items. Search/edit/export/delete locally. Capture is microphone-only and does not provide speaker identification.
+6. **Setup** — Entered only when the user opens the Silent Lab. Motion support, permission/connection status, live sample rate, and a brief next-step guide; detailed plots stay collapsed.
+7. **Train** — Choose normal voice, whisper, or silent mouthing as an experiment condition; select a word; capture, inspect, and remove motion templates.
+8. **Evaluate** — Select a condition and feature set; check study readiness; see leave-one-out results, majority baseline, permutation result, session holdout, and confusion matrix.
+9. **Silent Use** — Experimental trained-word decoding. Hold to capture or use calibrated auto-capture after evidence passes; inspect accepted/rejected words. Threshold tuning and candidate distances stay under Advanced.
+10. **Settings & Data** — Dictation language and mode controls, spoken-correction and filler-cleanup preferences, shortcut and vocabulary hints, opt-in nearby context, transcript-history control, motion capture and insertion shortcuts, microphone input, synchronized session recording, local data, export, and deletion.
 
 ## File map
 
 - `HushKey/App/` — app lifecycle, shared state, screen routing, shortcuts.
 - `HushKey/Motion/` — Core Motion access and normalized samples.
-- `HushKey/Audio/` — local microphone input, on-device speech recognition, file transcription, and local text transforms.
+- `HushKey/Audio/` — local microphone input, exclusive capture coordination, on-device speech recognition, meeting note generation, file transcription, and local text transforms.
 - `HushKey/Decoding/` — features, capture segmentation, DTW classifier, templates.
-- `HushKey/Recording/` — local synchronized experiment sessions and recent dictation history.
+- `HushKey/Recording/` — local synchronized experiment sessions, recent dictation history, and searchable meeting notes.
 - `HushKey/Services/` — Accessibility insertion and system hotkey handling.
 - `HushKey/Views/` — one view file per workflow plus shared visual components.
 - `HushKey/Assets.xcassets/` — HushKey's app icon and bundled visual assets.
@@ -61,8 +62,9 @@ Make ordinary voice and whispered dictation usable locally on a Mac, while keepi
 - **Completed:** add conservative optional filler cleanup, snippet-line validation, Apple on-device audio-file transcription, and downloadable WhisperKit model selection with local storage and TXT/SRT/WebVTT export.
 - **Completed:** add a searchable Snippets & Vocabulary workspace, searchable transcript history, and processed/raw restore actions; package only this app without deleting unrelated Xcode outputs.
 - **Completed:** add review-first text transforms using Apple's on-device Foundation Model when available, deterministic filler removal on older macOS versions, explicit apply, stale-preview protection, and undo; test the offline cleanup and undo paths.
+- **In progress:** add explicit microphone-only meeting notes with local transcript search, editing, export, and review-first on-device summaries/action items. System-audio capture and manual meeting acceptance remain open.
 - **Completed:** defer Motion access until the Silent Lab opens; display live state and avoid presenting a failed evidence result as a pass.
-- **Next:** complete manual acceptance of microphone/Speech, normal voice and whisper, global shortcuts, TextEdit and a second-app insertion/undo, history, and both file engines. Then compare Apple Speech and WhisperKit on consented local sample audio before recommending a default model. Meeting workflows remain deferred until this acceptance passes.
+- **Next:** complete manual acceptance of microphone/Speech, normal voice and whisper, global shortcuts, TextEdit and a second-app insertion/undo, history, file engines, and the new meeting-notes capture. Then compare Apple Speech and WhisperKit on consented local sample audio and add optional system-audio capture for calls after reviewing the additional macOS recording permission and source-selection UX.
 
 ## Completion checks
 
@@ -74,6 +76,7 @@ Make ordinary voice and whispered dictation usable locally on a Mac, while keepi
 - Recent transcripts and personal terms stay in local storage.
 - The Silent Lab explains its permissions, evidence gates, and experimental limits.
 - File transcription can run with Apple Speech when available or with an explicitly downloaded local WhisperKit model, and supports editable transcripts plus SRT/WebVTT export.
+- Meeting notes start only by explicit action, retain transcript text locally, never save microphone audio, allow searching/editing/export/deletion, and use only on-device models for generated notes.
 - Text transforms never silently replace a transcript, run without a cloud fallback, and can be undone before insertion or further editing.
 - A trained word shows its sample count and can be captured without confusing it with a session recording.
 - Evaluation explains what passes or blocks silent use.

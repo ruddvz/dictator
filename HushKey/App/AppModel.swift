@@ -14,6 +14,7 @@ final class AppModel {
         case dictation = "Dictation"
         case transforms = "Transforms"
         case files = "Transcribe files"
+        case meetings = "Meeting notes"
         case setup = "Setup"
         case train = "Train"
         case evaluate = "Evaluate"
@@ -26,6 +27,7 @@ final class AppModel {
             case .dictation: "mic"
             case .transforms: "wand.and.stars"
             case .files: "waveform.badge.mic"
+            case .meetings: "person.2.wave.2"
             case .setup: "headphones"
             case .train: "square.stack.3d.up"
             case .evaluate: "chart.bar.xaxis"
@@ -39,6 +41,8 @@ final class AppModel {
     let motion = HeadphoneMotionService()
     let audio = AudioService()
     let transcriber = MicTranscriber()
+    let captureGate: AudioCaptureGate
+    let meetingNotes: MeetingNotesService
     let localTransformService = LocalTransformService()
     let fileTranscriber = LocalFileTranscriber()
     let whisperFileTranscriber = WhisperKitFileTranscriber()
@@ -152,6 +156,9 @@ final class AppModel {
     @ObservationIgnored private var dictationStartGeneration = 0
 
     init() {
+        let captureGate = AudioCaptureGate()
+        self.captureGate = captureGate
+        meetingNotes = MeetingNotesService(captureGate: captureGate)
         selectedWord = dataset.vocabulary.first
         insertion.onInsertShortcut = { [weak self] in self?.insertLatestOutput() }
         insertion.onUndoShortcut = { [weak self] in self?.undoLastInsertion() }
@@ -213,7 +220,7 @@ final class AppModel {
                               label: prediction.best?.label ?? "", confidence: prediction.confidence)
         case .settings:
             recorder.logEvent(segment, kind: "segment", label: recorder.prompt, confidence: nil)
-        case .dictation, .transforms, .files, .setup, .evaluate, .personalization:
+        case .dictation, .transforms, .files, .meetings, .setup, .evaluate, .personalization:
             if recorder.isRecording {
                 recorder.logEvent(segment, kind: "segment", label: recorder.prompt, confidence: nil)
             }
@@ -252,6 +259,7 @@ final class AppModel {
         case .dictation: return false
         case .transforms: return false
         case .files: return false
+        case .meetings: return false
         case .personalization: return false
         case .settings: return false
         case .setup, .evaluate: return false
@@ -551,6 +559,14 @@ final class AppModel {
 
     private func startDictation() async {
         guard !isFinalizingDictation, !transcriber.isFinalizing else { return }
+        guard !meetingNotes.isStarting, !meetingNotes.isCapturing, !meetingNotes.isFinalizing else {
+            insertion.report("Meeting capture is active. Stop it before starting dictation.")
+            return
+        }
+        guard captureGate.claim(.dictation) else {
+            insertion.report("Meeting capture is active. Stop it before starting dictation.")
+            return
+        }
         dictationStartGeneration += 1
         let generation = dictationStartGeneration
         let target = NSWorkspace.shared.frontmostApplication
@@ -562,7 +578,11 @@ final class AppModel {
         usedNearbyTextHints = !nearbyHints.isEmpty
 
         await audio.start()
-        guard generation == dictationStartGeneration, audio.isRunning else { return }
+        guard generation == dictationStartGeneration, audio.isRunning else {
+            audio.stop()
+            captureGate.release(.dictation)
+            return
+        }
         let customWords = DictationVocabulary.terms(from: dictationTerms)
         let modeHints: [String]
         switch activeDictationMode {
@@ -576,9 +596,13 @@ final class AppModel {
         guard generation == dictationStartGeneration, audio.isRunning else {
             transcriber.stop()
             audio.stop()
+            captureGate.release(.dictation)
             return
         }
-        if !started { audio.stop() }
+        if !started {
+            audio.stop()
+            captureGate.release(.dictation)
+        }
     }
 
     private func stopDictation() {
@@ -599,6 +623,7 @@ final class AppModel {
             transcriber.replaceText(processed)
             saveCurrentDictation()
             isFinalizingDictation = false
+            captureGate.release(.dictation)
         }
     }
 

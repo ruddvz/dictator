@@ -11,6 +11,7 @@ HushKey is a native macOS dictation app with a separate experimental lab for sil
 - **Transforms** offers review-first local polish, concise, professional, bullets, and action-item drafts using Apple's on-device Foundation Model when available (macOS 26+); conservative filler removal works without a model on macOS 14+. Nothing is sent to a cloud service, and the original transcript can be restored after applying a draft.
 - Optional local filler cleanup removes only standalone “um”, “uh”, and “erm”; it is off by default. Snippet settings report malformed lines instead of silently ignoring them.
 - **Transcribe files** accepts one audio file at a time and exports editable text, SRT, or WebVTT captions. Choose Apple Speech for zero-download on-device recognition where supported, or explicitly download a WhisperKit model for offline inference after setup. Model downloads require internet; audio files are not uploaded.
+- **Meeting notes** provides explicit microphone capture, a searchable local transcript archive, editable transcripts, and TXT export. Meeting audio is not saved; the transcript is stored when capture stops. Summary and action-item drafts use Apple's on-device Foundation Model (macOS 26+), with no cloud fallback. HushKey does not identify speakers. The current meeting capture reads the selected microphone only, so remote participants sent directly to headphones may not be included.
 - Optional nearby-text hints are off by default. After a separate Accessibility opt-in, HushKey reads only a bounded slice around the cursor in a supported text field to extract local recognition terms; it discards the slice and does not store it.
 - Recent transcripts can be saved on this Mac (enabled by default and switchable in Settings). HushKey does not save microphone audio during ordinary dictation.
 - Motion input uses Apple's `CMHeadphoneMotionManager`. It sees processed head motion from compatible head-tracking headphones, not an inward-facing speech sensor or the AirPods speech-detecting accelerometer.
@@ -50,6 +51,10 @@ The packaged app is at `dist/HushKey.app`. The packaging script builds in an iso
 ## Local transforms
 
 Choose **Polish**, **Make concise**, **Professional**, **Bullet points**, or **Action items** for a reviewable draft from Apple's on-device Foundation Model. HushKey has no remote fallback. When Apple Intelligence is unavailable or preparing, the app explains that those actions cannot run. **Remove fillers** is a deterministic local cleanup and does not require Apple Intelligence. Every draft is editable and must be explicitly applied; stale previews cannot replace a transcript that changed after generation. Undo is available until the transcript changes or is inserted.
+
+## Meeting notes
+
+Open **Meeting notes** and choose **Start meeting** to explicitly request Speech and microphone access. HushKey transcribes from the selected microphone using on-device Speech, does not save microphone audio, and saves the transcript locally when you stop. You can search the archive, edit the transcript/title, create a reviewable local summary or action-item list (macOS 26+ with Apple's on-device model), delete a note after confirmation, or export transcript/all notes as text. The summary process breaks long transcripts into bounded local chunks and supports up to 120,000 characters. HushKey does not identify speakers; the current capture uses the microphone only, so audio routed directly to headphones may omit remote participants.
 
 ## Silent Lab
 

@@ -90,6 +90,53 @@ final class SafetyAndStorageTests: XCTestCase {
         try DictationHistoryStore.delete(at: url)
     }
 
+    @MainActor
+    func testAudioCaptureGatePreventsSimultaneousDictationAndMeetingCapture() {
+        let gate = AudioCaptureGate()
+        XCTAssertTrue(gate.claim(.dictation))
+        XCTAssertFalse(gate.claim(.meeting))
+        gate.release(.meeting)
+        XCTAssertEqual(gate.owner, .dictation)
+        gate.release(.dictation)
+        XCTAssertNil(gate.owner)
+        XCTAssertTrue(gate.claim(.meeting))
+    }
+
+    func testMeetingNotesRoundTripLocallyAndDeleteIsIdempotent() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appending(path: "hushkey-meetings-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let note = MeetingNote(title: "Planning", transcript: "We will ship Thursday.",
+                               summary: "The team agreed on Thursday.", actionItems: "No clear action items.")
+
+        try MeetingNotesStore.save([note], to: url)
+        XCTAssertEqual(MeetingNotesStore.load(from: url), [note])
+        try MeetingNotesStore.delete(at: url)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+        try MeetingNotesStore.delete(at: url)
+    }
+
+    func testMeetingTranscriptChunkerKeepsTextInBoundedOrderedChunks() {
+        let source = String(repeating: "We agreed to review the local draft. ", count: 20)
+        let chunks = LocalTransformService.meetingChunks(from: source, maxCharacters: 64)
+        XCTAssertGreaterThan(chunks.count, 1)
+        XCTAssertTrue(chunks.allSatisfy { $0.count <= 64 })
+        XCTAssertEqual(chunks.joined(separator: " "), source.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    @MainActor
+    func testMeetingSummaryAndActionItemsRunWithLocalModelWhenAvailable() async throws {
+        let transforms = LocalTransformService()
+        guard transforms.modelIsAvailable else { throw XCTSkip("Apple's on-device model is unavailable on this Mac.") }
+        let transcript = "The team approved the new draft. Mira will send the final copy by Thursday."
+
+        let summary = try await transforms.summarizeMeeting(transcript)
+        let actionItems = try await transforms.extractMeetingActionItems(transcript)
+
+        XCTAssertFalse(summary.isEmpty)
+        XCTAssertFalse(actionItems.isEmpty)
+    }
+
     func testInsertionGateRejectsCaptureAndFinalization() {
         XCTAssertNotNil(DictationInsertionGate.blockedReason(
             audioIsRunning: true, recognitionIsRunning: false, isFinalizing: false))
