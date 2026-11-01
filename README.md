@@ -38,13 +38,13 @@ HushKey appears in the menu bar. On first launch, allow Motion when macOS asks. 
 5. **Decode** uses only Silent-condition templates. It rejects segments beyond the distance limit or below the confidence margin. Inference stays unavailable until the evidence checks pass; if motion does not distinguish the words, HushKey reports that instead of presenting nearest matches as useful text.
 6. **Auto-detect** is optional. Calibrate while still, then tune the motion-energy trigger. Inspect false positives during ordinary head movement, chewing, and repositioning.
 
-The microphone reference is independent of TypeWhisper. It uses macOS Speech only when on-device recognition is available and sets `requiresOnDeviceRecognition`; otherwise it stays off. Starting the mic is optional. Audio is written to disk only when the user starts an experiment recording while the mic is active.
+The optional microphone reference uses macOS Speech only when on-device recognition is available and sets `requiresOnDeviceRecognition`; otherwise it stays off. Starting the mic is optional. Audio is written to disk only when the user starts an experiment recording while the mic is active.
 
 ## Safe text insertion
 
 Text insertion is off by default. The user must enable it in **Decode**, approve HushKey under **System Settings → Privacy & Security → Accessibility**, then press the displayed configurable global shortcut (`⌥⇧I` by default) while the intended text field remains focused in another app.
 
-HushKey uses Accessibility to inspect the frontmost app and focused control, allows only supported text fields, rejects secure/password controls, rechecks the process and focus immediately before insertion, and writes through the selected-text attribute once. It does not use or modify the clipboard. Unsupported controls fail closed. HushKey does not depend on TypeWhisper for insertion.
+HushKey uses Accessibility to inspect the frontmost app and focused control, allows only supported text fields, rejects secure/password controls, rechecks the process and focus immediately before insertion, and writes through the selected-text attribute once. It does not use or modify the clipboard. Unsupported controls fail closed.
 
 ## Local data and privacy
 
@@ -53,10 +53,6 @@ HushKey uses Accessibility to inspect the frontmost app and focused control, all
 - No telemetry, upload, cloud service, or paid API is used by HushKey.
 - Use **Sensors → Local data & privacy** to export the dataset or sessions, or delete templates and session files.
 - Voice recognition requires the user to start the mic and is local-only; no remote recognition fallback is used.
-
-## TypeWhisper boundary
-
-HushKey does not import TypeWhisper code or its GPLv3 plugin SDK. Its transcription plugin accepts 16 kHz mono audio, so headphone motion is not a drop-in transcription plugin. TypeWhisper's local text-processing endpoints may transform text but do not insert it into the focused app; HushKey does not call those endpoints. There is no TypeWhisper cloud or paid-API dependency.
 
 ## Project naming
 

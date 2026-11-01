@@ -2,11 +2,12 @@
 
 ## Completed — 2026-11-01
 
-- Created a standalone native macOS app project from the MIT-licensed Subvox motion prototype and retained its attribution.
+- Created a standalone native macOS HushKey app using an MIT-licensed upstream motion prototype and retained its required attribution in [NOTICE.md](NOTICE.md).
 - Added a menu bar app, configurable in-app capture shortcut, local training across voice/whisper/silent conditions, session IDs, holdout evaluation, and a strict evidence gate for silent decoding.
 - Added opt-in Accessibility insertion with a global shortcut, focus/role checks, secure-field rejection, one-insert-per-prediction behavior, and no clipboard fallback.
 - Restricted the microphone reference to on-device Speech recognition and added local dataset/session export and deletion.
 - Added build instructions, privacy/limitations, testing protocol, notices, CI configuration, and package script.
+- Standardized the app and user-facing documentation on the HushKey name; retained required source attribution in the notices and license.
 - `xcodebuild ... test`: 10 tests passed. Release `.app` packaging succeeded and ad-hoc signature verified.
 
 ## Next item — hardware feasibility
