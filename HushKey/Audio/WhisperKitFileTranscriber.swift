@@ -55,6 +55,11 @@ final class WhisperKitFileTranscriber {
     private(set) var error: String?
     @ObservationIgnored private var downloadTask: Task<Void, Never>?
     @ObservationIgnored private var transcriptionTask: Task<Void, Never>?
+    @ObservationIgnored var onSessionUpdate: ((FileTranscriptionSession) -> Void)?
+    @ObservationIgnored private var activeSessionID = UUID()
+    @ObservationIgnored private var activeSourceName: String?
+    @ObservationIgnored private var activeLanguageIdentifier = ""
+    @ObservationIgnored private var activeModelVariant: String?
     private(set) var downloadedModels: [String: String] = UserDefaults.standard.dictionary(forKey: "whisperKitModelPaths") as? [String: String] ?? [:] {
         didSet { UserDefaults.standard.set(downloadedModels, forKey: "whisperKitModelPaths") }
     }
@@ -158,15 +163,33 @@ final class WhisperKitFileTranscriber {
         text = value
     }
 
+    func restore(_ session: FileTranscriptionSession) {
+        guard !isTranscribing, !isDownloading else { return }
+        text = session.text
+        cues = session.cues
+        activeSessionID = session.id
+        activeSourceName = session.sourceName
+        activeLanguageIdentifier = session.languageIdentifier
+        activeModelVariant = session.modelVariant
+        selectedLanguage = session.languageIdentifier
+        if let variant = session.modelVariant, let parsedVariant = WhisperModelVariant(rawValue: variant) {
+            selectedVariant = parsedVariant
+        }
+        status = "Restored from this Mac. Original audio was not copied."
+        error = nil
+    }
+
     func clear() {
         guard !isTranscribing else { return }
         text = ""
         cues = []
+        activeSourceName = nil
+        activeSessionID = UUID()
         status = nil
         error = nil
     }
 
-    func transcribe(file url: URL, languageIdentifier: String) {
+    func transcribe(file url: URL, languageIdentifier: String, sessionID: UUID = UUID()) {
         guard !isTranscribing, !isDownloading else { return }
         guard selectedModelIsDownloaded,
               let modelPath = downloadedModels[selectedVariant.rawValue] else {
@@ -174,6 +197,10 @@ final class WhisperKitFileTranscriber {
             return
         }
         isTranscribing = true
+        activeSessionID = sessionID
+        activeSourceName = url.lastPathComponent
+        activeLanguageIdentifier = languageIdentifier
+        activeModelVariant = selectedVariant.rawValue
         status = "Loading the local model…"
         error = nil
         text = ""
@@ -226,5 +253,18 @@ final class WhisperKitFileTranscriber {
         await whisper?.unloadModels()
         isTranscribing = false
         transcriptionTask = nil
+        persistActiveSessionIfNeeded()
+    }
+
+    private func persistActiveSessionIfNeeded() {
+        guard let activeSourceName, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        onSessionUpdate?(FileTranscriptionSession(
+            id: activeSessionID,
+            sourceName: activeSourceName,
+            engine: .whisperKit,
+            languageIdentifier: activeLanguageIdentifier,
+            modelVariant: activeModelVariant,
+            text: text,
+            cues: cues))
     }
 }

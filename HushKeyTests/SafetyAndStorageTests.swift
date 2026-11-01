@@ -295,6 +295,40 @@ final class SafetyAndStorageTests: XCTestCase {
         XCTAssertEqual(DictationHistoryStore.load(from: url)?.first?.rawText, nil)
     }
 
+    func testFileTranscriptionHistoryRoundTripsLocalTranscriptAndTimedCues() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appending(path: "hushkey-file-history-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let session = FileTranscriptionSession(
+            sourceName: "planning.m4a",
+            engine: .whisperKit,
+            languageIdentifier: "en",
+            modelVariant: "base",
+            text: "Review the local release.",
+            cues: [SubtitleCue(start: 1.2, duration: 0.8, text: "Review the local release.")])
+
+        try FileTranscriptionSessionStore.save([session], to: url)
+
+        XCTAssertEqual(FileTranscriptionSessionStore.load(from: url), [session])
+    }
+
+    func testFileTranscriptionHistoryUpsertKeepsAgeAndSupportsDeletion() {
+        let createdAt = Date(timeIntervalSince1970: 100)
+        let existing = FileTranscriptionSession(id: UUID(), createdAt: createdAt,
+                                                sourceName: "draft.wav", engine: .apple,
+                                                languageIdentifier: "en-US", text: "Raw words", cues: [])
+        let edited = FileTranscriptionSession(id: existing.id, createdAt: Date(),
+                                              sourceName: "draft.wav", engine: .apple,
+                                              languageIdentifier: "en-US", text: "Edited words", cues: [])
+
+        let updated = FileTranscriptionSessionStore.upserting(edited, into: [existing])
+
+        XCTAssertEqual(updated.count, 1)
+        XCTAssertEqual(updated.first?.text, "Edited words")
+        XCTAssertEqual(updated.first?.createdAt, createdAt)
+        XCTAssertTrue(FileTranscriptionSessionStore.deleting(id: existing.id, from: updated).isEmpty)
+    }
+
     @MainActor
     func testDictationHistoryCanRestoreProcessedOrRawText() {
         let model = AppModel()

@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import Speech
 
-struct SubtitleCue: Equatable {
+struct SubtitleCue: Codable, Equatable {
     var start: TimeInterval
     var duration: TimeInterval
     var text: String
@@ -20,11 +20,16 @@ final class LocalFileTranscriber {
     @ObservationIgnored private var task: SFSpeechRecognitionTask?
     @ObservationIgnored private var completion: CheckedContinuation<Void, Never>?
     @ObservationIgnored private var generation = 0
+    @ObservationIgnored var onSessionUpdate: ((FileTranscriptionSession) -> Void)?
+    @ObservationIgnored private var activeSessionID = UUID()
+    @ObservationIgnored private var activeLanguageIdentifier = "en-US"
 
-    func transcribe(file url: URL, localeIdentifier: String) async {
+    func transcribe(file url: URL, localeIdentifier: String, sessionID: UUID = UUID()) async {
         guard !isTranscribing else { return }
         generation += 1
         let currentGeneration = generation
+        activeSessionID = sessionID
+        activeLanguageIdentifier = localeIdentifier
         isTranscribing = true
         text = ""
         cues = []
@@ -77,6 +82,7 @@ final class LocalFileTranscriber {
         task = nil
         isTranscribing = false
         status = "Transcription cancelled."
+        persistActiveSessionIfNeeded()
         completion?.resume()
         completion = nil
     }
@@ -92,6 +98,18 @@ final class LocalFileTranscriber {
         cues = []
         sourceName = nil
         status = nil
+        error = nil
+        activeSessionID = UUID()
+    }
+
+    func restore(_ session: FileTranscriptionSession) {
+        guard !isTranscribing else { return }
+        text = session.text
+        cues = session.cues
+        sourceName = session.sourceName
+        activeSessionID = session.id
+        activeLanguageIdentifier = session.languageIdentifier
+        status = "Restored from this Mac. Original audio was not copied."
         error = nil
     }
 
@@ -111,6 +129,7 @@ final class LocalFileTranscriber {
         } else {
             status = text.isEmpty ? "No speech was detected in this file." : "Finished locally. The source audio was not changed."
         }
+        persistActiveSessionIfNeeded()
         completion?.resume()
         completion = nil
     }
@@ -119,6 +138,17 @@ final class LocalFileTranscriber {
         isTranscribing = false
         status = nil
         error = message
+    }
+
+    private func persistActiveSessionIfNeeded() {
+        guard let sourceName, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        onSessionUpdate?(FileTranscriptionSession(
+            id: activeSessionID,
+            sourceName: sourceName,
+            engine: .apple,
+            languageIdentifier: activeLanguageIdentifier,
+            text: text,
+            cues: cues))
     }
 }
 

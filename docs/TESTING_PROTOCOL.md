@@ -61,9 +61,11 @@ Run this separately from the AirPods motion study:
 
 1. Import a short consented audio file and transcribe it with Apple Speech. Confirm HushKey refuses remote fallback when the selected language lacks on-device support.
 2. Edit the transcript, save TXT, and export SRT and WebVTT. Check subtitle timestamps against the source audio and confirm the source file remains unchanged.
-3. Choose a WhisperKit model and explicitly download it. Verify the download state reaches completion and the model appears in `~/Library/Application Support/HushKey/WhisperKitModels/`.
-4. Disconnect from the network after download and transcribe a local file with WhisperKit. Reopen HushKey to confirm the model remains available, then remove it and confirm the model files are deleted.
-5. Repeat with files of increasing length. Watch memory use and report engine, model variant, language, file duration, first-run download time, transcription time, and qualitative errors. Do not claim a model is more accurate without a representative benchmark.
+3. Confirm a completed job appears in searchable Recent file transcripts. Edit its text, switch screens, return, restore it, and verify the edited text and original timed cues remain. Choose a second source file and verify the first job remains recoverable.
+4. Delete one saved job, then clear all saved file transcripts. Confirm deletion persists after reopening HushKey and that source audio was never copied into Application Support.
+5. Choose a WhisperKit model and explicitly download it. Verify the download state reaches completion and the model appears in `~/Library/Application Support/HushKey/WhisperKitModels/`.
+6. Disconnect from the network after download and transcribe a local file with WhisperKit. Reopen HushKey to confirm the model remains available, then remove it and confirm the model files are deleted.
+7. Repeat with files of increasing length. Watch memory use and report engine, model variant, language, file duration, first-run download time, transcription time, and qualitative errors. Do not claim a model is more accurate without a representative benchmark.
 
 ## Meeting notes acceptance
 

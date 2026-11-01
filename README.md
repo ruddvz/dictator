@@ -75,6 +75,7 @@ HushKey uses Accessibility to inspect the frontmost app and focused control, all
 
 - Templates: `~/Library/Application Support/HushKey/dataset.json`.
 - Recent dictations: `~/Library/Application Support/HushKey/dictation-history.json`.
+- File transcription history: `~/Library/Application Support/HushKey/file-transcription-history.json` (up to 50 searchable jobs with edited text and timed cues; source audio is not copied).
 - Experiment sessions: `~/Documents/HushKey/Sessions/`, with motion CSV, event CSV, metadata, and optional microphone audio.
 - No telemetry, remote text processing, or paid API is used by HushKey. WhisperKit model files are fetched only after the user asks to download a model; the selected file is then processed locally.
 - Use **Settings & Data** to configure shortcuts and vocabulary hints, choose the microphone, enable/disable transcript history, record synchronized sessions, export the dataset or sessions, and delete local files. Clear recent transcripts from the Dictation screen.

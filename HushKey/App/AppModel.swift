@@ -83,6 +83,8 @@ final class AppModel {
     private(set) var experimentSessionID = UUID()
     var dataMessage: String?
     private(set) var dictationHistoryMessage: String?
+    private(set) var fileTranscriptionSessions = FileTranscriptionSessionStore.load()
+    private(set) var fileTranscriptionHistoryMessage: String?
 
     var captureShortcut: CaptureShortcut = CaptureShortcut(
         rawValue: UserDefaults.standard.string(forKey: CaptureShortcut.preferenceKey) ?? "") ?? .default {
@@ -166,9 +168,47 @@ final class AppModel {
         self.captureGate = captureGate
         meetingNotes = MeetingNotesService(captureGate: captureGate)
         selectedWord = dataset.vocabulary.first
+        fileTranscriber.onSessionUpdate = { [weak self] session in
+            self?.saveFileTranscriptionSession(session)
+        }
+        whisperFileTranscriber.onSessionUpdate = { [weak self] session in
+            self?.saveFileTranscriptionSession(session)
+        }
         insertion.onInsertShortcut = { [weak self] in self?.insertLatestOutput() }
         insertion.onUndoShortcut = { [weak self] in self?.undoLastInsertion() }
         rebuildClassifier()
+    }
+
+    func saveFileTranscriptionSession(_ session: FileTranscriptionSession) {
+        let updated = FileTranscriptionSessionStore.upserting(session, into: fileTranscriptionSessions)
+        do {
+            try FileTranscriptionSessionStore.save(updated)
+            fileTranscriptionSessions = updated
+            fileTranscriptionHistoryMessage = nil
+        } catch {
+            fileTranscriptionHistoryMessage = "Couldn’t save this transcript locally: \(error.localizedDescription)"
+        }
+    }
+
+    func deleteFileTranscriptionSession(_ session: FileTranscriptionSession) {
+        let updated = FileTranscriptionSessionStore.deleting(id: session.id, from: fileTranscriptionSessions)
+        do {
+            try FileTranscriptionSessionStore.save(updated)
+            fileTranscriptionSessions = updated
+            fileTranscriptionHistoryMessage = nil
+        } catch {
+            fileTranscriptionHistoryMessage = "Couldn’t delete this transcript: \(error.localizedDescription)"
+        }
+    }
+
+    func clearFileTranscriptionHistory() {
+        do {
+            try FileTranscriptionSessionStore.deleteAll()
+            fileTranscriptionSessions.removeAll()
+            fileTranscriptionHistoryMessage = nil
+        } catch {
+            fileTranscriptionHistoryMessage = "Couldn’t delete saved transcripts: \(error.localizedDescription)"
+        }
     }
 
     func start() {
