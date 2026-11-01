@@ -1,7 +1,7 @@
 # HushKey competitor landscape and product opportunities
 
 **Reviewed:** 2026-11-01  
-**Scope:** Mac voice dictation and transcription products, using their own current product pages, help centers, and source repositories. Features and availability change; this is a product scan, not hands-on testing.
+**Scope:** Mac voice dictation and transcription products, using current product pages, help centers, and source repositories, plus a read-only accessibility-tree inspection of Wispr Flow v1.6.1337 installed on this Mac. This is not a speech-quality benchmark or a full screenshot-backed usability audit. Features and availability change.
 
 ## What the market already offers
 
@@ -21,6 +21,14 @@ The common expectation is now: a global shortcut; insertion at the cursor; usefu
 ## HushKey today
 
 The current app has on-device Apple Speech recognition, configurable start/stop shortcuts, editable output, copy, guarded one-time insertion, local history, microphone/language controls, personal vocabulary and phrase snippets. The Dictation screen adds Natural, Message, Email, Code, and Automatic modes; app-identifier mapping; explicit spoken correction cues with raw-transcript restore; optional transient nearby-text hints; guarded one-step insertion undo; conservative optional filler cleanup; and snippet validation. **Transcribe files** offers Apple on-device Speech or an explicitly downloaded WhisperKit model, editable TXT output, and SRT/WebVTT export. Silent Lab remains a separate, evidence-gated experiment. HushKey still lacks LLM rewriting, voice editing of selected text, meeting capture, and workflow/plugin automation. The manual microphone, second-app insertion, WhisperKit offline, and subtitle-alignment acceptance remains open; see the [testing protocol](TESTING_PROTOCOL.md), [local model evaluation](LOCAL_MODEL_EVALUATION.md), [README](../README.md), and [product plan](PRODUCT_PLAN.md).
+
+## Installed Wispr Flow interface spot check
+
+On 2026-11-01, the installed macOS app identified itself as v1.6.1337. A read-only accessibility-tree inspection exposed these product areas: Dictation/history, Notetaker, Insights, Dictionary, Snippets, Style, Transforms, Scratchpad, and Settings. The Notetaker setup presented a guided tour, calendar connection, past-meeting import, and MCP setup; its notes area had Past notes, Shared with me, and Folders. Dictionary and snippets had search and add flows. Style separated personal, work, email, other, and Auto Cleanup; cleanup offered None, Light, and Medium and described restoring the original dictation. Transforms were opt-in, shortcut-driven, could run automatically after dictation, and included custom transforms. Settings grouped shortcut, microphone, languages, and data/privacy controls.
+
+**What this means for HushKey:** the current HushKey window already uses a persistent native sidebar and puts a visible start action, shortcut, on-device status, editable transcript, copy/insert, and local history on its Dictation screen. Keep that clear first screen and its explicit local/privacy messaging. The largest interface gaps are that snippets and vocabulary live in Settings instead of their own searchable workspace, history lacks search and richer recovery controls, and HushKey has no local transform or meeting workflow. A Wispr-like information hierarchy is feasible; use HushKey's own visual identity and local-first behavior rather than copying Flow branding or proprietary implementation.
+
+This spot check did not start dictation or meeting capture, change a privacy setting, connect a calendar, or inspect any account data for the report. A valid Wispr screenshot could not be captured: the desktop capture showed HushKey in front of Wispr Flow, and the native UI pipe later closed when switching back to HushKey. Findings above are limited to the accessibility tree; they do not establish visual polish, feature behavior, or speech accuracy.
 
 ## What HushKey could offer that matters
 
@@ -49,7 +57,7 @@ Let a user choose **Natural**, **Message**, **Email**, or **Code** before dictat
 
 ### 6. Expand from dictation into transcription when the core is stable
 
-Add drag-and-drop audio/video files, a queue, editable transcripts, and text/SRT/VTT export. Keep it local by default. Meeting recording and automation are later choices, not launch requirements.
+The single-file Apple Speech and WhisperKit paths now exist. Next, finish their manual acceptance and model comparison; only then consider drag-and-drop, queued audio/video, and meeting recording. Keep these local by default.
 
 ### 7. Keep the silent-mouthing experiment as HushKey’s distinctive lane
 
@@ -67,4 +75,4 @@ Do not pursue meetings, cloud providers, cross-device sync, a plugin marketplace
 
 ## Supplied Wispr Flow vs TypeWhisper report
 
-The full dated source report is included at [docs/research/Wispr_Flow_vs_TypeWhisper_Research_Report_2026-11-01.pdf](research/Wispr_Flow_vs_TypeWhisper_Research_Report_2026-11-01.pdf). Its product and licensing claims are a point-in-time scan, not hands-on testing of the apps on this Mac. The [report index](research/README.md) separates the original report from HushKey's implementation notes.
+The full dated source report is included at [docs/research/Wispr_Flow_vs_TypeWhisper_Research_Report_2026-11-01.pdf](research/Wispr_Flow_vs_TypeWhisper_Research_Report_2026-11-01.pdf). Its product and licensing claims are a point-in-time public-source scan; the installed-app spot check above is separate and limited to the visible accessibility tree. The [report index](research/README.md) separates the original report from HushKey's implementation notes.
