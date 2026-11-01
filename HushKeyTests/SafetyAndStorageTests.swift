@@ -67,4 +67,29 @@ final class SafetyAndStorageTests: XCTestCase {
         XCTAssertEqual(restored.templates.first?.condition, .silent)
         XCTAssertEqual(restored.templates.first?.sessionID, sessionID)
     }
+
+    func testDictationHistoryRoundTripsLocally() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appending(path: "hushkey-history-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let entries = [DictationHistoryEntry(text: "A local phrase."), DictationHistoryEntry(text: "Another phrase.")]
+
+        try DictationHistoryStore.save(entries, to: url)
+
+        XCTAssertEqual(DictationHistoryStore.load(from: url), entries)
+    }
+
+    @MainActor
+    func testDictationIsTheFirstScreen() {
+        let model = AppModel()
+        XCTAssertEqual(model.screen, .dictation)
+        XCTAssertFalse(model.audio.isRunning)
+    }
+
+    func testLocalVoiceSnippetsExpandWholeCues() {
+        let result = DictationSnippetExpander.expand(
+            "Send my short intro, please.",
+            definitions: "short intro => Hello team, my name is Rudra.")
+        XCTAssertEqual(result, "Send my Hello team, my name is Rudra, please.")
+    }
 }

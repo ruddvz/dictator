@@ -87,12 +87,16 @@ struct SetupView: View {
     }
 
     private var studyPathCard: some View {
-        GroupBox("Study path") {
+        let trained = model.dataset.vocabulary.count >= 5 &&
+            model.dataset.vocabulary.allSatisfy { model.templateCount(for: $0, condition: .silent) >= 10 }
+        let connected = model.motion.status == .streaming
+        let passed = model.isMotionInferenceEnabled
+        return GroupBox("Study path") {
             VStack(alignment: .leading, spacing: 13) {
-                StudyStep(number: "1", title: "Check motion", detail: "Connect compatible headphones as the Mac’s sound output.", state: model.motion.status == .streaming ? .done : .current)
-                StudyStep(number: "2", title: "Train words", detail: "Collect 10 examples each for at least 5 words.", state: model.motion.status == .streaming ? .current : .next)
-                StudyStep(number: "3", title: "Evaluate", detail: "Compare with chance and a separate session.", state: .next)
-                StudyStep(number: "4", title: "Try Use", detail: "Silent decoding unlocks only if the evidence passes.", state: .next)
+                StudyStep(number: "1", title: "Check motion", detail: connected ? "A live headphone-motion stream is arriving." : "Connect compatible headphones as the Mac’s sound output.", state: connected ? .done : .current)
+                StudyStep(number: "2", title: "Train words", detail: trained ? "The silent set has 10 takes each for at least 5 words." : "Collect 10 takes each for at least 5 words.", state: trained ? .done : connected ? .current : .next)
+                StudyStep(number: "3", title: "Evaluate", detail: passed ? "The held-out silent result passes the evidence checks." : "Run the significance and separate-session checks.", state: passed ? .done : trained ? .current : .next)
+                StudyStep(number: "4", title: "Try Silent Use", detail: passed ? "Experimental silent decoding is available." : "Silent decoding unlocks only if every evidence check passes.", state: passed ? .done : .next)
             }
             .padding(8)
             .frame(maxWidth: .infinity, minHeight: 188, alignment: .topLeading)

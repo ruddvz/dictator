@@ -112,7 +112,7 @@ final class TextInsertionService {
             self?.onInsertShortcut?()
         }
         status = result == noErr
-            ? "Enabled. Focus a supported text field in another app, then press \(shortcut.label)."
+            ? "Enabled. Focus a supported text field in another app, then press \(shortcut.label) to insert the current output once."
             : "Could not register \(shortcut.label) (system status \(result))."
     }
 

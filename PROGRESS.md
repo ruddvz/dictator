@@ -19,9 +19,18 @@
 - End-to-end audit: all 10 automated tests pass; the Release app builds, packages, and verifies. Setup now offers direct Bluetooth and Sound settings actions when no headphone-motion stream is present. Removed stale HushKey Debug/Release app bundles from Xcode DerivedData; Spotlight now resolves only the packaged app.
 - Live hardware check found the AirPods are not connected and MacBook Pro Speakers are the selected output. HushKey therefore has no live motion samples and correctly stays in Setup; decoding, live capture, and insertion could not be hardware-validated in this state.
 
-## Next item — AirPods hardware validation
+## Completed — 2026-11-01 (Dictation UX)
 
-In a fresh session, connect the user's compatible headphones in Bluetooth, select them as the Mac's active audio output, grant Motion permission if prompted, verify a live sample stream, and run the study in [docs/TESTING_PROTOCOL.md](docs/TESTING_PROTOCOL.md). The exact AirPods generation remains unverified.
+- Made Voice & Whisper dictation the launch screen; starting the app no longer asks for Motion permission. Motion streaming starts only when a Silent Lab screen is opened and stops when the user leaves that lab.
+- Added global hold-to-talk and press-to-toggle dictation, editable phrase transcription, copy and safe phrase insertion, local recent history, on-device language selection, personal vocabulary hints/snippets, microphone selection, and shortcut controls in the menu bar and Settings.
+- Fixed distinct global shortcut IDs so dictation and insertion hotkeys do not call each other's actions. Made insertion one-time per dictation to prevent duplicates.
+- Moved voice recognition out of Use diagnostics. Silent Lab now has dynamic study progress, honest auto-capture lock copy, and result colors reflect every evidence check.
+- Updated README and product plan with the actual flows and limits. No cloud rewrite, app-specific styles, snippets, workflow plugins, or language picker are included yet.
+- `xcodebuild ... test`: 12 tests passed. Release package built; source-level build succeeded. The app's Dictation screen rendered in the on-screen window capture.
+
+## Next item — voice dictation acceptance check
+
+In a fresh session, confirm microphone and Speech permissions, dictate a short voice phrase and a whispered phrase, edit/copy/insert into TextEdit, then repeat with another frontmost app. Confirm local history and the new global shortcuts. No AirPods motion validation is part of this next step.
 
 ## Naming note
 

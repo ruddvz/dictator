@@ -21,8 +21,8 @@ targets:
         CFBundleDisplayName: HushKey
         LSApplicationCategoryType: public.app-category.productivity
         NSMotionUsageDescription: HushKey reads processed head motion from compatible headphones for local silent-mouthing experiments.
-        NSMicrophoneUsageDescription: HushKey records microphone audio only when you start a local comparison session.
-        NSSpeechRecognitionUsageDescription: HushKey uses on-device speech recognition only when available, as a local comparison reference.
+        NSMicrophoneUsageDescription: HushKey listens only when you start local dictation or an experiment recording.
+        NSSpeechRecognitionUsageDescription: HushKey recognizes speech on this Mac only when on-device recognition is available.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ruddvz.hushkey

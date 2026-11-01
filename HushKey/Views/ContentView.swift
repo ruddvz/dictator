@@ -6,7 +6,11 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             List(selection: screenSelection) {
-                Section("STUDY") {
+                Section("WRITE") {
+                    Label(AppModel.Screen.dictation.rawValue, systemImage: AppModel.Screen.dictation.symbol)
+                        .tag(AppModel.Screen.dictation)
+                }
+                Section("SILENT LAB") {
                     ForEach([AppModel.Screen.setup, .train, .evaluate, .use]) { screen in
                         Label(screen.rawValue, systemImage: screen.symbol).tag(screen)
                     }
@@ -20,6 +24,7 @@ struct ContentView: View {
             .navigationSplitViewColumnWidth(min: 160, ideal: 180)
         } detail: {
             switch model.screen {
+            case .dictation: DictationView()
             case .setup: SetupView()
             case .train: TrainView()
             case .evaluate: EvaluateView()

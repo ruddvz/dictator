@@ -63,6 +63,9 @@ final class HeadphoneMotionService {
     func stop() {
         manager.stopDeviceMotionUpdates()
         manager.stopConnectionStatusUpdates()
+        isConnected = false
+        sampleRate = 0
+        status = .waiting
     }
 
     func connectionChanged(_ connected: Bool) {

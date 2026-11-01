@@ -24,7 +24,6 @@ struct UseView: View {
                 DisclosureGroup("Advanced diagnostics and comparison") {
                     VStack(alignment: .leading, spacing: 14) {
                         lastPredictionPanel
-                        micPanel
                     }
                     .padding(.top, 10)
                 }
@@ -124,8 +123,14 @@ struct UseView: View {
                         isEnabled: model.isMotionInferenceEnabled && model.motion.status == .streaming,
                         onBegin: capture.begin,
                         onEnd: capture.end)
-                } else {
+                } else if model.isMotionInferenceEnabled && model.motion.status == .streaming {
                     autoControls
+                } else {
+                    Label("Auto capture is locked until silent-motion evidence passes and a live motion stream is available.",
+                          systemImage: "lock.shield")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 DisclosureGroup("Advanced detection thresholds") {
@@ -252,31 +257,4 @@ struct UseView: View {
         }
     }
 
-    private var micPanel: some View {
-        GroupBox("Optional on-device speech reference") {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Button(model.audio.isRunning ? "Stop Mic" : "Start Mic") {
-                        Task { await model.toggleMic() }
-                    }
-                    LevelMeter(value: Double(model.audio.level))
-                    Button("Clear", action: model.transcriber.clear)
-                }
-                Text(model.transcriber.text.isEmpty ? "Speak or whisper to compare against the motion decoder." : model.transcriber.text)
-                    .foregroundStyle(model.transcriber.text.isEmpty ? .secondary : .primary)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, minHeight: 60, alignment: .topLeading)
-                if model.transcriber.isRunning {
-                    Text("On-device recognition")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                if let error = model.audio.error ?? model.transcriber.error {
-                    Text(error).font(.caption).foregroundStyle(.red)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(6)
-        }
-    }
 }

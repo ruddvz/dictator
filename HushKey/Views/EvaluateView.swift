@@ -183,7 +183,7 @@ private struct EvaluationResultView: View {
                 }
                 Text(verdict)
                     .font(.callout.weight(.medium))
-                    .foregroundStyle(passesPermutation ? .green : .orange)
+                    .foregroundStyle(passesAllChecks ? .green : .orange)
                 DisclosureGroup("Confusion matrix · \(result.templateCount) examples") {
                     confusionMatrix
                         .padding(.top, 10)
@@ -220,6 +220,15 @@ private struct EvaluationResultView: View {
     }
 
     private var passesPermutation: Bool { result.pValue < 0.05 }
+
+    private var passesAllChecks: Bool {
+        guard result.templateCount >= 50,
+              result.accuracy > result.chance,
+              passesPermutation,
+              let holdout = result.sessionHoldoutAccuracy,
+              let baseline = result.sessionHoldoutChance else { return false }
+        return holdout > baseline
+    }
 
     private var verdict: String {
         guard result.accuracy > result.chance else {

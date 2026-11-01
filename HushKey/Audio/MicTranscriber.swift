@@ -2,7 +2,7 @@ import AVFoundation
 import Observation
 import Speech
 
-/// On-device speech-to-text reference. Recognition stays off when macOS cannot run it locally.
+/// On-device dictation. Recognition stays off when macOS cannot run it locally.
 @MainActor @Observable
 final class MicTranscriber {
     private(set) var isRunning = false
@@ -10,7 +10,7 @@ final class MicTranscriber {
     private(set) var isOnDevice = false
     private(set) var error: String?
 
-    @ObservationIgnored private let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
+    @ObservationIgnored private var recognizer: SFSpeechRecognizer?
     @ObservationIgnored private let box = RequestBox()
     @ObservationIgnored private var task: SFSpeechRecognitionTask?
     @ObservationIgnored private var sinkID: UUID?
@@ -18,8 +18,8 @@ final class MicTranscriber {
     @ObservationIgnored private var finalized = ""
     @ObservationIgnored private var generation = 0
 
-    func start(sink: AudioSink) async {
-        guard !isRunning else { return }
+    func start(sink: AudioSink, localeIdentifier: String = "en-US", contextualStrings: [String] = []) async -> Bool {
+        guard !isRunning else { return true }
         error = nil
 
         let status = await withCheckedContinuation { continuation in
@@ -27,17 +27,21 @@ final class MicTranscriber {
         }
         guard status == .authorized else {
             error = "Speech recognition not authorized."
-            return
+            return false
         }
+        let recognizer = SFSpeechRecognizer(locale: Locale(identifier: localeIdentifier))
+        self.recognizer = recognizer
         guard let recognizer, recognizer.isAvailable, recognizer.supportsOnDeviceRecognition else {
-            error = "On-device speech recognition is unavailable for this language or macOS version. No audio was sent for remote recognition."
-            return
+            error = "On-device speech recognition is unavailable for \(localeIdentifier) on this Mac. No audio was sent for remote recognition."
+            return false
         }
 
         self.sink = sink
         sinkID = sink.add { [box] buffer, _ in box.append(buffer) }
         isRunning = true
+        self.contextualStrings = Array(contextualStrings.prefix(100))
         startTask()
+        return true
     }
 
     func stop() {
@@ -55,6 +59,12 @@ final class MicTranscriber {
         text = ""
     }
 
+    func replaceText(_ value: String) {
+        guard !isRunning else { return }
+        finalized = value
+        text = value
+    }
+
     private func startTask() {
         guard isRunning, let recognizer else { return }
         generation += 1
@@ -64,23 +74,28 @@ final class MicTranscriber {
         request.addsPunctuation = true
         isOnDevice = true
         request.requiresOnDeviceRecognition = true
+        request.contextualStrings = contextualStrings
         box.set(request)
 
         task?.cancel()
         task = recognizer.recognitionTask(with: request, resultHandler: Self.resultHandler(owner: self, generation: generation))
     }
 
-    private func handle(generation: Int, partial: String?, isFinal: Bool, failed: Bool) {
+    @ObservationIgnored private var contextualStrings: [String] = []
+
+    private func handle(generation: Int, partial: String?, isFinal: Bool, failure: String?) {
         guard generation == self.generation, isRunning else { return }
         if let partial {
             text = finalized + partial
+            error = nil
         }
-        if isFinal || failed {
+        if isFinal || failure != nil {
             if let partial, !partial.isEmpty { finalized += partial + " " }
             text = finalized
+            if let failure { error = "Speech recognition issue: \(failure)" }
             // Recognition tasks end on silence/timeout; keep listening with a fresh one.
             Task { @MainActor [weak self] in
-                try? await Task.sleep(for: .milliseconds(failed ? 500 : 50))
+                try? await Task.sleep(for: .milliseconds(failure != nil ? 500 : 50))
                 self?.startTask()
             }
         }
@@ -92,9 +107,9 @@ final class MicTranscriber {
         { [weak owner] result, error in
             let partial = result?.bestTranscription.formattedString
             let isFinal = result?.isFinal ?? false
-            let failed = error != nil
+            let failure = error?.localizedDescription
             Task { @MainActor in
-                owner?.handle(generation: generation, partial: partial, isFinal: isFinal, failed: failed)
+                owner?.handle(generation: generation, partial: partial, isFinal: isFinal, failure: failure)
             }
         }
     }

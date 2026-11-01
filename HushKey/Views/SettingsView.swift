@@ -10,8 +10,9 @@ struct SettingsView: View {
                 PageHeader(
                     eyebrow: "Manage",
                     title: "Settings & data",
-                    subtitle: "Optional recording, shortcuts, insertion, and local files stay separate from the core motion experiment.")
+                    subtitle: "Set up local dictation, safe text insertion, and the separate silent-mouthing experiment.")
 
+                DictationSettingsCard()
                 ShortcutSettingsCard()
                 TextInsertionSettingsCard()
                 MicrophoneCard()
@@ -21,6 +22,70 @@ struct SettingsView: View {
             .frame(maxWidth: 920, alignment: .leading)
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+    }
+}
+
+private struct DictationSettingsCard: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        @Bindable var model = model
+        GroupBox("Voice & whisper dictation") {
+            VStack(alignment: .leading, spacing: 10) {
+                Picker("On-device speech language", selection: $model.dictationLanguage) {
+                    ForEach(DictationLanguage.onDevice) { language in
+                        Text(language.name).tag(language.identifier)
+                    }
+                    if !DictationLanguage.onDevice.contains(where: { $0.identifier == model.dictationLanguage }) {
+                        Text(Locale.current.localizedString(forIdentifier: model.dictationLanguage) ?? model.dictationLanguage)
+                            .tag(model.dictationLanguage)
+                    }
+                }
+                .frame(maxWidth: 340, alignment: .leading)
+                Text("Only languages supported for on-device recognition on this Mac appear here. No remote fallback is used.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Picker("Start or stop dictation", selection: $model.dictationShortcut) {
+                    ForEach(DictationShortcut.allCases) { Text($0.label).tag($0) }
+                }
+                .frame(maxWidth: 280, alignment: .leading)
+                Picker("Shortcut behavior", selection: $model.dictationCaptureBehavior) {
+                    ForEach(DictationCaptureBehavior.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 360)
+                Text(model.dictationShortcutStatus)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Text("Personal vocabulary")
+                    .font(.callout.weight(.medium))
+                TextEditor(text: $model.dictationTerms)
+                    .font(.body)
+                    .frame(height: 72)
+                    .padding(4)
+                    .background(.background, in: RoundedRectangle(cornerRadius: 8))
+                Text("Add names or special terms, separated by commas or new lines. HushKey passes these as local recognition hints; spelling is not guaranteed.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("Voice snippets")
+                    .font(.callout.weight(.medium))
+                TextEditor(text: $model.dictationSnippets)
+                    .font(.body.monospaced())
+                    .frame(height: 74)
+                    .padding(4)
+                    .background(.background, in: RoundedRectangle(cornerRadius: 8))
+                Text("One per line: spoken cue => expanded phrase. HushKey expands complete cue matches locally when you stop dictating.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Toggle("Save recent transcripts on this Mac", isOn: $model.savesDictationHistory)
+                Text("Turn this off to stop adding new dictations to history. Clear saved text from the Dictation screen.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(8)
         }
     }
 }
@@ -67,7 +132,7 @@ private struct TextInsertionSettingsCard: View {
                 Label(insertion.status, systemImage: insertion.isEnabled ? "checkmark.shield" : "lock.shield")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Text("When enabled, the shortcut inserts only the latest accepted word into a supported text field in the frontmost app. Password fields are rejected; the clipboard is not used. Use is disabled until the study passes its evidence checks.")
+                Text("When enabled, the insertion shortcut adds your reviewed voice transcript, or the latest accepted silent word, to a supported text field in the frontmost app. Password fields are rejected. Explicit insertion does not use the clipboard. Silent Use still needs evidence to unlock.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -82,7 +147,7 @@ private struct MicrophoneCard: View {
 
     var body: some View {
         @Bindable var audio = model.audio
-        GroupBox("Optional on-device speech reference") {
+        GroupBox("Microphone input") {
             VStack(alignment: .leading, spacing: 10) {
                 Picker("Input", selection: $audio.selectedDeviceID) {
                     Text("System default").tag(AudioDeviceID?.none)
@@ -91,9 +156,6 @@ private struct MicrophoneCard: View {
                     }
                 }
                 HStack {
-                    Button(audio.isRunning ? "Stop microphone" : "Start microphone") {
-                        Task { await model.toggleMic() }
-                    }
                     Button("Refresh inputs", systemImage: "arrow.clockwise") { audio.refreshDevices() }
                     LevelMeter(value: Double(audio.level))
                 }
@@ -105,7 +167,7 @@ private struct MicrophoneCard: View {
                 if let error = audio.error ?? model.transcriber.error {
                     Text(error).font(.caption).foregroundStyle(.red)
                 }
-                Text("Recognition uses macOS on-device speech only. Audio is not saved unless a session recording is active. Choosing AirPods as the microphone may reduce playback quality.")
+                Text("Choose an input here, then start dictation from the Dictation screen. Recognition stays on this Mac when on-device speech is available; dictation audio is not saved. The separate research recorder saves audio only when you explicitly start a session.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

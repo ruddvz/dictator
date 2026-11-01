@@ -11,14 +11,16 @@ struct DecodedWord: Identifiable, Hashable {
 @MainActor @Observable
 final class AppModel {
     enum Screen: String, CaseIterable, Identifiable {
+        case dictation = "Dictation"
         case setup = "Setup"
         case train = "Train"
         case evaluate = "Evaluate"
-        case use = "Use"
+        case use = "Silent Use"
         case settings = "Settings & Data"
         var id: String { rawValue }
         var symbol: String {
             switch self {
+            case .dictation: "mic"
             case .setup: "headphones"
             case .train: "square.stack.3d.up"
             case .evaluate: "chart.bar.xaxis"
@@ -35,8 +37,11 @@ final class AppModel {
     let capture = CaptureController()
     let recorder = SessionRecorder()
 
-    var screen: Screen = .setup {
-        didSet { syncCaptureMode() }
+    var screen: Screen = .dictation {
+        didSet {
+            syncCaptureMode()
+            updateMotionActivity()
+        }
     }
 
     // MARK: Training
@@ -64,6 +69,37 @@ final class AppModel {
         didSet { UserDefaults.standard.set(captureShortcut.rawValue, forKey: CaptureShortcut.preferenceKey) }
     }
 
+    var dictationShortcut: DictationShortcut = DictationShortcut(
+        rawValue: UserDefaults.standard.string(forKey: DictationShortcut.preferenceKey) ?? "") ?? .default {
+        didSet {
+            UserDefaults.standard.set(dictationShortcut.rawValue, forKey: DictationShortcut.preferenceKey)
+            if started { installDictationShortcut() }
+        }
+    }
+    var dictationCaptureBehavior: DictationCaptureBehavior = DictationCaptureBehavior(
+        rawValue: UserDefaults.standard.string(forKey: DictationCaptureBehavior.preferenceKey) ?? "") ?? .hold {
+        didSet {
+            UserDefaults.standard.set(dictationCaptureBehavior.rawValue, forKey: DictationCaptureBehavior.preferenceKey)
+            if started { installDictationShortcut() }
+        }
+    }
+    private(set) var dictationShortcutStatus = "Shortcut is not registered yet."
+    var dictationTerms = UserDefaults.standard.string(forKey: "dictationTerms") ?? "" {
+        didSet { UserDefaults.standard.set(dictationTerms, forKey: "dictationTerms") }
+    }
+    var dictationSnippets = UserDefaults.standard.string(forKey: "dictationSnippets") ?? "" {
+        didSet { UserDefaults.standard.set(dictationSnippets, forKey: "dictationSnippets") }
+    }
+    var dictationLanguage = UserDefaults.standard.string(forKey: "dictationLanguage") ?? "en-US" {
+        didSet { UserDefaults.standard.set(dictationLanguage, forKey: "dictationLanguage") }
+    }
+    var savesDictationHistory = UserDefaults.standard.object(forKey: "saveDictationHistory") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(savesDictationHistory, forKey: "saveDictationHistory") }
+    }
+    private(set) var dictationHistory: [DictationHistoryEntry] = DictationHistoryStore.load()
+    private(set) var didInsertCurrentDictation = false
+    @ObservationIgnored private var lastSavedDictationText: String?
+
     // MARK: Decoding
 
     var useCaptureMode: CaptureController.Mode = .hold {
@@ -76,11 +112,14 @@ final class AppModel {
     private(set) var lastInsertedPredictionID: UUID?
 
     @ObservationIgnored private var keyMonitor: Any?
+    @ObservationIgnored private let dictationHotKey = GlobalHotKeyRegistration(id: 2)
     @ObservationIgnored private var started = false
+    @ObservationIgnored private var motionStarted = false
+    @ObservationIgnored private var dictationShortcutHeld = false
 
     init() {
         selectedWord = dataset.vocabulary.first
-        insertion.onInsertShortcut = { [weak self] in self?.insertLatestPrediction() }
+        insertion.onInsertShortcut = { [weak self] in self?.insertLatestOutput() }
         rebuildClassifier()
     }
 
@@ -89,9 +128,10 @@ final class AppModel {
         started = true
         motion.onSample = { [weak self] sample in self?.ingest(sample) }
         capture.onSegment = { [weak self] segment in self?.handleSegment(segment) }
-        motion.start()
         audio.refreshDevices()
         installKeyMonitor()
+        installDictationShortcut()
+        updateMotionActivity()
     }
 
     private func ingest(_ sample: MotionSample) {
@@ -101,6 +141,18 @@ final class AppModel {
 
     private func syncCaptureMode() {
         capture.autoEnabled = isMotionInferenceEnabled && screen == .use && useCaptureMode == .auto
+    }
+
+    private func updateMotionActivity() {
+        guard started else { return }
+        let needsMotion = [.setup, .train, .evaluate, .use].contains(screen)
+        if needsMotion && !motionStarted {
+            motionStarted = true
+            motion.start()
+        } else if !needsMotion && motionStarted {
+            motion.stop()
+            motionStarted = false
+        }
     }
 
     private func handleSegment(_ segment: [MotionSample]) {
@@ -126,7 +178,7 @@ final class AppModel {
                               label: prediction.best?.label ?? "", confidence: prediction.confidence)
         case .settings:
             recorder.logEvent(segment, kind: "segment", label: recorder.prompt, confidence: nil)
-        case .setup, .evaluate:
+        case .dictation, .setup, .evaluate:
             if recorder.isRecording {
                 recorder.logEvent(segment, kind: "segment", label: recorder.prompt, confidence: nil)
             }
@@ -162,6 +214,7 @@ final class AppModel {
         switch screen {
         case .train: return selectedWord != nil && motion.status == .streaming
         case .use: return useCaptureMode == .hold && isMotionInferenceEnabled && classifier != nil
+        case .dictation: return false
         case .settings: return false
         case .setup, .evaluate: return false
         }
@@ -318,15 +371,136 @@ final class AppModel {
         if insertion.insert(word.text) { lastInsertedPredictionID = word.id }
     }
 
-    // MARK: Mic
-
-    func toggleMic() async {
-        if audio.isRunning {
-            transcriber.stop()
-            audio.stop()
+    func insertLatestOutput() {
+        if screen == .dictation {
+            insertDictationText()
         } else {
-            await audio.start()
-            if audio.isRunning { await transcriber.start(sink: audio.sink) }
+            insertLatestPrediction()
         }
     }
+
+    func insertDictationText() {
+        let text = transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else {
+            insertion.report("Dictate something first.")
+            return
+        }
+        guard !didInsertCurrentDictation else {
+            insertion.report("This transcript was already inserted once.")
+            return
+        }
+        if insertion.insert(text) { didInsertCurrentDictation = true }
+    }
+
+    func copyDictationText() {
+        let text = transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        insertion.report("Transcript copied to the clipboard.")
+    }
+
+    func startNewDictation() async {
+        if audio.isRunning {
+            stopDictation()
+        }
+        saveCurrentDictation()
+        screen = .dictation
+        transcriber.clear()
+        didInsertCurrentDictation = false
+        lastSavedDictationText = nil
+        await startDictation()
+    }
+
+    func toggleDictation() async {
+        if audio.isRunning {
+            stopDictation()
+        } else {
+            await startNewDictation()
+        }
+    }
+
+    func clearDictationHistory() {
+        dictationHistory.removeAll()
+        DictationHistoryStore.save(dictationHistory)
+        if !audio.isRunning {
+            transcriber.clear()
+            lastSavedDictationText = nil
+            didInsertCurrentDictation = false
+        }
+    }
+
+    func restoreDictation(_ entry: DictationHistoryEntry) {
+        guard !audio.isRunning else { return }
+        transcriber.replaceText(entry.text)
+        didInsertCurrentDictation = false
+        lastSavedDictationText = entry.text
+        screen = .dictation
+    }
+
+    private func startDictation() async {
+        await audio.start()
+        guard audio.isRunning else { return }
+        let customWords = dictationTerms
+            .split(whereSeparator: { $0 == "," || $0.isNewline })
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        let started = await transcriber.start(sink: audio.sink, localeIdentifier: dictationLanguage,
+                                              contextualStrings: Array(Set(dataset.vocabulary + customWords)))
+        if !started { audio.stop() }
+    }
+
+    private func stopDictation() {
+        transcriber.stop()
+        audio.stop()
+        transcriber.replaceText(DictationSnippetExpander.expand(transcriber.text, definitions: dictationSnippets))
+        saveCurrentDictation()
+    }
+
+    private func saveCurrentDictation() {
+        let text = transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard savesDictationHistory, !text.isEmpty, text != lastSavedDictationText else { return }
+        let entry = DictationHistoryEntry(text: text)
+        dictationHistory.insert(entry, at: 0)
+        dictationHistory = Array(dictationHistory.prefix(50))
+        lastSavedDictationText = text
+        DictationHistoryStore.save(dictationHistory)
+    }
+
+    private func installDictationShortcut() {
+        let status: OSStatus
+        switch dictationCaptureBehavior {
+        case .hold:
+            status = dictationHotKey.registerHold(keyCode: dictationShortcut.keyCode,
+                                                  modifiers: dictationShortcut.carbonModifiers) { [weak self] pressed in
+                guard let self else { return }
+                if pressed { self.beginShortcutDictation() } else { self.endShortcutDictation() }
+            }
+        case .toggle:
+            status = dictationHotKey.register(keyCode: dictationShortcut.keyCode,
+                                              modifiers: dictationShortcut.carbonModifiers) { [weak self] in
+                Task { @MainActor in await self?.toggleDictation() }
+            }
+        }
+        dictationShortcutStatus = status == noErr
+            ? dictationCaptureBehavior == .hold
+                ? "Hold \(dictationShortcut.label) to dictate from any app; release to stop."
+                : "Press \(dictationShortcut.label) to start or stop local dictation from any app."
+            : "Could not register \(dictationShortcut.label) (system status \(status))."
+    }
+
+    private func beginShortcutDictation() {
+        guard !dictationShortcutHeld, !audio.isRunning else { return }
+        dictationShortcutHeld = true
+        Task { @MainActor in
+            await startNewDictation()
+            if !dictationShortcutHeld, audio.isRunning { stopDictation() }
+        }
+    }
+
+    private func endShortcutDictation() {
+        dictationShortcutHeld = false
+        if audio.isRunning { stopDictation() }
+    }
+
 }
