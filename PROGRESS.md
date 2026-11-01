@@ -116,6 +116,23 @@ In a fresh session, use the app with the user present to accept Microphone, Spee
 
 With the user present, verify packaged dictation, whisper, shortcut, history, insertion/undo, file transcription, and microphone-only Meeting notes. Then decide whether to add optional system-audio capture for calls; it needs a clear source picker and a separate just-in-time macOS recording permission. Keep voice editing and workflow automation behind those acceptance checks.
 
+## Completed — local dictation eval harness
+
+- Added a StarHarness-style eval with separate `dev` and `holdout` splits under [Fixtures/eval](Fixtures/eval/README.md). StarHarness itself was not run, and no remote model or service is used.
+- Deterministic processor checks (43 cases: code tokens, line breaks, spoken corrections, snippets, filler cleanup) run in `xcodebuild test` and fail CI on any regression. Intended behavior that is not built yet is marked `knownGap` and reported, not gated. A split-disjointness test guards against leaked cases.
+- `./Scripts/eval.sh` runs each clip through the app's `LocalFileTranscriber` (Apple on-device Speech) and any WhisperKit model already downloaded in HushKey via `WhisperKitFileTranscriber`, then through `DictationTranscriptProcessor` in Natural, Message, Email, and Code. It writes [docs/eval/report.md](docs/eval/report.md) and `report.json`. Audio scores are reported only.
+- No consented recordings exist yet. The first numbers use local macOS text-to-speech clips (voice Samantha, not committed), which are cleaner than real speech, so WER is optimistic.
+- First numbers, 2026-11-01:
+  - Processor: dev 20/25 passed, holdout 12/18 passed, 0 regressions. The 11 known gaps are mostly Code-mode spacing (`user. id`, `print (name)`, `- - verbose`), "new line" replaced inside "new line of credit", "at" not accepted before a correction, and no capitalization after filler removal.
+  - Apple Speech (en-US, on-device, 14 synthetic clips): WER dev 9.0%, holdout 7.8%; real-time factor about 0.06×. Per-mode checks: dev Natural 10/13, Message 2/2, Email 2/2, Code 4/4; holdout Natural 4/6, Message 2/2, Email 4/4, Code 2/4.
+  - WhisperKit: skipped. No model is downloaded in HushKey, and the harness does not download one.
+- Audio findings: Apple Speech applies "new line", "new paragraph", underscore, and parentheses itself in every mode, so Natural cannot keep "new line" literal. It also omits the comma before "actually", so spoken corrections did not trigger on audio.
+- `xcodebuild test`: 37 tests, 0 failures, 1 skipped (the report test, which runs only from `Scripts/eval.sh`). In the first full run before this change, `testFoundationModelTransformRunsLocallyWhenAvailable` crashed with signal TERM. It passed when re-run alone and in later full runs, so it appears flaky.
+
+## Next item — consented recordings and processor gaps
+
+Record the 14 clip references as consented audio in `Fixtures/eval/<split>/audio/` with the user and rerun `./Scripts/eval.sh` for real-speech WER. Optionally download a WhisperKit model in the app to add a second engine. Then fix dev known gaps against the dev split only, and confirm holdout aggregates do not drop.
+
 ## Naming note
 
 The private prototype keeps the requested HushKey name. A distinct public macOS silent-dictation project already uses that name: https://github.com/amirrsyed/hushkey. Choose a different public product name before any public release.
