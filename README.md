@@ -36,14 +36,14 @@ xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build te
 
 HushKey opens as a normal Mac app window and also offers a menu-bar shortcut. Voice dictation does not require AirPods or Motion permission. To try the Silent Lab, open **Setup**, connect compatible headphones, choose them as the Mac's active audio output, and check for a live stream. If Motion access is denied, change it in **System Settings → Privacy & Security → Motion**.
 
-The packaged app is at `dist/HushKey.app`. Xcode's local test/build output uses `.build`; the packaging script clears stale Debug/Release app copies and builds in a temporary directory, leaving one HushKey app to open.
+The packaged app is at `dist/HushKey.app`. The packaging script builds in an isolated temporary directory and replaces only this app bundle; it leaves other Xcode build products untouched.
 
 ## Dictation flow
 
 1. Use **Start dictation**, hold the configurable global shortcut (`⌥⇧D` by default), or choose press-to-toggle in **Settings & Data**. The shortcut works from any app; HushKey listens only while dictation is active.
 2. Choose a writing mode. **Automatic** maps common email, messaging, and code apps when the global shortcut starts dictation; **Code** formats spoken symbols, while Message and Email support spoken line breaks. Corrections such as “scratch that” are applied only with an explicit pause cue.
 3. Stop when you’re finished. Edit the recognized phrase, restore the original recognition if needed, then **Copy text** or enable Accessibility and choose **Insert into current app**. The insertion shortcut (`⌥⇧I` by default) inserts the current output once into the focused supported field. Press `⌥⇧U` immediately in that same unchanged field to undo.
-4. Reload a recent transcript from the local history list. Add names or uncommon words under **Settings & Data → Personal vocabulary** to provide local recognition hints. Add `spoken cue => expanded phrase` lines to expand snippets when you stop dictating.
+4. Search recent transcripts and restore either the processed text or original recognition. Add names under **Snippets & Vocabulary → Vocabulary** for local recognition hints. Add a spoken cue and expanded phrase under **Snippets & Vocabulary → Snippets**.
 
 ## Silent Lab
 

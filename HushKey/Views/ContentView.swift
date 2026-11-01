@@ -18,6 +18,8 @@ struct ContentView: View {
                     }
                 }
                 Section("MANAGE") {
+                    Label(AppModel.Screen.personalization.rawValue, systemImage: AppModel.Screen.personalization.symbol)
+                        .tag(AppModel.Screen.personalization)
                     Label(AppModel.Screen.settings.rawValue, systemImage: AppModel.Screen.settings.symbol)
                         .tag(AppModel.Screen.settings)
                 }
@@ -32,6 +34,7 @@ struct ContentView: View {
             case .train: TrainView()
             case .evaluate: EvaluateView()
             case .use: UseView()
+            case .personalization: PersonalizationView()
             case .settings: SettingsView()
             }
         }

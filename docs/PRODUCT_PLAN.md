@@ -57,6 +57,7 @@ Make ordinary voice and whispered dictation usable locally on a Mac, while keepi
 - **Completed:** add global start/stop dictation, live local transcription, transcript editing, copy, safe phrase insertion, recent local history, and personal vocabulary hints.
 - **Completed:** add five local writing modes, common app mapping, explicit spoken correction with raw restore, optional transient nearby terms, and a focus-checked insertion undo shortcut.
 - **Completed:** add conservative optional filler cleanup, snippet-line validation, Apple on-device audio-file transcription, and downloadable WhisperKit model selection with local storage and TXT/SRT/WebVTT export.
+- **Completed:** add a searchable Snippets & Vocabulary workspace, searchable transcript history, and processed/raw restore actions; package only this app without deleting unrelated Xcode outputs.
 - **Completed:** defer Motion access until the Silent Lab opens; display live state and avoid presenting a failed evidence result as a pass.
 - **Next:** complete manual acceptance of microphone/Speech, normal voice and whisper, global shortcuts, TextEdit and a second-app insertion/undo, history, and both file engines. Then compare Apple Speech and WhisperKit on consented local sample audio before recommending a default model. Meeting workflows remain deferred until this acceptance passes.
 

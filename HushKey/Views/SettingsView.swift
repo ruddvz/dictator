@@ -124,33 +124,15 @@ private struct DictationSettingsCard: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                Text("Personal vocabulary")
-                    .font(.callout.weight(.medium))
-                TextEditor(text: $model.dictationTerms)
-                    .font(.body)
-                    .frame(height: 72)
-                    .padding(4)
-                    .background(.background, in: RoundedRectangle(cornerRadius: 8))
-                Text("Add names or special terms, separated by commas or new lines. HushKey passes these as local recognition hints; spelling is not guaranteed.")
+                Button {
+                    model.screen = .personalization
+                } label: {
+                    Label("Manage vocabulary and snippets", systemImage: "text.badge.plus")
+                }
+                .buttonStyle(.bordered)
+                Text("Add recognition hints and reusable phrases in one searchable workspace.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Text("Voice snippets")
-                    .font(.callout.weight(.medium))
-                TextEditor(text: $model.dictationSnippets)
-                    .font(.body.monospaced())
-                    .frame(height: 74)
-                    .padding(4)
-                    .background(.background, in: RoundedRectangle(cornerRadius: 8))
-                Text("One per line: spoken cue => expanded phrase. HushKey expands complete cue matches locally when you stop dictating.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                let validation = DictationSnippetExpander.validation(for: model.dictationSnippets)
-                Label(validation.invalidLines.isEmpty
-                      ? "\(validation.validCount) snippet\(validation.validCount == 1 ? "" : "s") ready"
-                      : "\(validation.validCount) ready · fix line\(validation.invalidLines.count == 1 ? "" : "s") \(validation.invalidLines.map(String.init).joined(separator: ", "))",
-                      systemImage: validation.invalidLines.isEmpty ? "checkmark.circle" : "exclamationmark.circle")
-                    .font(.caption)
-                    .foregroundStyle(validation.invalidLines.isEmpty ? Color.secondary : Color.orange)
                 Toggle("Save recent transcripts on this Mac", isOn: $model.savesDictationHistory)
                 Text("Turn this off to stop adding new dictations to history. Clear saved text from the Dictation screen.")
                     .font(.caption)

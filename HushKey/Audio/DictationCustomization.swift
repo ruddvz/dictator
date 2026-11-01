@@ -274,3 +274,22 @@ enum DictationSnippetExpander {
         "(?<![\\p{L}\\p{N}_])" + NSRegularExpression.escapedPattern(for: cue) + "(?![\\p{L}\\p{N}_])"
     }
 }
+
+enum DictationVocabulary {
+    static func terms(from source: String) -> [String] {
+        let candidates = source
+            .split(whereSeparator: { $0 == "," || $0.isNewline })
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        var seen = Set<String>()
+        return candidates.filter { term in
+            seen.insert(term.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)).inserted
+        }
+    }
+
+    static func encode(_ terms: [String]) -> String {
+        terms.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
+    }
+}

@@ -7,12 +7,23 @@ cd "$project_root"
 swift Scripts/generate-app-icon.swift
 xcodegen generate
 derived_data="$(mktemp -d "${TMPDIR:-/tmp}/HushKey-build.XXXXXX")"
-trap 'rm -rf "$derived_data"' EXIT
+stage_dir=""
+backup_dir=""
+backup_path=""
+cleanup() {
+  rm -rf "$derived_data"
+  if [[ -n "$stage_dir" && -d "$stage_dir" ]]; then rm -rf "$stage_dir"; fi
+  if [[ -n "$backup_path" && -d "$backup_path" && ! -d "$project_root/dist/HushKey.app" ]]; then
+    mv "$backup_path" "$project_root/dist/HushKey.app"
+  fi
+  if [[ -n "$backup_dir" && -d "$backup_dir" ]]; then rm -rf "$backup_dir"; fi
+}
+trap cleanup EXIT
 xcodebuild -project HushKey.xcodeproj -scheme HushKey -configuration Release -derivedDataPath "$derived_data" CODE_SIGNING_ALLOWED=NO build
 app_path="$derived_data/Build/Products/Release/HushKey.app"
 mkdir -p "$project_root/dist"
-staged_app="$project_root/dist/HushKey.app.staging"
-rm -rf "$staged_app"
+stage_dir="$(mktemp -d "$project_root/dist/.HushKey-stage.XXXXXX")"
+staged_app="$stage_dir/HushKey.app"
 ditto "$app_path" "$staged_app"
 resources="$staged_app/Contents/Resources"
 mkdir -p "$resources"
@@ -24,15 +35,18 @@ cp "$project_root/LICENSE" "$resources/"
 cp "$project_root/docs/licenses/ARGMAX-MIT-LICENSE.txt" "$resources/"
 cp "$project_root/docs/licenses/ARGMAX-NOTICES.txt" "$resources/"
 codesign --force --deep --sign - --timestamp=none "$staged_app"
-rm -rf "$project_root/dist/HushKey.app"
-mv "$staged_app" "$project_root/dist/HushKey.app"
-# Remove stale Xcode products that can make Finder or the Dock pick a Debug build.
-rm -rf "$project_root/build" "$project_root/.build"
-derived_data_root="$HOME/Library/Developer/Xcode/DerivedData"
-for stale_app in "$derived_data_root"/HushKey-*/Build/Products/{Debug,Release}/HushKey.app; do
-  if [[ -d "$stale_app" ]]; then
-    /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -u "$stale_app" >/dev/null 2>&1 || true
-    rm -rf "$stale_app"
-  fi
-done
+destination="$project_root/dist/HushKey.app"
+if [[ -e "$destination" ]]; then
+  backup_dir="$(mktemp -d "$project_root/dist/.HushKey-backup.XXXXXX")"
+  backup_path="$backup_dir/HushKey.app"
+  mv "$destination" "$backup_path"
+fi
+mv "$staged_app" "$destination"
+if [[ -n "$backup_path" ]]; then
+  rm -rf "$backup_dir"
+  backup_dir=""
+  backup_path=""
+fi
+rmdir "$stage_dir"
+stage_dir=""
 echo "Built $project_root/dist/HushKey.app"

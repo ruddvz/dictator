@@ -3,6 +3,7 @@ import SwiftUI
 struct DictationView: View {
     @Environment(AppModel.self) private var model
     @State private var confirmClearHistory = false
+    @State private var historySearch = ""
 
     var body: some View {
         ScrollView {
@@ -228,26 +229,57 @@ struct DictationView: View {
                                           : "Transcript history is off. Turn it on in Settings & Data to keep recent text."))
                         .frame(minHeight: 90)
                 } else {
-                    ForEach(model.dictationHistory.prefix(8)) { entry in
-                        Button {
-                            model.restoreDictation(entry)
-                        } label: {
-                            HStack(spacing: 12) {
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(entry.text).lineLimit(1).foregroundStyle(.primary)
-                                    Text(entry.createdAt.formatted(date: .abbreviated, time: .shortened))
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                Image(systemName: "arrow.uturn.backward")
-                                    .foregroundStyle(.secondary)
-                            }
-                            .padding(.vertical, 5)
-                            .contentShape(Rectangle())
+                    HStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                        TextField("Search saved transcripts", text: $historySearch)
+                            .textFieldStyle(.plain)
+                            .accessibilityLabel("Search saved dictations")
+                        if !historySearch.isEmpty {
+                            Button("Clear search", systemImage: "xmark.circle.fill") { historySearch = "" }
+                                .labelStyle(.iconOnly)
+                                .buttonStyle(.plain)
+                                .foregroundStyle(.secondary)
                         }
-                        .buttonStyle(.plain)
-                        if entry.id != model.dictationHistory.prefix(8).last?.id { Divider() }
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(.background, in: RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(.quaternary, lineWidth: 1))
+
+                    if filteredHistory.isEmpty {
+                        ContentUnavailableView("No matching dictations", systemImage: "magnifyingglass",
+                                               description: Text("Try a different search term."))
+                            .frame(minHeight: 100)
+                    } else {
+                        ForEach(filteredHistory) { entry in
+                            HStack(spacing: 12) {
+                                Button {
+                                    model.restoreDictation(entry)
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(entry.text).lineLimit(2).foregroundStyle(.primary)
+                                        Text(entry.createdAt.formatted(date: .abbreviated, time: .shortened))
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .help("Restore this dictation")
+
+                                if entry.rawText != nil {
+                                    Button("Restore raw transcript", systemImage: "arrow.uturn.backward") {
+                                        model.restoreDictation(entry, useRawText: true)
+                                    }
+                                    .labelStyle(.iconOnly)
+                                    .buttonStyle(.borderless)
+                                    .help("Restore the original, unprocessed recognition")
+                                }
+                            }
+                            .padding(.vertical, 7)
+                            Divider()
+                        }
                     }
                 }
                 Text("Transcript history is stored in HushKey’s local Application Support folder while history is enabled. Microphone audio is not saved by dictation.")
@@ -258,6 +290,15 @@ struct DictationView: View {
         }
         .confirmationDialog("Delete all recent dictations?", isPresented: $confirmClearHistory, titleVisibility: .visible) {
             Button("Delete history", role: .destructive) { model.clearDictationHistory() }
+        }
+    }
+
+    private var filteredHistory: [DictationHistoryEntry] {
+        let query = historySearch.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return model.dictationHistory }
+        return model.dictationHistory.filter { entry in
+            entry.text.localizedCaseInsensitiveContains(query) ||
+                (entry.rawText?.localizedCaseInsensitiveContains(query) ?? false)
         }
     }
 

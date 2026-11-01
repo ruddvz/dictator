@@ -153,4 +153,22 @@ final class SafetyAndStorageTests: XCTestCase {
         try data.write(to: url)
         XCTAssertEqual(DictationHistoryStore.load(from: url)?.first?.rawText, nil)
     }
+
+    @MainActor
+    func testDictationHistoryCanRestoreProcessedOrRawText() {
+        let model = AppModel()
+        let entry = DictationHistoryEntry(text: "Clean transcript.", rawText: "Um, clean transcript.")
+
+        model.restoreDictation(entry)
+        XCTAssertEqual(model.transcriber.text, "Clean transcript.")
+
+        model.restoreDictation(entry, useRawText: true)
+        XCTAssertEqual(model.transcriber.text, "Um, clean transcript.")
+    }
+
+    func testPersonalVocabularySplitsAndDeduplicatesLocalHints() {
+        XCTAssertEqual(DictationVocabulary.terms(from: "HushKey, Maya\nhushkey\nCafé,cafe"),
+                       ["HushKey", "Maya", "Café"])
+        XCTAssertEqual(DictationVocabulary.encode([" Maya ", "", "HushKey"]), "Maya\nHushKey")
+    }
 }

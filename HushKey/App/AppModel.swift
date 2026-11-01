@@ -17,6 +17,7 @@ final class AppModel {
         case train = "Train"
         case evaluate = "Evaluate"
         case use = "Silent Use"
+        case personalization = "Snippets & Vocabulary"
         case settings = "Settings & Data"
         var id: String { rawValue }
         var symbol: String {
@@ -27,6 +28,7 @@ final class AppModel {
             case .train: "square.stack.3d.up"
             case .evaluate: "chart.bar.xaxis"
             case .use: "text.bubble"
+            case .personalization: "text.badge.plus"
             case .settings: "slider.horizontal.3"
             }
         }
@@ -201,7 +203,7 @@ final class AppModel {
                               label: prediction.best?.label ?? "", confidence: prediction.confidence)
         case .settings:
             recorder.logEvent(segment, kind: "segment", label: recorder.prompt, confidence: nil)
-        case .dictation, .files, .setup, .evaluate:
+        case .dictation, .files, .setup, .evaluate, .personalization:
             if recorder.isRecording {
                 recorder.logEvent(segment, kind: "segment", label: recorder.prompt, confidence: nil)
             }
@@ -239,6 +241,7 @@ final class AppModel {
         case .use: return useCaptureMode == .hold && isMotionInferenceEnabled && classifier != nil
         case .dictation: return false
         case .files: return false
+        case .personalization: return false
         case .settings: return false
         case .setup, .evaluate: return false
         }
@@ -465,9 +468,9 @@ final class AppModel {
         }
     }
 
-    func restoreDictation(_ entry: DictationHistoryEntry) {
+    func restoreDictation(_ entry: DictationHistoryEntry, useRawText: Bool = false) {
         guard !audio.isRunning, !isFinalizingDictation, !transcriber.isFinalizing else { return }
-        transcriber.replaceText(entry.text)
+        transcriber.replaceText(useRawText ? (entry.rawText ?? entry.text) : entry.text)
         rawDictationText = entry.rawText ?? entry.text
         didInsertCurrentDictation = false
         insertion.clearUndoRecord()
@@ -508,10 +511,7 @@ final class AppModel {
 
         await audio.start()
         guard generation == dictationStartGeneration, audio.isRunning else { return }
-        let customWords = dictationTerms
-            .split(whereSeparator: { $0 == "," || $0.isNewline })
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
+        let customWords = DictationVocabulary.terms(from: dictationTerms)
         let modeHints: [String]
         switch activeDictationMode {
         case .message: modeHints = ["DM", "FYI", "ASAP", "RSVP", "TL;DR"]

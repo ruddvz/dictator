@@ -73,9 +73,17 @@ Run the voice checklist with normal and whispered speech, TextEdit plus one othe
 - Reviewed ServiceNow/StarHarness. It evolves agent harnesses using model calls and proposer-generated code, so it is not suitable for this product UI review and was not run. Its held-out evaluation principle is recorded for HushKey's acceptance work.
 - Added scope and limitations to [docs/COMPETITOR_RESEARCH.md](docs/COMPETITOR_RESEARCH.md). No app source changed and no tests were run for this documentation-only update.
 
-## Next item — HushKey UI parity slice
+## Completed — personalization and searchable recovery
 
-In a fresh session, implement the next narrow UI slice: move Snippets and Vocabulary into a dedicated searchable local workspace, then complete the real-app microphone/shortcut/insertion acceptance before adding local transforms or meeting capture. Keep HushKey's native design and local-first privacy; do not copy Wispr Flow assets or internals.
+- Added a dedicated native Snippets & Vocabulary sidebar workspace with search, add/edit/delete flows, duplicate checks, and an advanced repair editor for legacy snippet lines. Settings now links to this workspace instead of embedding raw text editors.
+- Dictation history searches all saved transcripts, matches both processed and raw text, and offers separate restore actions for each.
+- Updated the vocabulary parser and added coverage for case/diacritic-insensitive deduplication and raw-history restoration.
+- `xcodebuild ... test` passed. Release packaging succeeded, and `dist/HushKey.app` passes strict code-signature verification. Packaging now stages and replaces only HushKey; it no longer removes other HushKey build products or DerivedData apps.
+- The native computer-use pipe still closes before UI inspection, so the new screens could not be visually checked in the live app. Microphone, shortcut and insertion acceptance also remains open.
+
+## Next item — live dictation acceptance
+
+In a fresh session, verify the packaged app in TextEdit and a second supported app: microphone permission, normal speech and whisper, global shortcut behavior, history search/raw restore, insertion, duplicate prevention, and undo. After that, add local text transformations and meeting capture with clear recording controls and on-device processing. Do not copy proprietary app code or assets.
 
 ## Naming note
 
