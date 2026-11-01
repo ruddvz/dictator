@@ -30,6 +30,12 @@ On 2026-11-01, the installed macOS app identified itself as v1.6.1337. A read-on
 
 This spot check did not start dictation or meeting capture, change a privacy setting, connect a calendar, or inspect any account data for the report. A valid Wispr screenshot could not be captured: the desktop capture showed HushKey in front of Wispr Flow, and the native UI pipe later closed when switching back to HushKey. Findings above are limited to the accessibility tree; they do not establish visual polish, feature behavior, or speech accuracy.
 
+## App reconnaissance tools and limits
+
+- The official [REA repository](https://github.com/morluto/rea) was used in read-only desktop-bundle inventory mode against `/Applications/Wispr Flow.app`. REA 6.8.0 examined 1,605 directory entries, probed 94 files, and read 16,396 bytes. It found an Electron `app.asar` packaging marker; that is a packaging candidate, not proof of which code is loaded at runtime. The scan did not inspect or extract the ASAR, decompile native code, or access user transcripts or account data. The local Evidence bundle is temporary and is not part of this repository.
+- [ServiceNow/StarHarness](https://github.com/ServiceNow/StarHarness) is an MIT-licensed framework for evolving AI-agent prompts, tools, and loops against search, selection, and holdout task splits. It requires an external model endpoint and runs proposer-generated code with local user permissions. It does not inspect desktop-app UI or dictate audio, so it was reviewed but not run or added to HushKey. Its useful evaluation lesson is to keep acceptance examples separate from development examples and report a held-out result.
+- These tools supplement the visible-interface inspection; they do not justify copying Wispr Flow's proprietary source, assets, or implementation. HushKey should implement equivalent user-facing workflows with its own native interface and local-first behavior.
+
 ## What HushKey could offer that matters
 
 ### 1. Make the existing path dependable first

@@ -67,6 +67,12 @@ Run the voice checklist with normal and whispered speech, TextEdit plus one othe
 - Confirmed HushKey already has the similar native sidebar/workspace pattern and a clearer local-first Dictation path. Key gaps are dedicated searchable Snippets/Vocabulary, richer searchable/recoverable history, local transforms, and meeting workflows.
 - The computer-use screenshot did not show Wispr Flow unobstructed; HushKey covered it, and the native UI pipe later closed when switching back. This is a text-only accessibility-tree review, not a screenshot-backed visual audit.
 
+## Completed — app reconnaissance tool review
+
+- Used the official REA 6.8.0 CLI for bounded, read-only inventory of the installed Wispr Flow app bundle. It identified an Electron `app.asar` packaging marker; no app source, assets, user data, or native implementation were extracted or decompiled.
+- Reviewed ServiceNow/StarHarness. It evolves agent harnesses using model calls and proposer-generated code, so it is not suitable for this product UI review and was not run. Its held-out evaluation principle is recorded for HushKey's acceptance work.
+- Added scope and limitations to [docs/COMPETITOR_RESEARCH.md](docs/COMPETITOR_RESEARCH.md). No app source changed and no tests were run for this documentation-only update.
+
 ## Next item — HushKey UI parity slice
 
 In a fresh session, implement the next narrow UI slice: move Snippets and Vocabulary into a dedicated searchable local workspace, then complete the real-app microphone/shortcut/insertion acceptance before adding local transforms or meeting capture. Keep HushKey's native design and local-first privacy; do not copy Wispr Flow assets or internals.
