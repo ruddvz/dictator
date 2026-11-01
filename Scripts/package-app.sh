@@ -17,6 +17,6 @@ ditto "$app_path" "$staged_app"
 codesign --force --deep --sign - --timestamp=none "$staged_app"
 rm -rf "$project_root/dist/HushKey.app"
 mv "$staged_app" "$project_root/dist/HushKey.app"
-# Remove the old visible Xcode build tree that produced duplicate Finder results.
-rm -rf "$project_root/build"
+# Remove stale Xcode products that can make Finder or the Dock pick a Debug build.
+rm -rf "$project_root/build" "$project_root/.build"
 echo "Built $project_root/dist/HushKey.app"

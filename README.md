@@ -29,7 +29,7 @@ xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build te
 
 HushKey opens as a normal Mac app window and also offers a menu-bar shortcut. On first launch, allow Motion when macOS asks. Connect compatible headphones, choose them as the Mac's active audio output, and check **Setup** for a live stream and sample rate. If Motion access was previously denied, change it in **System Settings → Privacy & Security → Motion** and relaunch HushKey.
 
-The packaged app is at `dist/HushKey.app`. Xcode's intermediate files go into the hidden `.build` folder; the packaging script builds in a temporary directory and removes it so Finder search has one obvious HushKey app to open.
+The packaged app is at `dist/HushKey.app`. Xcode's local test/build output uses `.build`; the packaging script clears stale Debug/Release app copies and builds in a temporary directory, leaving one HushKey app to open.
 
 ## Experiment flow
 

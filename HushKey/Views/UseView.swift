@@ -66,8 +66,7 @@ struct UseView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.orange.opacity(0.25)))
+        .background(.quaternary.opacity(0.28), in: RoundedRectangle(cornerRadius: 10))
     }
 
     private var eligibilityMessage: String {
@@ -195,12 +194,12 @@ struct UseView: View {
                 }
                 if model.decoded.isEmpty {
                     Text(model.isMotionInferenceEnabled ? "Mouth a trained word…" : "Complete the evidence checks to begin.")
-                        .font(.system(size: 28, weight: .regular, design: .rounded))
+                        .font(.title)
                         .foregroundStyle(.tertiary)
                         .frame(maxWidth: .infinity, minHeight: 80, alignment: .topLeading)
                 } else {
                     decodedText
-                        .font(.system(size: 28, weight: .medium, design: .rounded))
+                        .font(.title)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, minHeight: 80, alignment: .topLeading)
                 }

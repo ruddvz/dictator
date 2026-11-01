@@ -14,7 +14,7 @@ struct HushKeyApp: App {
         }
         .windowResizability(.contentMinSize)
 
-        MenuBarExtra("HushKey", systemImage: "waveform") {
+        MenuBarExtra("HushKey", image: "HushKeyMenuBar") {
             Button("Open HushKey") { openWindow(id: "main") }
             Divider()
             Label(model.motion.status.label, systemImage: model.motion.isConnected ? "headphones" : "headphones.slash")

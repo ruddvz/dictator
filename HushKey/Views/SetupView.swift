@@ -2,21 +2,22 @@ import SwiftUI
 
 struct SetupView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         let motion = model.motion
         let span = motion.latest.map { ($0.t - 8)...$0.t }
 
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: 18) {
                 PageHeader(
                     eyebrow: "Step 1 · Prepare",
-                    title: "Check your motion signal",
-                    subtitle: "HushKey reads processed head motion from compatible headphones. Confirm a live stream before collecting examples.")
+                    title: "Connect your headphones",
+                    subtitle: "Confirm HushKey is receiving live motion before you start the study.")
 
-                HStack(alignment: .top, spacing: 16) {
-                    readinessCard
-                    nextStepsCard
+                HStack(alignment: .top, spacing: 14) {
+                    connectionCard
+                    studyPathCard
                 }
 
                 DisclosureGroup {
@@ -28,17 +29,15 @@ struct SetupView: View {
                         SignalPlot(title: "Attitude (rad)", samples: motion.history,
                                    channels: SignalPlot.attitude, span: span, minScale: 0.1)
                     }
-                    .padding(.top, 12)
+                    .padding(.top, 10)
                 } label: {
                     Label("Motion diagnostics", systemImage: "waveform.path.ecg")
                         .font(.headline)
                 }
-                .padding(16)
-                .background(.background, in: RoundedRectangle(cornerRadius: 12))
 
-                Label("This is a small-vocabulary experiment. Head motion is not an inward microphone or a hidden speech sensor.",
+                Label("Headphone motion is not an inward-facing microphone or a lip-reading sensor.",
                       systemImage: "info.circle")
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: 920, alignment: .leading)
@@ -47,91 +46,154 @@ struct SetupView: View {
         }
     }
 
-    private var readinessCard: some View {
+    private var connectionCard: some View {
         let motion = model.motion
         let ready = motion.status == .streaming
 
-        return VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Label("Headphone motion", systemImage: "airpodspro")
-                    .font(.headline)
-                Spacer()
-                StatusPill(title: ready ? "LIVE" : statusTitle,
-                           symbol: ready ? "waveform" : "exclamationmark.circle",
-                           tint: ready ? .green : .orange)
+        return GroupBox("Connection") {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: statusSymbol)
+                        .font(.title2)
+                        .foregroundStyle(statusColor)
+                        .frame(width: 28)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(statusTitle)
+                            .font(.headline)
+                        Text(statusMessage)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                Divider()
+
+                HStack(spacing: 22) {
+                    metric("Sample rate", ready ? String(format: "%.1f Hz", motion.sampleRate) : "—")
+                    metric("Samples", "\(motion.sampleCount)")
+                }
+
+                HStack {
+                    Spacer()
+                    primaryActionButton
+                }
             }
-
-            Text(statusMessage)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            Divider()
-
-            HStack(spacing: 28) {
-                metric("Sample rate", ready ? String(format: "%.1f Hz", motion.sampleRate) : "—")
-                metric("Samples received", "\(motion.sampleCount)")
-            }
+            .padding(8)
+            .frame(maxWidth: .infinity, minHeight: 188, alignment: .topLeading)
         }
-        .padding(18)
-        .frame(maxWidth: .infinity, minHeight: 200, alignment: .topLeading)
-        .background(.background, in: RoundedRectangle(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(ready ? Color.green.opacity(0.35) : Color.orange.opacity(0.28)))
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
-    private var nextStepsCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Study path")
-                .font(.headline)
-            StudyStep(number: "1", title: "Check motion", detail: "Connect headphones as the Mac’s audio output.", state: model.motion.status == .streaming ? .done : .current)
-            StudyStep(number: "2", title: "Train words", detail: "Collect 10 examples each for at least 5 words.", state: model.motion.status == .streaming ? .current : .next)
-            StudyStep(number: "3", title: "Evaluate", detail: "Compare against chance and a separate session.", state: .next)
-            StudyStep(number: "4", title: "Try Use", detail: "Only unlock silent decoding if the evidence passes.", state: .next)
-            HStack {
-                Spacer()
-                Button("Continue to training", systemImage: "arrow.right") {
-                    model.screen = .train
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(model.motion.status != .streaming)
+    private var studyPathCard: some View {
+        GroupBox("Study path") {
+            VStack(alignment: .leading, spacing: 13) {
+                StudyStep(number: "1", title: "Check motion", detail: "Connect compatible headphones as the Mac’s sound output.", state: model.motion.status == .streaming ? .done : .current)
+                StudyStep(number: "2", title: "Train words", detail: "Collect 10 examples each for at least 5 words.", state: model.motion.status == .streaming ? .current : .next)
+                StudyStep(number: "3", title: "Evaluate", detail: "Compare with chance and a separate session.", state: .next)
+                StudyStep(number: "4", title: "Try Use", detail: "Silent decoding unlocks only if the evidence passes.", state: .next)
             }
-            .padding(.top, 2)
+            .padding(8)
+            .frame(maxWidth: .infinity, minHeight: 188, alignment: .topLeading)
         }
-        .padding(18)
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .background(.background, in: RoundedRectangle(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(.quaternary))
     }
 
     private var statusTitle: String {
         switch model.motion.status {
-        case .unsupported: "UNAVAILABLE"
-        case .denied: "PERMISSION"
-        case .waiting: "WAITING"
-        case .streaming: "LIVE"
-        case .error: "ERROR"
+        case .unsupported: "Motion isn’t available"
+        case .denied: "Motion access is off"
+        case .waiting: "Waiting for headphones"
+        case .streaming: "Motion is live"
+        case .error: "Motion could not start"
+        }
+    }
+
+    private var statusSymbol: String {
+        switch model.motion.status {
+        case .unsupported: "headphones.slash"
+        case .denied: "hand.raised.slash"
+        case .waiting: "headphones"
+        case .streaming: "waveform.path"
+        case .error: "exclamationmark.triangle"
+        }
+    }
+
+    private var statusColor: Color {
+        switch model.motion.status {
+        case .streaming: .green
+        case .waiting: .secondary
+        case .denied: .orange
+        case .unsupported, .error: .red
         }
     }
 
     private var statusMessage: String {
         switch model.motion.status {
         case .streaming:
-            "A live motion stream is arriving. HushKey can now record training examples."
+            "A live motion stream is arriving. You can now collect training examples."
         case .waiting:
-            "Connect compatible head-tracking headphones and select them as this Mac’s active audio output. HushKey checks capability from the live stream; it cannot identify the exact AirPods model."
+            "Connect supported head-tracking headphones and choose them as this Mac’s sound output. HushKey detects the live stream, but cannot identify the exact model."
         case .denied:
-            "Motion access is off. Allow HushKey under System Settings → Privacy & Security → Motion, then reopen the app."
+            "Allow HushKey under System Settings → Privacy & Security → Motion, then reopen the app."
         case .unsupported:
-            "This Mac or the connected headphones do not provide the public headphone-motion API HushKey needs."
+            "This Mac or the selected headphones do not provide the public headphone-motion API HushKey needs."
         case .error(let message):
             "Motion could not start: \(message)"
         }
     }
 
+    private var actionTitle: String {
+        switch model.motion.status {
+        case .streaming: "Continue to training"
+        case .denied: "Open Motion Settings"
+        case .waiting, .unsupported, .error: "Open Sound Settings"
+        }
+    }
+
+    private var actionSymbol: String {
+        switch model.motion.status {
+        case .streaming: "arrow.right"
+        case .denied: "lock.open"
+        case .waiting, .unsupported, .error: "speaker.wave.2"
+        }
+    }
+
+    @ViewBuilder
+    private var primaryActionButton: some View {
+        if model.motion.status == .streaming {
+            Button(actionTitle, systemImage: actionSymbol, action: primaryAction)
+                .buttonStyle(.borderedProminent)
+        } else {
+            Button(actionTitle, systemImage: actionSymbol, action: primaryAction)
+                .buttonStyle(.bordered)
+        }
+    }
+
+    private func primaryAction() {
+        switch model.motion.status {
+        case .streaming:
+            model.screen = .train
+        case .denied:
+            openSystemSettings("x-apple.systempreferences:com.apple.preference.security?Privacy_Motion")
+        case .waiting, .unsupported, .error:
+            openSystemSettings("x-apple.systempreferences:com.apple.Sound-Settings.extension")
+        }
+    }
+
+    private func openSystemSettings(_ address: String) {
+        guard let url = URL(string: address) else { return }
+        openURL(url)
+    }
+
     private func metric(_ title: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(title).font(.caption).foregroundStyle(.secondary)
-            Text(value).font(.title3.monospacedDigit().weight(.semibold))
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.title3.monospacedDigit().weight(.semibold))
         }
     }
 }
@@ -156,6 +218,7 @@ private struct StudyStep: View {
                 Text(detail)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

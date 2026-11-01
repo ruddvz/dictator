@@ -105,7 +105,7 @@ struct TrainView: View {
                     onBegin: model.capture.begin,
                     onEnd: model.capture.end)
                 if model.motion.status != .streaming {
-                    Label(model.motion.status.label, systemImage: "airpodspro")
+                    Label(model.motion.status.label, systemImage: "headphones")
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }

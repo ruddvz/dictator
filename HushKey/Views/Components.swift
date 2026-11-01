@@ -7,33 +7,18 @@ struct PageHeader: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(eyebrow.uppercased())
-                .font(.caption.weight(.semibold))
-                .tracking(1.1)
+            Text(eyebrow)
+                .font(.callout.weight(.medium))
                 .foregroundStyle(.secondary)
             Text(title)
-                .font(.system(size: 30, weight: .semibold, design: .rounded))
+                .font(.title.weight(.semibold))
             Text(subtitle)
-                .font(.callout)
+                .font(.body)
                 .foregroundStyle(.secondary)
+                .lineSpacing(2)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.bottom, 4)
-    }
-}
-
-struct StatusPill: View {
-    var title: String
-    var symbol: String
-    var tint: Color
-
-    var body: some View {
-        Label(title, systemImage: symbol)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(tint)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(tint.opacity(0.12), in: Capsule())
     }
 }
 
@@ -152,9 +137,9 @@ struct HoldToCaptureButton: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            Image(systemName: isCapturing ? "waveform" : "mouth")
+            Image(systemName: isCapturing ? "record.circle.fill" : "hand.tap")
                 .font(.system(size: 30, weight: .medium))
-                .symbolEffect(.variableColor.iterative, isActive: isCapturing)
+                .symbolEffect(.pulse, isActive: isCapturing)
             Text(isCapturing ? "Capturing…" : title)
                 .font(.headline)
             Text("Hold \(shortcut) or press and hold here")
@@ -200,12 +185,24 @@ struct MotionStatusBadge: View {
     var rate: Double
 
     var body: some View {
-        HStack(spacing: 6) {
-            Circle().fill(color).frame(width: 8, height: 8)
+        Label {
             Text(status == .streaming ? "Motion · \(Int(rate.rounded())) Hz" : status.label)
                 .font(.callout.monospacedDigit())
+        } icon: {
+            Image(systemName: symbol)
+                .foregroundStyle(color)
         }
-        .padding(.horizontal, 8)
+        .help("Processed headphone-motion status")
+    }
+
+    private var symbol: String {
+        switch status {
+        case .streaming: "waveform.path"
+        case .waiting: "headphones"
+        case .denied: "hand.raised.slash"
+        case .unsupported: "headphones.slash"
+        case .error: "exclamationmark.triangle"
+        }
     }
 
     private var color: Color {

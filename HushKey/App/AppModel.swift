@@ -19,7 +19,7 @@ final class AppModel {
         var id: String { rawValue }
         var symbol: String {
             switch self {
-            case .setup: "airpodspro"
+            case .setup: "headphones"
             case .train: "square.stack.3d.up"
             case .evaluate: "chart.bar.xaxis"
             case .use: "text.bubble"

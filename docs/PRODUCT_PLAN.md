@@ -15,6 +15,14 @@ Help one person test whether processed headphone motion can distinguish a small,
 - Open as a standard resizable Mac window, with the menu-bar item as a secondary shortcut rather than the only way into the app.
 - Never present a low-confidence nearest match as a successful word.
 
+## macOS visual system
+
+- Prefer native macOS controls and materials: `NavigationSplitView`, `GroupBox`, system button styles, SF Symbols, and the user's current appearance and accent color.
+- Use Dynamic Type system text styles for page titles and body copy. Keep color, motion, and custom decoration secondary to the research task.
+- Show connection and permission states with a clear label and symbol; never rely on color alone. Give the current state one useful next action, such as opening Sound or Motion settings.
+- Keep the app icon and menu-bar mark related: a simple H keycap with a quiet motion trace. Use the detailed, layered mark in the Dock/Finder and a monochrome template version in the menu bar.
+- Keep advanced plots and thresholds collapsed until requested. Let the main window answer “what should I do next?” before showing research controls.
+
 ## Primary navigation
 
 1. **Setup** — Motion support, permission/connection status, live sample rate, and a brief next-step guide. Detailed plots are collapsible diagnostics.
@@ -36,7 +44,7 @@ Help one person test whether processed headphone motion can distinguish a small,
 - `HushKeyTests/` — classifier, permission-state, insertion-safety, and storage tests.
 - `docs/` — user build instructions, testing protocol, product plan, and licensing notices.
 - `Scripts/` — deterministic icon generation and app packaging helpers; the package script builds in a temporary directory and publishes only `dist/HushKey.app`.
-- `.build/` — hidden local Xcode test/build output; excluded from source control.
+- `.build/` — hidden local Xcode test/build output; excluded from source control and cleared by packaging to prevent stale app copies.
 - `dist/HushKey.app` — the one packaged app to open.
 
 ## Current delivery sequence
