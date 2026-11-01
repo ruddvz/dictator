@@ -4,11 +4,13 @@ struct DictationHistoryEntry: Codable, Identifiable, Equatable {
     var id: UUID
     var createdAt: Date
     var text: String
+    var rawText: String?
 
-    init(id: UUID = UUID(), createdAt: Date = Date(), text: String) {
+    init(id: UUID = UUID(), createdAt: Date = Date(), text: String, rawText: String? = nil) {
         self.id = id
         self.createdAt = createdAt
         self.text = text
+        self.rawText = rawText
     }
 }
 

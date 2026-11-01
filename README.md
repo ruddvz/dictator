@@ -7,7 +7,9 @@ HushKey is a native macOS dictation app with a separate experimental lab for sil
 - macOS 14 or later; designed for Apple Silicon and Intel Macs.
 - The app opens to Voice & Whisper dictation. Use the button, hold the configurable global shortcut (`⌥⇧D` by default), or choose press-to-toggle; then review/edit, copy, or optionally insert a complete phrase into a supported text field.
 - Speech recognition uses Apple's on-device Speech framework and exposes languages supported for on-device recognition on this Mac. HushKey does not send audio to a remote service.
-- Recent transcripts can be saved on this Mac (enabled by default and switchable in Settings); personal vocabulary hints and spoken-phrase snippets also stay local. HushKey does not save microphone audio during ordinary dictation.
+- Dictation includes Natural, Message, Email, Code, and Automatic modes; explicit spoken corrections with raw-transcript restore; local vocabulary/snippets; and a one-step guarded insertion undo. Automatic mode maps common Mac app identifiers when started with the global shortcut.
+- Optional nearby-text hints are off by default. After a separate Accessibility opt-in, HushKey reads only a bounded slice around the cursor in a supported text field to extract local recognition terms; it discards the slice and does not store it.
+- Recent transcripts can be saved on this Mac (enabled by default and switchable in Settings). HushKey does not save microphone audio during ordinary dictation.
 - Motion input uses Apple's `CMHeadphoneMotionManager`. It sees processed head motion from compatible head-tracking headphones, not an inward-facing speech sensor or the AirPods speech-detecting accelerometer.
 - Motion permission is requested only when you open **Silent Lab → Setup**. Setup checks live motion availability, permission, connection, and sample rate. It cannot identify the exact AirPods model. Apple documents headphone motion in [Core Motion](https://developer.apple.com/documentation/coremotion/cmheadphonemotionmanager) and its [headphone motion sample](https://developer.apple.com/documentation/CoreMotion/getting-motion-activity-data-from-headphones); the headphones must be connected and selected as the Mac's audio output.
 - Silent decoding is experimental and remains locked until the selected Silent condition reaches the minimum study size, beats the majority baseline with a label-permutation test (`p < 0.05`), and beats baseline on a separate-session holdout.
@@ -37,8 +39,9 @@ The packaged app is at `dist/HushKey.app`. Xcode's local test/build output uses 
 ## Dictation flow
 
 1. Use **Start dictation**, hold the configurable global shortcut (`⌥⇧D` by default), or choose press-to-toggle in **Settings & Data**. The shortcut works from any app; HushKey listens only while dictation is active.
-2. Stop when you’re finished. Edit the recognized phrase, then **Copy text** or enable Accessibility and choose **Insert into current app**. The insertion shortcut (`⌥⇧I` by default) inserts the current output once into the focused supported field.
-3. Reload a recent transcript from the local history list. Add names or uncommon words under **Settings & Data → Personal vocabulary** to provide local recognition hints. Add `spoken cue => expanded phrase` lines to expand snippets when you stop dictating.
+2. Choose a writing mode. **Automatic** maps common email, messaging, and code apps when the global shortcut starts dictation; **Code** formats spoken symbols, while Message and Email support spoken line breaks. Corrections such as “scratch that” are applied only with an explicit pause cue.
+3. Stop when you’re finished. Edit the recognized phrase, restore the original recognition if needed, then **Copy text** or enable Accessibility and choose **Insert into current app**. The insertion shortcut (`⌥⇧I` by default) inserts the current output once into the focused supported field. Press `⌥⇧U` immediately in that same unchanged field to undo.
+4. Reload a recent transcript from the local history list. Add names or uncommon words under **Settings & Data → Personal vocabulary** to provide local recognition hints. Add `spoken cue => expanded phrase` lines to expand snippets when you stop dictating.
 
 ## Silent Lab
 
@@ -53,7 +56,7 @@ The packaged app is at `dist/HushKey.app`. Xcode's local test/build output uses 
 
 Text insertion is off by default. Enable it in **Settings & Data**, approve HushKey under **System Settings → Privacy & Security → Accessibility**, then press **Insert into current app** or the displayed configurable global shortcut (`⌥⇧I` by default) while the intended text field remains focused in another app.
 
-HushKey uses Accessibility to inspect the frontmost app and focused control, allows only supported text fields, rejects secure/password controls, rechecks the process and focus immediately before insertion, and writes through the selected-text attribute once. It does not use or modify the clipboard. Unsupported controls fail closed.
+HushKey uses Accessibility to inspect the frontmost app and focused control, allows only supported text fields, rejects secure/password controls, rechecks the process and focus immediately before insertion, and writes through the selected-text attribute once. It does not use or modify the clipboard. Unsupported controls fail closed. Undo is available only while the same field stays focused and its contents remain unchanged.
 
 ## Local data and privacy
 
@@ -63,6 +66,7 @@ HushKey uses Accessibility to inspect the frontmost app and focused control, all
 - No telemetry, upload, cloud service, or paid API is used by HushKey.
 - Use **Settings & Data** to configure shortcuts and vocabulary hints, choose the microphone, enable/disable transcript history, record synchronized sessions, export the dataset or sessions, and delete local files. Clear recent transcripts from the Dictation screen.
 - Voice recognition requires the user to start the mic and is local-only; no remote recognition fallback is used. Audio is saved only if the separate research recorder is explicitly active.
+- Nearby-text hints require an explicit opt-in and Accessibility permission. HushKey extracts terms transiently; it does not save the surrounding text.
 
 ## Project naming
 
@@ -72,6 +76,14 @@ HushKey is the requested working name for this private prototype. A separate pub
 
 Headphone motion is processed and low-rate (often about 25 Hz). Jaw movement and head motion can dominate the signal, and reseating the headphones can change the measurements. A result on a small trained vocabulary does not establish arbitrary phrase recognition. Voice, whisper, and silent-mouthing results must be evaluated separately and across sessions before drawing conclusions.
 
-HushKey does not currently include cloud transcription, LLM rewriting, app-specific writing styles, command processing, file transcription, or workflow/plugins. Speech languages depend on what macOS supports for on-device recognition on this Mac. These are separate features from the silent-motion experiment and are not implied by the current build.
+HushKey does not include downloadable ASR models, LLM rewriting, selected-text voice editing, file transcription, meeting recording, or workflow/plugin automation. Its writing modes are small deterministic local formatting presets, not full Wispr Flow or TypeWhisper parity. Speech languages depend on what macOS supports for on-device recognition on this Mac. These are separate features from the silent-motion experiment and are not implied by the current build.
+
+## Research reports
+
+- [Wispr Flow vs TypeWhisper report (PDF)](docs/research/Wispr_Flow_vs_TypeWhisper_Research_Report_2026-11-01.pdf)
+- [HushKey competitor landscape and product opportunities](docs/COMPETITOR_RESEARCH.md)
+- [Report index and how findings map to HushKey](docs/research/README.md)
+
+HushKey does not rebrand or bundle TypeWhisper code. TypeWhisper's upstream repository uses GPLv3 and states that rebranded distributions require a separate commercial license; HushKey implements its own local features and keeps the source project's license boundary. See [NOTICE.md](NOTICE.md) and the report index for attribution and scope.
 
 See [docs/TESTING_PROTOCOL.md](docs/TESTING_PROTOCOL.md) for the repeatable study and hardware-validation procedure. See [docs/PRODUCT_PLAN.md](docs/PRODUCT_PLAN.md) for the screen flow and file map. See [NOTICE.md](NOTICE.md) for source attribution and license boundaries.

@@ -6,6 +6,7 @@ import Speech
 @MainActor @Observable
 final class MicTranscriber {
     private(set) var isRunning = false
+    private(set) var isFinalizing = false
     private(set) var text = ""
     private(set) var isOnDevice = false
     private(set) var error: String?
@@ -17,9 +18,11 @@ final class MicTranscriber {
     @ObservationIgnored private weak var sink: AudioSink?
     @ObservationIgnored private var finalized = ""
     @ObservationIgnored private var generation = 0
+    @ObservationIgnored private var finalizationContinuation: CheckedContinuation<String, Never>?
+    @ObservationIgnored private var finalizationTimeoutTask: Task<Void, Never>?
 
     func start(sink: AudioSink, localeIdentifier: String = "en-US", contextualStrings: [String] = []) async -> Bool {
-        guard !isRunning else { return true }
+        guard !isRunning, !isFinalizing else { return false }
         error = nil
 
         let status = await withCheckedContinuation { continuation in
@@ -46,12 +49,42 @@ final class MicTranscriber {
 
     func stop() {
         isRunning = false
+        isFinalizing = false
         generation += 1
         if let sinkID { sink?.remove(sinkID) }
         sinkID = nil
         box.set(nil)
         task?.cancel()
         task = nil
+        finalizationTimeoutTask?.cancel()
+        finalizationTimeoutTask = nil
+        finalizationContinuation?.resume(returning: text)
+        finalizationContinuation = nil
+    }
+
+    /// Stops accepting microphone buffers, then waits briefly for Speech's final partial.
+    func beginFinalization() {
+        guard isRunning else { return }
+        isRunning = false
+        isFinalizing = true
+        if let sinkID { sink?.remove(sinkID) }
+        sinkID = nil
+        box.set(nil)
+        finalizationTimeoutTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(2))
+            self?.completeFinalization()
+        }
+    }
+
+    func waitForFinalization() async -> String {
+        guard isFinalizing else { return text }
+        return await withCheckedContinuation { continuation in
+            finalizationContinuation = continuation
+            if !isFinalizing {
+                finalizationContinuation = nil
+                continuation.resume(returning: text)
+            }
+        }
     }
 
     func clear() {
@@ -84,21 +117,38 @@ final class MicTranscriber {
     @ObservationIgnored private var contextualStrings: [String] = []
 
     private func handle(generation: Int, partial: String?, isFinal: Bool, failure: String?) {
-        guard generation == self.generation, isRunning else { return }
+        guard generation == self.generation, isRunning || isFinalizing else { return }
         if let partial {
             text = finalized + partial
             error = nil
         }
         if isFinal || failure != nil {
             if let partial, !partial.isEmpty { finalized += partial + " " }
-            text = finalized
+            if isFinal || partial != nil { text = finalized }
             if let failure { error = "Speech recognition issue: \(failure)" }
+            if isFinalizing {
+                completeFinalization()
+                return
+            }
             // Recognition tasks end on silence/timeout; keep listening with a fresh one.
             Task { @MainActor [weak self] in
                 try? await Task.sleep(for: .milliseconds(failure != nil ? 500 : 50))
                 self?.startTask()
             }
         }
+    }
+
+    private func completeFinalization() {
+        guard isFinalizing else { return }
+        isFinalizing = false
+        generation += 1
+        finalizationTimeoutTask?.cancel()
+        finalizationTimeoutTask = nil
+        task?.cancel()
+        task = nil
+        box.set(nil)
+        finalizationContinuation?.resume(returning: text)
+        finalizationContinuation = nil
     }
 
     nonisolated private static func resultHandler(owner: MicTranscriber, generation: Int)

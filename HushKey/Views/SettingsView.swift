@@ -1,4 +1,5 @@
 import CoreAudio
+import AppKit
 import SwiftUI
 
 struct SettingsView: View {
@@ -17,12 +18,46 @@ struct SettingsView: View {
                 TextInsertionSettingsCard()
                 MicrophoneCard()
                 RecordingCard()
+                ResearchReportsCard()
                 DataManagementCard()
             }
             .frame(maxWidth: 920, alignment: .leading)
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
+    }
+}
+
+private struct ResearchReportsCard: View {
+    @State private var status: String?
+
+    var body: some View {
+        GroupBox("Research reports") {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("The supplied comparison and HushKey's competitor notes are bundled with this app and open locally.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Button("Open Wispr Flow vs TypeWhisper report", systemImage: "doc.text.magnifyingglass") {
+                    openResource("Wispr_Flow_vs_TypeWhisper_Research_Report_2026-11-01", extension: "pdf")
+                }
+                Button("Open HushKey competitor notes", systemImage: "list.bullet.rectangle") {
+                    openResource("COMPETITOR_RESEARCH", extension: "md")
+                }
+                if let status {
+                    Text(status).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(8)
+        }
+    }
+
+    private func openResource(_ name: String, extension fileExtension: String) {
+        guard let url = Bundle.main.url(forResource: name, withExtension: fileExtension) else {
+            status = "This report is missing from the app bundle."
+            return
+        }
+        status = NSWorkspace.shared.open(url) ? "Opened locally." : "macOS could not open this report."
     }
 }
 
@@ -46,6 +81,20 @@ private struct DictationSettingsCard: View {
                 Text("Only languages supported for on-device recognition on this Mac appear here. No remote fallback is used.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                Toggle("Apply explicit spoken corrections", isOn: $model.appliesSpokenCorrections)
+                Text("Recognizes cues such as “scratch that” or “actually” after a pause. The original recognition stays available to restore.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Toggle("Use nearby text as optional vocabulary hints", isOn: $model.usesNearbyTextHints)
+                Text("When started with the global shortcut in another app, HushKey can read a small slice around the cursor in a supported text field. It extracts terms locally for on-device recognition, then discards the slice. Off by default.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                HStack(spacing: 10) {
+                    Button("Check local context access…") { model.requestNearbyTextAccess() }
+                    Text(model.insertion.contextAccessStatus)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Picker("Start or stop dictation", selection: $model.dictationShortcut) {
                     ForEach(DictationShortcut.allCases) { Text($0.label).tag($0) }
                 }
@@ -130,6 +179,9 @@ private struct TextInsertionSettingsCard: View {
                     .disabled(!insertion.isEnabled)
                 }
                 Label(insertion.status, systemImage: insertion.isEnabled ? "checkmark.shield" : "lock.shield")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("If the destination field remains focused and unchanged, press ⌥⇧U immediately after insertion to undo it. Undo is fail-closed if the target or text changes.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Text("When enabled, the insertion shortcut adds your reviewed voice transcript, or the latest accepted silent word, to a supported text field in the frontmost app. Password fields are rejected. Explicit insertion does not use the clipboard. Silent Use still needs evidence to unlock.")

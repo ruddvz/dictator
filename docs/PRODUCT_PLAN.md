@@ -26,12 +26,12 @@ Make ordinary voice and whispered dictation usable locally on a Mac, while keepi
 
 ## Primary navigation
 
-1. **Dictation** — Hold a global shortcut to talk or press it to toggle; also start/stop with the button. Choose an on-device-supported language, see live local recognition, edit the phrase, expand personal snippets, copy it, insert it once into a supported focused field, and reload recent local transcripts.
+1. **Dictation** — Hold a global shortcut to talk or press it to toggle; also start/stop with the button. Choose an on-device-supported language and Natural, Message, Email, Code, or Automatic mode. Automatic maps common frontmost app identifiers when launched with the global shortcut. Review/edit the local transcript, apply explicit spoken correction cues, restore the raw recognition, expand personal snippets, copy, insert once into a supported focused field, and reload recent local transcripts. Optional nearby vocabulary hints use a bounded cursor slice only after explicit Accessibility opt-in.
 2. **Setup** — Entered only when the user opens the Silent Lab. Motion support, permission/connection status, live sample rate, and a brief next-step guide; detailed plots stay collapsed.
 3. **Train** — Choose normal voice, whisper, or silent mouthing as an experiment condition; select a word; capture, inspect, and remove motion templates.
 4. **Evaluate** — Select a condition and feature set; check study readiness; see leave-one-out results, majority baseline, permutation result, session holdout, and confusion matrix.
 5. **Silent Use** — Experimental trained-word decoding. Hold to capture or use calibrated auto-capture after evidence passes; inspect accepted/rejected words. Threshold tuning and candidate distances stay under Advanced.
-6. **Settings & Data** — Dictation language, shortcut and vocabulary hints, local snippets and transcript-history control, motion capture and insertion shortcuts, microphone input, synchronized session recording, local data, export, and deletion.
+6. **Settings & Data** — Dictation language and mode controls, spoken-correction preference, shortcut and vocabulary hints, opt-in nearby context, local snippets and transcript-history control, motion capture and insertion shortcuts, microphone input, synchronized session recording, local data, export, and deletion.
 
 ## File map
 
@@ -45,6 +45,7 @@ Make ordinary voice and whispered dictation usable locally on a Mac, while keepi
 - `HushKey/Assets.xcassets/` — HushKey's app icon and bundled visual assets.
 - `HushKeyTests/` — classifier, permission-state, insertion-safety, and local storage tests.
 - `docs/` — user build instructions, testing protocol, product plan, and licensing notices.
+- `docs/research/` — the supplied Wispr Flow vs TypeWhisper PDF and a short index linking both research reports to HushKey decisions.
 - `Scripts/` — deterministic icon generation and app packaging helpers; the package script builds in a temporary directory and publishes only `dist/HushKey.app`.
 - `.build/` — hidden local Xcode test/build output; excluded from source control and cleared by packaging to prevent stale app copies.
 - `dist/HushKey.app` — the one packaged app to open.
@@ -53,13 +54,16 @@ Make ordinary voice and whispered dictation usable locally on a Mac, while keepi
 
 - **Completed:** make Voice/Whisper dictation the launch screen; keep Setup, Train, Evaluate, and Silent Use in a separate Silent Lab.
 - **Completed:** add global start/stop dictation, live local transcription, transcript editing, copy, safe phrase insertion, recent local history, and personal vocabulary hints.
+- **Completed:** add five local writing modes, common app mapping, explicit spoken correction with raw restore, optional transient nearby terms, and a focus-checked insertion undo shortcut.
 - **Completed:** defer Motion access until the Silent Lab opens; display live state and avoid presenting a failed evidence result as a pass.
-- **Next:** in a fresh session, validate voice permission, microphone selection, transcription, shortcuts, and insertion into TextEdit and another app; then extend language choice and optional text cleanup if desired.
+- **Next:** in a fresh session, validate microphone/Speech permissions, real voice and whisper capture, shortcuts, context opt-in, insertion, and undo in TextEdit and another app; address failures before adding file transcription or meeting workflows.
 
 ## Completion checks
 
 - A first-time user can start dictating without pairing headphones or granting Motion access.
 - Voice and whisper dictation can be reviewed, edited, copied, and inserted into a supported text field.
+- Spoken corrections preserve a locally recoverable raw transcript; writing modes format only documented deterministic tokens.
+- Nearby context remains off by default and reads only a bounded text-field slice after an explicit Accessibility opt-in.
 - The dictation shortcut works while another app is frontmost.
 - Recent transcripts and personal terms stay in local storage.
 - The Silent Lab explains its permissions, evidence gates, and experimental limits.

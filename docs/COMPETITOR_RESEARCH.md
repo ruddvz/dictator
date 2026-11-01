@@ -20,7 +20,7 @@ The common expectation is now: a global shortcut; insertion at the cursor; usefu
 
 ## HushKey today
 
-The current app already has on-device Apple Speech recognition, configurable start/stop shortcuts, editable output, copy, guarded one-time insertion, local history, microphone/language controls, personal vocabulary and phrase snippets. Silent Lab remains a separate, evidence-gated experiment. It does **not** yet have downloadable speech models, AI rewriting, per-app writing styles, voice editing of selected text, file transcription, workflow automation, or undo/restore of an inserted transcript. See the [README](../README.md) and [product plan](PRODUCT_PLAN.md) for shipped behavior and limits.
+The current app has on-device Apple Speech recognition, configurable start/stop shortcuts, editable output, copy, guarded one-time insertion, local history, microphone/language controls, personal vocabulary and phrase snippets. The Dictation screen now adds Natural, Message, Email, Code, and Automatic modes; app-identifier mapping; explicit spoken correction cues with raw-transcript restore; optional transient nearby-text hints; and guarded one-step insertion undo. Silent Lab remains a separate, evidence-gated experiment. HushKey still lacks downloadable speech models, LLM rewriting, voice editing of selected text, file transcription, meeting capture, and workflow/plugin automation. See the [README](../README.md) and [product plan](PRODUCT_PLAN.md) for shipped behavior and limits.
 
 ## What HushKey could offer that matters
 
@@ -58,10 +58,14 @@ No competitor feature list removes the feasibility constraint: headphone motion 
 ## Recommended sequence
 
 1. Complete and fix the voice-dictation acceptance check.
-2. Add clear capture states, recovery, insertion undo, and raw-text restore.
-3. Improve vocabulary/snippets and add a few explicit writing modes.
-4. Evaluate a local speech-engine option and an opt-in local polishing model.
-5. Add file transcription and subtitle export.
+2. Complete the manual voice acceptance check, including actual app focus, Accessibility insertion, and undo in TextEdit and a second app.
+3. Evaluate a downloadable local speech engine and compare it with Apple Speech before adding model choice.
+4. Add preview-first selected-text editing only if it can remain local and safely recover the original text.
+5. Add local file transcription and subtitle export after voice capture is reliable.
 6. Continue Silent Lab research independently, with no unlock unless session-separated evaluation supports it.
 
 Do not pursue meetings, cloud providers, cross-device sync, a plugin marketplace, or automatic screen context until the core has passed real-app acceptance. Those features add substantial surface area and do not solve HushKey’s current reliability gap.
+
+## Supplied Wispr Flow vs TypeWhisper report
+
+The full dated source report is included at [docs/research/Wispr_Flow_vs_TypeWhisper_Research_Report_2026-11-01.pdf](research/Wispr_Flow_vs_TypeWhisper_Research_Report_2026-11-01.pdf). Its product and licensing claims are a point-in-time scan, not hands-on testing of the apps on this Mac. The [report index](research/README.md) separates the original report from HushKey's implementation notes.

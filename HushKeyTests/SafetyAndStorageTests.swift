@@ -92,4 +92,35 @@ final class SafetyAndStorageTests: XCTestCase {
             definitions: "short intro => Hello team, my name is Rudra.")
         XCTAssertEqual(result, "Send my Hello team, my name is Rudra, please.")
     }
+
+    func testSpokenCorrectionsReplaceThePreviousPhraseAndKeepRawInputSeparate() {
+        XCTAssertEqual(DictationBacktrack.apply(to: "Send it to Alice, actually Bob."), "Send it to Bob.")
+        XCTAssertEqual(DictationBacktrack.apply(to: "Use the old route, scratch that, new route."), "Use the new route.")
+        XCTAssertEqual(DictationBacktrack.apply(to: "I like the first option."), "I like the first option.")
+    }
+
+    func testWritingModesFormatLineBreaksAndCodeTokens() {
+        XCTAssertEqual(DictationModeFormatter.format("Hello new line team", mode: .message), "Hello\nteam")
+        XCTAssertEqual(DictationModeFormatter.format("Hello new paragraph team", mode: .email), "Hello\n\nteam")
+        XCTAssertEqual(DictationCodeFormatter.format("open parenthesis value close parenthesis"), "(value)")
+        XCTAssertEqual(DictationTranscriptProcessor.process("log underscore value new line", mode: .code,
+                                                             snippets: ""), "log_value")
+    }
+
+    func testAutomaticModeMapsCommonMacAppsAndContextExtractionIsBounded() {
+        XCTAssertEqual(DictationMode.resolved(.automatic, bundleIdentifier: "com.apple.mail"), .email)
+        XCTAssertEqual(DictationMode.resolved(.automatic, bundleIdentifier: "com.todesktop.230313mzl4w4u92"), .natural)
+        XCTAssertEqual(DictationMode.resolved(.automatic, bundleIdentifier: "com.microsoft.VSCode"), .code)
+        let hints = DictationContextHintExtractor.extract(from: "Deploy AlphaWidget with build_v3 to project Redwood", limit: 2)
+        XCTAssertEqual(hints.count, 2)
+        XCTAssertTrue(hints.allSatisfy { ["AlphaWidget", "build_v3", "Redwood"].contains($0) })
+    }
+
+    func testDictationHistoryLoadsEntriesWithoutRawTranscriptField() throws {
+        let data = Data(#"[{"id":"00000000-0000-0000-0000-000000000001","createdAt":0,"text":"saved phrase"}]"#.utf8)
+        let url = FileManager.default.temporaryDirectory.appending(path: "hushkey-legacy-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try data.write(to: url)
+        XCTAssertEqual(DictationHistoryStore.load(from: url)?.first?.rawText, nil)
+    }
 }

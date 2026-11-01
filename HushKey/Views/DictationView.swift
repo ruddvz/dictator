@@ -30,15 +30,45 @@ struct DictationView: View {
     private var dictationCard: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 18) {
+                HStack(spacing: 12) {
+                    Label("Writing mode", systemImage: model.dictationMode.symbol)
+                        .font(.callout.weight(.medium))
+                    Picker("Writing mode", selection: Binding(
+                        get: { model.dictationMode },
+                        set: { model.dictationMode = $0 })) {
+                        ForEach(DictationMode.allCases) { mode in
+                            Label(mode.rawValue, systemImage: mode.symbol).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .disabled(model.audio.isRunning || model.isFinalizingDictation || model.transcriber.isFinalizing)
+                    Spacer()
+                }
+                Text(model.dictationMode == .automatic
+                     ? "Automatic selects Natural, Message, Email, or Code from the app that is frontmost when you start with the shortcut."
+                     : modeDescription(model.dictationMode))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if !model.rawDictationText.isEmpty {
+                    Label("Last capture: \(model.activeDictationMode.rawValue) · \(model.activeDictationTarget ?? "HushKey window") · \(contextHintSummary)",
+                          systemImage: "sparkle.magnifyingglass")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+
                 HStack(alignment: .top, spacing: 14) {
                     Image(systemName: model.audio.isRunning ? "waveform.circle.fill" : "mic.circle.fill")
                         .font(.system(size: 42, weight: .regular))
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(model.audio.isRunning ? Color.red : Color.accentColor)
                     VStack(alignment: .leading, spacing: 5) {
-                        Text(model.audio.isRunning ? "Listening" : "Ready when you are")
+                        Text(model.isFinalizingDictation ? "Finishing transcription" :
+                             model.audio.isRunning ? "Listening" : "Ready when you are")
                             .font(.title3.weight(.semibold))
-                        Text(model.audio.isRunning
+                        Text(model.isFinalizingDictation
+                             ? "HushKey is collecting the final on-device recognition result."
+                             : model.audio.isRunning
                              ? "Your speech is being recognized locally. Select Stop when you’re done."
                              : "Your microphone is off until you start a dictation.")
                             .font(.callout)
@@ -58,13 +88,16 @@ struct DictationView: View {
                     Button {
                         Task { await model.toggleDictation() }
                     } label: {
-                        Label(model.audio.isRunning ? "Stop dictation" : "Start dictation",
-                              systemImage: model.audio.isRunning ? "stop.fill" : "mic.fill")
+                        Label(model.isFinalizingDictation ? "Finishing…" :
+                              model.audio.isRunning ? "Stop dictation" : "Start dictation",
+                              systemImage: model.isFinalizingDictation ? "hourglass" :
+                                  model.audio.isRunning ? "stop.fill" : "mic.fill")
                             .frame(minWidth: 150)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(model.audio.isRunning ? .red : .accentColor)
                     .controlSize(.large)
+                    .disabled(model.isFinalizingDictation || model.transcriber.isFinalizing)
 
                     if model.audio.isRunning {
                         Text(model.audio.activeDeviceName ?? "Default microphone")
@@ -105,14 +138,16 @@ struct DictationView: View {
                     Text("Transcript").font(.headline)
                     Spacer()
                     if !model.transcriber.text.isEmpty {
-                        Button("Clear") { model.transcriber.clear() }
-                            .disabled(model.audio.isRunning)
+                        Button("Clear") { model.clearCurrentDictation() }
+                            .disabled(model.audio.isRunning || model.isFinalizingDictation || model.transcriber.isFinalizing)
                     }
                 }
 
-                if model.transcriber.isRunning {
+                if model.transcriber.isRunning || model.isFinalizingDictation || model.transcriber.isFinalizing {
                     ScrollView {
-                        Text(model.transcriber.text.isEmpty ? "Your words will appear here…" : model.transcriber.text)
+                        Text(model.isFinalizingDictation || model.transcriber.isFinalizing
+                             ? (model.transcriber.text.isEmpty ? "Finishing transcription…" : model.transcriber.text)
+                             : (model.transcriber.text.isEmpty ? "Your words will appear here…" : model.transcriber.text))
                             .foregroundStyle(model.transcriber.text.isEmpty ? .tertiary : .primary)
                             .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
                             .textSelection(.enabled)
@@ -140,15 +175,28 @@ struct DictationView: View {
 
                 HStack(spacing: 10) {
                     Button("Copy text", systemImage: "doc.on.doc") { model.copyDictationText() }
-                        .disabled(model.transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .disabled(model.audio.isRunning || model.isFinalizingDictation || model.transcriber.isFinalizing ||
+                                  model.transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     Button("Insert into current app", systemImage: "text.insert") { model.insertDictationText() }
                         .buttonStyle(.borderedProminent)
-                        .disabled(!model.insertion.isEnabled || model.audio.isRunning ||
+                        .disabled(!model.insertion.isEnabled || model.audio.isRunning || model.isFinalizingDictation || model.transcriber.isFinalizing ||
                                   model.transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     if !model.insertion.isEnabled {
                         Button("Enable insertion…") { model.screen = .settings }
                             .buttonStyle(.link)
                     }
+                }
+
+                if !model.audio.isRunning, !model.isFinalizingDictation, !model.transcriber.isFinalizing,
+                   !model.rawDictationText.isEmpty,
+                   model.rawDictationText != model.transcriber.text {
+                    Button("Restore original transcript", systemImage: "arrow.uturn.backward") {
+                        model.restoreRawTranscript()
+                    }
+                    .buttonStyle(.link)
+                    Text("The original on-device recognition is kept locally so you can recover it after spoken corrections or code formatting.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 if !model.insertion.status.isEmpty {
@@ -215,5 +263,20 @@ struct DictationView: View {
 
     private var transcriptBinding: Binding<String> {
         Binding(get: { model.transcriber.text }, set: { model.transcriber.replaceText($0) })
+    }
+
+    private func modeDescription(_ mode: DictationMode) -> String {
+        switch mode {
+        case .automatic: "HushKey selects a writing style from the app in front."
+        case .natural: "Keeps the on-device transcript with your vocabulary, snippets, and optional spoken corrections."
+        case .message: "Adds common message terms as local recognition hints and turns “new line” into a line break."
+        case .email: "Adds email terms as local recognition hints; “new paragraph” starts a new paragraph."
+        case .code: "Formats spoken programming tokens such as parentheses, underscores, arrows, and new lines."
+        }
+    }
+
+    private var contextHintSummary: String {
+        guard model.usesNearbyTextHints else { return "nearby hints off" }
+        return model.usedNearbyTextHints ? "nearby terms used" : "no nearby terms available"
     }
 }

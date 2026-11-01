@@ -93,11 +93,25 @@ final class AppModel {
     var dictationLanguage = UserDefaults.standard.string(forKey: "dictationLanguage") ?? "en-US" {
         didSet { UserDefaults.standard.set(dictationLanguage, forKey: "dictationLanguage") }
     }
+    var dictationMode = DictationMode(rawValue: UserDefaults.standard.string(forKey: "dictationMode") ?? "") ?? .automatic {
+        didSet { UserDefaults.standard.set(dictationMode.rawValue, forKey: "dictationMode") }
+    }
+    var usesNearbyTextHints = UserDefaults.standard.object(forKey: "useNearbyTextHints") as? Bool ?? false {
+        didSet { UserDefaults.standard.set(usesNearbyTextHints, forKey: "useNearbyTextHints") }
+    }
+    var appliesSpokenCorrections = UserDefaults.standard.object(forKey: "applySpokenCorrections") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(appliesSpokenCorrections, forKey: "applySpokenCorrections") }
+    }
     var savesDictationHistory = UserDefaults.standard.object(forKey: "saveDictationHistory") as? Bool ?? true {
         didSet { UserDefaults.standard.set(savesDictationHistory, forKey: "saveDictationHistory") }
     }
     private(set) var dictationHistory: [DictationHistoryEntry] = DictationHistoryStore.load()
     private(set) var didInsertCurrentDictation = false
+    private(set) var rawDictationText = ""
+    private(set) var activeDictationMode: DictationMode = .natural
+    private(set) var activeDictationTarget: String?
+    private(set) var usedNearbyTextHints = false
+    private(set) var isFinalizingDictation = false
     @ObservationIgnored private var lastSavedDictationText: String?
 
     // MARK: Decoding
@@ -116,10 +130,12 @@ final class AppModel {
     @ObservationIgnored private var started = false
     @ObservationIgnored private var motionStarted = false
     @ObservationIgnored private var dictationShortcutHeld = false
+    @ObservationIgnored private var dictationStartGeneration = 0
 
     init() {
         selectedWord = dataset.vocabulary.first
         insertion.onInsertShortcut = { [weak self] in self?.insertLatestOutput() }
+        insertion.onUndoShortcut = { [weak self] in self?.undoLastInsertion() }
         rebuildClassifier()
     }
 
@@ -380,6 +396,10 @@ final class AppModel {
     }
 
     func insertDictationText() {
+        guard !isFinalizingDictation, !transcriber.isFinalizing else {
+            insertion.report("Wait for the local transcript to finish before inserting it.")
+            return
+        }
         let text = transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else {
             insertion.report("Dictate something first.")
@@ -392,6 +412,10 @@ final class AppModel {
         if insertion.insert(text) { didInsertCurrentDictation = true }
     }
 
+    func undoLastInsertion() {
+        if insertion.undoLastInsertion() { didInsertCurrentDictation = false }
+    }
+
     func copyDictationText() {
         let text = transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
@@ -401,13 +425,16 @@ final class AppModel {
     }
 
     func startNewDictation() async {
+        guard !isFinalizingDictation, !transcriber.isFinalizing else { return }
         if audio.isRunning {
             stopDictation()
         }
         saveCurrentDictation()
         screen = .dictation
         transcriber.clear()
+        rawDictationText = ""
         didInsertCurrentDictation = false
+        insertion.clearUndoRecord()
         lastSavedDictationText = nil
         await startDictation()
     }
@@ -423,7 +450,7 @@ final class AppModel {
     func clearDictationHistory() {
         dictationHistory.removeAll()
         DictationHistoryStore.save(dictationHistory)
-        if !audio.isRunning {
+        if !audio.isRunning, !isFinalizingDictation, !transcriber.isFinalizing {
             transcriber.clear()
             lastSavedDictationText = nil
             didInsertCurrentDictation = false
@@ -431,36 +458,94 @@ final class AppModel {
     }
 
     func restoreDictation(_ entry: DictationHistoryEntry) {
-        guard !audio.isRunning else { return }
+        guard !audio.isRunning, !isFinalizingDictation, !transcriber.isFinalizing else { return }
         transcriber.replaceText(entry.text)
+        rawDictationText = entry.rawText ?? entry.text
         didInsertCurrentDictation = false
+        insertion.clearUndoRecord()
         lastSavedDictationText = entry.text
         screen = .dictation
     }
 
+    func restoreRawTranscript() {
+        guard !audio.isRunning, !isFinalizingDictation, !transcriber.isFinalizing,
+              !rawDictationText.isEmpty else { return }
+        transcriber.replaceText(rawDictationText)
+    }
+
+    func clearCurrentDictation() {
+        guard !audio.isRunning, !isFinalizingDictation, !transcriber.isFinalizing else { return }
+        transcriber.clear()
+        rawDictationText = ""
+        didInsertCurrentDictation = false
+        insertion.clearUndoRecord()
+        lastSavedDictationText = nil
+    }
+
+    func requestNearbyTextAccess() {
+        _ = insertion.requestAccessibilityAccessForContext()
+    }
+
     private func startDictation() async {
+        guard !isFinalizingDictation, !transcriber.isFinalizing else { return }
+        dictationStartGeneration += 1
+        let generation = dictationStartGeneration
+        let target = NSWorkspace.shared.frontmostApplication
+        let isHushKey = target?.bundleIdentifier == "com.ruddvz.hushkey"
+        activeDictationTarget = isHushKey ? nil : target?.localizedName
+        activeDictationMode = DictationMode.resolved(dictationMode,
+                                                      bundleIdentifier: isHushKey ? nil : target?.bundleIdentifier)
+        let nearbyHints = usesNearbyTextHints ? insertion.nearbyContextHints() : []
+        usedNearbyTextHints = !nearbyHints.isEmpty
+
         await audio.start()
-        guard audio.isRunning else { return }
+        guard generation == dictationStartGeneration, audio.isRunning else { return }
         let customWords = dictationTerms
             .split(whereSeparator: { $0 == "," || $0.isNewline })
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
+        let modeHints: [String]
+        switch activeDictationMode {
+        case .message: modeHints = ["DM", "FYI", "ASAP", "RSVP", "TL;DR"]
+        case .email: modeHints = ["subject", "greeting", "regards", "sincerely", "attachment", "forward"]
+        case .code: modeHints = ["underscore", "camelCase", "snake_case", "open parenthesis", "close parenthesis", "semicolon", "arrow"]
+        case .automatic, .natural: modeHints = []
+        }
         let started = await transcriber.start(sink: audio.sink, localeIdentifier: dictationLanguage,
-                                              contextualStrings: Array(Set(dataset.vocabulary + customWords)))
+                                              contextualStrings: Array(Set(dataset.vocabulary + customWords + modeHints + nearbyHints)).prefix(100).map { $0 })
+        guard generation == dictationStartGeneration, audio.isRunning else {
+            transcriber.stop()
+            audio.stop()
+            return
+        }
         if !started { audio.stop() }
     }
 
     private func stopDictation() {
-        transcriber.stop()
+        guard audio.isRunning else { return }
+        dictationStartGeneration += 1
+        isFinalizingDictation = true
+        if transcriber.isRunning { transcriber.beginFinalization() }
+        else { transcriber.stop() }
         audio.stop()
-        transcriber.replaceText(DictationSnippetExpander.expand(transcriber.text, definitions: dictationSnippets))
-        saveCurrentDictation()
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            let rawText = await transcriber.waitForFinalization()
+            rawDictationText = rawText
+            let processed = DictationTranscriptProcessor.process(rawText, mode: activeDictationMode,
+                                                                  snippets: dictationSnippets,
+                                                                  applyCorrections: appliesSpokenCorrections)
+            transcriber.replaceText(processed)
+            saveCurrentDictation()
+            isFinalizingDictation = false
+        }
     }
 
     private func saveCurrentDictation() {
         let text = transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard savesDictationHistory, !text.isEmpty, text != lastSavedDictationText else { return }
-        let entry = DictationHistoryEntry(text: text)
+        let raw = rawDictationText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let entry = DictationHistoryEntry(text: text, rawText: raw.isEmpty || raw == text ? nil : raw)
         dictationHistory.insert(entry, at: 0)
         dictationHistory = Array(dictationHistory.prefix(50))
         lastSavedDictationText = text

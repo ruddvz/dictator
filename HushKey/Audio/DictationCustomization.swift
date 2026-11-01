@@ -14,6 +14,183 @@ struct DictationLanguage: Identifiable, Hashable {
     .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
 }
 
+enum DictationMode: String, CaseIterable, Identifiable {
+    case automatic = "Automatic"
+    case natural = "Natural"
+    case message = "Message"
+    case email = "Email"
+    case code = "Code"
+
+    var id: String { rawValue }
+
+    var symbol: String {
+        switch self {
+        case .automatic: "sparkles"
+        case .natural: "text.alignleft"
+        case .message: "bubble.left"
+        case .email: "envelope"
+        case .code: "chevron.left.forwardslash.chevron.right"
+        }
+    }
+
+    static func resolved(_ requested: DictationMode, bundleIdentifier: String?) -> DictationMode {
+        guard requested == .automatic else { return requested }
+        let bundle = (bundleIdentifier ?? "").lowercased()
+        if bundle == "com.apple.mail" || bundle.contains("outlook") { return .email }
+        if bundle == "com.apple.mobilesms" || bundle.contains("slack") ||
+            bundle.contains("discord") || bundle.contains("teams") { return .message }
+        if bundle == "com.apple.dt.xcode" || bundle.contains("vscode") ||
+            bundle.contains("cursor") || bundle.contains("antigravity") ||
+            bundle.contains("jetbrains") || bundle == "com.apple.terminal" ||
+            bundle == "com.googlecode.iterm2" || bundle == "com.mitchellh.ghostty" { return .code }
+        return .natural
+    }
+}
+
+enum DictationContextHintExtractor {
+    private static let stopWords: Set<String> = [
+        "about", "after", "again", "also", "and", "are", "been", "before", "being", "but",
+        "can", "could", "did", "does", "for", "from", "get", "had", "has", "have", "her",
+        "here", "him", "his", "how", "into", "its", "just", "like", "make", "more", "most",
+        "not", "our", "out", "over", "please", "project", "same", "should", "some", "such", "than", "that",
+        "the", "their", "them", "then", "there", "these", "they", "this", "those", "through",
+        "under", "until", "very", "want", "was", "were", "what", "when", "where", "which",
+        "while", "with", "would", "you", "your"
+    ]
+
+    static func extract(from text: String, limit: Int = 24) -> [String] {
+        guard limit > 0,
+              let expression = try? NSRegularExpression(pattern: #"[\p{L}_$][\p{L}\p{N}_$.-]{2,}"#) else { return [] }
+        let range = NSRange(text.startIndex..., in: text)
+        var seen = Set<String>()
+        var distinctiveHints: [String] = []
+        var otherHints: [String] = []
+        for match in expression.matches(in: text, range: range).reversed() {
+            guard let wordRange = Range(match.range, in: text) else { continue }
+            let word = String(text[wordRange]).trimmingCharacters(in: CharacterSet(charactersIn: ".-$"))
+            guard word.count >= 3,
+                  !stopWords.contains(word.lowercased()),
+                  seen.insert(word.lowercased()).inserted else { continue }
+            let distinctive = word.contains(where: \.isNumber) || word.contains("_") || word.contains(".") ||
+                word.rangeOfCharacter(from: .uppercaseLetters) != nil
+            guard distinctive || word.count >= 5 else { continue }
+            if distinctive { distinctiveHints.append(word) }
+            else { otherHints.append(word) }
+        }
+        return Array((distinctiveHints + otherHints).prefix(limit))
+    }
+}
+
+enum DictationBacktrack {
+    private static let markerExpression = try! NSRegularExpression(
+        pattern: #"(?:,\s*|;\s*)(?:scratch\s+that|actually|i\s+mean|no)\s*,?\s+"#,
+        options: [.caseInsensitive])
+    private static let anchorExpression = try! NSRegularExpression(
+        pattern: #"(?i)\b(for|on|at|in|to|from|with|is|was|be|called|named|equals)\s+([\p{L}\p{N}_'’.-]+(?:\s+[\p{L}\p{N}_'’.-]+){0,3})$"#)
+    private static let wordExpression = try! NSRegularExpression(pattern: #"[\p{L}\p{N}_'’.-]+"#)
+
+    /// Applies only explicit mid-sentence correction cues; raw recognition remains available to restore.
+    static func apply(to raw: String) -> String {
+        var result = raw
+        for _ in 0..<8 {
+            let fullRange = NSRange(result.startIndex..., in: result)
+            let nsResult = result as NSString
+            guard let match = markerExpression.matches(in: result, range: fullRange).last else { break }
+            let prefixRaw = nsResult.substring(to: match.range.location)
+            let suffixRaw = nsResult.substring(from: NSMaxRange(match.range))
+            let prefix = prefixRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+                .replacingOccurrences(of: #"[,;:]$"#, with: "", options: .regularExpression)
+            let suffix = suffixRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !prefix.isEmpty, !suffix.isEmpty,
+                  wordExpression.numberOfMatches(in: suffix, range: NSRange(suffix.startIndex..., in: suffix)) <= 8 else { break }
+
+            let prefixNSString = prefix as NSString
+            let anchorRange = anchorExpression.firstMatch(in: prefix,
+                                                          range: NSRange(location: 0, length: prefixNSString.length))
+            var correctedPrefix = prefix
+            if let anchorRange, anchorRange.range(at: 2).location != NSNotFound,
+               let tailRange = Range(anchorRange.range(at: 2), in: prefix) {
+                correctedPrefix.replaceSubrange(tailRange, with: suffix)
+            } else {
+                let suffixWords = wordExpression.numberOfMatches(in: suffix,
+                    range: NSRange(suffix.startIndex..., in: suffix))
+                let removeCount = max(1, min(4, suffixWords))
+                let prefixWords = wordExpression.matches(in: prefix,
+                    range: NSRange(prefix.startIndex..., in: prefix))
+                guard prefixWords.count > 1,
+                      let removalStart = Range(prefixWords[max(0, prefixWords.count - removeCount)].range, in: prefix)?.lowerBound else {
+                    break
+                }
+                correctedPrefix = String(prefix[..<removalStart]).trimmingCharacters(in: .whitespacesAndNewlines)
+                if correctedPrefix.isEmpty { break }
+                correctedPrefix += " " + suffix
+            }
+
+            let leading = String(prefixRaw.prefix(while: { $0.isWhitespace || $0.isNewline }))
+            result = leading + correctedPrefix
+        }
+        return result
+    }
+}
+
+enum DictationCodeFormatter {
+    private static let replacements: [(String, String)] = [
+        (#"new\s+line"#, "\n"),
+        (#"open\s+parenthesis"#, "("), (#"close\s+parenthesis"#, ")"),
+        (#"open\s+bracket"#, "["), (#"close\s+bracket"#, "]"),
+        (#"open\s+brace"#, "{"), (#"close\s+brace"#, "}"),
+        (#"double\s+quote"#, "\""), (#"single\s+quote"#, "'"),
+        (#"underscore"#, "_"), (#"backtick"#, "`"),
+        (#"equals"#, "="), (#"arrow"#, "->"),
+        (#"semicolon"#, ";"), (#"colon"#, ":"),
+        (#"comma"#, ","), (#"dot"#, "."), (#"slash"#, "/"),
+        (#"hyphen|dash"#, "-")
+    ]
+
+    static func format(_ text: String) -> String {
+        var result = text
+        for (pattern, replacement) in replacements {
+            guard let expression = try? NSRegularExpression(pattern: #"\b(?:"# + pattern + #")\b"#,
+                                                           options: [.caseInsensitive]) else { continue }
+            let range = NSRange(result.startIndex..., in: result)
+            result = expression.stringByReplacingMatches(in: result, range: range, withTemplate: replacement)
+        }
+        result = result.replacingOccurrences(of: #"[ \t]*\n[ \t]*"#, with: "\n", options: .regularExpression)
+        result = result.replacingOccurrences(of: #"([(\[{])\s+"#, with: "$1", options: .regularExpression)
+        result = result.replacingOccurrences(of: #"\s+([)\]}])"#, with: "$1", options: .regularExpression)
+        result = result.replacingOccurrences(of: #"\s*_\s*"#, with: "_", options: .regularExpression)
+        return result.replacingOccurrences(of: #"[ \t]+([,.;:])"#, with: "$1", options: .regularExpression)
+    }
+}
+
+enum DictationModeFormatter {
+    static func format(_ text: String, mode: DictationMode) -> String {
+        guard mode == .message || mode == .email else { return text }
+        var result = text
+        let paragraphBreak = mode == .email ? "\n\n" : "\n"
+        let replacements = [(#"new\s+paragraph"#, paragraphBreak), (#"new\s+line"#, "\n")]
+        for (pattern, replacement) in replacements {
+            guard let expression = try? NSRegularExpression(pattern: #"\b(?:"# + pattern + #")\b"#,
+                                                           options: [.caseInsensitive]) else { continue }
+            result = expression.stringByReplacingMatches(in: result,
+                                                         range: NSRange(result.startIndex..., in: result),
+                                                         withTemplate: NSRegularExpression.escapedTemplate(for: replacement))
+        }
+        return result.replacingOccurrences(of: #"[ \t]*\n[ \t]*"#, with: "\n", options: .regularExpression)
+    }
+}
+
+enum DictationTranscriptProcessor {
+    static func process(_ raw: String, mode: DictationMode, snippets: String,
+                        applyCorrections: Bool = true) -> String {
+        var result = applyCorrections ? DictationBacktrack.apply(to: raw) : raw
+        if mode == .code { result = DictationCodeFormatter.format(result) }
+        else { result = DictationModeFormatter.format(result, mode: mode) }
+        return DictationSnippetExpander.expand(result, definitions: snippets)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
 enum DictationSnippetExpander {
     /// Lines use `spoken cue => expanded text`; only complete word or phrase matches expand.
     static func expand(_ text: String, definitions: String) -> String {

@@ -45,6 +45,18 @@ Report how many segments are triggered and accepted. Repeat after reseating the 
 
 Start a session recording explicitly. If the microphone is active, audio is stored locally alongside motion for later alignment. Export only when needed, and delete logs or templates from the Local data & privacy panel when finished. Do not share recordings without consent from everyone recorded.
 
+## Voice dictation acceptance
+
+Run this separately from the AirPods motion study:
+
+1. Start from the packaged `dist/HushKey.app`; grant Microphone and Speech permissions only if the user wants live dictation. Confirm the selected language supports on-device recognition.
+2. Dictate one short normal-voice phrase and one whispered phrase. Stop immediately after the final word and confirm the app finishes recognition instead of dropping the last partial result.
+3. Try an explicit “scratch that” correction, restore the original recognition, and confirm history keeps the processed text and raw text separately.
+4. Test Code formatting in a code editor and the Automatic mapping from TextEdit, Mail, Messages, and an editor using the global shortcut. Confirm the last-capture status shows the selected mode and app.
+5. Leave nearby text hints off first. If the user enables them, grant Accessibility access separately, confirm a supported non-secure text field is required, then verify HushKey only reports extracted terms and saves no surrounding text.
+6. In TextEdit and one other supported app, insert once, confirm the clipboard did not change, then press `⌥⇧U` immediately while the same field is unchanged. Confirm that the insert is removed; change focus or edit the field and confirm undo fails closed.
+7. Reload the local history entry, restore raw recognition, clear the current draft, and clear history. Confirm microphone audio is never stored by ordinary dictation.
+
 ## Build and test
 
 Run `xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build test`. Unit tests use synthetic signals and verify classifier behavior, capture segmentation, permission/connection state transitions, dataset persistence, and secure-target insertion guards. They do not emulate AirPods or prove real-world feasibility.
