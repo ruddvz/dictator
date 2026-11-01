@@ -72,6 +72,7 @@ final class AppModel {
     }
     private(set) var experimentSessionID = UUID()
     var dataMessage: String?
+    private(set) var dictationHistoryMessage: String?
 
     var captureShortcut: CaptureShortcut = CaptureShortcut(
         rawValue: UserDefaults.standard.string(forKey: CaptureShortcut.preferenceKey) ?? "") ?? .default {
@@ -130,7 +131,7 @@ final class AppModel {
     private(set) var activeDictationTarget: String?
     private(set) var usedNearbyTextHints = false
     private(set) var isFinalizingDictation = false
-    @ObservationIgnored private var lastSavedDictationText: String?
+    @ObservationIgnored private(set) var lastSavedDictationText: String?
 
     // MARK: Decoding
 
@@ -417,8 +418,12 @@ final class AppModel {
     }
 
     func insertDictationText() {
-        guard !isFinalizingDictation, !transcriber.isFinalizing else {
-            insertion.report("Wait for the local transcript to finish before inserting it.")
+        if let reason = DictationInsertionGate.blockedReason(
+            audioIsRunning: audio.isRunning,
+            recognitionIsRunning: transcriber.isRunning,
+            isFinalizing: isFinalizingDictation || transcriber.isFinalizing
+        ) {
+            insertion.report(reason)
             return
         }
         let text = transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -495,8 +500,14 @@ final class AppModel {
     }
 
     func clearDictationHistory() {
-        dictationHistory.removeAll()
-        DictationHistoryStore.save(dictationHistory)
+        do {
+            try DictationHistoryStore.delete()
+            dictationHistory.removeAll()
+            dictationHistoryMessage = "Saved transcript history was deleted from this Mac."
+        } catch {
+            dictationHistoryMessage = "Could not delete transcript history: \(error.localizedDescription)"
+            return
+        }
         if !audio.isRunning, !isFinalizingDictation, !transcriber.isFinalizing {
             transcriber.clear()
             lastSavedDictationText = nil
@@ -506,12 +517,13 @@ final class AppModel {
 
     func restoreDictation(_ entry: DictationHistoryEntry, useRawText: Bool = false) {
         guard !audio.isRunning, !isFinalizingDictation, !transcriber.isFinalizing else { return }
-        transcriber.replaceText(useRawText ? (entry.rawText ?? entry.text) : entry.text)
+        let restoredText = useRawText ? (entry.rawText ?? entry.text) : entry.text
+        transcriber.replaceText(restoredText)
         rawDictationText = entry.rawText ?? entry.text
         clearLocalTransformUndo()
         didInsertCurrentDictation = false
         insertion.clearUndoRecord()
-        lastSavedDictationText = entry.text
+        lastSavedDictationText = restoredText
         screen = .dictation
     }
 
@@ -519,6 +531,7 @@ final class AppModel {
         guard !audio.isRunning, !isFinalizingDictation, !transcriber.isFinalizing,
               !rawDictationText.isEmpty else { return }
         transcriber.replaceText(rawDictationText)
+        lastSavedDictationText = rawDictationText.trimmingCharacters(in: .whitespacesAndNewlines)
         clearLocalTransformUndo()
     }
 
@@ -591,13 +604,19 @@ final class AppModel {
 
     private func saveCurrentDictation() {
         let text = transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard savesDictationHistory, !text.isEmpty, text != lastSavedDictationText else { return }
+        guard DictationHistorySaveGate.shouldSave(text: text, lastSavedText: lastSavedDictationText,
+                                                  enabled: savesDictationHistory) else { return }
         let raw = rawDictationText.trimmingCharacters(in: .whitespacesAndNewlines)
         let entry = DictationHistoryEntry(text: text, rawText: raw.isEmpty || raw == text ? nil : raw)
         dictationHistory.insert(entry, at: 0)
         dictationHistory = Array(dictationHistory.prefix(50))
         lastSavedDictationText = text
-        DictationHistoryStore.save(dictationHistory)
+        do {
+            try DictationHistoryStore.save(dictationHistory)
+            dictationHistoryMessage = nil
+        } catch {
+            dictationHistoryMessage = "This transcript could not be saved to history: \(error.localizedDescription)"
+        }
     }
 
     private func clearLocalTransformUndo() {

@@ -88,6 +88,9 @@ enum DictationBacktrack {
     private static let anchorExpression = try! NSRegularExpression(
         pattern: #"(?i)\b(called|named|equals)\s+([\p{L}\p{N}_'’.-]+(?:\s+[\p{L}\p{N}_'’.-]+){0,3})$"#)
     private static let wordExpression = try! NSRegularExpression(pattern: #"[\p{L}\p{N}_'’.-]+"#)
+    private static let safeTailBoundaries: Set<String> = [
+        "a", "an", "for", "from", "meet", "my", "on", "prefer", "select", "send", "take", "the", "to", "use", "with", "your"
+    ]
 
     /// Applies only explicit mid-sentence correction cues; raw recognition remains available to restore.
     static func apply(to raw: String) -> String {
@@ -114,13 +117,16 @@ enum DictationBacktrack {
             } else {
                 let suffixWords = wordExpression.numberOfMatches(in: suffix,
                     range: NSRange(suffix.startIndex..., in: suffix))
-                let removeCount = max(1, min(4, suffixWords))
                 let prefixWords = wordExpression.matches(in: prefix,
                     range: NSRange(prefix.startIndex..., in: prefix))
-                guard prefixWords.count > 1,
-                      let removalStart = Range(prefixWords[max(0, prefixWords.count - removeCount)].range, in: prefix)?.lowerBound else {
+                guard suffixWords > 0, suffixWords <= 4,
+                      prefixWords.count > suffixWords + 1,
+                      let removalStart = Range(prefixWords[prefixWords.count - suffixWords].range, in: prefix)?.lowerBound else {
                     break
                 }
+                let boundaryRange = prefixWords[prefixWords.count - suffixWords - 1].range
+                guard let boundary = Range(boundaryRange, in: prefix),
+                      safeTailBoundaries.contains(String(prefix[boundary]).lowercased()) else { break }
                 correctedPrefix = String(prefix[..<removalStart]).trimmingCharacters(in: .whitespacesAndNewlines)
                 if correctedPrefix.isEmpty { break }
                 correctedPrefix += " " + suffix

@@ -218,7 +218,13 @@ struct DictationView: View {
                     Text("Recent dictations").font(.headline)
                     Spacer()
                     Button("Clear history…", role: .destructive) { confirmClearHistory = true }
-                        .disabled(model.dictationHistory.isEmpty)
+                }
+                if let message = model.dictationHistoryMessage {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundStyle(message.hasPrefix("Could not") || message.hasPrefix("This transcript")
+                                         ? Color.orange : Color.primary.opacity(0.65))
+                        .textSelection(.enabled)
                 }
                 if model.dictationHistory.isEmpty {
                     ContentUnavailableView(

@@ -47,7 +47,7 @@ Before adding features, finish the manual acceptance check already listed in `PR
 - Keep a simple first-run path: choose a shortcut, confirm the mic, dictate one phrase, then edit or insert it.
 - Show recording, processing, success, and failure clearly; preserve the draft after errors.
 - Add **Undo last insertion** and **Restore raw transcript** so polishing never destroys the user's original words.
-- Upgrade vocabulary/snippets with searchable entries, import/export, placeholders, and a clear way to undo a learned correction.
+- Searchable vocabulary/snippets and raw-transcript recovery are implemented. Next, add import/export and placeholders after validating the current dictation and insertion flows.
 
 ### 3. Add real local model choice
 
@@ -55,7 +55,7 @@ Keep Apple Speech as the zero-download option. Later, evaluate one compatible do
 
 ### 4. Add optional local polishing and voice editing
 
-Start with deterministic cleanup for punctuation, spoken formatting, and phrase replacements. Then consider an opt-in on-device language model for “clean this up,” translate, or rewrite-selected-text actions. Show raw and revised text, let the user preview before insertion, and offer Undo. Never silently submit a message or run arbitrary system commands from dictated words.
+The preview-first transform workspace now offers polish, concise, professional, bullets, action items, and deterministic filler removal using the on-device Apple Foundation Model when available. Generated results remain drafts until the user applies them, and the prior transcript can be restored. The next step is voice-driven selected-text editing, with explicit selection/focus checks and recovery before any replacement. Never silently submit a message or run arbitrary system commands from dictated words.
 
 ### 5. Add small, understandable writing modes
 

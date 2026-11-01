@@ -207,7 +207,8 @@ final class WhisperKitFileTranscriber {
             let results = try await whisper!.transcribe(
                 audioPath: url.path,
                 audioInputOptions: AudioInputOptions(audioLoadingMode: .incremental),
-                decodeOptions: options)
+                decodeOptions: options,
+                callback: { _ in !Task.isCancelled })
             try Task.checkCancellation()
             text = results.map(\.text).joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
             cues = results.flatMap(\.segments).map {

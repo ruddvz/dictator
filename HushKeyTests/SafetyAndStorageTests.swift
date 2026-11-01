@@ -79,6 +79,28 @@ final class SafetyAndStorageTests: XCTestCase {
         XCTAssertEqual(DictationHistoryStore.load(from: url), entries)
     }
 
+    func testDictationHistoryDeleteRemovesMalformedFileAndMissingFileIsSuccess() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appending(path: "hushkey-history-corrupt-\(UUID().uuidString).json")
+        try Data("not json".utf8).write(to: url)
+        XCTAssertTrue(DictationHistoryStore.containsFile(at: url))
+
+        try DictationHistoryStore.delete(at: url)
+        XCTAssertFalse(DictationHistoryStore.containsFile(at: url))
+        try DictationHistoryStore.delete(at: url)
+    }
+
+    func testInsertionGateRejectsCaptureAndFinalization() {
+        XCTAssertNotNil(DictationInsertionGate.blockedReason(
+            audioIsRunning: true, recognitionIsRunning: false, isFinalizing: false))
+        XCTAssertNotNil(DictationInsertionGate.blockedReason(
+            audioIsRunning: false, recognitionIsRunning: true, isFinalizing: false))
+        XCTAssertNotNil(DictationInsertionGate.blockedReason(
+            audioIsRunning: false, recognitionIsRunning: false, isFinalizing: true))
+        XCTAssertNil(DictationInsertionGate.blockedReason(
+            audioIsRunning: false, recognitionIsRunning: false, isFinalizing: false))
+    }
+
     @MainActor
     func testDictationIsTheFirstScreen() {
         let model = AppModel()
@@ -97,6 +119,8 @@ final class SafetyAndStorageTests: XCTestCase {
         XCTAssertEqual(DictationBacktrack.apply(to: "Send it to Alice, actually Bob."), "Send it to Bob.")
         XCTAssertEqual(DictationBacktrack.apply(to: "Use the old route, scratch that, new route."), "Use the new route.")
         XCTAssertEqual(DictationBacktrack.apply(to: "I want to meet Tuesday, actually Thursday."), "I want to meet Thursday.")
+        XCTAssertEqual(DictationBacktrack.apply(to: "Let's meet Friday afternoon, actually Thursday."),
+                       "Let's meet Friday afternoon, actually Thursday.")
         XCTAssertEqual(DictationBacktrack.apply(to: "I like the first option."), "I like the first option.")
     }
 
@@ -161,9 +185,17 @@ final class SafetyAndStorageTests: XCTestCase {
 
         model.restoreDictation(entry)
         XCTAssertEqual(model.transcriber.text, "Clean transcript.")
+        XCTAssertFalse(DictationHistorySaveGate.shouldSave(text: model.transcriber.text,
+                                                            lastSavedText: model.lastSavedDictationText,
+                                                            enabled: true))
 
         model.restoreDictation(entry, useRawText: true)
         XCTAssertEqual(model.transcriber.text, "Um, clean transcript.")
+        model.restoreRawTranscript()
+        XCTAssertEqual(model.transcriber.text, "Um, clean transcript.")
+        XCTAssertFalse(DictationHistorySaveGate.shouldSave(text: model.transcriber.text,
+                                                            lastSavedText: model.lastSavedDictationText,
+                                                            enabled: true))
     }
 
     func testPersonalVocabularySplitsAndDeduplicatesLocalHints() {

@@ -89,6 +89,20 @@ Run the voice checklist with normal and whispered speech, TextEdit plus one othe
 - Fixed the explicit Xcode project file lists so the new service and screen are compiled; updated README, competitor research, and product plan.
 - Built and strictly signature-verified `dist/HushKey.app` (version 1.0, bundle ID `com.ruddvz.hushkey`). Automated tests do not establish generated-text quality or microphone/insertion behavior. The native computer-use pipe still closes before live UI inspection; manual app acceptance is the next step.
 
+## Completed — dictation reliability hardening
+
+- Blocked the global insert shortcut while microphone capture, recognition, or finalization is active so it cannot insert a partial transcript.
+- Made history deletion remove the stored file directly, including malformed history files; deletion and save failures now appear in the Dictation screen.
+- Limited automatic spoken corrections to recognizable phrase boundaries, preserving ambiguous raw wording instead of silently corrupting it.
+- Prevented raw transcript restore from being saved as a duplicate history entry and added regression coverage.
+- Connected WhisperKit cancellation to its transcription callback so decoding can stop early when the user cancels.
+- `xcodebuild test`: 27 tests passed, including on-device Foundation Model generation. Release packaging succeeded; `dist/HushKey.app` passes strict signature verification (version 1.0, `com.ruddvz.hushkey`).
+- Live inspection returned HushKey’s Dictation accessibility tree. Further HushKey navigation failed when the computer-use native pipe closed; opening Wispr Flow timed out. No microphone, Accessibility, or AirPods permissions were changed. Live voice, insertion, and screenshot-backed UI acceptance remain open.
+
+## Next item — manual dictation acceptance
+
+In a fresh session, use the app with the user present to accept Microphone, Speech, and Accessibility prompts as needed; check normal and whispered dictation, active-capture insertion blocking, and one-time insertion plus undo in TextEdit and a second app. Then inspect current HushKey and Wispr Flow screens with computer use and tune any visible UX defects. Keep the AirPods motion experiment separate from this acceptance.
+
 ## Next item — live dictation acceptance
 
 In a fresh session, verify the packaged app in TextEdit and a second supported app: microphone permission, normal speech and whisper, global shortcut behavior, history search/raw restore, insertion, duplicate prevention, and undo. Then continue with meeting capture and summaries, voice editing of selected text, and workflow automation using original HushKey code and license-compatible dependencies.
