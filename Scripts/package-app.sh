@@ -19,4 +19,11 @@ rm -rf "$project_root/dist/HushKey.app"
 mv "$staged_app" "$project_root/dist/HushKey.app"
 # Remove stale Xcode products that can make Finder or the Dock pick a Debug build.
 rm -rf "$project_root/build" "$project_root/.build"
+derived_data_root="$HOME/Library/Developer/Xcode/DerivedData"
+for stale_app in "$derived_data_root"/HushKey-*/Build/Products/{Debug,Release}/HushKey.app; do
+  if [[ -d "$stale_app" ]]; then
+    /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -u "$stale_app" >/dev/null 2>&1 || true
+    rm -rf "$stale_app"
+  fi
+done
 echo "Built $project_root/dist/HushKey.app"

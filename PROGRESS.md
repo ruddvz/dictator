@@ -16,10 +16,12 @@
 - Changed HushKey from a menu-bar-only utility to a normal windowed Mac app while retaining the menu-bar shortcut, added a custom icon, and moved packaging builds to a disposable temporary folder so Finder search has one distributable app.
 - Canonical local app location: `dist/HushKey.app`. Spotlight indexing now returns this one app bundle; old visible build copies are removed and new package builds use a disposable temporary folder.
 - Refreshed the visual identity around an H keycap and quiet motion trace, added a matching monochrome menu-bar mark, moved page headings to native system typography, and made Setup recovery actions open the relevant system settings.
+- End-to-end audit: all 10 automated tests pass; the Release app builds, packages, and verifies. Setup now offers direct Bluetooth and Sound settings actions when no headphone-motion stream is present. Removed stale HushKey Debug/Release app bundles from Xcode DerivedData; Spotlight now resolves only the packaged app.
+- Live hardware check found the AirPods are not connected and MacBook Pro Speakers are the selected output. HushKey therefore has no live motion samples and correctly stays in Setup; decoding, live capture, and insertion could not be hardware-validated in this state.
 
 ## Next item — AirPods hardware validation
 
-In a fresh session, connect the user's compatible headphones as the Mac's active audio output, grant Motion permission, verify a live sample stream, and run the study in [docs/TESTING_PROTOCOL.md](docs/TESTING_PROTOCOL.md). The current app shows **Waiting for headphones**; HushKey has not been tested with live headphone motion. The exact AirPods generation remains unverified.
+In a fresh session, connect the user's compatible headphones in Bluetooth, select them as the Mac's active audio output, grant Motion permission if prompted, verify a live sample stream, and run the study in [docs/TESTING_PROTOCOL.md](docs/TESTING_PROTOCOL.md). The exact AirPods generation remains unverified.
 
 ## Naming note
 

@@ -134,7 +134,7 @@ struct SetupView: View {
         case .streaming:
             "A live motion stream is arriving. You can now collect training examples."
         case .waiting:
-            "Connect supported head-tracking headphones and choose them as this Mac’s sound output. HushKey detects the live stream, but cannot identify the exact model."
+            "No compatible headphone-motion stream is arriving. Pair your headphones in Bluetooth settings, then select them under Sound → Output. HushKey confirms support when live samples arrive."
         case .denied:
             "Allow HushKey under System Settings → Privacy & Security → Motion, then reopen the app."
         case .unsupported:
@@ -144,41 +144,33 @@ struct SetupView: View {
         }
     }
 
-    private var actionTitle: String {
-        switch model.motion.status {
-        case .streaming: "Continue to training"
-        case .denied: "Open Motion Settings"
-        case .waiting, .unsupported, .error: "Open Sound Settings"
-        }
-    }
-
-    private var actionSymbol: String {
-        switch model.motion.status {
-        case .streaming: "arrow.right"
-        case .denied: "lock.open"
-        case .waiting, .unsupported, .error: "speaker.wave.2"
-        }
-    }
-
     @ViewBuilder
     private var primaryActionButton: some View {
-        if model.motion.status == .streaming {
-            Button(actionTitle, systemImage: actionSymbol, action: primaryAction)
-                .buttonStyle(.borderedProminent)
-        } else {
-            Button(actionTitle, systemImage: actionSymbol, action: primaryAction)
-                .buttonStyle(.bordered)
-        }
-    }
-
-    private func primaryAction() {
         switch model.motion.status {
         case .streaming:
-            model.screen = .train
+            Button("Continue to training", systemImage: "arrow.right") {
+                model.screen = .train
+            }
+                .buttonStyle(.borderedProminent)
         case .denied:
-            openSystemSettings("x-apple.systempreferences:com.apple.preference.security?Privacy_Motion")
-        case .waiting, .unsupported, .error:
-            openSystemSettings("x-apple.systempreferences:com.apple.Sound-Settings.extension")
+            Button("Open Motion Settings", systemImage: "lock.open") {
+                openSystemSettings("x-apple.systempreferences:com.apple.preference.security?Privacy_Motion")
+            }
+                .buttonStyle(.bordered)
+        case .waiting:
+            Button("Bluetooth Settings", systemImage: "dot.radiowaves.left.and.right") {
+                openSystemSettings("x-apple.systempreferences:com.apple.BluetoothSettings")
+            }
+            .buttonStyle(.borderedProminent)
+            Button("Sound Settings", systemImage: "speaker.wave.2") {
+                openSystemSettings("x-apple.systempreferences:com.apple.Sound-Settings.extension")
+            }
+            .buttonStyle(.bordered)
+        case .unsupported, .error:
+            Button("Open Sound Settings", systemImage: "speaker.wave.2") {
+                openSystemSettings("x-apple.systempreferences:com.apple.Sound-Settings.extension")
+            }
+            .buttonStyle(.bordered)
         }
     }
 
