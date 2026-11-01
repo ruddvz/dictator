@@ -57,6 +57,14 @@ Run this separately from the AirPods motion study:
 6. In TextEdit and one other supported app, insert once, confirm the clipboard did not change, then press `⌥⇧U` immediately while the same field is unchanged. Confirm that the insert is removed; change focus or edit the field and confirm undo fails closed.
 7. Reload the local history entry, restore raw recognition, clear the current draft, and clear history. Confirm microphone audio is never stored by ordinary dictation.
 
+## Local file transcription acceptance
+
+1. Import a short consented audio file and transcribe it with Apple Speech. Confirm HushKey refuses remote fallback when the selected language lacks on-device support.
+2. Edit the transcript, save TXT, and export SRT and WebVTT. Check subtitle timestamps against the source audio and confirm the source file remains unchanged.
+3. Choose a WhisperKit model and explicitly download it. Verify the download state reaches completion and the model appears in `~/Library/Application Support/HushKey/WhisperKitModels/`.
+4. Disconnect from the network after download and transcribe a local file with WhisperKit. Reopen HushKey to confirm the model remains available, then remove it and confirm the model files are deleted.
+5. Repeat with files of increasing length. Watch memory use and report engine, model variant, language, file duration, first-run download time, transcription time, and qualitative errors. Do not claim a model is more accurate without a representative benchmark.
+
 ## Build and test
 
 Run `xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build test`. Unit tests use synthetic signals and verify classifier behavior, capture segmentation, permission/connection state transitions, dataset persistence, and secure-target insertion guards. They do not emulate AirPods or prove real-world feasibility.

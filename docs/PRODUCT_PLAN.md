@@ -31,7 +31,8 @@ Make ordinary voice and whispered dictation usable locally on a Mac, while keepi
 3. **Train** — Choose normal voice, whisper, or silent mouthing as an experiment condition; select a word; capture, inspect, and remove motion templates.
 4. **Evaluate** — Select a condition and feature set; check study readiness; see leave-one-out results, majority baseline, permutation result, session holdout, and confusion matrix.
 5. **Silent Use** — Experimental trained-word decoding. Hold to capture or use calibrated auto-capture after evidence passes; inspect accepted/rejected words. Threshold tuning and candidate distances stay under Advanced.
-6. **Settings & Data** — Dictation language and mode controls, spoken-correction preference, shortcut and vocabulary hints, opt-in nearby context, local snippets and transcript-history control, motion capture and insertion shortcuts, microphone input, synchronized session recording, local data, export, and deletion.
+6. **Transcribe files** — Import one audio file, choose Apple on-device Speech or an explicitly downloaded WhisperKit model, edit the local transcript, and export TXT, SRT, or WebVTT with timestamps.
+7. **Settings & Data** — Dictation language and mode controls, spoken-correction and filler-cleanup preferences, shortcut and vocabulary hints, opt-in nearby context, local snippets and transcript-history control, motion capture and insertion shortcuts, microphone input, synchronized session recording, local data, export, and deletion.
 
 ## File map
 
@@ -55,8 +56,9 @@ Make ordinary voice and whispered dictation usable locally on a Mac, while keepi
 - **Completed:** make Voice/Whisper dictation the launch screen; keep Setup, Train, Evaluate, and Silent Use in a separate Silent Lab.
 - **Completed:** add global start/stop dictation, live local transcription, transcript editing, copy, safe phrase insertion, recent local history, and personal vocabulary hints.
 - **Completed:** add five local writing modes, common app mapping, explicit spoken correction with raw restore, optional transient nearby terms, and a focus-checked insertion undo shortcut.
+- **Completed:** add conservative optional filler cleanup, snippet-line validation, Apple on-device audio-file transcription, and downloadable WhisperKit model selection with local storage and TXT/SRT/WebVTT export.
 - **Completed:** defer Motion access until the Silent Lab opens; display live state and avoid presenting a failed evidence result as a pass.
-- **Next:** in a fresh session, validate microphone/Speech permissions, real voice and whisper capture, shortcuts, context opt-in, insertion, and undo in TextEdit and another app; address failures before adding file transcription or meeting workflows.
+- **Next:** complete manual acceptance of microphone/Speech, normal voice and whisper, global shortcuts, TextEdit and a second-app insertion/undo, history, and both file engines. Then compare Apple Speech and WhisperKit on consented local sample audio before recommending a default model. Meeting workflows remain deferred until this acceptance passes.
 
 ## Completion checks
 
@@ -67,6 +69,7 @@ Make ordinary voice and whispered dictation usable locally on a Mac, while keepi
 - The dictation shortcut works while another app is frontmost.
 - Recent transcripts and personal terms stay in local storage.
 - The Silent Lab explains its permissions, evidence gates, and experimental limits.
+- File transcription can run with Apple Speech when available or with an explicitly downloaded local WhisperKit model, and supports editable transcripts plus SRT/WebVTT export.
 - A trained word shows its sample count and can be captured without confusing it with a session recording.
 - Evaluation explains what passes or blocks silent use.
 - The Use screen prioritizes capture and transcript; advanced controls remain available.

@@ -9,6 +9,8 @@ struct ContentView: View {
                 Section("WRITE") {
                     Label(AppModel.Screen.dictation.rawValue, systemImage: AppModel.Screen.dictation.symbol)
                         .tag(AppModel.Screen.dictation)
+                    Label(AppModel.Screen.files.rawValue, systemImage: AppModel.Screen.files.symbol)
+                        .tag(AppModel.Screen.files)
                 }
                 Section("SILENT LAB") {
                     ForEach([AppModel.Screen.setup, .train, .evaluate, .use]) { screen in
@@ -25,6 +27,7 @@ struct ContentView: View {
         } detail: {
             switch model.screen {
             case .dictation: DictationView()
+            case .files: FileTranscriptionView()
             case .setup: SetupView()
             case .train: TrainView()
             case .evaluate: EvaluateView()

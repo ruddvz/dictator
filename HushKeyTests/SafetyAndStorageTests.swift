@@ -96,6 +96,7 @@ final class SafetyAndStorageTests: XCTestCase {
     func testSpokenCorrectionsReplaceThePreviousPhraseAndKeepRawInputSeparate() {
         XCTAssertEqual(DictationBacktrack.apply(to: "Send it to Alice, actually Bob."), "Send it to Bob.")
         XCTAssertEqual(DictationBacktrack.apply(to: "Use the old route, scratch that, new route."), "Use the new route.")
+        XCTAssertEqual(DictationBacktrack.apply(to: "I want to meet Tuesday, actually Thursday."), "I want to meet Thursday.")
         XCTAssertEqual(DictationBacktrack.apply(to: "I like the first option."), "I like the first option.")
     }
 
@@ -105,6 +106,35 @@ final class SafetyAndStorageTests: XCTestCase {
         XCTAssertEqual(DictationCodeFormatter.format("open parenthesis value close parenthesis"), "(value)")
         XCTAssertEqual(DictationTranscriptProcessor.process("log underscore value new line", mode: .code,
                                                              snippets: ""), "log_value")
+    }
+
+    func testOptionalCleanupRemovesOnlyStandaloneFillersAndKeepsRawRestorable() {
+        XCTAssertEqual(DictationLocalCleanup.removeFillers(from: "Um, could you, uh, send it?"), "could you send it?")
+        XCTAssertEqual(DictationLocalCleanup.removeFillers(from: "The umbrella is here."), "The umbrella is here.")
+        XCTAssertEqual(DictationLocalCleanup.removeFillers(from: "ER is the emergency room."), "ER is the emergency room.")
+        XCTAssertEqual(DictationTranscriptProcessor.process("Um, use foo underscore bar", mode: .code,
+                                                             snippets: "", cleanupFillers: true), "use foo_bar")
+    }
+
+    func testSnippetValidationReportsMalformedLinesWithoutRejectingValidEntries() {
+        let validation = DictationSnippetExpander.validation(for: "email => person@example.com\nbad line\nshort =>")
+        XCTAssertEqual(validation.validCount, 1)
+        XCTAssertEqual(validation.invalidLines, [2, 3])
+        XCTAssertEqual(DictationSnippetExpander.expand(
+            "Open C++ and message @name.",
+            definitions: "C++ => C plus plus\n@name => Rudra"), "Open C plus plus and message Rudra.")
+        let duplicateValidation = DictationSnippetExpander.validation(for: "C++ => C plus plus\nc++ => another expansion")
+        XCTAssertEqual(duplicateValidation.validCount, 1)
+        XCTAssertEqual(duplicateValidation.invalidLines, [2])
+    }
+
+    func testSubtitleExportsUseSRTAndWebVTTTimestamps() {
+        let cues = [SubtitleCue(start: 1.25, duration: 0.8, text: "Hello."),
+                    SubtitleCue(start: 61.1, duration: 1.2, text: "Goodbye.")]
+        XCTAssertEqual(SubtitleFormatter.srt(cues),
+                       "1\n00:00:01,250 --> 00:00:02,050\nHello.\n\n2\n00:01:01,100 --> 00:01:02,300\nGoodbye.\n")
+        XCTAssertEqual(SubtitleFormatter.vtt(cues),
+                       "WEBVTT\n\n00:00:01.250 --> 00:00:02.050\nHello.\n\n00:01:01.100 --> 00:01:02.300\nGoodbye.\n")
     }
 
     func testAutomaticModeMapsCommonMacAppsAndContextExtractionIsBounded() {

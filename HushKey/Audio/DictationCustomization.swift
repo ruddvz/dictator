@@ -86,7 +86,7 @@ enum DictationBacktrack {
         pattern: #"(?:,\s*|;\s*)(?:scratch\s+that|actually|i\s+mean|no)\s*,?\s+"#,
         options: [.caseInsensitive])
     private static let anchorExpression = try! NSRegularExpression(
-        pattern: #"(?i)\b(for|on|at|in|to|from|with|is|was|be|called|named|equals)\s+([\p{L}\p{N}_'’.-]+(?:\s+[\p{L}\p{N}_'’.-]+){0,3})$"#)
+        pattern: #"(?i)\b(called|named|equals)\s+([\p{L}\p{N}_'’.-]+(?:\s+[\p{L}\p{N}_'’.-]+){0,3})$"#)
     private static let wordExpression = try! NSRegularExpression(pattern: #"[\p{L}\p{N}_'’.-]+"#)
 
     /// Applies only explicit mid-sentence correction cues; raw recognition remains available to restore.
@@ -182,8 +182,9 @@ enum DictationModeFormatter {
 
 enum DictationTranscriptProcessor {
     static func process(_ raw: String, mode: DictationMode, snippets: String,
-                        applyCorrections: Bool = true) -> String {
+                        applyCorrections: Bool = true, cleanupFillers: Bool = false) -> String {
         var result = applyCorrections ? DictationBacktrack.apply(to: raw) : raw
+        if cleanupFillers { result = DictationLocalCleanup.removeFillers(from: result) }
         if mode == .code { result = DictationCodeFormatter.format(result) }
         else { result = DictationModeFormatter.format(result, mode: mode) }
         return DictationSnippetExpander.expand(result, definitions: snippets)
@@ -191,7 +192,43 @@ enum DictationTranscriptProcessor {
     }
 }
 
+enum DictationLocalCleanup {
+    private static let fillerExpression = try! NSRegularExpression(
+        pattern: #"(?i)(?:,\s*|\s+)?(?<![\p{L}\p{N}_])(?:um+|uh+|erm+)(?![\p{L}\p{N}_])(?:\s*,)?"#)
+
+    /// Conservative, optional cleanup: removes only standalone filler words.
+    static func removeFillers(from text: String) -> String {
+        var result = fillerExpression.stringByReplacingMatches(
+            in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "")
+        result = result.replacingOccurrences(of: #"\s+([,.;:!?])"#, with: "$1", options: .regularExpression)
+        result = result.replacingOccurrences(of: #"^[\s,;:!?]+"#, with: "", options: .regularExpression)
+        result = result.replacingOccurrences(of: #"[ \t]{2,}"#, with: " ", options: .regularExpression)
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
 enum DictationSnippetExpander {
+    static func validation(for definitions: String) -> (validCount: Int, invalidLines: [Int]) {
+        var validCount = 0
+        var invalidLines: [Int] = []
+        var seenCues = Set<String>()
+        for (offset, rawLine) in definitions.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
+            let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !line.isEmpty else { continue }
+            let parts = line.components(separatedBy: "=>")
+            let cue = parts.first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let replacement = parts.dropFirst().joined(separator: "=>").trimmingCharacters(in: .whitespacesAndNewlines)
+            let key = cue.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            let hasValidPattern = !cue.isEmpty && (try? NSRegularExpression(pattern: boundaryPattern(for: cue))) != nil
+            if parts.count >= 2, hasValidPattern, !replacement.isEmpty, seenCues.insert(key).inserted {
+                validCount += 1
+            } else {
+                invalidLines.append(offset + 1)
+            }
+        }
+        return (validCount, invalidLines)
+    }
+
     /// Lines use `spoken cue => expanded text`; only complete word or phrase matches expand.
     static func expand(_ text: String, definitions: String) -> String {
         var result = text
@@ -204,11 +241,18 @@ enum DictationSnippetExpander {
                 let replacement = parts.dropFirst().joined(separator: "=>").trimmingCharacters(in: .whitespacesAndNewlines)
                 return cue.isEmpty || replacement.isEmpty ? nil : (cue, replacement)
             }
+            .reduce(into: [(String, String)]()) { unique, snippet in
+                let alreadyPresent = unique.contains {
+                    $0.0.compare(snippet.0, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+                }
+                if !alreadyPresent { unique.append(snippet) }
+            }
             .sorted { $0.0.count > $1.0.count }
 
         for (cue, replacement) in snippets {
             guard let expression = try? NSRegularExpression(
-                pattern: "(?i)\\b\(NSRegularExpression.escapedPattern(for: cue))\\b([,.;:!?])?") else { continue }
+                pattern: boundaryPattern(for: cue) + "([,.;:!?])?",
+                options: [.caseInsensitive]) else { continue }
             let range = NSRange(result.startIndex..., in: result)
             for match in expression.matches(in: result, range: range).reversed() {
                 guard let whole = Range(match.range, in: result) else { continue }
@@ -224,5 +268,9 @@ enum DictationSnippetExpander {
             }
         }
         return result
+    }
+
+    private static func boundaryPattern(for cue: String) -> String {
+        "(?<![\\p{L}\\p{N}_])" + NSRegularExpression.escapedPattern(for: cue) + "(?![\\p{L}\\p{N}_])"
     }
 }

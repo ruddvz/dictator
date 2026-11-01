@@ -32,7 +32,7 @@ private struct ResearchReportsCard: View {
     @State private var status: String?
 
     var body: some View {
-        GroupBox("Research reports") {
+        GroupBox("Reports, local models & licenses") {
             VStack(alignment: .leading, spacing: 8) {
                 Text("The supplied comparison and HushKey's competitor notes are bundled with this app and open locally.")
                     .font(.caption)
@@ -42,6 +42,18 @@ private struct ResearchReportsCard: View {
                 }
                 Button("Open HushKey competitor notes", systemImage: "list.bullet.rectangle") {
                     openResource("COMPETITOR_RESEARCH", extension: "md")
+                }
+                Button("Open local speech model notes", systemImage: "waveform") {
+                    openResource("LOCAL_MODEL_EVALUATION", extension: "md")
+                }
+                Button("Open licenses and attribution", systemImage: "doc.text") {
+                    openResource("NOTICE", extension: "md")
+                }
+                Button("Open Argmax MIT license", systemImage: "doc.text") {
+                    openResource("ARGMAX-MIT-LICENSE", extension: "txt")
+                }
+                Button("Open third-party notices", systemImage: "doc.text") {
+                    openResource("ARGMAX-NOTICES", extension: "txt")
                 }
                 if let status {
                     Text(status).font(.caption).foregroundStyle(.secondary)
@@ -83,6 +95,10 @@ private struct DictationSettingsCard: View {
                     .foregroundStyle(.secondary)
                 Toggle("Apply explicit spoken corrections", isOn: $model.appliesSpokenCorrections)
                 Text("Recognizes cues such as “scratch that” or “actually” after a pause. The original recognition stays available to restore.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Toggle("Remove common filler words", isOn: $model.cleansDictationFillers)
+                Text("Optional local cleanup removes only standalone “um”, “uh”, and “erm”. It does not rewrite your wording, and the raw transcript can be restored.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Toggle("Use nearby text as optional vocabulary hints", isOn: $model.usesNearbyTextHints)
@@ -128,6 +144,13 @@ private struct DictationSettingsCard: View {
                 Text("One per line: spoken cue => expanded phrase. HushKey expands complete cue matches locally when you stop dictating.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                let validation = DictationSnippetExpander.validation(for: model.dictationSnippets)
+                Label(validation.invalidLines.isEmpty
+                      ? "\(validation.validCount) snippet\(validation.validCount == 1 ? "" : "s") ready"
+                      : "\(validation.validCount) ready · fix line\(validation.invalidLines.count == 1 ? "" : "s") \(validation.invalidLines.map(String.init).joined(separator: ", "))",
+                      systemImage: validation.invalidLines.isEmpty ? "checkmark.circle" : "exclamationmark.circle")
+                    .font(.caption)
+                    .foregroundStyle(validation.invalidLines.isEmpty ? Color.secondary : Color.orange)
                 Toggle("Save recent transcripts on this Mac", isOn: $model.savesDictationHistory)
                 Text("Turn this off to stop adding new dictations to history. Clear saved text from the Dictation screen.")
                     .font(.caption)

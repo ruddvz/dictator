@@ -8,6 +8,8 @@ HushKey is a native macOS dictation app with a separate experimental lab for sil
 - The app opens to Voice & Whisper dictation. Use the button, hold the configurable global shortcut (`⌥⇧D` by default), or choose press-to-toggle; then review/edit, copy, or optionally insert a complete phrase into a supported text field.
 - Speech recognition uses Apple's on-device Speech framework and exposes languages supported for on-device recognition on this Mac. HushKey does not send audio to a remote service.
 - Dictation includes Natural, Message, Email, Code, and Automatic modes; explicit spoken corrections with raw-transcript restore; local vocabulary/snippets; and a one-step guarded insertion undo. Automatic mode maps common Mac app identifiers when started with the global shortcut.
+- Optional local filler cleanup removes only standalone “um”, “uh”, and “erm”; it is off by default. Snippet settings report malformed lines instead of silently ignoring them.
+- **Transcribe files** accepts one audio file at a time and exports editable text, SRT, or WebVTT captions. Choose Apple Speech for zero-download on-device recognition where supported, or explicitly download a WhisperKit model for offline inference after setup. Model downloads require internet; audio files are not uploaded.
 - Optional nearby-text hints are off by default. After a separate Accessibility opt-in, HushKey reads only a bounded slice around the cursor in a supported text field to extract local recognition terms; it discards the slice and does not store it.
 - Recent transcripts can be saved on this Mac (enabled by default and switchable in Settings). HushKey does not save microphone audio during ordinary dictation.
 - Motion input uses Apple's `CMHeadphoneMotionManager`. It sees processed head motion from compatible head-tracking headphones, not an inward-facing speech sensor or the AirPods speech-detecting accelerometer.
@@ -63,9 +65,10 @@ HushKey uses Accessibility to inspect the frontmost app and focused control, all
 - Templates: `~/Library/Application Support/HushKey/dataset.json`.
 - Recent dictations: `~/Library/Application Support/HushKey/dictation-history.json`.
 - Experiment sessions: `~/Documents/HushKey/Sessions/`, with motion CSV, event CSV, metadata, and optional microphone audio.
-- No telemetry, upload, cloud service, or paid API is used by HushKey.
+- No telemetry, remote text processing, or paid API is used by HushKey. WhisperKit model files are fetched only after the user asks to download a model; the selected file is then processed locally.
 - Use **Settings & Data** to configure shortcuts and vocabulary hints, choose the microphone, enable/disable transcript history, record synchronized sessions, export the dataset or sessions, and delete local files. Clear recent transcripts from the Dictation screen.
 - Voice recognition requires the user to start the mic and is local-only; no remote recognition fallback is used. Audio is saved only if the separate research recorder is explicitly active.
+- WhisperKit models are stored at `~/Library/Application Support/HushKey/WhisperKitModels/`; choose **Remove model** in **Transcribe files** to reclaim the downloaded model files.
 - Nearby-text hints require an explicit opt-in and Accessibility permission. HushKey extracts terms transiently; it does not save the surrounding text.
 
 ## Project naming
@@ -76,7 +79,7 @@ HushKey is the requested working name for this private prototype. A separate pub
 
 Headphone motion is processed and low-rate (often about 25 Hz). Jaw movement and head motion can dominate the signal, and reseating the headphones can change the measurements. A result on a small trained vocabulary does not establish arbitrary phrase recognition. Voice, whisper, and silent-mouthing results must be evaluated separately and across sessions before drawing conclusions.
 
-HushKey does not include downloadable ASR models, LLM rewriting, selected-text voice editing, file transcription, meeting recording, or workflow/plugin automation. Its writing modes are small deterministic local formatting presets, not full Wispr Flow or TypeWhisper parity. Speech languages depend on what macOS supports for on-device recognition on this Mac. These are separate features from the silent-motion experiment and are not implied by the current build.
+HushKey does not include LLM rewriting, selected-text voice editing, meeting recording, or workflow/plugin automation. Its writing modes and filler cleanup are deterministic local rules, not a generative cleanup model or full Wispr Flow or TypeWhisper parity. Apple Speech and WhisperKit language support depends on the chosen local engine. These are separate features from the silent-motion experiment and are not implied by the current build.
 
 ## Research reports
 

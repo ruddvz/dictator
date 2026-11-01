@@ -12,6 +12,7 @@ struct DecodedWord: Identifiable, Hashable {
 final class AppModel {
     enum Screen: String, CaseIterable, Identifiable {
         case dictation = "Dictation"
+        case files = "Transcribe files"
         case setup = "Setup"
         case train = "Train"
         case evaluate = "Evaluate"
@@ -21,6 +22,7 @@ final class AppModel {
         var symbol: String {
             switch self {
             case .dictation: "mic"
+            case .files: "waveform.badge.mic"
             case .setup: "headphones"
             case .train: "square.stack.3d.up"
             case .evaluate: "chart.bar.xaxis"
@@ -33,6 +35,8 @@ final class AppModel {
     let motion = HeadphoneMotionService()
     let audio = AudioService()
     let transcriber = MicTranscriber()
+    let fileTranscriber = LocalFileTranscriber()
+    let whisperFileTranscriber = WhisperKitFileTranscriber()
     let insertion = TextInsertionService()
     let capture = CaptureController()
     let recorder = SessionRecorder()
@@ -101,6 +105,9 @@ final class AppModel {
     }
     var appliesSpokenCorrections = UserDefaults.standard.object(forKey: "applySpokenCorrections") as? Bool ?? true {
         didSet { UserDefaults.standard.set(appliesSpokenCorrections, forKey: "applySpokenCorrections") }
+    }
+    var cleansDictationFillers = UserDefaults.standard.object(forKey: "cleanDictationFillers") as? Bool ?? false {
+        didSet { UserDefaults.standard.set(cleansDictationFillers, forKey: "cleanDictationFillers") }
     }
     var savesDictationHistory = UserDefaults.standard.object(forKey: "saveDictationHistory") as? Bool ?? true {
         didSet { UserDefaults.standard.set(savesDictationHistory, forKey: "saveDictationHistory") }
@@ -194,7 +201,7 @@ final class AppModel {
                               label: prediction.best?.label ?? "", confidence: prediction.confidence)
         case .settings:
             recorder.logEvent(segment, kind: "segment", label: recorder.prompt, confidence: nil)
-        case .dictation, .setup, .evaluate:
+        case .dictation, .files, .setup, .evaluate:
             if recorder.isRecording {
                 recorder.logEvent(segment, kind: "segment", label: recorder.prompt, confidence: nil)
             }
@@ -231,6 +238,7 @@ final class AppModel {
         case .train: return selectedWord != nil && motion.status == .streaming
         case .use: return useCaptureMode == .hold && isMotionInferenceEnabled && classifier != nil
         case .dictation: return false
+        case .files: return false
         case .settings: return false
         case .setup, .evaluate: return false
         }
@@ -534,7 +542,8 @@ final class AppModel {
             rawDictationText = rawText
             let processed = DictationTranscriptProcessor.process(rawText, mode: activeDictationMode,
                                                                   snippets: dictationSnippets,
-                                                                  applyCorrections: appliesSpokenCorrections)
+                                                                  applyCorrections: appliesSpokenCorrections,
+                                                                  cleanupFillers: cleansDictationFillers)
             transcriber.replaceText(processed)
             saveCurrentDictation()
             isFinalizingDictation = false
