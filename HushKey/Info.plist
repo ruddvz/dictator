@@ -21,9 +21,7 @@
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>LSApplicationCategoryType</key>
-	<string>public.app-category.developer-tools</string>
-	<key>LSUIElement</key>
-	<true/>
+	<string>public.app-category.productivity</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>HushKey records microphone audio only when you start a local comparison session.</string>
 	<key>NSMotionUsageDescription</key>

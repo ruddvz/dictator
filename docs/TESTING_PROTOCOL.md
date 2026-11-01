@@ -47,4 +47,4 @@ Start a session recording explicitly. If the microphone is active, audio is stor
 
 ## Build and test
 
-Run `xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath build test`. Unit tests use synthetic signals and verify classifier behavior, capture segmentation, permission/connection state transitions, dataset persistence, and secure-target insertion guards. They do not emulate AirPods or prove real-world feasibility.
+Run `xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build test`. Unit tests use synthetic signals and verify classifier behavior, capture segmentation, permission/connection state transitions, dataset persistence, and secure-target insertion guards. They do not emulate AirPods or prove real-world feasibility.

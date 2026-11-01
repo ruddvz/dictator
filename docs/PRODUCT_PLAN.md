@@ -12,6 +12,7 @@ Help one person test whether processed headphone motion can distinguish a small,
 - Separate per-word template capture from synchronized session recording; they save different data.
 - Keep voice comparison, advanced thresholds, diagnostics, and Accessibility insertion optional and clearly labeled.
 - Preserve macOS conventions, keyboard access, readable hierarchy, and the current appearance setting.
+- Open as a standard resizable Mac window, with the menu-bar item as a secondary shortcut rather than the only way into the app.
 - Never present a low-confidence nearest match as a successful word.
 
 ## Primary navigation
@@ -31,14 +32,18 @@ Help one person test whether processed headphone motion can distinguish a small,
 - `HushKey/Recording/` — local synchronized experiment sessions.
 - `HushKey/Services/` — Accessibility insertion and system hotkey handling.
 - `HushKey/Views/` — one view file per workflow plus shared visual components.
+- `HushKey/Assets.xcassets/` — HushKey's app icon and bundled visual assets.
 - `HushKeyTests/` — classifier, permission-state, insertion-safety, and storage tests.
 - `docs/` — user build instructions, testing protocol, product plan, and licensing notices.
-- `Scripts/` — app packaging helpers.
+- `Scripts/` — deterministic icon generation and app packaging helpers; the package script builds in a temporary directory and publishes only `dist/HushKey.app`.
+- `.build/` — hidden local Xcode test/build output; excluded from source control.
+- `dist/HushKey.app` — the one packaged app to open.
 
 ## Current delivery sequence
 
 - **Completed:** split the interface into Setup, Train, Evaluate, Use, and Settings & Data; make first-run guidance and decoding eligibility explicit; document the screen and source layout.
-- **Next:** visually inspect the rebuilt screens, connect compatible AirPods as the Mac's active output, verify the live stream and Motion permission, then run the study in `TESTING_PROTOCOL.md`.
+- **Completed:** opened the packaged build as a standard desktop app and confirmed the Setup window renders; Spotlight now resolves only to the canonical `dist/HushKey.app` package rather than the old visible Debug/Release copies.
+- **Next:** connect compatible AirPods as the Mac's active output, verify the live stream and Motion permission, then run the study in `TESTING_PROTOCOL.md`.
 - **After hardware results:** adjust thresholds or interaction only from measured false-positive and held-out accuracy results. Do not expand to free-form dictation unless evidence supports it.
 
 ## Completion checks

@@ -4,10 +4,19 @@ set -euo pipefail
 project_root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$project_root"
 
+swift Scripts/generate-app-icon.swift
 xcodegen generate
-xcodebuild -project HushKey.xcodeproj -scheme HushKey -configuration Release -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
-app_path="$project_root/build/Build/Products/Release/HushKey.app"
+derived_data="$(mktemp -d "${TMPDIR:-/tmp}/HushKey-build.XXXXXX")"
+trap 'rm -rf "$derived_data"' EXIT
+xcodebuild -project HushKey.xcodeproj -scheme HushKey -configuration Release -derivedDataPath "$derived_data" CODE_SIGNING_ALLOWED=NO build
+app_path="$derived_data/Build/Products/Release/HushKey.app"
 mkdir -p "$project_root/dist"
-ditto "$app_path" "$project_root/dist/HushKey.app"
-codesign --force --deep --sign - --timestamp=none "$project_root/dist/HushKey.app"
+staged_app="$project_root/dist/HushKey.app.staging"
+rm -rf "$staged_app"
+ditto "$app_path" "$staged_app"
+codesign --force --deep --sign - --timestamp=none "$staged_app"
+rm -rf "$project_root/dist/HushKey.app"
+mv "$staged_app" "$project_root/dist/HushKey.app"
+# Remove the old visible Xcode build tree that produced duplicate Finder results.
+rm -rf "$project_root/build"
 echo "Built $project_root/dist/HushKey.app"

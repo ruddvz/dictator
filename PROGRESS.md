@@ -12,11 +12,13 @@
 - Reorganized navigation into Setup → Train → Evaluate → Use, with Settings & Data separated from per-word capture.
 - Added a first-run motion readiness path, per-word training progress, a dedicated evidence screen, explicit silent-use lock reasons, and optional advanced diagnostics.
 - Moved insertion, microphone, session recording, and local data controls into Settings & Data; documented the interface and file map in [docs/PRODUCT_PLAN.md](docs/PRODUCT_PLAN.md).
-- Updated the XcodeGen project and verified a macOS build plus all 10 tests. A visual screenshot review remains outstanding because the desktop control bridge could not attach to the menu-bar app.
+- Updated the XcodeGen project and verified a macOS build plus all 10 tests. Opened the packaged build and confirmed its standard Setup window is visible.
+- Changed HushKey from a menu-bar-only utility to a normal windowed Mac app while retaining the menu-bar shortcut, added a custom icon, and moved packaging builds to a disposable temporary folder so Finder search has one distributable app.
+- Canonical local app location: `dist/HushKey.app`. Spotlight indexing now returns this one app bundle; old visible build copies are removed and new package builds use a disposable temporary folder.
 
-## Next item — visual and hardware validation
+## Next item — AirPods hardware validation
 
-In a fresh session, inspect the rebuilt screens at the intended window size, then connect the user's AirPods as the Mac's active audio output, grant Motion permission, verify a live sample stream, and run the study in [docs/TESTING_PROTOCOL.md](docs/TESTING_PROTOCOL.md). The current Mac showed an AirPods Pro device entry, but MacBook Pro Speakers were the active output; HushKey has not been tested with live AirPods motion. The exact AirPods generation remains unverified.
+In a fresh session, connect the user's AirPods as the Mac's active audio output, grant Motion permission, verify a live sample stream, and run the study in [docs/TESTING_PROTOCOL.md](docs/TESTING_PROTOCOL.md). The current app shows **Waiting for AirPods**; HushKey has not been tested with live AirPods motion. The exact AirPods generation remains unverified.
 
 ## Naming note
 

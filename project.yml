@@ -19,14 +19,14 @@ targets:
       path: HushKey/Info.plist
       properties:
         CFBundleDisplayName: HushKey
-        LSUIElement: true
-        LSApplicationCategoryType: public.app-category.developer-tools
+        LSApplicationCategoryType: public.app-category.productivity
         NSMotionUsageDescription: HushKey reads processed head motion from compatible headphones for local silent-mouthing experiments.
         NSMicrophoneUsageDescription: HushKey records microphone audio only when you start a local comparison session.
         NSSpeechRecognitionUsageDescription: HushKey uses on-device speech recognition only when available, as a local comparison reference.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ruddvz.hushkey
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
   HushKeyTests:
     type: bundle.unit-test
     platform: macOS
