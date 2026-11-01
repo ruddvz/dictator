@@ -149,7 +149,7 @@ In a fresh session, with the user present, verify microphone and Speech prompts,
 ## Completed — recoverable file transcription history
 
 - Added local file-transcription job records for engine, language/model, source filename, editable transcript, and timed subtitle cues. Source audio is never copied into HushKey's history.
-- Apple Speech and WhisperKit now save completed or partial text when their transcription service finishes, even if the user leaves the Files screen. Editing a restored transcript is debounced and saved locally.
+- Apple Speech and WhisperKit now save completed or partial text when their transcription service finishes, even if the user leaves the Files screen. Editing a restored transcript is debounced, and the Files screen checkpoints its current draft when it closes.
 - Added searchable, restorable recent jobs, per-job deletion, and delete-all confirmation. Choosing a new audio file no longer destroys the prior job.
 - Added storage and lifecycle regression coverage. `xcodebuild ... test`: 38 passed, 0 failed, 0 skipped. The first build exposed that XcodeGen needed regeneration to include a new source file; regenerated project and reran successfully.
 - Built `dist/HushKey.app` in Release configuration and verified its ad-hoc code signature. Resource bundle and app identifier are present.

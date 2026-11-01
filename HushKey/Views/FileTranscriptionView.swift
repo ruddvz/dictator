@@ -217,6 +217,10 @@ struct FileTranscriptionView: View {
             }
         }
         .onChange(of: currentText) { _, _ in scheduleSessionSave() }
+        .onDisappear {
+            pendingSaveTask?.cancel()
+            persistActiveSession()
+        }
         .confirmationDialog("Delete all saved file transcripts?", isPresented: $confirmClearHistory,
                             titleVisibility: .visible) {
             Button("Delete transcripts", role: .destructive) { clearHistory() }
