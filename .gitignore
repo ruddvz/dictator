@@ -1,0 +1,6 @@
+build/
+dist/
+DerivedData/
+HushKey.xcodeproj/
+*.xcuserstate
+.DS_Store
