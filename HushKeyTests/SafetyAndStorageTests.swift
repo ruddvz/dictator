@@ -24,6 +24,12 @@ final class SafetyAndStorageTests: XCTestCase {
         XCTAssertEqual(taps?.first?["uid"] as? String, "system-tap")
     }
 
+    func testBothSidesMeetingSourceStopsTheSystemAudioCaptureEngine() {
+        XCTAssertEqual(MeetingAudioSource.both.captureRoute, .systemAudio)
+        XCTAssertEqual(MeetingAudioSource.systemAudio.captureRoute, .systemAudio)
+        XCTAssertEqual(MeetingAudioSource.microphone.captureRoute, .microphone)
+    }
+
     func testCombinedMeetingAudioDownmixesSourceChannelsForSpeech() throws {
         let format = try XCTUnwrap(AVAudioFormat(commonFormat: .pcmFormatFloat32,
                                                  sampleRate: 48_000,
@@ -193,6 +199,23 @@ final class SafetyAndStorageTests: XCTestCase {
             audioIsRunning: false, recognitionIsRunning: false, isFinalizing: true))
         XCTAssertNil(DictationInsertionGate.blockedReason(
             audioIsRunning: false, recognitionIsRunning: false, isFinalizing: false))
+        XCTAssertNotNil(DictationInsertionGate.blockedReason(
+            audioIsRunning: false, recognitionIsRunning: false,
+            isFinalizing: false, meetingCaptureIsActive: true))
+    }
+
+    @MainActor
+    func testGlobalInsertShortcutOnlyRoutesCurrentOutputScreens() {
+        XCTAssertEqual(AppModel.insertionOutputRoute(for: .dictation), .dictation)
+        XCTAssertEqual(AppModel.insertionOutputRoute(for: .transforms), .dictation)
+        XCTAssertEqual(AppModel.insertionOutputRoute(for: .use), .silentPrediction)
+        XCTAssertEqual(AppModel.insertionOutputRoute(for: .meetings), .unavailable)
+        XCTAssertEqual(AppModel.insertionOutputRoute(for: .files), .unavailable)
+        XCTAssertEqual(AppModel.insertionOutputRoute(for: .personalization), .unavailable)
+        XCTAssertEqual(AppModel.insertionOutputRoute(for: .settings), .unavailable)
+        XCTAssertEqual(AppModel.insertionOutputRoute(for: .train), .unavailable)
+        XCTAssertEqual(AppModel.insertionOutputRoute(for: .evaluate), .unavailable)
+        XCTAssertEqual(AppModel.insertionOutputRoute(for: .setup), .unavailable)
     }
 
     @MainActor

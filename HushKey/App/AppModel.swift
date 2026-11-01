@@ -38,6 +38,12 @@ final class AppModel {
         }
     }
 
+    enum InsertionOutputRoute: Equatable {
+        case dictation
+        case silentPrediction
+        case unavailable
+    }
+
     let motion = HeadphoneMotionService()
     let audio = AudioService()
     let transcriber = MicTranscriber()
@@ -406,6 +412,14 @@ final class AppModel {
     }
 
     func insertLatestPrediction() {
+        guard screen == .use else {
+            insertion.report("Open Silent Use before inserting a trained-word prediction.")
+            return
+        }
+        guard captureGate.owner == nil else {
+            insertion.report("Stop active capture before inserting a trained-word prediction.")
+            return
+        }
         guard let word = decoded.last, word.prediction.accepted else {
             insertion.report("No accepted prediction is ready to insert.")
             return
@@ -418,10 +432,25 @@ final class AppModel {
     }
 
     func insertLatestOutput() {
-        if screen == .dictation || screen == .transforms {
+        guard captureGate.owner != .meeting else {
+            insertion.report("Stop meeting capture before inserting text.")
+            return
+        }
+        switch Self.insertionOutputRoute(for: screen) {
+        case .dictation:
             insertDictationText()
-        } else {
+        case .silentPrediction:
             insertLatestPrediction()
+        case .unavailable:
+            insertion.report("Open Dictation or Silent Use before inserting text.")
+        }
+    }
+
+    static func insertionOutputRoute(for screen: Screen) -> InsertionOutputRoute {
+        switch screen {
+        case .dictation, .transforms: .dictation
+        case .use: .silentPrediction
+        default: .unavailable
         }
     }
 
@@ -429,7 +458,8 @@ final class AppModel {
         if let reason = DictationInsertionGate.blockedReason(
             audioIsRunning: audio.isRunning,
             recognitionIsRunning: transcriber.isRunning,
-            isFinalizing: isFinalizingDictation || transcriber.isFinalizing
+            isFinalizing: isFinalizingDictation || transcriber.isFinalizing,
+            meetingCaptureIsActive: captureGate.owner == .meeting
         ) {
             insertion.report(reason)
             return

@@ -7,6 +7,15 @@ enum MeetingAudioSource: String, CaseIterable, Identifiable {
     case both = "Both sides"
 
     var id: String { rawValue }
+
+    var captureRoute: MeetingAudioCaptureRoute {
+        self == .microphone ? .microphone : .systemAudio
+    }
+}
+
+enum MeetingAudioCaptureRoute: Equatable {
+    case microphone
+    case systemAudio
 }
 
 /// Explicit meeting capture. Audio buffers are streamed to on-device Speech and never written to disk.
@@ -43,7 +52,7 @@ final class MeetingNotesService {
     }
 
     var activeAudioLevel: Float {
-        activeAudioSource == .microphone ? audio.level : systemAudio.level
+        activeAudioSource?.captureRoute == .microphone ? audio.level : systemAudio.level
     }
 
     func start(localeIdentifier: String, contextualStrings: [String] = [], dictationIsBusy: Bool) async {
@@ -76,21 +85,20 @@ final class MeetingNotesService {
             return
         }
 
-        switch source {
+        switch source.captureRoute {
         case .microphone:
             await audio.start()
         case .systemAudio:
-            await systemAudio.start()
-        case .both:
-            await systemAudio.start(includeMicrophone: true, microphoneDeviceID: audio.selectedDeviceID)
+            await systemAudio.start(includeMicrophone: source == .both,
+                                    microphoneDeviceID: source == .both ? audio.selectedDeviceID : nil)
         }
-        let sourceStarted = source == .microphone ? audio.isRunning : systemAudio.isRunning
+        let sourceStarted = source.captureRoute == .microphone ? audio.isRunning : systemAudio.isRunning
         guard startGeneration == generation, sourceStarted else {
             transcriber.stop()
-            switch source {
+            switch source.captureRoute {
             case .microphone:
                 message = audio.error ?? "Microphone capture could not start."
-            case .systemAudio, .both:
+            case .systemAudio:
                 message = systemAudio.error ?? "Meeting audio capture could not start."
             }
             captureGate.release(.meeting)
@@ -111,8 +119,14 @@ final class MeetingNotesService {
         isFinalizing = true
         let stoppedAt = Date()
         transcriber.beginFinalization()
-        if activeAudioSource == .systemAudio { systemAudio.stop() }
-        else { audio.stop() }
+        switch activeAudioSource?.captureRoute {
+        case .microphone:
+            audio.stop()
+        case .systemAudio:
+            systemAudio.stop()
+        case nil:
+            break
+        }
 
         Task { @MainActor [weak self] in
             guard let self else { return }

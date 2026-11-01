@@ -134,6 +134,14 @@ The private prototype keeps the requested HushKey name. A distinct public macOS 
 - Rebuilt `dist/HushKey.app`; strict code-signature verification passed and the packaged privacy string names both permission paths. Opened that exact bundle and confirmed the Meeting Notes picker exposes Microphone, System audio, and Both sides; left Microphone selected without starting capture.
 - Live combined capture remains unverified because no microphone or System Audio Recording permission has been granted in this session.
 
+## Completed — post-audit capture shutdown and insertion routing
+
+- Fixed a stop-path defect where **Both sides** started the aggregate system-audio engine but Stop attempted to stop the unused microphone engine. Capture now stops by source route, so combined mode tears down the tap and aggregate device before releasing the meeting gate.
+- Restricted the global insert shortcut to Dictation/Transforms or Silent Use, blocked Silent Use insertion during any active capture, and explicitly blocked dictation insertion during Meeting Notes capture. Unrelated screens can no longer paste a stale motion prediction.
+- Added regression coverage for combined-source stop routing, every screen's insert destination, and the meeting-capture insertion gate. `xcodebuild test`: 36 passed, 0 failed, 0 skipped.
+- Rebuilt `dist/HushKey.app`; strict code-signature verification passed. The app was already running from that bundle, but the computer-use pipe closed before the new process could be relaunched and its shutdown behavior inspected. Only one HushKey process was running.
+- Live microphone/system-audio shutdown and shortcut behavior remain part of manual acceptance; source-level regression tests are not proof of real audio teardown or focused-app insertion.
+
 ## Next item — manual voice and meeting-source acceptance
 
-In a fresh session, with the user present, verify microphone and Speech prompts, normal and whispered dictation, shortcuts, guarded insertion/undo, file engines, and all three Meeting Notes sources. For **Both sides**, confirm both just-in-time macOS prompts and simultaneous recognition of microphone speech and remote app playback; do not treat a successful build as proof of live audio behavior. Then compare Apple Speech and downloaded WhisperKit models on consented local audio.
+In a fresh session, with the user present, verify microphone and Speech prompts, normal and whispered dictation, shortcuts, guarded insertion/undo, file engines, and all three Meeting Notes sources. For **Both sides**, confirm both just-in-time macOS prompts, simultaneous recognition of microphone speech and remote app playback, teardown on Stop, and capture-gate release. Verify the global insert shortcut cannot paste a stale Silent Lab prediction from other screens; do not treat a successful build as proof of live behavior. Then compare Apple Speech and downloaded WhisperKit models on consented local audio.
