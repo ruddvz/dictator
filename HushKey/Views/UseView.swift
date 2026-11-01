@@ -23,8 +23,8 @@ struct UseView: View {
                 }
                 DisclosureGroup("Advanced diagnostics and comparison") {
                     VStack(alignment: .leading, spacing: 14) {
-                    lastPredictionPanel
-                    micPanel
+                        lastPredictionPanel
+                        micPanel
                     }
                     .padding(.top, 10)
                 }

@@ -84,7 +84,7 @@ struct SetupView: View {
             Text("Study path")
                 .font(.headline)
             StudyStep(number: "1", title: "Check motion", detail: "Connect headphones as the Mac’s audio output.", state: model.motion.status == .streaming ? .done : .current)
-            StudyStep(number: "2", title: "Train words", detail: "Collect 10 examples each for at least 5 words.", state: .next)
+            StudyStep(number: "2", title: "Train words", detail: "Collect 10 examples each for at least 5 words.", state: model.motion.status == .streaming ? .current : .next)
             StudyStep(number: "3", title: "Evaluate", detail: "Compare against chance and a separate session.", state: .next)
             StudyStep(number: "4", title: "Try Use", detail: "Only unlock silent decoding if the evidence passes.", state: .next)
             HStack {
@@ -93,6 +93,7 @@ struct SetupView: View {
                     model.screen = .train
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(model.motion.status != .streaming)
             }
             .padding(.top, 2)
         }
