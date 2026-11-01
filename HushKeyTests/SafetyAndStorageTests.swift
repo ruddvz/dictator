@@ -171,4 +171,47 @@ final class SafetyAndStorageTests: XCTestCase {
                        ["HushKey", "Maya", "Café"])
         XCTAssertEqual(DictationVocabulary.encode([" Maya ", "", "HushKey"]), "Maya\nHushKey")
     }
+
+    @MainActor
+    func testLocalFillerTransformRunsWithoutTheLanguageModel() async throws {
+        let service = LocalTransformService()
+        let result = try await service.transform("Um, can you, uh, send it?", using: .removeFillers)
+        XCTAssertEqual(result, "can you send it?")
+        XCTAssertFalse(service.isTransforming)
+    }
+
+    @MainActor
+    func testFoundationModelTransformRunsLocallyWhenAvailable() async throws {
+        let service = LocalTransformService()
+        guard service.modelIsAvailable else {
+            throw XCTSkip("Apple's on-device language model is not available on this Mac.")
+        }
+        let result = try await service.transform("Please send me the meeting notes tomorrow.", using: .concise)
+        XCTAssertFalse(result.isEmpty)
+        XCTAssertFalse(service.isTransforming)
+    }
+
+    @MainActor
+    func testLocalTransformCanBeUndoneAndRejectsStalePreview() {
+        let model = AppModel()
+        let previousHistorySetting = model.savesDictationHistory
+        model.savesDictationHistory = false
+        defer { model.savesDictationHistory = previousHistorySetting }
+
+        model.transcriber.replaceText("Please send this")
+        XCTAssertFalse(model.applyLocalTransform("Please send this now.", basedOn: "Older transcript"))
+        XCTAssertEqual(model.transcriber.text, "Please send this")
+
+        XCTAssertTrue(model.applyLocalTransform("Please send this now.", basedOn: "Please send this"))
+        XCTAssertEqual(model.transcriber.text, "Please send this now.")
+        XCTAssertTrue(model.canUndoLocalTransform)
+
+        model.undoLocalTransform()
+        XCTAssertEqual(model.transcriber.text, "Please send this")
+        XCTAssertFalse(model.canUndoLocalTransform)
+
+        model.transcriber.replaceText(" Please send this \n")
+        XCTAssertFalse(model.applyLocalTransform("Please send this", basedOn: " Please send this \n"))
+        XCTAssertEqual(model.transcriber.text, " Please send this \n")
+    }
 }

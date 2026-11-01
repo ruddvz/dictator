@@ -8,6 +8,7 @@ HushKey is a native macOS dictation app with a separate experimental lab for sil
 - The app opens to Voice & Whisper dictation. Use the button, hold the configurable global shortcut (`⌥⇧D` by default), or choose press-to-toggle; then review/edit, copy, or optionally insert a complete phrase into a supported text field.
 - Speech recognition uses Apple's on-device Speech framework and exposes languages supported for on-device recognition on this Mac. HushKey does not send audio to a remote service.
 - Dictation includes Natural, Message, Email, Code, and Automatic modes; explicit spoken corrections with raw-transcript restore; local vocabulary/snippets; and a one-step guarded insertion undo. Automatic mode maps common Mac app identifiers when started with the global shortcut.
+- **Transforms** offers review-first local polish, concise, professional, bullets, and action-item drafts using Apple's on-device Foundation Model when available (macOS 26+); conservative filler removal works without a model on macOS 14+. Nothing is sent to a cloud service, and the original transcript can be restored after applying a draft.
 - Optional local filler cleanup removes only standalone “um”, “uh”, and “erm”; it is off by default. Snippet settings report malformed lines instead of silently ignoring them.
 - **Transcribe files** accepts one audio file at a time and exports editable text, SRT, or WebVTT captions. Choose Apple Speech for zero-download on-device recognition where supported, or explicitly download a WhisperKit model for offline inference after setup. Model downloads require internet; audio files are not uploaded.
 - Optional nearby-text hints are off by default. After a separate Accessibility opt-in, HushKey reads only a bounded slice around the cursor in a supported text field to extract local recognition terms; it discards the slice and does not store it.
@@ -44,6 +45,11 @@ The packaged app is at `dist/HushKey.app`. The packaging script builds in an iso
 2. Choose a writing mode. **Automatic** maps common email, messaging, and code apps when the global shortcut starts dictation; **Code** formats spoken symbols, while Message and Email support spoken line breaks. Corrections such as “scratch that” are applied only with an explicit pause cue.
 3. Stop when you’re finished. Edit the recognized phrase, restore the original recognition if needed, then **Copy text** or enable Accessibility and choose **Insert into current app**. The insertion shortcut (`⌥⇧I` by default) inserts the current output once into the focused supported field. Press `⌥⇧U` immediately in that same unchanged field to undo.
 4. Search recent transcripts and restore either the processed text or original recognition. Add names under **Snippets & Vocabulary → Vocabulary** for local recognition hints. Add a spoken cue and expanded phrase under **Snippets & Vocabulary → Snippets**.
+5. Open **Transforms** to create and edit a local preview. Apply it only after review; undo restores the prior transcript. Model-backed actions require macOS 26+ with Apple's on-device model available. Filler removal uses local text rules and works on supported macOS 14+ systems.
+
+## Local transforms
+
+Choose **Polish**, **Make concise**, **Professional**, **Bullet points**, or **Action items** for a reviewable draft from Apple's on-device Foundation Model. HushKey has no remote fallback. When Apple Intelligence is unavailable or preparing, the app explains that those actions cannot run. **Remove fillers** is a deterministic local cleanup and does not require Apple Intelligence. Every draft is editable and must be explicitly applied; stale previews cannot replace a transcript that changed after generation. Undo is available until the transcript changes or is inserted.
 
 ## Silent Lab
 
@@ -79,7 +85,7 @@ HushKey is the requested working name for this private prototype. A separate pub
 
 Headphone motion is processed and low-rate (often about 25 Hz). Jaw movement and head motion can dominate the signal, and reseating the headphones can change the measurements. A result on a small trained vocabulary does not establish arbitrary phrase recognition. Voice, whisper, and silent-mouthing results must be evaluated separately and across sessions before drawing conclusions.
 
-HushKey does not include LLM rewriting, selected-text voice editing, meeting recording, or workflow/plugin automation. Its writing modes and filler cleanup are deterministic local rules, not a generative cleanup model or full Wispr Flow or TypeWhisper parity. Apple Speech and WhisperKit language support depends on the chosen local engine. These are separate features from the silent-motion experiment and are not implied by the current build.
+HushKey includes optional local text transforms, but they are not a claim of full Wispr Flow or TypeWhisper parity. A generated draft can change meaning and must be reviewed. HushKey still does not include voice editing of selected text, meeting recording/notes, or workflow/plugin automation. Apple Speech, WhisperKit, and Apple Foundation Model availability depends on the chosen local engine, supported OS, and device readiness. These are separate features from the silent-motion experiment and are not implied by its results.
 
 ## Research reports
 

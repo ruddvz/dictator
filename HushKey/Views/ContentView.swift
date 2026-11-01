@@ -9,6 +9,8 @@ struct ContentView: View {
                 Section("WRITE") {
                     Label(AppModel.Screen.dictation.rawValue, systemImage: AppModel.Screen.dictation.symbol)
                         .tag(AppModel.Screen.dictation)
+                    Label(AppModel.Screen.transforms.rawValue, systemImage: AppModel.Screen.transforms.symbol)
+                        .tag(AppModel.Screen.transforms)
                     Label(AppModel.Screen.files.rawValue, systemImage: AppModel.Screen.files.symbol)
                         .tag(AppModel.Screen.files)
                 }
@@ -29,6 +31,7 @@ struct ContentView: View {
         } detail: {
             switch model.screen {
             case .dictation: DictationView()
+            case .transforms: TransformView()
             case .files: FileTranscriptionView()
             case .setup: SetupView()
             case .train: TrainView()

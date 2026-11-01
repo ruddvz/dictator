@@ -12,6 +12,7 @@ struct DecodedWord: Identifiable, Hashable {
 final class AppModel {
     enum Screen: String, CaseIterable, Identifiable {
         case dictation = "Dictation"
+        case transforms = "Transforms"
         case files = "Transcribe files"
         case setup = "Setup"
         case train = "Train"
@@ -23,6 +24,7 @@ final class AppModel {
         var symbol: String {
             switch self {
             case .dictation: "mic"
+            case .transforms: "wand.and.stars"
             case .files: "waveform.badge.mic"
             case .setup: "headphones"
             case .train: "square.stack.3d.up"
@@ -37,6 +39,7 @@ final class AppModel {
     let motion = HeadphoneMotionService()
     let audio = AudioService()
     let transcriber = MicTranscriber()
+    let localTransformService = LocalTransformService()
     let fileTranscriber = LocalFileTranscriber()
     let whisperFileTranscriber = WhisperKitFileTranscriber()
     let insertion = TextInsertionService()
@@ -117,6 +120,12 @@ final class AppModel {
     private(set) var dictationHistory: [DictationHistoryEntry] = DictationHistoryStore.load()
     private(set) var didInsertCurrentDictation = false
     private(set) var rawDictationText = ""
+    private(set) var transformUndoOriginalText: String?
+    private(set) var transformUndoOutputText: String?
+    var canUndoLocalTransform: Bool {
+        guard let output = transformUndoOutputText else { return false }
+        return !didInsertCurrentDictation && !audio.isRunning && !isFinalizingDictation && transcriber.text == output
+    }
     private(set) var activeDictationMode: DictationMode = .natural
     private(set) var activeDictationTarget: String?
     private(set) var usedNearbyTextHints = false
@@ -203,7 +212,7 @@ final class AppModel {
                               label: prediction.best?.label ?? "", confidence: prediction.confidence)
         case .settings:
             recorder.logEvent(segment, kind: "segment", label: recorder.prompt, confidence: nil)
-        case .dictation, .files, .setup, .evaluate, .personalization:
+        case .dictation, .transforms, .files, .setup, .evaluate, .personalization:
             if recorder.isRecording {
                 recorder.logEvent(segment, kind: "segment", label: recorder.prompt, confidence: nil)
             }
@@ -240,6 +249,7 @@ final class AppModel {
         case .train: return selectedWord != nil && motion.status == .streaming
         case .use: return useCaptureMode == .hold && isMotionInferenceEnabled && classifier != nil
         case .dictation: return false
+        case .transforms: return false
         case .files: return false
         case .personalization: return false
         case .settings: return false
@@ -399,7 +409,7 @@ final class AppModel {
     }
 
     func insertLatestOutput() {
-        if screen == .dictation {
+        if screen == .dictation || screen == .transforms {
             insertDictationText()
         } else {
             insertLatestPrediction()
@@ -435,6 +445,31 @@ final class AppModel {
         insertion.report("Transcript copied to the clipboard.")
     }
 
+    @discardableResult
+    func applyLocalTransform(_ transformedText: String, basedOn sourceText: String) -> Bool {
+        guard !audio.isRunning, !isFinalizingDictation, !transcriber.isFinalizing,
+              transcriber.text == sourceText else { return false }
+        let transformed = transformedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedSource = sourceText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !transformed.isEmpty, transformed != normalizedSource else { return false }
+        transformUndoOriginalText = sourceText
+        transformUndoOutputText = transformed
+        transcriber.replaceText(transformed)
+        didInsertCurrentDictation = false
+        insertion.clearUndoRecord()
+        saveCurrentDictation()
+        return true
+    }
+
+    func undoLocalTransform() {
+        guard canUndoLocalTransform, let original = transformUndoOriginalText else { return }
+        transcriber.replaceText(original)
+        clearLocalTransformUndo()
+        didInsertCurrentDictation = false
+        insertion.clearUndoRecord()
+        saveCurrentDictation()
+    }
+
     func startNewDictation() async {
         guard !isFinalizingDictation, !transcriber.isFinalizing else { return }
         if audio.isRunning {
@@ -444,6 +479,7 @@ final class AppModel {
         screen = .dictation
         transcriber.clear()
         rawDictationText = ""
+        clearLocalTransformUndo()
         didInsertCurrentDictation = false
         insertion.clearUndoRecord()
         lastSavedDictationText = nil
@@ -472,6 +508,7 @@ final class AppModel {
         guard !audio.isRunning, !isFinalizingDictation, !transcriber.isFinalizing else { return }
         transcriber.replaceText(useRawText ? (entry.rawText ?? entry.text) : entry.text)
         rawDictationText = entry.rawText ?? entry.text
+        clearLocalTransformUndo()
         didInsertCurrentDictation = false
         insertion.clearUndoRecord()
         lastSavedDictationText = entry.text
@@ -482,12 +519,14 @@ final class AppModel {
         guard !audio.isRunning, !isFinalizingDictation, !transcriber.isFinalizing,
               !rawDictationText.isEmpty else { return }
         transcriber.replaceText(rawDictationText)
+        clearLocalTransformUndo()
     }
 
     func clearCurrentDictation() {
         guard !audio.isRunning, !isFinalizingDictation, !transcriber.isFinalizing else { return }
         transcriber.clear()
         rawDictationText = ""
+        clearLocalTransformUndo()
         didInsertCurrentDictation = false
         insertion.clearUndoRecord()
         lastSavedDictationText = nil
@@ -559,6 +598,11 @@ final class AppModel {
         dictationHistory = Array(dictationHistory.prefix(50))
         lastSavedDictationText = text
         DictationHistoryStore.save(dictationHistory)
+    }
+
+    private func clearLocalTransformUndo() {
+        transformUndoOriginalText = nil
+        transformUndoOutputText = nil
     }
 
     private func installDictationShortcut() {
