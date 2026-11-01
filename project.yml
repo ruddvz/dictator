@@ -1,0 +1,47 @@
+name: HushKey
+options:
+  bundleIdPrefix: com.ruddvz
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    CODE_SIGNING_ALLOWED: NO
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  HushKey:
+    type: application
+    platform: macOS
+    sources: [HushKey]
+    info:
+      path: HushKey/Info.plist
+      properties:
+        CFBundleDisplayName: HushKey
+        LSUIElement: true
+        LSApplicationCategoryType: public.app-category.developer-tools
+        NSMotionUsageDescription: HushKey reads processed head motion from compatible headphones for local silent-mouthing experiments.
+        NSMicrophoneUsageDescription: HushKey records microphone audio only when you start a local comparison session.
+        NSSpeechRecognitionUsageDescription: HushKey uses on-device speech recognition only when available, as a local comparison reference.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ruddvz.hushkey
+  HushKeyTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources: [HushKeyTests]
+    dependencies:
+      - target: HushKey
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ruddvz.hushkey.tests
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  HushKey:
+    build:
+      targets:
+        HushKey: all
+        HushKeyTests: [test]
+    test:
+      targets: [HushKeyTests]
