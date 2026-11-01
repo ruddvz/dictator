@@ -63,7 +63,7 @@ Let a user choose **Natural**, **Message**, **Email**, or **Code** before dictat
 
 ### 6. Expand from dictation into transcription when the core is stable
 
-The single-file Apple Speech and WhisperKit paths now exist. Meeting notes also has a microphone-only local path with searchable transcripts, export, and on-device generated notes. Next, finish manual acceptance of dictation and files; then evaluate optional system-audio capture for calls, including the additional macOS audio-recording permission and clear source-selection controls. Keep captured audio transient by default.
+The single-file Apple Speech and WhisperKit paths now exist. Meeting notes supports microphone, system-audio, or combined local capture, with searchable transcripts, export, and on-device generated notes. Next, finish manual acceptance of dictation, files, and all meeting sources. Combined capture requires both macOS audio permissions and remains unverified on live devices; keep captured audio transient by default.
 
 ### 7. Keep the silent-mouthing experiment as HushKey’s distinctive lane
 
@@ -74,7 +74,7 @@ No competitor feature list removes the feasibility constraint: headphone motion 
 1. Complete and fix the manual voice acceptance check, including actual app focus, Accessibility insertion and undo in TextEdit and a second app.
 2. Compare Apple Speech with each downloadable WhisperKit model on consented sample audio on the target M1 Pro; record speed, memory, accuracy, and subtitle alignment before recommending a default.
 3. Consider preview-first selected-text editing only if it can remain local and safely recover the original text.
-4. Finish manual acceptance of the microphone-only Meeting Notes workflow; then evaluate an optional system-audio source for remote call participants, with just-in-time permission and no persistent audio by default.
+4. Finish manual acceptance of microphone, system-audio, and combined Meeting Notes capture, including just-in-time permission, remote-call playback, and confirmation that audio is not persisted.
 5. Continue Silent Lab research independently, with no unlock unless session-separated evaluation supports it.
 
 Do not add cloud providers, cross-device sync, a plugin marketplace, or automatic screen context. They add substantial privacy and maintenance costs without improving HushKey's local-first path.

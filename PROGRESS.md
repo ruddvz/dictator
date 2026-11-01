@@ -103,18 +103,14 @@ Run the voice checklist with normal and whispered speech, TextEdit plus one othe
 
 In a fresh session, use the app with the user present to accept Microphone, Speech, and Accessibility prompts as needed; check normal and whispered dictation, active-capture insertion blocking, and one-time insertion plus undo in TextEdit and a second app. Then inspect current HushKey and Wispr Flow screens with computer use and tune any visible UX defects. Keep the AirPods motion experiment separate from this acceptance.
 
-## Completed — first local Meeting Notes workflow
+## Completed — first local Meeting Notes workflow (initial microphone-only version)
 
 - Added a separate Meeting notes workspace with explicit microphone capture, live transcript, stop-to-save, local searchable/editable notes, text export, and confirmed deletion.
 - Meeting transcripts and generated summaries/action items are stored locally; microphone audio is not written to disk. Apple Speech must support on-device recognition for the selected language. Summary/action generation uses Apple's on-device Foundation Model only, and long transcripts are reduced in bounded chunks.
 - Added a shared microphone capture gate so meeting capture and dictation cannot run simultaneously. Added personal vocabulary hints to meeting recognition and updated the microphone privacy string.
-- Clearly disclosed the current scope: capture uses the selected microphone only, may miss remote voices played directly to headphones, and does not identify speakers. System-audio capture was not added because it requires a separate macOS recording permission and source-selection UX.
+- At this stage capture used the selected microphone only and could miss remote voices played directly to headphones. The later system-audio and combined-source sections below supersede that source limitation; HushKey still does not identify speakers.
 - Added coverage for capture exclusivity, local note storage/deletion, chunk boundaries, and local-model note generation. `xcodebuild test`: 31 passed, 0 failed, 0 skipped. `Scripts/package-app.sh` succeeded; the packaged app passed `codesign --verify --deep --strict` with bundle ID `com.ruddvz.hushkey`.
 - Opened the packaged app and inspected the Meeting notes accessibility tree. No microphone permission was accepted and no meeting recording was started, so live capture remains unverified.
-
-## Next item — live audio and meeting acceptance
-
-With the user present, verify packaged dictation, whisper, shortcut, history, insertion/undo, file transcription, and microphone-only Meeting notes. Then decide whether to add optional system-audio capture for calls; it needs a clear source picker and a separate just-in-time macOS recording permission. Keep voice editing and workflow automation behind those acceptance checks.
 
 ## Naming note
 
@@ -128,6 +124,16 @@ The private prototype keeps the requested HushKey name. A distinct public macOS 
 - Added source selection and capture-status UI, updated the privacy copy, README, product plan, competitor report, and manual acceptance protocol.
 - `xcodebuild test`: 31 passed, 0 failed, 0 skipped. The release app built and passed strict signature verification; its bundle contains the system-audio usage description. A read-only UI check showed both source options and left the app on Microphone. No capture was started and no microphone or system-audio permission was granted, so physical system-audio/call behavior remains unverified.
 
+## Completed — combined local meeting capture
+
+- Added a **Both sides** source that combines the selected microphone and a private Core Audio system-audio tap in one drift-corrected aggregate input, then sends that stream only to on-device Speech.
+- Downmixed aggregate input channels to mono before recognition so microphone and remote playback are analyzed together in a speech-compatible stream.
+- Requests microphone permission only after Start meeting and retains the just-in-time system-audio permission path. A denied or unavailable input fails closed and releases the shared capture gate; System audio-only remains available.
+- Updated the source picker, active capture status, permission disclosure, app privacy string, README, product plan, competitor research, and manual acceptance protocol. Added unit coverage for system-only and combined aggregate composition.
+- `xcodebuild test`: 34 passed, 0 failed, 0 skipped. Synthetic audio tests confirm channel downmix and aggregate composition; this does not substitute for live call acceptance.
+- Rebuilt `dist/HushKey.app`; strict code-signature verification passed and the packaged privacy string names both permission paths. Opened that exact bundle and confirmed the Meeting Notes picker exposes Microphone, System audio, and Both sides; left Microphone selected without starting capture.
+- Live combined capture remains unverified because no microphone or System Audio Recording permission has been granted in this session.
+
 ## Next item — manual voice and meeting-source acceptance
 
-In a fresh session, with the user present, verify microphone and Speech prompts, normal and whispered dictation, shortcuts, guarded insertion/undo, file engines, and both Meeting Notes sources. For System audio, confirm the just-in-time macOS prompt and recognized remote app playback on macOS 14.2+; do not treat a successful build as proof of live audio behavior. Then compare Apple Speech and downloaded WhisperKit models on consented local audio.
+In a fresh session, with the user present, verify microphone and Speech prompts, normal and whispered dictation, shortcuts, guarded insertion/undo, file engines, and all three Meeting Notes sources. For **Both sides**, confirm both just-in-time macOS prompts and simultaneous recognition of microphone speech and remote app playback; do not treat a successful build as proof of live audio behavior. Then compare Apple Speech and downloaded WhisperKit models on consented local audio.

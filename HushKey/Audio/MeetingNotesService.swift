@@ -4,6 +4,7 @@ import Observation
 enum MeetingAudioSource: String, CaseIterable, Identifiable {
     case microphone = "Microphone"
     case systemAudio = "System audio"
+    case both = "Both sides"
 
     var id: String { rawValue }
 }
@@ -42,7 +43,7 @@ final class MeetingNotesService {
     }
 
     var activeAudioLevel: Float {
-        activeAudioSource == .systemAudio ? systemAudio.level : audio.level
+        activeAudioSource == .microphone ? audio.level : systemAudio.level
     }
 
     func start(localeIdentifier: String, contextualStrings: [String] = [], dictationIsBusy: Bool) async {
@@ -75,17 +76,23 @@ final class MeetingNotesService {
             return
         }
 
-        if source == .microphone {
+        switch source {
+        case .microphone:
             await audio.start()
-        } else {
-            systemAudio.start()
+        case .systemAudio:
+            await systemAudio.start()
+        case .both:
+            await systemAudio.start(includeMicrophone: true, microphoneDeviceID: audio.selectedDeviceID)
         }
         let sourceStarted = source == .microphone ? audio.isRunning : systemAudio.isRunning
         guard startGeneration == generation, sourceStarted else {
             transcriber.stop()
-            message = source == .microphone
-                ? audio.error ?? "Microphone capture could not start."
-                : systemAudio.error ?? "System audio capture could not start."
+            switch source {
+            case .microphone:
+                message = audio.error ?? "Microphone capture could not start."
+            case .systemAudio, .both:
+                message = systemAudio.error ?? "Meeting audio capture could not start."
+            }
             captureGate.release(.meeting)
             isStarting = false
             return

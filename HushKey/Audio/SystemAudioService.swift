@@ -15,13 +15,27 @@ final class SystemAudioService {
     @ObservationIgnored private var aggregateID: AudioObjectID?
     @ObservationIgnored private var engine: AVAudioEngine?
 
-    func start() {
+    func start(includeMicrophone: Bool = false, microphoneDeviceID: AudioDeviceID? = nil) async {
         guard !isRunning else { return }
         error = nil
 
         guard #available(macOS 14.2, *) else {
             error = "System audio capture requires macOS 14.2 or later. Choose Microphone instead."
             return
+        }
+
+        var microphoneUID: String?
+        if includeMicrophone {
+            guard await AVCaptureDevice.requestAccess(for: .audio) else {
+                error = "Microphone access denied. Enable it in System Settings › Privacy & Security, or choose System audio only."
+                return
+            }
+            guard let microphoneID = microphoneDeviceID ?? AudioDevices.defaultInputID(),
+                  let uid = AudioDevices.uid(of: microphoneID) else {
+                error = "The selected microphone is no longer available. Choose another microphone or use System audio only."
+                return
+            }
+            microphoneUID = uid
         }
 
         let description = CATapDescription(monoGlobalTapButExcludeProcesses: [])
@@ -43,17 +57,7 @@ final class SystemAudioService {
             return
         }
 
-        let aggregateDescription: [String: Any] = [
-            kAudioAggregateDeviceNameKey: "HushKey Meeting Audio",
-            kAudioAggregateDeviceUIDKey: "com.ruddvz.hushkey.meeting.\(UUID().uuidString)",
-            kAudioAggregateDeviceIsPrivateKey: 1,
-            kAudioAggregateDeviceIsStackedKey: 0,
-            kAudioAggregateDeviceTapListKey: [[
-                kAudioSubTapUIDKey: tapUID,
-                kAudioSubTapDriftCompensationKey: 1
-            ]],
-            kAudioAggregateDeviceTapAutoStartKey: 1
-        ]
+        let aggregateDescription = Self.aggregateDescription(tapUID: tapUID, microphoneUID: microphoneUID)
         var createdAggregate = AudioObjectID(kAudioObjectUnknown)
         let aggregateStatus = AudioHardwareCreateAggregateDevice(aggregateDescription as CFDictionary,
                                                                   &createdAggregate)
@@ -87,6 +91,11 @@ final class SystemAudioService {
             tearDown()
             return
         }
+        guard format.commonFormat == .pcmFormatFloat32, !format.isInterleaved else {
+            error = "This Mac's meeting audio format cannot be mixed safely. Choose Microphone or System audio only."
+            tearDown()
+            return
+        }
 
         sink.setLevelHandler { [weak self] level in
             Task { @MainActor in self?.level = level }
@@ -97,7 +106,8 @@ final class SystemAudioService {
             try engine.start()
         } catch {
             input.removeTap(onBus: 0)
-            self.error = "System audio capture could not start. Check System Settings › Privacy & Security › System Audio Recording. \(error.localizedDescription)"
+            engine.stop()
+            self.error = "Meeting audio capture could not start. Check System Settings › Privacy & Security for microphone and System Audio Recording access. \(error.localizedDescription)"
             sink.setLevelHandler(nil)
             tearDown()
             return
@@ -105,6 +115,29 @@ final class SystemAudioService {
 
         self.engine = engine
         isRunning = true
+    }
+
+    nonisolated static func aggregateDescription(tapUID: String, microphoneUID: String?) -> [String: Any] {
+        var description: [String: Any] = [
+            kAudioAggregateDeviceNameKey: "HushKey Meeting Audio",
+            kAudioAggregateDeviceUIDKey: "com.ruddvz.hushkey.meeting.\(UUID().uuidString)",
+            kAudioAggregateDeviceIsPrivateKey: 1,
+            kAudioAggregateDeviceIsStackedKey: 0,
+            kAudioAggregateDeviceTapListKey: [[
+                kAudioSubTapUIDKey: tapUID,
+                kAudioSubTapDriftCompensationKey: 1
+            ]],
+            kAudioAggregateDeviceTapAutoStartKey: 1
+        ]
+
+        if let microphoneUID {
+            description[kAudioAggregateDeviceSubDeviceListKey] = [[
+                kAudioSubDeviceUIDKey: microphoneUID,
+                kAudioSubDeviceDriftCompensationKey: 1
+            ]]
+            description[kAudioAggregateDeviceMainSubDeviceKey] = microphoneUID
+        }
+        return description
     }
 
     func stop() {
@@ -151,6 +184,36 @@ final class SystemAudioService {
     }
 
     nonisolated private static func tapBlock(for sink: AudioSink) -> AVAudioNodeTapBlock {
-        { buffer, time in sink.dispatch(buffer, time) }
+        { buffer, time in
+            guard let speechBuffer = monoBuffer(from: buffer) else { return }
+            sink.dispatch(speechBuffer, time)
+        }
+    }
+
+    nonisolated static func monoBuffer(from buffer: AVAudioPCMBuffer) -> AVAudioPCMBuffer? {
+        guard buffer.format.commonFormat == .pcmFormatFloat32,
+              !buffer.format.isInterleaved,
+              let inputChannels = buffer.floatChannelData else { return nil }
+        let channelCount = Int(buffer.format.channelCount)
+        guard channelCount > 0 else { return nil }
+        guard channelCount > 1 else { return buffer }
+
+        guard let monoFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32,
+                                              sampleRate: buffer.format.sampleRate,
+                                              channels: 1,
+                                              interleaved: false),
+              let mono = AVAudioPCMBuffer(pcmFormat: monoFormat, frameCapacity: buffer.frameLength),
+              let output = mono.floatChannelData?[0] else { return nil }
+        mono.frameLength = buffer.frameLength
+        let frames = Int(buffer.frameLength)
+        let scale = 1 / Float(channelCount)
+        for frame in 0..<frames {
+            var sample: Float = 0
+            for channel in 0..<channelCount {
+                sample += inputChannels[channel][frame]
+            }
+            output[frame] = sample * scale
+        }
+        return mono
     }
 }

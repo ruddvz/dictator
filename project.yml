@@ -29,7 +29,7 @@ targets:
         LSApplicationCategoryType: public.app-category.productivity
         NSMotionUsageDescription: HushKey reads processed head motion from compatible headphones for local silent-mouthing experiments.
         NSMicrophoneUsageDescription: HushKey listens only when you start local dictation, meeting notes, or an experiment recording.
-        NSAudioCaptureUsageDescription: HushKey captures system audio only when you explicitly start a meeting using the System audio source. Audio is streamed to on-device speech recognition and is not saved.
+        NSAudioCaptureUsageDescription: HushKey captures system audio only when you explicitly start a meeting using System audio or Both sides. Audio is streamed to on-device speech recognition and is not saved.
         NSSpeechRecognitionUsageDescription: HushKey recognizes speech on this Mac only when on-device recognition is available.
     settings:
       base:

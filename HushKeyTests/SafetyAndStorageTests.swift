@@ -1,7 +1,54 @@
+import AVFoundation
 import XCTest
 @testable import HushKey
 
 final class SafetyAndStorageTests: XCTestCase {
+    func testCombinedMeetingAudioAggregateIncludesMicrophoneAndTappedSystemAudio() {
+        let description = SystemAudioService.aggregateDescription(tapUID: "system-tap", microphoneUID: "selected-mic")
+        let taps = description["taps"] as? [[String: Any]]
+        let subdevices = description["subdevices"] as? [[String: Any]]
+
+        XCTAssertEqual(taps?.first?["uid"] as? String, "system-tap")
+        XCTAssertEqual(subdevices?.first?["uid"] as? String, "selected-mic")
+        XCTAssertEqual(subdevices?.first?["drift"] as? Int, 1)
+        XCTAssertEqual(description["master"] as? String, "selected-mic")
+        XCTAssertEqual(description["private"] as? Int, 1)
+    }
+
+    func testSystemOnlyMeetingAggregateDoesNotAddMicrophone() {
+        let description = SystemAudioService.aggregateDescription(tapUID: "system-tap", microphoneUID: nil)
+        let taps = description["taps"] as? [[String: Any]]
+
+        XCTAssertNil(description["subdevices"])
+        XCTAssertNil(description["master"])
+        XCTAssertEqual(taps?.first?["uid"] as? String, "system-tap")
+    }
+
+    func testCombinedMeetingAudioDownmixesSourceChannelsForSpeech() throws {
+        let format = try XCTUnwrap(AVAudioFormat(commonFormat: .pcmFormatFloat32,
+                                                 sampleRate: 48_000,
+                                                 channels: 2,
+                                                 interleaved: false))
+        let input = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 3))
+        input.frameLength = 3
+        let channels = try XCTUnwrap(input.floatChannelData)
+        channels[0][0] = 0.6
+        channels[0][1] = -0.2
+        channels[0][2] = 0.4
+        channels[1][0] = 0.2
+        channels[1][1] = 0.6
+        channels[1][2] = -0.4
+
+        let mono = try XCTUnwrap(SystemAudioService.monoBuffer(from: input))
+        let samples = try XCTUnwrap(mono.floatChannelData?[0])
+
+        XCTAssertEqual(mono.format.channelCount, 1)
+        XCTAssertEqual(mono.frameLength, 3)
+        XCTAssertEqual(samples[0], 0.4, accuracy: 0.0001)
+        XCTAssertEqual(samples[1], 0.2, accuracy: 0.0001)
+        XCTAssertEqual(samples[2], 0, accuracy: 0.0001)
+    }
+
     @MainActor
     func testHoldCaptureEmitsOneSegmentOnRelease() {
         let capture = CaptureController()

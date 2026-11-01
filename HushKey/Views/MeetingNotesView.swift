@@ -101,7 +101,7 @@ struct MeetingNotesView: View {
         return GroupBox {
             HStack(spacing: 14) {
                 if service.isCapturing {
-                    Label(service.activeAudioSource == .systemAudio ? "Capturing system audio" : "Capturing microphone",
+                    Label(captureStatusTitle,
                           systemImage: "waveform.circle.fill")
                         .foregroundStyle(.red)
                     ProgressView(value: Double(service.activeAudioLevel))
@@ -133,16 +133,14 @@ struct MeetingNotesView: View {
                             }
                         }
                         .pickerStyle(.segmented)
-                        .frame(maxWidth: 300)
+                        .frame(maxWidth: 360)
 
-                        Text(service.audioSource == .systemAudio
-                             ? "Captures audio playing from apps on this Mac. Your microphone is not included."
-                             : "Captures your selected microphone. Remote voices routed to headphones may be missed.")
+                        Text(audioSourceDescription)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button("Start meeting", systemImage: service.audioSource == .systemAudio ? "waveform" : "record.circle",
+                    Button("Start meeting", systemImage: service.audioSource == .microphone ? "record.circle" : "waveform",
                            action: startMeeting)
                     .buttonStyle(.borderedProminent)
                     .disabled(model.captureGate.owner != nil)
@@ -319,8 +317,28 @@ struct MeetingNotesView: View {
             model.localTransformService.modelIsAvailable
     }
 
+    private var captureStatusTitle: String {
+        switch service.activeAudioSource {
+        case .microphone: "Capturing microphone"
+        case .systemAudio: "Capturing system audio"
+        case .both: "Capturing both sides"
+        case nil: "Capturing meeting audio"
+        }
+    }
+
+    private var audioSourceDescription: String {
+        switch service.audioSource {
+        case .microphone:
+            "Captures your selected microphone. Remote voices routed to headphones may be missed."
+        case .systemAudio:
+            "Captures audio playing from apps on this Mac. Your microphone is not included."
+        case .both:
+            "Captures your selected microphone and Mac audio together. Requires both permissions."
+        }
+    }
+
     private var privacyNote: some View {
-        Label("Start capture explicitly. Choose Microphone for people nearby or System audio for sound playing from apps. System audio requires macOS System Audio Recording access. Speech recognition and notes stay on this Mac; audio is not saved and speakers are not identified.",
+        Label("Start capture explicitly. Both sides combines your microphone with sound playing from apps. macOS may ask separately for microphone and System Audio Recording access. Speech recognition and notes stay on this Mac; audio is not saved and speakers are not identified.",
               systemImage: "lock.shield")
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -328,7 +346,7 @@ struct MeetingNotesView: View {
     }
 
     private func startMeeting() {
-        if service.audioSource == .microphone {
+        if service.audioSource == .microphone || service.audioSource == .both {
             service.audio.selectedDeviceID = model.audio.selectedDeviceID
         }
         Task {
