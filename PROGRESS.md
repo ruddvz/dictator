@@ -155,6 +155,15 @@ In a fresh session, with the user present, verify microphone and Speech prompts,
 - Built `dist/HushKey.app` in Release configuration and verified its ad-hoc code signature. Resource bundle and app identifier are present.
 - The native UI check timed out while selecting the packaged app in Computer Use, so Recent file transcripts/search/restore/deletion have not been visually verified. No source audio or user permission was used in this verification.
 
-## Next item — manual file transcription acceptance
+## Completed — transcript editing and recovery correctness
 
-Open the packaged app and verify Recent file transcripts, search, restore, and deletion. Complete the documented Apple Speech and WhisperKit file acceptance with user-provided consented audio; leave the microphone and system-audio live acceptance for the following fresh session.
+- Routed Dictation and Transform transcript editors through `AppModel.editCurrentDictation`, which rejects edits during capture/finalization, resets insertion and local-transform undo state, and debounces local history saves.
+- Restoring the raw transcript now follows the same safe edit path. Transform previews are discarded when their source transcript changes, including while a local model is generating a preview.
+- Injected the dictation-history destination into `AppModel` so the debounced persistence path can be verified against isolated local storage. History clearing now keeps in-memory and insertion state in sync with successful deletion.
+- Added regression coverage for debounced manual-edit persistence, raw transcript restoration, stale transform rejection, and failed history writes. `xcodebuild test`: 40 passed, 0 failed, 0 skipped.
+- Rebuilt `dist/HushKey.app` in Release configuration; `codesign --verify --deep --strict` passed.
+- Computer Use could not bind to the packaged app path (`-10005`), so the running window was not visually refreshed or verified. No microphone, audio, or user permission was used.
+
+## Next item — manual runtime acceptance
+
+With the user present, verify the packaged app's transcript editing, delayed history save, raw restore, transform preview invalidation, and undo/insertion reset. Then test recent file transcripts, search, restore, and deletion with consented audio, plus the documented voice and meeting capture flows. Recheck the running app path when Computer Use can bind to it; builds and unit tests do not prove live microphone, Accessibility insertion, AirPods, or system-audio behavior.

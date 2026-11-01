@@ -58,6 +58,10 @@ struct TransformView: View {
         } message: {
             Text(errorMessage ?? "Please try again.")
         }
+        .onChange(of: currentText) { oldText, newText in
+            guard oldText != newText else { return }
+            invalidatePreviewForTranscriptChange()
+        }
     }
 
     private var transcriptCard: some View {
@@ -95,7 +99,7 @@ struct TransformView: View {
     }
 
     private var transcriptBinding: Binding<String> {
-        Binding(get: { model.transcriber.text }, set: { model.transcriber.replaceText($0) })
+        Binding(get: { model.transcriber.text }, set: { model.editCurrentDictation($0) })
     }
 
     private var transformPicker: some View {
@@ -238,6 +242,14 @@ struct TransformView: View {
         }
     }
 
+    private func invalidatePreviewForTranscriptChange() {
+        guard !sourceSnapshot.isEmpty || !draft.isEmpty else { return }
+        draft = ""
+        sourceSnapshot = ""
+        previewAction = nil
+        statusMessage = "The transcript changed. Create a fresh preview before applying."
+    }
+
     @MainActor
     private func createPreview() async {
         let source = currentText
@@ -248,7 +260,7 @@ struct TransformView: View {
         statusMessage = nil
         do {
             let result = try await model.localTransformService.transform(source, using: action)
-            guard selectedAction == action else { return }
+            guard selectedAction == action, currentText == source else { return }
             previewAction = action
             draft = result
         } catch {

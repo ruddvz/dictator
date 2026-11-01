@@ -44,6 +44,15 @@ enum DictationHistoryStore {
         try JSONEncoder().encode(entries).write(to: url, options: .atomic)
     }
 
+    static func appendingAndSaving(_ entry: DictationHistoryEntry,
+                                   to url: URL,
+                                   existing entries: [DictationHistoryEntry],
+                                   limit: Int = 50) throws -> [DictationHistoryEntry] {
+        let updated = Array(([entry] + entries).prefix(max(0, limit)))
+        try save(updated, to: url)
+        return updated
+    }
+
     static func delete(at url: URL = url) throws {
         guard fileManager.fileExists(atPath: url.path) else { return }
         try fileManager.removeItem(at: url)

@@ -143,6 +143,21 @@ final class SafetyAndStorageTests: XCTestCase {
         try DictationHistoryStore.delete(at: url)
     }
 
+    func testDictationHistoryWriteFailureDoesNotReturnUncommittedEntries() throws {
+        let blocker = FileManager.default.temporaryDirectory
+            .appending(path: "hushkey-history-blocker-\(UUID().uuidString)")
+        let destination = blocker.appending(path: "dictation-history.json")
+        defer { try? FileManager.default.removeItem(at: blocker) }
+        try Data("file, not a directory".utf8).write(to: blocker)
+        let existing = [DictationHistoryEntry(text: "Previously saved.")]
+        let pending = DictationHistoryEntry(text: "New transcript.")
+
+        XCTAssertThrowsError(try DictationHistoryStore.appendingAndSaving(
+            pending, to: destination, existing: existing))
+        XCTAssertEqual(existing.map(\.text), ["Previously saved."])
+        XCTAssertNil(DictationHistoryStore.load(from: destination))
+    }
+
     @MainActor
     func testAudioCaptureGatePreventsSimultaneousDictationAndMeetingCapture() {
         let gate = AudioCaptureGate()
@@ -331,7 +346,13 @@ final class SafetyAndStorageTests: XCTestCase {
 
     @MainActor
     func testDictationHistoryCanRestoreProcessedOrRawText() {
-        let model = AppModel()
+        let url = FileManager.default.temporaryDirectory
+            .appending(path: "hushkey-restore-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let model = AppModel(dictationHistoryURL: url)
+        let previousHistorySetting = model.savesDictationHistory
+        model.savesDictationHistory = false
+        defer { model.savesDictationHistory = previousHistorySetting }
         let entry = DictationHistoryEntry(text: "Clean transcript.", rawText: "Um, clean transcript.")
 
         model.restoreDictation(entry)
@@ -340,13 +361,34 @@ final class SafetyAndStorageTests: XCTestCase {
                                                             lastSavedText: model.lastSavedDictationText,
                                                             enabled: true))
 
-        model.restoreDictation(entry, useRawText: true)
-        XCTAssertEqual(model.transcriber.text, "Um, clean transcript.")
         model.restoreRawTranscript()
         XCTAssertEqual(model.transcriber.text, "Um, clean transcript.")
-        XCTAssertFalse(DictationHistorySaveGate.shouldSave(text: model.transcriber.text,
-                                                            lastSavedText: model.lastSavedDictationText,
-                                                            enabled: true))
+        XCTAssertTrue(DictationHistorySaveGate.shouldSave(text: model.transcriber.text,
+                                                           lastSavedText: model.lastSavedDictationText,
+                                                           enabled: true))
+    }
+
+    @MainActor
+    func testManualTranscriptEditsAreDebouncedIntoLocalHistory() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appending(path: "hushkey-edit-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let original = DictationHistoryEntry(text: "Processed words.", rawText: "Um, processed words.")
+        try DictationHistoryStore.save([original], to: url)
+
+        let model = AppModel(dictationHistoryURL: url)
+        let previousHistorySetting = model.savesDictationHistory
+        model.savesDictationHistory = true
+        defer { model.savesDictationHistory = previousHistorySetting }
+        model.restoreDictation(original)
+        model.editCurrentDictation("Human-edited words.")
+
+        XCTAssertEqual(model.transcriber.text, "Human-edited words.")
+        try await Task.sleep(for: .milliseconds(700))
+
+        XCTAssertEqual(model.dictationHistory.first?.text, "Human-edited words.")
+        XCTAssertEqual(model.dictationHistory.first?.rawText, "Um, processed words.")
+        XCTAssertEqual(DictationHistoryStore.load(from: url)?.first?.text, "Human-edited words.")
     }
 
     func testPersonalVocabularySplitsAndDeduplicatesLocalHints() {
@@ -396,5 +438,10 @@ final class SafetyAndStorageTests: XCTestCase {
         model.transcriber.replaceText(" Please send this \n")
         XCTAssertFalse(model.applyLocalTransform("Please send this", basedOn: " Please send this \n"))
         XCTAssertEqual(model.transcriber.text, " Please send this \n")
+
+        model.transcriber.replaceText("Please send this")
+        XCTAssertTrue(model.applyLocalTransform("Please send this now.", basedOn: "Please send this"))
+        model.editCurrentDictation("Please send your notes")
+        XCTAssertFalse(model.canUndoLocalTransform)
     }
 }

@@ -309,7 +309,7 @@ struct DictationView: View {
     }
 
     private var transcriptBinding: Binding<String> {
-        Binding(get: { model.transcriber.text }, set: { model.transcriber.replaceText($0) })
+        Binding(get: { model.transcriber.text }, set: { model.editCurrentDictation($0) })
     }
 
     private func modeDescription(_ mode: DictationMode) -> String {
