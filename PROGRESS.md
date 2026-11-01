@@ -107,6 +107,20 @@ In a fresh session, use the app with the user present to accept Microphone, Spee
 
 In a fresh session, verify the packaged app in TextEdit and a second supported app: microphone permission, normal speech and whisper, global shortcut behavior, history search/raw restore, insertion, duplicate prevention, and undo. Then continue with meeting capture and summaries, voice editing of selected text, and workflow automation using original HushKey code and license-compatible dependencies.
 
+## Completed — 2026-11-01 (Flow-style UI pass, branch `feature/flow-style-ui`)
+
+- Compared the installed Wispr Flow home screen and its floating status window with HushKey's Dictation screen (screenshot-backed this time). Wispr's source was not extracted; only visible UI was reviewed.
+- Added a floating dictation pill: a non-activating bottom-of-screen panel that idles as a small bar, expands on hover with the shortcut, shows a live waveform while listening and a spinner while transcribing. Click toggles dictation without stealing focus. Toggle in Settings & Data and the menu bar.
+- Redesigned Dictation as a home: greeting with keycap shortcut, one "now" card (status, writing-mode chip, target-app chip, Start/Stop, live waveform, editor, Copy/Insert/Original/Clear), a stats card (total words, wpm, day streak, dictations), a short privacy card, and day-grouped history with hover/context actions (copy, edit again, restore original, delete).
+- History entries now store dictation duration (optional, backward compatible) for wpm. Added single-entry delete and copy.
+- Sidebar: HushKey brand header and a "Get started" checklist (microphone, speech, insertion, first dictation) that hides when complete. Motion status badge now shows only on Silent Lab screens.
+- New shared components in `HushKey/Views/Theme.swift` (card, keycap, waveform, status chip).
+- `xcodebuild test`: 28 tests passed (new stats test). Debug app launched; Dictation home and idle pill verified by screenshot. Listening/transcribing pill states and the waveform were not exercised live (would need the microphone prompt).
+
+## Next item — eval harness and pill acceptance
+
+With the user present, grant Microphone/Speech and confirm the pill's listening and transcribing states in another app. Then build a held-out evaluation harness (fixed consented audio clips → transcript → WER and formatting checks, plus UI screenshot checks) in the StarHarness spirit, separate from this UI branch.
+
 ## Naming note
 
 The private prototype keeps the requested HushKey name. A distinct public macOS silent-dictation project already uses that name: https://github.com/amirrsyed/hushkey. Choose a different public product name before any public release.

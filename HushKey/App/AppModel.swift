@@ -115,6 +115,9 @@ final class AppModel {
     var cleansDictationFillers = UserDefaults.standard.object(forKey: "cleanDictationFillers") as? Bool ?? false {
         didSet { UserDefaults.standard.set(cleansDictationFillers, forKey: "cleanDictationFillers") }
     }
+    var showsFloatingPill = UserDefaults.standard.object(forKey: "showFloatingPill") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(showsFloatingPill, forKey: "showFloatingPill") }
+    }
     var savesDictationHistory = UserDefaults.standard.object(forKey: "saveDictationHistory") as? Bool ?? true {
         didSet { UserDefaults.standard.set(savesDictationHistory, forKey: "saveDictationHistory") }
     }
@@ -132,6 +135,10 @@ final class AppModel {
     private(set) var usedNearbyTextHints = false
     private(set) var isFinalizingDictation = false
     @ObservationIgnored private(set) var lastSavedDictationText: String?
+    @ObservationIgnored private var dictationStartedAt: Date?
+    @ObservationIgnored private var lastDictationDuration: TimeInterval?
+
+    var dictationStats: DictationStats { DictationStats(entries: dictationHistory) }
 
     // MARK: Decoding
 
@@ -450,6 +457,24 @@ final class AppModel {
         insertion.report("Transcript copied to the clipboard.")
     }
 
+    func copyDictation(_ entry: DictationHistoryEntry) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(entry.text, forType: .string)
+        dictationHistoryMessage = "Copied to the clipboard."
+    }
+
+    func deleteDictation(_ entry: DictationHistoryEntry) {
+        let remaining = dictationHistory.filter { $0.id != entry.id }
+        do {
+            if remaining.isEmpty { try DictationHistoryStore.delete() }
+            else { try DictationHistoryStore.save(remaining) }
+            dictationHistory = remaining
+            dictationHistoryMessage = nil
+        } catch {
+            dictationHistoryMessage = "Could not delete this dictation: \(error.localizedDescription)"
+        }
+    }
+
     @discardableResult
     func applyLocalTransform(_ transformedText: String, basedOn sourceText: String) -> Bool {
         guard !audio.isRunning, !isFinalizingDictation, !transcriber.isFinalizing,
@@ -563,6 +588,8 @@ final class AppModel {
 
         await audio.start()
         guard generation == dictationStartGeneration, audio.isRunning else { return }
+        dictationStartedAt = Date()
+        lastDictationDuration = nil
         let customWords = DictationVocabulary.terms(from: dictationTerms)
         let modeHints: [String]
         switch activeDictationMode {
@@ -588,6 +615,8 @@ final class AppModel {
         if transcriber.isRunning { transcriber.beginFinalization() }
         else { transcriber.stop() }
         audio.stop()
+        lastDictationDuration = dictationStartedAt.map { Date().timeIntervalSince($0) }
+        dictationStartedAt = nil
         Task { @MainActor [weak self] in
             guard let self else { return }
             let rawText = await transcriber.waitForFinalization()
@@ -607,7 +636,9 @@ final class AppModel {
         guard DictationHistorySaveGate.shouldSave(text: text, lastSavedText: lastSavedDictationText,
                                                   enabled: savesDictationHistory) else { return }
         let raw = rawDictationText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let entry = DictationHistoryEntry(text: text, rawText: raw.isEmpty || raw == text ? nil : raw)
+        let entry = DictationHistoryEntry(text: text, rawText: raw.isEmpty || raw == text ? nil : raw,
+                                          duration: lastDictationDuration)
+        lastDictationDuration = nil
         dictationHistory.insert(entry, at: 0)
         dictationHistory = Array(dictationHistory.prefix(50))
         lastSavedDictationText = text

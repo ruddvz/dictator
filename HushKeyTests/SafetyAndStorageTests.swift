@@ -246,4 +246,22 @@ final class SafetyAndStorageTests: XCTestCase {
         XCTAssertFalse(model.applyLocalTransform("Please send this", basedOn: " Please send this \n"))
         XCTAssertEqual(model.transcriber.text, " Please send this \n")
     }
+
+    func testDictationStatsCountWordsPaceAndStreak() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let day: TimeInterval = 86_400
+        let entries = [
+            DictationHistoryEntry(createdAt: now.addingTimeInterval(-day), text: "one two three four", duration: 2),
+            DictationHistoryEntry(createdAt: now.addingTimeInterval(-2 * day), text: "five six", duration: 2),
+            DictationHistoryEntry(createdAt: now.addingTimeInterval(-4 * day), text: "seven"),
+        ]
+        let stats = DictationStats(entries: entries, now: now, calendar: calendar)
+        XCTAssertEqual(stats.totalWords, 7)
+        XCTAssertEqual(stats.dictations, 3)
+        XCTAssertEqual(stats.wordsPerMinute, 90) // 6 timed words over 4 seconds
+        XCTAssertEqual(stats.dayStreak, 2) // yesterday and the day before; today not yet dictated
+        XCTAssertEqual(DictationStats(entries: [], now: now, calendar: calendar).wordsPerMinute, nil)
+    }
 }
