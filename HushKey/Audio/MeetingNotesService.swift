@@ -1,10 +1,18 @@
 import Foundation
 import Observation
 
-/// Explicit, microphone-only meeting capture. Audio buffers are streamed to on-device Speech and never written to disk.
+enum MeetingAudioSource: String, CaseIterable, Identifiable {
+    case microphone = "Microphone"
+    case systemAudio = "System audio"
+
+    var id: String { rawValue }
+}
+
+/// Explicit meeting capture. Audio buffers are streamed to on-device Speech and never written to disk.
 @MainActor @Observable
 final class MeetingNotesService {
     let audio = AudioService()
+    let systemAudio = SystemAudioService()
     let transcriber = MicTranscriber()
 
     private(set) var notes: [MeetingNote] = MeetingNotesStore.load()
@@ -15,6 +23,11 @@ final class MeetingNotesService {
     private(set) var message: String?
     private(set) var activeMeetingStartedAt: Date?
     private(set) var selectedNoteID: UUID?
+    private(set) var activeAudioSource: MeetingAudioSource?
+    var audioSource: MeetingAudioSource = MeetingAudioSource(
+        rawValue: UserDefaults.standard.string(forKey: "meetingAudioSource") ?? "") ?? .microphone {
+        didSet { UserDefaults.standard.set(audioSource.rawValue, forKey: "meetingAudioSource") }
+    }
 
     @ObservationIgnored private let captureGate: AudioCaptureGate
     @ObservationIgnored private var generation = 0
@@ -26,6 +39,10 @@ final class MeetingNotesService {
     var activeDuration: TimeInterval {
         guard let activeMeetingStartedAt else { return 0 }
         return Date().timeIntervalSince(activeMeetingStartedAt)
+    }
+
+    var activeAudioLevel: Float {
+        activeAudioSource == .systemAudio ? systemAudio.level : audio.level
     }
 
     func start(localeIdentifier: String, contextualStrings: [String] = [], dictationIsBusy: Bool) async {
@@ -41,7 +58,9 @@ final class MeetingNotesService {
         let startGeneration = generation
         transcriber.clear()
 
-        let speechReady = await transcriber.start(sink: audio.sink, localeIdentifier: localeIdentifier,
+        let source = audioSource
+        let sink = source == .microphone ? audio.sink : systemAudio.sink
+        let speechReady = await transcriber.start(sink: sink, localeIdentifier: localeIdentifier,
                                                  contextualStrings: Array(contextualStrings.prefix(100)))
         guard startGeneration == generation else {
             transcriber.stop()
@@ -56,15 +75,23 @@ final class MeetingNotesService {
             return
         }
 
-        await audio.start()
-        guard startGeneration == generation, audio.isRunning else {
+        if source == .microphone {
+            await audio.start()
+        } else {
+            systemAudio.start()
+        }
+        let sourceStarted = source == .microphone ? audio.isRunning : systemAudio.isRunning
+        guard startGeneration == generation, sourceStarted else {
             transcriber.stop()
-            message = audio.error ?? "Microphone capture could not start."
+            message = source == .microphone
+                ? audio.error ?? "Microphone capture could not start."
+                : systemAudio.error ?? "System audio capture could not start."
             captureGate.release(.meeting)
             isStarting = false
             return
         }
 
+        activeAudioSource = source
         activeMeetingStartedAt = Date()
         isCapturing = true
         isStarting = false
@@ -77,13 +104,15 @@ final class MeetingNotesService {
         isFinalizing = true
         let stoppedAt = Date()
         transcriber.beginFinalization()
-        audio.stop()
+        if activeAudioSource == .systemAudio { systemAudio.stop() }
+        else { audio.stop() }
 
         Task { @MainActor [weak self] in
             guard let self else { return }
             let transcript = await transcriber.waitForFinalization()
             let startedAt = activeMeetingStartedAt ?? stoppedAt
             activeMeetingStartedAt = nil
+            activeAudioSource = nil
             transcriber.clear()
 
             let cleanTranscript = transcript.trimmingCharacters(in: .whitespacesAndNewlines)

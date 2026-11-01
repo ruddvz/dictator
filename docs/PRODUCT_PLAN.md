@@ -62,9 +62,9 @@ Make ordinary voice and whispered dictation usable locally on a Mac, while keepi
 - **Completed:** add conservative optional filler cleanup, snippet-line validation, Apple on-device audio-file transcription, and downloadable WhisperKit model selection with local storage and TXT/SRT/WebVTT export.
 - **Completed:** add a searchable Snippets & Vocabulary workspace, searchable transcript history, and processed/raw restore actions; package only this app without deleting unrelated Xcode outputs.
 - **Completed:** add review-first text transforms using Apple's on-device Foundation Model when available, deterministic filler removal on older macOS versions, explicit apply, stale-preview protection, and undo; test the offline cleanup and undo paths.
-- **In progress:** add explicit microphone-only meeting notes with local transcript search, editing, export, and review-first on-device summaries/action items. System-audio capture and manual meeting acceptance remain open.
+- **Completed (implementation):** add explicit microphone or system-audio meeting capture with local transcript search, editing, export, and review-first on-device summaries/action items. The system source uses a private Core Audio tap, requests macOS System Audio Recording permission at capture time, and never saves audio. Manual source-permission and remote-call acceptance remains open.
 - **Completed:** defer Motion access until the Silent Lab opens; display live state and avoid presenting a failed evidence result as a pass.
-- **Next:** complete manual acceptance of microphone/Speech, normal voice and whisper, global shortcuts, TextEdit and a second-app insertion/undo, history, file engines, and the new meeting-notes capture. Then compare Apple Speech and WhisperKit on consented local sample audio and add optional system-audio capture for calls after reviewing the additional macOS recording permission and source-selection UX.
+- **Next:** complete manual acceptance of microphone/Speech, normal voice and whisper, global shortcuts, TextEdit and a second-app insertion/undo, history, file engines, and both Meeting Notes sources. Then compare Apple Speech and WhisperKit on consented local sample audio.
 
 ## Completion checks
 

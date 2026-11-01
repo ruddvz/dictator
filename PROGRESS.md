@@ -119,3 +119,15 @@ With the user present, verify packaged dictation, whisper, shortcut, history, in
 ## Naming note
 
 The private prototype keeps the requested HushKey name. A distinct public macOS silent-dictation project already uses that name: https://github.com/amirrsyed/hushkey. Choose a different public product name before any public release.
+
+## Completed — optional local system-audio meeting source
+
+- Added a separate Meeting Notes source choice for Microphone or System audio. System output is captured through a private Core Audio tap on macOS 14.2+ and streamed into the existing on-device Speech path; the microphone is not included, and audio is not written to disk.
+- Added just-in-time `NSAudioCaptureUsageDescription` text to both the source Info.plist and the XcodeGen configuration that generates the packaged bundle. The UI explains that System audio captures app output across the Mac and uses a separate macOS permission.
+- Fixed the meeting start failure path so a rejected/failed capture source also stops Speech recognition and releases the shared audio-capture gate.
+- Added source selection and capture-status UI, updated the privacy copy, README, product plan, competitor report, and manual acceptance protocol.
+- `xcodebuild test`: 31 passed, 0 failed, 0 skipped. The release app built and passed strict signature verification; its bundle contains the system-audio usage description. A read-only UI check showed both source options and left the app on Microphone. No capture was started and no microphone or system-audio permission was granted, so physical system-audio/call behavior remains unverified.
+
+## Next item — manual voice and meeting-source acceptance
+
+In a fresh session, with the user present, verify microphone and Speech prompts, normal and whispered dictation, shortcuts, guarded insertion/undo, file engines, and both Meeting Notes sources. For System audio, confirm the just-in-time macOS prompt and recognized remote app playback on macOS 14.2+; do not treat a successful build as proof of live audio behavior. Then compare Apple Speech and downloaded WhisperKit models on consented local audio.

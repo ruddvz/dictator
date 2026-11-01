@@ -22,6 +22,8 @@
 	<string>1</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.productivity</string>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>HushKey captures system audio only when you explicitly start a meeting using the System audio source. Audio is streamed to on-device speech recognition and is not saved.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>HushKey listens only when you start local dictation, meeting notes, or an experiment recording.</string>
 	<key>NSMotionUsageDescription</key>

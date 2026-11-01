@@ -67,12 +67,13 @@ Run this separately from the AirPods motion study:
 
 ## Meeting notes acceptance
 
-1. Start capture explicitly and grant Microphone/Speech access only if wanted. Confirm no capture begins merely by opening the page, selecting a note, or opening the menu-bar item.
+1. Start capture explicitly and grant only the selected source's permission (Microphone/Speech or System Audio Recording/Speech). Confirm no capture begins merely by opening the page, selecting a note, or opening the menu-bar item.
 2. Use the configured microphone for a short consented conversation. Confirm the live transcript updates, stop produces a saved note, and microphone audio is not present in HushKey's Application Support data.
 3. Edit the title and transcript, search for text in the transcript, export transcript and all notes as TXT, restart HushKey, and confirm the edited note is still available.
 4. With Apple's on-device model available, create summary and action-item drafts, edit them, and confirm they persist locally. Include a transcript longer than 12,000 characters to verify chunking. With the model unavailable, confirm the app explains that it did not send transcript text elsewhere.
 5. Start dictation and meeting capture in both orders; verify the capture gate prevents two microphone engines from starting. Test stop during speech and confirm final words are retained.
-6. Test in a call with remote participants sent to headphones. The current implementation captures the selected microphone only; report that limitation separately from local transcription quality. HushKey does not provide speaker labels.
+6. On macOS 14.2 or later, choose System audio and capture a short consented call/test sound. Confirm the System Audio Recording prompt appears only after Start meeting, remote app playback is recognized, and microphone speech is not included unless it is played into system output.
+7. Test a call with remote participants sent to headphones. Compare microphone and system-audio captures separately; report source limitations apart from transcription quality. HushKey does not provide speaker labels.
 
 ## Build and test
 
