@@ -1,58 +1,78 @@
 import CoreAudio
 import SwiftUI
 
-struct SensorsView: View {
+struct SettingsView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        let motion = model.motion
-        let span = motion.latest.map { ($0.t - 8)...$0.t }
-
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(alignment: .top, spacing: 16) {
-                    motionCard
-                    MicrophoneCard()
-                }
+            VStack(alignment: .leading, spacing: 18) {
+                PageHeader(
+                    eyebrow: "Manage",
+                    title: "Settings & data",
+                    subtitle: "Optional recording, shortcuts, insertion, and local files stay separate from the core motion experiment.")
 
-                GroupBox("Live motion (last 8 s)") {
-                    VStack(spacing: 12) {
-                        SignalPlot(title: "User acceleration (g)", samples: motion.history,
-                                   channels: SignalPlot.acceleration, span: span, minScale: 0.01)
-                        SignalPlot(title: "Rotation rate (rad/s)", samples: motion.history,
-                                   channels: SignalPlot.rotation, span: span, minScale: 0.05)
-                        SignalPlot(title: "Attitude (rad)", samples: motion.history,
-                                   channels: SignalPlot.attitude, span: span, minScale: 0.1)
-                    }
-                    .padding(6)
-                }
-
+                ShortcutSettingsCard()
+                TextInsertionSettingsCard()
+                MicrophoneCard()
                 RecordingCard()
                 DataManagementCard()
             }
-            .padding(20)
+            .frame(maxWidth: 920, alignment: .leading)
+            .padding(24)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
     }
+}
 
-    private var motionCard: some View {
-        let motion = model.motion
-        return GroupBox("Headphone motion") {
-            VStack(alignment: .leading, spacing: 8) {
-                LabeledContent("Status", value: motion.status.label)
-                LabeledContent("Sample rate", value: String(format: "%.1f Hz", motion.sampleRate))
-                LabeledContent("Samples", value: "\(motion.sampleCount)")
-                if let s = motion.latest {
-                    LabeledContent("Gravity", value: String(format: "%.2f, %.2f, %.2f", s.gx, s.gy, s.gz))
+private struct ShortcutSettingsCard: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        @Bindable var model = model
+        GroupBox("Capture shortcut") {
+            VStack(alignment: .leading, spacing: 10) {
+                Picker("Hold to capture", selection: $model.captureShortcut) {
+                    ForEach(CaptureShortcut.allCases) { Text($0.label).tag($0) }
                 }
-                if motion.status == .waiting {
-                    Text("Connect compatible head-tracking headphones as this Mac’s active audio output. HushKey verifies live motion capability and cannot identify the exact AirPods model.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                .frame(maxWidth: 260, alignment: .leading)
+                Text("Use it in Train to capture a word, or in Use after the evidence gate passes. While a synchronized session is recording, it can also mark utterances from any HushKey screen. It does not intercept Space in other apps.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-            .font(.callout.monospacedDigit())
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(6)
+            .padding(8)
+        }
+    }
+}
+
+private struct TextInsertionSettingsCard: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        @Bindable var insertion = model.insertion
+        GroupBox("Optional Accessibility insertion") {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Button(insertion.isEnabled ? "Disable insertion" : "Enable insertion") {
+                        insertion.isEnabled ? insertion.disable() : insertion.enable()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    Picker("Shortcut", selection: $insertion.shortcut) {
+                        ForEach(InsertionShortcut.allCases) { Text($0.label).tag($0) }
+                    }
+                    .frame(width: 170)
+                    .disabled(!insertion.isEnabled)
+                }
+                Label(insertion.status, systemImage: insertion.isEnabled ? "checkmark.shield" : "lock.shield")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("When enabled, the shortcut inserts only the latest accepted word into a supported text field in the frontmost app. Password fields are rejected; the clipboard is not used. Use is disabled until the study passes its evidence checks.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(8)
         }
     }
 }
@@ -62,7 +82,7 @@ private struct MicrophoneCard: View {
 
     var body: some View {
         @Bindable var audio = model.audio
-        GroupBox("Microphone") {
+        GroupBox("Optional on-device speech reference") {
             VStack(alignment: .leading, spacing: 10) {
                 Picker("Input", selection: $audio.selectedDeviceID) {
                     Text("System default").tag(AudioDeviceID?.none)
@@ -71,25 +91,26 @@ private struct MicrophoneCard: View {
                     }
                 }
                 HStack {
-                    Button(audio.isRunning ? "Stop Mic" : "Start Mic") {
+                    Button(audio.isRunning ? "Stop microphone" : "Start microphone") {
                         Task { await model.toggleMic() }
                     }
-                    Button("Refresh", systemImage: "arrow.clockwise") { audio.refreshDevices() }
-                        .labelStyle(.iconOnly)
+                    Button("Refresh inputs", systemImage: "arrow.clockwise") { audio.refreshDevices() }
                     LevelMeter(value: Double(audio.level))
                 }
                 if let name = audio.activeDeviceName {
-                    Text("Capturing from \(name)").font(.caption).foregroundStyle(.secondary)
+                    Label("Listening with \(name)", systemImage: "mic.fill")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
                 if let error = audio.error ?? model.transcriber.error {
                     Text(error).font(.caption).foregroundStyle(.red)
                 }
-                Text("Selecting AirPods as input switches them to the Bluetooth headset profile, which can lower playback quality.")
-                    .font(.caption2)
+                Text("Recognition uses macOS on-device speech only. Audio is not saved unless a session recording is active. Choosing AirPods as the microphone may reduce playback quality.")
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(6)
+            .padding(8)
         }
     }
 }
@@ -99,22 +120,22 @@ private struct RecordingCard: View {
 
     var body: some View {
         @Bindable var recorder = model.recorder
-        GroupBox("Experiment recording") {
+        GroupBox("Synchronized session recording") {
             VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Picker("Condition", selection: $recorder.condition) {
-                        ForEach(SessionRecorder.Condition.allCases) { Text($0.rawValue).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    .disabled(recorder.isRecording)
+                Picker("Condition", selection: $recorder.condition) {
+                    ForEach(SessionRecorder.Condition.allCases) { Text($0.rawValue).tag($0) }
                 }
-                TextField("Prompt / what you're saying (e.g. “yes no yes stop”)", text: $recorder.prompt)
+                .pickerStyle(.segmented)
+                .disabled(recorder.isRecording)
+
+                TextField("Prompt or phrase label", text: $recorder.prompt)
                     .textFieldStyle(.roundedBorder)
+
                 HStack {
                     Button {
                         recorder.isRecording ? recorder.stop() : recorder.start(audio: model.audio)
                     } label: {
-                        Label(recorder.isRecording ? "Stop" : "Record",
+                        Label(recorder.isRecording ? "Stop recording" : "Start recording",
                               systemImage: recorder.isRecording ? "stop.fill" : "record.circle")
                     }
                     .tint(recorder.isRecording ? .red : .accentColor)
@@ -127,12 +148,10 @@ private struct RecordingCard: View {
                     }
                     Spacer()
                     if let url = recorder.lastSessionURL {
-                        Button("Show Last Session") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+                        Button("Show last session") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
                     }
                 }
-                Text(model.audio.isRunning
-                     ? "Motion + audio will be recorded. Use \(model.captureShortcut.label) to mark each utterance."
-                     : "Motion only — start the mic above to also record audio. Use \(model.captureShortcut.label) to mark each utterance.")
+                Text("This writes synchronized motion CSV and optional microphone audio to your local Sessions folder. It is separate from per-word templates. While recording, use \(model.captureShortcut.label) to mark an utterance.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if let error = recorder.error {
@@ -140,7 +159,7 @@ private struct RecordingCard: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(6)
+            .padding(8)
         }
     }
 }
@@ -151,7 +170,7 @@ private struct DataManagementCard: View {
     @State private var confirmDeleteSessions = false
 
     var body: some View {
-        GroupBox("Local data & privacy") {
+        GroupBox("Local files & privacy") {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Templates stay in Application Support. Session CSV and optional audio stay in Documents. HushKey sends no recordings or templates anywhere.")
                     .font(.caption)
@@ -172,7 +191,7 @@ private struct DataManagementCard: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(6)
+            .padding(8)
         }
         .confirmationDialog("Delete all training templates from this Mac?", isPresented: $confirmDeleteTemplates, titleVisibility: .visible) {
             Button("Delete templates", role: .destructive) { model.clearTrainingData() }

@@ -35,7 +35,7 @@ final class GlobalHotKeyRegistration {
             &eventHandler)
         guard installStatus == noErr else { return installStatus }
 
-        var identifier = EventHotKeyID(signature: signature, id: 1)
+        let identifier = EventHotKeyID(signature: signature, id: 1)
         let registerStatus = RegisterEventHotKey(
             keyCode,
             modifiers,

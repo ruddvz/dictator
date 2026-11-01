@@ -11,15 +11,19 @@ struct DecodedWord: Identifiable, Hashable {
 @MainActor @Observable
 final class AppModel {
     enum Screen: String, CaseIterable, Identifiable {
-        case sensors = "Sensors"
+        case setup = "Setup"
         case train = "Train"
-        case decode = "Decode"
+        case evaluate = "Evaluate"
+        case use = "Use"
+        case settings = "Settings & Data"
         var id: String { rawValue }
         var symbol: String {
             switch self {
-            case .sensors: "waveform.path.ecg"
+            case .setup: "airpodspro"
             case .train: "square.stack.3d.up"
-            case .decode: "text.bubble"
+            case .evaluate: "chart.bar.xaxis"
+            case .use: "text.bubble"
+            case .settings: "slider.horizontal.3"
             }
         }
     }
@@ -31,7 +35,7 @@ final class AppModel {
     let capture = CaptureController()
     let recorder = SessionRecorder()
 
-    var screen: Screen = .train {
+    var screen: Screen = .setup {
         didSet { syncCaptureMode() }
     }
 
@@ -62,7 +66,7 @@ final class AppModel {
 
     // MARK: Decoding
 
-    var decodeMode: CaptureController.Mode = .hold {
+    var useCaptureMode: CaptureController.Mode = .hold {
         didSet { syncCaptureMode() }
     }
     var maxDistance: Double = 1.5
@@ -96,18 +100,21 @@ final class AppModel {
     }
 
     private func syncCaptureMode() {
-        capture.autoEnabled = isMotionInferenceEnabled && screen == .decode && decodeMode == .auto
+        capture.autoEnabled = isMotionInferenceEnabled && screen == .use && useCaptureMode == .auto
     }
 
     private func handleSegment(_ segment: [MotionSample]) {
         lastSegment = segment
         switch screen {
         case .train:
-            guard let word = selectedWord else { return }
-            addTemplate(Template(label: word, samples: segment,
-                                 condition: trainingCondition, sessionID: experimentSessionID))
-            recorder.logEvent(segment, kind: "train", label: word, confidence: nil)
-        case .decode:
+            if let word = selectedWord {
+                addTemplate(Template(label: word, samples: segment,
+                                     condition: trainingCondition, sessionID: experimentSessionID))
+                recorder.logEvent(segment, kind: "train", label: word, confidence: nil)
+            } else if recorder.isRecording {
+                recorder.logEvent(segment, kind: "segment", label: recorder.prompt, confidence: nil)
+            }
+        case .use:
             guard isMotionInferenceEnabled, let classifier else {
                 recorder.logEvent(segment, kind: "blocked-no-evidence", label: "", confidence: nil)
                 return
@@ -117,8 +124,12 @@ final class AppModel {
             decoded.append(DecodedWord(prediction: prediction))
             recorder.logEvent(segment, kind: prediction.accepted ? "decode" : "reject",
                               label: prediction.best?.label ?? "", confidence: prediction.confidence)
-        case .sensors:
+        case .settings:
             recorder.logEvent(segment, kind: "segment", label: recorder.prompt, confidence: nil)
+        case .setup, .evaluate:
+            if recorder.isRecording {
+                recorder.logEvent(segment, kind: "segment", label: recorder.prompt, confidence: nil)
+            }
         }
     }
 
@@ -147,10 +158,12 @@ final class AppModel {
 
     private var shortcutCapturesMotion: Bool {
         if NSApp.keyWindow?.firstResponder is NSText { return false }
+        if recorder.isRecording { return true }
         switch screen {
-        case .train: return selectedWord != nil
-        case .decode: return decodeMode == .hold && classifier != nil
-        case .sensors: return recorder.isRecording
+        case .train: return selectedWord != nil && motion.status == .streaming
+        case .use: return useCaptureMode == .hold && isMotionInferenceEnabled && classifier != nil
+        case .settings: return false
+        case .setup, .evaluate: return false
         }
     }
 

@@ -1,5 +1,42 @@
 import SwiftUI
 
+struct PageHeader: View {
+    var eyebrow: String
+    var title: String
+    var subtitle: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(eyebrow.uppercased())
+                .font(.caption.weight(.semibold))
+                .tracking(1.1)
+                .foregroundStyle(.secondary)
+            Text(title)
+                .font(.system(size: 30, weight: .semibold, design: .rounded))
+            Text(subtitle)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.bottom, 4)
+    }
+}
+
+struct StatusPill: View {
+    var title: String
+    var symbol: String
+    var tint: Color
+
+    var body: some View {
+        Label(title, systemImage: symbol)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(tint)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(tint.opacity(0.12), in: Capsule())
+    }
+}
+
 /// Multi-channel line plot of motion samples, drawn with Canvas so it keeps up at sensor rate.
 struct SignalPlot: View {
     struct Channel {
@@ -102,7 +139,7 @@ struct LevelMeter: View {
     }
 }
 
-/// Explicit mouse hold control; the keyboard shortcut is app-local and configurable.
+/// Explicit hold control with a configurable app-local shortcut and an accessible action.
 struct HoldToCaptureButton: View {
     var title: String
     var shortcut: String = "⌥⇧M"
@@ -133,6 +170,16 @@ struct HoldToCaptureButton: View {
                 .strokeBorder(isCapturing ? Color.red : Color.accentColor.opacity(0.4), lineWidth: isCapturing ? 2 : 1))
         .contentShape(Rectangle())
         .opacity(isEnabled ? 1 : 0.4)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(isCapturing ? "Stop capture" : title)
+        .accessibilityValue(isCapturing ? "Capturing" : isEnabled ? "Ready" : "Unavailable")
+        .accessibilityHint("Press and hold to capture, or hold \(shortcut). Releasing ends the capture.")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction(.default) {
+            guard isEnabled else { return }
+            if isCapturing { onEnd() } else { onBegin() }
+        }
+        .help("Hold \(shortcut) or press and hold here to capture")
         .gesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { _ in
@@ -155,7 +202,7 @@ struct MotionStatusBadge: View {
     var body: some View {
         HStack(spacing: 6) {
             Circle().fill(color).frame(width: 8, height: 8)
-            Text(status == .streaming ? "AirPods · \(Int(rate.rounded())) Hz" : status.label)
+            Text(status == .streaming ? "Motion · \(Int(rate.rounded())) Hz" : status.label)
                 .font(.callout.monospacedDigit())
         }
         .padding(.horizontal, 8)

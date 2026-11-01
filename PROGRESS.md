@@ -9,10 +9,14 @@
 - Added build instructions, privacy/limitations, testing protocol, notices, CI configuration, and package script.
 - Standardized the app and user-facing documentation on the HushKey name; retained required source attribution in the notices and license.
 - `xcodebuild ... test`: 10 tests passed. Release `.app` packaging succeeded and ad-hoc signature verified.
+- Reorganized navigation into Setup → Train → Evaluate → Use, with Settings & Data separated from per-word capture.
+- Added a first-run motion readiness path, per-word training progress, a dedicated evidence screen, explicit silent-use lock reasons, and optional advanced diagnostics.
+- Moved insertion, microphone, session recording, and local data controls into Settings & Data; documented the interface and file map in [docs/PRODUCT_PLAN.md](docs/PRODUCT_PLAN.md).
+- Updated the XcodeGen project and verified a macOS build plus all 10 tests. A visual screenshot review remains outstanding because the desktop control bridge could not attach to the menu-bar app.
 
-## Next item — hardware feasibility
+## Next item — visual and hardware validation
 
-In a fresh session, connect the user's AirPods as the Mac's active audio output, grant Motion permission, verify a live sample stream, and run the study in [docs/TESTING_PROTOCOL.md](docs/TESTING_PROTOCOL.md). The current Mac showed an AirPods Pro device entry, but MacBook Pro Speakers were the active output; HushKey has not been tested with live AirPods motion. The exact AirPods generation remains unverified.
+In a fresh session, inspect the rebuilt screens at the intended window size, then connect the user's AirPods as the Mac's active audio output, grant Motion permission, verify a live sample stream, and run the study in [docs/TESTING_PROTOCOL.md](docs/TESTING_PROTOCOL.md). The current Mac showed an AirPods Pro device entry, but MacBook Pro Speakers were the active output; HushKey has not been tested with live AirPods motion. The exact AirPods generation remains unverified.
 
 ## Naming note
 

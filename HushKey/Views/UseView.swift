@@ -1,27 +1,106 @@
 import SwiftUI
 
-/// The "motion → text" screen: segments are classified against the trained vocabulary
-/// and appended to a running transcript, with the mic transcript alongside for comparison.
-struct DecodeView: View {
+/// Experimental motion-to-text use screen.
+struct UseView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 18) {
+                PageHeader(
+                    eyebrow: "Step 4 · Experimental",
+                    title: "Use your trained words",
+                    subtitle: "Capture one word at a time. HushKey shows uncertain matches as rejected instead of guessing.")
                 if !model.isMotionInferenceEnabled {
-                    Label("Silent decoding stays locked until the statistical test and separate-session holdout both beat their baselines.", systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(.orange)
+                    eligibilityCard
                 }
                 controls
                 transcriptPanel
-                insertionPanel
-                HStack(alignment: .top, spacing: 16) {
+                if model.insertion.isEnabled {
+                    Label("Accessibility insertion is enabled · \(model.insertion.shortcut.label)", systemImage: "checkmark.shield")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                DisclosureGroup("Advanced diagnostics and comparison") {
+                    VStack(alignment: .leading, spacing: 14) {
                     lastPredictionPanel
                     micPanel
+                    }
+                    .padding(.top, 10)
+                }
+                .padding(14)
+                .background(.background, in: RoundedRectangle(cornerRadius: 12))
+            }
+            .frame(maxWidth: 920, alignment: .leading)
+            .padding(24)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+    }
+
+    private var eligibilityCard: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "lock.shield")
+                .font(.title2)
+                .foregroundStyle(.orange)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Silent use is locked").font(.headline)
+                Text(eligibilityMessage)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 12)
+            Button(nextActionTitle, systemImage: "arrow.right") {
+                if model.motion.status != .streaming {
+                    model.screen = .setup
+                } else if !meetsTemplateProtocol {
+                    model.trainingCondition = .silent
+                    model.screen = .train
+                } else {
+                    model.trainingCondition = .silent
+                    model.screen = .evaluate
                 }
             }
-            .padding(20)
+            .buttonStyle(.bordered)
         }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.orange.opacity(0.25)))
+    }
+
+    private var eligibilityMessage: String {
+        if model.motion.status != .streaming {
+            return "Connect compatible head-tracking headphones and confirm a live motion stream on Setup."
+        }
+        if model.trainingCondition != .silent {
+            return "Evaluation is set to \(model.trainingCondition.rawValue). Silent mouthing needs its own passing evidence."
+        }
+        if !meetsTemplateProtocol {
+            return "Collect 10 examples each for at least 5 words in the Silent condition before evaluation."
+        }
+        guard let result = model.evaluation else {
+            return "Collect the study minimum, then pass the permutation test and separate-session holdout on Evaluate."
+        }
+        if result.pValue >= 0.05 {
+            return "The current silent-motion result does not pass the permutation test. HushKey will not guess."
+        }
+        if let holdout = result.sessionHoldoutAccuracy, let baseline = result.sessionHoldoutChance, holdout <= baseline {
+            return "Held-out sessions do not beat the majority baseline yet. Collect more independent sessions."
+        }
+        return "The current evidence is incomplete. Check the study size and held-out session result."
+    }
+
+    private var meetsTemplateProtocol: Bool {
+        model.dataset.vocabulary.count >= 5 &&
+        model.dataset.vocabulary.allSatisfy { model.templateCount(for: $0, condition: .silent) >= 10 }
+    }
+
+    private var nextActionTitle: String {
+        if model.motion.status != .streaming { return "Open Setup" }
+        if !meetsTemplateProtocol { return "Continue training" }
+        return "Review evidence"
     }
 
     // MARK: Controls
@@ -29,16 +108,16 @@ struct DecodeView: View {
     private var controls: some View {
         @Bindable var model = model
         @Bindable var capture = model.capture
-        return GroupBox {
+        return GroupBox("Capture") {
             VStack(alignment: .leading, spacing: 12) {
-                Picker("Segmentation", selection: $model.decodeMode) {
+                Picker("Capture mode", selection: $model.useCaptureMode) {
                     ForEach(CaptureController.Mode.allCases) { Text($0.rawValue).tag($0) }
                 }
                 .pickerStyle(.segmented)
                 .frame(maxWidth: 320)
                 .disabled(!model.isMotionInferenceEnabled)
 
-                if model.decodeMode == .hold {
+                if model.useCaptureMode == .hold {
                     HoldToCaptureButton(
                         title: "Mouth a word",
                         shortcut: model.captureShortcut.label,
@@ -50,17 +129,20 @@ struct DecodeView: View {
                     autoControls
                 }
 
-                HStack(spacing: 24) {
-                    LabeledContent("Max distance") {
-                        Slider(value: $model.maxDistance, in: 0.2...4).frame(width: 140)
-                        Text(String(format: "%.2f", model.maxDistance)).monospacedDigit().frame(width: 36)
+                DisclosureGroup("Advanced detection thresholds") {
+                    VStack(spacing: 10) {
+                        LabeledContent("Maximum distance") {
+                            Slider(value: $model.maxDistance, in: 0.2...4).frame(width: 180)
+                            Text(String(format: "%.2f", model.maxDistance)).monospacedDigit().frame(width: 36)
+                        }
+                        LabeledContent("Minimum confidence") {
+                            Slider(value: $model.minConfidence, in: 0...0.5).frame(width: 180)
+                            Text(String(format: "%.2f", model.minConfidence)).monospacedDigit().frame(width: 36)
+                        }
                     }
-                    LabeledContent("Min confidence") {
-                        Slider(value: $model.minConfidence, in: 0...0.5).frame(width: 140)
-                        Text(String(format: "%.2f", model.minConfidence)).monospacedDigit().frame(width: 36)
-                    }
+                    .padding(.top, 8)
                 }
-                .font(.callout)
+                .font(.caption)
             }
             .padding(6)
         }
@@ -104,16 +186,15 @@ struct DecodeView: View {
     // MARK: Transcript
 
     private var transcriptPanel: some View {
-        GroupBox {
+        GroupBox("Transcript") {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Text("Decoded from motion").font(.headline)
                     Spacer()
                     Button("Clear", action: model.clearDecoded)
                         .disabled(model.decoded.isEmpty)
                 }
                 if model.decoded.isEmpty {
-                    Text("Mouth a trained word…")
+                    Text(model.isMotionInferenceEnabled ? "Mouth a trained word…" : "Complete the evidence checks to begin.")
                         .font(.system(size: 28, weight: .regular, design: .rounded))
                         .foregroundStyle(.tertiary)
                         .frame(maxWidth: .infinity, minHeight: 80, alignment: .topLeading)
@@ -123,7 +204,7 @@ struct DecodeView: View {
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, minHeight: 80, alignment: .topLeading)
                 }
-                Text("Faded words were rejected by the distance/confidence thresholds.")
+                Text("Accepted words appear normally. Rejected matches stay faded and will not be inserted.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -135,32 +216,6 @@ struct DecodeView: View {
         model.decoded.reduce(Text("")) { text, word in
             let piece = Text(word.text + " ")
             return text + (word.prediction.accepted ? piece : piece.foregroundColor(.secondary.opacity(0.4)))
-        }
-    }
-
-    private var insertionPanel: some View {
-        @Bindable var insertion = model.insertion
-        return GroupBox("Optional text insertion") {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Button(insertion.isEnabled ? "Disable insertion" : "Enable Accessibility insertion") {
-                        insertion.isEnabled ? insertion.disable() : insertion.enable()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    Picker("Shortcut", selection: $insertion.shortcut) {
-                        ForEach(InsertionShortcut.allCases) { Text($0.label).tag($0) }
-                    }
-                    .frame(width: 170)
-                    .disabled(!insertion.isEnabled)
-                }
-                Text(insertion.status)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text("After enabling, focus a normal text field in another app and press the shortcut. HushKey inserts the latest accepted word once, without using the clipboard. Secure fields and unsupported controls are rejected.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(6)
         }
     }
 
@@ -199,7 +254,7 @@ struct DecodeView: View {
     }
 
     private var micPanel: some View {
-        GroupBox("Microphone transcript (reference)") {
+        GroupBox("Optional on-device speech reference") {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Button(model.audio.isRunning ? "Stop Mic" : "Start Mic") {
@@ -208,7 +263,7 @@ struct DecodeView: View {
                     LevelMeter(value: Double(model.audio.level))
                     Button("Clear", action: model.transcriber.clear)
                 }
-                Text(model.transcriber.text.isEmpty ? "Whisper or speak to compare against the motion decoder." : model.transcriber.text)
+                Text(model.transcriber.text.isEmpty ? "Speak or whisper to compare against the motion decoder." : model.transcriber.text)
                     .foregroundStyle(model.transcriber.text.isEmpty ? .secondary : .primary)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, minHeight: 60, alignment: .topLeading)

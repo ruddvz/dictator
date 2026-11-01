@@ -27,22 +27,22 @@ Run the tests:
 xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath build test
 ```
 
-HushKey appears in the menu bar. On first launch, allow Motion when macOS asks. Connect the headphones, choose them as the Mac's active audio output, and check **Sensors** for a live stream and sample rate. If Motion access was previously denied, change it in **System Settings → Privacy & Security → Motion** and relaunch HushKey.
+HushKey appears in the menu bar. On first launch, allow Motion when macOS asks. Connect compatible headphones, choose them as the Mac's active audio output, and check **Setup** for a live stream and sample rate. If Motion access was previously denied, change it in **System Settings → Privacy & Security → Motion** and relaunch HushKey.
 
 ## Experiment flow
 
-1. In **Sensors**, confirm a live stream. The motion plots show user acceleration, rotation rate, and attitude.
-2. In **Train**, select **Normal voice**, **Whisper**, or **Silent mouthing**. Select a word and hold the on-screen control or the configurable app-local shortcut (`⌥⇧M` by default). Space is never captured as a shortcut.
+1. In **Setup**, confirm a live stream. Expand Motion diagnostics to see acceleration, rotation, and attitude.
+2. In **Train**, select **Normal voice**, **Whisper**, or **Silent mouthing**. Select a word and hold the on-screen control or the configurable app-local shortcut (`⌥⇧M` by default; change it in **Settings & Data**). Space is never captured as a shortcut.
 3. Use **New session** when you want a distinct session ID for held-out evaluation. Collect at least 10 takes for each of 5 or more words in each condition.
-4. Compare acceleration, rotation, attitude, and combined features. **Evaluate** reports leave-one-out accuracy, majority-class accuracy, confusion matrix, and a 500-run label-permutation test. With at least two sessions, it also reports leave-one-session-out accuracy and its training-fold majority baseline.
-5. **Decode** uses only Silent-condition templates. It rejects segments beyond the distance limit or below the confidence margin. Inference stays unavailable until the evidence checks pass; if motion does not distinguish the words, HushKey reports that instead of presenting nearest matches as useful text.
-6. **Auto-detect** is optional. Calibrate while still, then tune the motion-energy trigger. Inspect false positives during ordinary head movement, chewing, and repositioning.
+4. In **Evaluate**, compare acceleration, rotation, attitude, and combined features. Results include leave-one-out accuracy, the majority baseline, a 500-run label-permutation test, confusion matrix, and session-separated holdout when at least two sessions are available.
+5. **Use** remains locked until the Silent condition has enough examples, beats the majority baseline with a label-permutation test (`p < 0.05`), and beats baseline on a separate-session holdout. It rejects weak matches instead of presenting nearest neighbors as text.
+6. Optional auto-capture is available under **Use**. Calibrate while still, then tune the motion-energy trigger under Advanced detection thresholds. Inspect false positives during ordinary head movement, chewing, and repositioning.
 
 The optional microphone reference uses macOS Speech only when on-device recognition is available and sets `requiresOnDeviceRecognition`; otherwise it stays off. Starting the mic is optional. Audio is written to disk only when the user starts an experiment recording while the mic is active.
 
 ## Safe text insertion
 
-Text insertion is off by default. The user must enable it in **Decode**, approve HushKey under **System Settings → Privacy & Security → Accessibility**, then press the displayed configurable global shortcut (`⌥⇧I` by default) while the intended text field remains focused in another app.
+Text insertion is off by default. Enable it in **Settings & Data**, approve HushKey under **System Settings → Privacy & Security → Accessibility**, then press the displayed configurable global shortcut (`⌥⇧I` by default) while the intended text field remains focused in another app.
 
 HushKey uses Accessibility to inspect the frontmost app and focused control, allows only supported text fields, rejects secure/password controls, rechecks the process and focus immediately before insertion, and writes through the selected-text attribute once. It does not use or modify the clipboard. Unsupported controls fail closed.
 
@@ -51,7 +51,7 @@ HushKey uses Accessibility to inspect the frontmost app and focused control, all
 - Templates: `~/Library/Application Support/HushKey/dataset.json`.
 - Experiment sessions: `~/Documents/HushKey/Sessions/`, with motion CSV, event CSV, metadata, and optional microphone audio.
 - No telemetry, upload, cloud service, or paid API is used by HushKey.
-- Use **Sensors → Local data & privacy** to export the dataset or sessions, or delete templates and session files.
+- Use **Settings & Data** to configure shortcuts, record synchronized sessions, export the dataset or sessions, and delete local files.
 - Voice recognition requires the user to start the mic and is local-only; no remote recognition fallback is used.
 
 ## Project naming
@@ -62,4 +62,4 @@ HushKey is the requested working name for this private prototype. A separate pub
 
 Headphone motion is processed and low-rate (often about 25 Hz). Jaw movement and head motion can dominate the signal, and reseating the headphones can change the measurements. A result on a small trained vocabulary does not establish arbitrary phrase recognition. Voice, whisper, and silent-mouthing results must be evaluated separately and across sessions before drawing conclusions.
 
-See [docs/TESTING_PROTOCOL.md](docs/TESTING_PROTOCOL.md) for the repeatable study and hardware-validation procedure. See [NOTICE.md](NOTICE.md) for source attribution and license boundaries.
+See [docs/TESTING_PROTOCOL.md](docs/TESTING_PROTOCOL.md) for the repeatable study and hardware-validation procedure. See [docs/PRODUCT_PLAN.md](docs/PRODUCT_PLAN.md) for the screen flow and file map. See [NOTICE.md](NOTICE.md) for source attribution and license boundaries.
