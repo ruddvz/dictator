@@ -28,7 +28,7 @@ struct EvaluateView: View {
                         }
                         .pickerStyle(.segmented)
                         Text(conditionNote)
-                            .font(.caption)
+                            .font(.hkCaption)
                             .foregroundStyle(.secondary)
                     }
                     .padding(8)
@@ -69,7 +69,7 @@ struct EvaluateView: View {
                     detail: "\(uniqueSessions) distinct sessions in this condition",
                     complete: uniqueSessions >= 2)
                 Text("Evaluation can run once the first two study-size checks pass. Silent use also requires significant permutation results and held-out session accuracy above baseline.")
-                    .font(.caption)
+                    .font(.hkCaption)
                     .foregroundStyle(.secondary)
                     .padding(.top, 2)
             }
@@ -89,7 +89,7 @@ struct EvaluateView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Text("Features")
-                        .font(.callout.weight(.medium))
+                        .font(.hkCallout.weight(.medium))
                     FeatureToggle(title: "Acceleration", option: .acceleration)
                     FeatureToggle(title: "Rotation", option: .rotation)
                     FeatureToggle(title: "Attitude", option: .attitude)
@@ -105,7 +105,7 @@ struct EvaluateView: View {
                           ? "Silent use is enabled by the current evidence."
                           : "Silent use remains locked until every evidence check passes.",
                           systemImage: model.isMotionInferenceEnabled ? "checkmark.shield" : "lock.shield")
-                        .font(.caption)
+                        .font(.hkCaption)
                         .foregroundStyle(model.isMotionInferenceEnabled ? .green : .secondary)
                 }
             }
@@ -131,9 +131,9 @@ private struct ReadinessRow: View {
             Image(systemName: complete ? "checkmark.circle.fill" : "circle")
                 .foregroundStyle(complete ? Color.green : Color.secondary)
                 .accessibilityHidden(true)
-            Text(title).font(.callout.weight(.medium))
+            Text(title).font(.hkCallout.weight(.medium))
             Spacer()
-            Text(detail).font(.caption).foregroundStyle(.secondary)
+            Text(detail).font(.hkCaption).foregroundStyle(.secondary)
         }
         .accessibilityElement(children: .combine)
     }
@@ -171,22 +171,22 @@ private struct EvaluationResultView: View {
                         metric("Held-out sessions", percent(holdout), highlight: true)
                         metric("Holdout baseline", percent(baseline))
                         Text("\(result.sessionHoldoutSessions) folds")
-                            .font(.caption)
+                            .font(.hkCaption)
                             .foregroundStyle(.secondary)
                     }
                 } else {
                     Label("Session holdout needs examples from at least two distinct sessions.", systemImage: "info.circle")
-                        .font(.caption)
+                        .font(.hkCaption)
                         .foregroundStyle(.secondary)
                 }
                 Text(verdict)
-                    .font(.callout.weight(.medium))
+                    .font(.hkCallout.weight(.medium))
                     .foregroundStyle(passesAllChecks ? .green : .orange)
                 DisclosureGroup("Confusion matrix · \(result.templateCount) examples") {
                     confusionMatrix
                         .padding(.top, 10)
                 }
-                .font(.callout.weight(.medium))
+                .font(.hkCallout.weight(.medium))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(10)
@@ -196,17 +196,17 @@ private struct EvaluationResultView: View {
     private var confusionMatrix: some View {
         Grid(horizontalSpacing: 2, verticalSpacing: 2) {
             GridRow {
-                Text("actual ↓ / predicted →").font(.caption2).foregroundStyle(.secondary)
-                ForEach(result.labels, id: \.self) { Text($0).font(.caption2).lineLimit(1) }
+                Text("actual ↓ / predicted →").font(.hkMeta).foregroundStyle(.secondary)
+                ForEach(result.labels, id: \.self) { Text($0).font(.hkMeta).lineLimit(1) }
             }
             ForEach(result.labels.indices, id: \.self) { row in
                 let total = max(result.confusion[row].reduce(0, +), 1)
                 GridRow {
-                    Text(result.labels[row]).font(.caption2).gridColumnAlignment(.trailing)
+                    Text(result.labels[row]).font(.hkMeta).gridColumnAlignment(.trailing)
                     ForEach(result.labels.indices, id: \.self) { col in
                         let count = result.confusion[row][col]
                         Text("\(count)")
-                            .font(.caption.monospacedDigit())
+                            .font(.hkCaption.monospacedDigit())
                             .frame(minWidth: 36, minHeight: 24)
                             .background((row == col ? Theme.success : Theme.danger)
                                 .opacity(Double(count) / Double(total) * 0.7))
@@ -247,7 +247,7 @@ private struct EvaluationResultView: View {
 
     private func metric(_ title: String, _ value: String, highlight: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(title).font(.caption).foregroundStyle(.secondary)
+            Text(title).font(.hkCaption).foregroundStyle(.secondary)
             Text(value).font(highlight ? .title2.bold().monospacedDigit() : .title3.monospacedDigit())
         }
     }

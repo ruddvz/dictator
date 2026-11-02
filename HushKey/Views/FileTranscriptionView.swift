@@ -54,7 +54,7 @@ struct FileTranscriptionView: View {
                         if !currentText.isEmpty {
                             Label("This transcript is saved in Recent file transcripts. Choose an audio file to start a separate job or switch engines.",
                                   systemImage: "checkmark.circle")
-                                .font(.caption)
+                                .font(.hkCaption)
                                 .foregroundStyle(.secondary)
                         }
 
@@ -62,7 +62,7 @@ struct FileTranscriptionView: View {
                               ? "Apple Speech runs on this Mac when the selected language supports on-device recognition. No speech model download is needed."
                               : "WhisperKit uses a model you choose and download. The model download needs internet; transcription itself runs locally after setup.",
                               systemImage: "lock.shield")
-                            .font(.callout)
+                            .font(.hkCallout)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
 
@@ -93,13 +93,13 @@ struct FileTranscriptionView: View {
                                     ProgressView(value: whisper.downloadProgress)
                                         .accessibilityLabel("Downloading local speech model")
                                     Text(whisper.downloadProgressDescription)
-                                        .font(.caption.monospacedDigit())
+                                        .font(.hkCaption.monospacedDigit())
                                         .foregroundStyle(.secondary)
                                     Button("Cancel", role: .cancel) { whisper.cancelDownload() }
                                         .disabled(whisper.status == "Cancelling model download…")
                                 }
                                 Text("Model files stay in HushKey’s local Application Support folder. You can remove them here.")
-                                    .font(.caption)
+                                    .font(.hkCaption)
                                     .foregroundStyle(.secondary)
                             }
                         }
@@ -174,7 +174,7 @@ struct FileTranscriptionView: View {
                                 .frame(minHeight: 160)
                         } else {
                             TextEditor(text: transcriptBinding)
-                                .font(.body)
+                                .font(.hkBody)
                                 .frame(minHeight: 220)
                                 .disabled(isBusy)
                                 .padding(4)
@@ -188,15 +188,15 @@ struct FileTranscriptionView: View {
                                     .disabled(currentCues.isEmpty)
                                 Spacer()
                                 Text("\(currentCues.count) timed segments")
-                                    .font(.caption)
+                                    .font(.hkCaption)
                                     .foregroundStyle(.secondary)
                             }
                             Text("Transcript edits save automatically to Recent file transcripts and appear in TXT export. Subtitle exports keep the original timed recognition segments.")
-                                .font(.caption)
+                                .font(.hkCaption)
                                 .foregroundStyle(.secondary)
                         }
                         if let exportMessage {
-                            Text(exportMessage).font(.caption).foregroundStyle(.secondary)
+                            Text(exportMessage).font(.hkCaption).foregroundStyle(.secondary)
                         }
                     }
                     .padding(8)
@@ -257,12 +257,12 @@ struct FileTranscriptionView: View {
                             Button { restore(session) } label: {
                                 VStack(alignment: .leading, spacing: 4) {
                                     HStack(spacing: 8) {
-                                        Text(session.sourceName).font(.headline).lineLimit(1)
-                                        Text(session.engine.rawValue).font(.caption).foregroundStyle(.secondary)
+                                        Text(session.sourceName).font(.hkHeadline).lineLimit(1)
+                                        Text(session.engine.rawValue).font(.hkCaption).foregroundStyle(.secondary)
                                     }
-                                    Text(session.text).font(.callout).foregroundStyle(.secondary).lineLimit(2)
+                                    Text(session.text).font(.hkCallout).foregroundStyle(.secondary).lineLimit(2)
                                     Text(session.createdAt.formatted(date: .abbreviated, time: .shortened))
-                                        .font(.caption2).foregroundStyle(.tertiary)
+                                        .font(.hkMeta).foregroundStyle(.tertiary)
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .contentShape(Rectangle())
@@ -282,10 +282,10 @@ struct FileTranscriptionView: View {
                 }
 
                 Text("Transcript text and timed cues stay on this Mac. HushKey does not copy or retain the source audio.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.hkCaption).foregroundStyle(.secondary)
                 if let message = model.fileTranscriptionHistoryMessage {
                     Label(message, systemImage: "exclamationmark.triangle")
-                        .font(.caption).foregroundStyle(.orange)
+                        .font(.hkCaption).foregroundStyle(.orange)
                 }
             }
             .padding(8)

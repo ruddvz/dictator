@@ -22,9 +22,9 @@ enum Theme {
 
     // Sizes: W page column, H1 sidebar row, H2 control, I1 icon
     static let pageWidth: CGFloat = 800
-    static let sidebarRow: CGFloat = 34
-    static let controlHeight: CGFloat = 32
-    static let icon: CGFloat = 16
+    static let sidebarRow: CGFloat = 38
+    static let controlHeight: CGFloat = 36
+    static let icon: CGFloat = 18
 
     // Color: warm paper and ink, each with a dark counterpart
     // Fog & sage: cool fog surfaces, charcoal text, one calm sage signal.
@@ -62,7 +62,18 @@ enum Theme {
     }
 }
 
+/// HushKey's type scale. macOS defaults (13 pt body, 10 pt captions) read small in a
+/// full-window app, so every view uses these steps instead of system text styles.
 extension Font {
+    static let hkTitle1 = Font.display(32)                              // page titles
+    static let hkTitle2 = Font.system(size: 22, weight: .semibold)      // large card values
+    static let hkTitle3 = Font.system(size: 19, weight: .semibold)      // section titles
+    static let hkHeadline = Font.system(size: 16, weight: .semibold)    // card and row titles
+    static let hkBody = Font.system(size: 15)                           // reading text, controls
+    static let hkCallout = Font.system(size: 14)                        // secondary text
+    static let hkCaption = Font.system(size: 13)                        // descriptions, status
+    static let hkMeta = Font.system(size: 12)                           // timestamps, counts
+
     /// Rounded display face for page titles, hero copy, and big numbers.
     static func display(_ size: CGFloat, weight: Font.Weight = .semibold) -> Font {
         .system(size: size, weight: weight, design: .rounded)
@@ -102,7 +113,7 @@ struct PrimaryButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 13, weight: .semibold))
+            .font(.system(size: 14, weight: .semibold))
             .foregroundStyle(Theme.inverseInk)
             .padding(.horizontal, Theme.s4)
             .frame(height: Theme.controlHeight)
@@ -119,7 +130,7 @@ struct SecondaryButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 13, weight: .medium))
+            .font(.system(size: 14, weight: .medium))
             .foregroundStyle(Theme.ink.opacity(isEnabled ? 1 : 0.4))
             .padding(.horizontal, Theme.s3 + 2)
             .frame(height: Theme.controlHeight)
@@ -138,7 +149,7 @@ struct IconButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .labelStyle(.iconOnly)
-            .font(.system(size: 13, weight: .medium))
+            .font(.system(size: 14, weight: .medium))
             .foregroundStyle(Theme.ink2)
             .frame(width: 28, height: 28)
             .background(hovering ? Theme.hover : .clear, in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
@@ -462,7 +473,7 @@ struct StatusChip: View {
 
     var body: some View {
         Label(title, systemImage: systemImage)
-            .font(.system(size: 12, weight: .medium))
+            .font(.system(size: 13, weight: .medium))
             .foregroundStyle(tint)
             .padding(.horizontal, Theme.s2 + 2)
             .frame(height: 24)
@@ -477,7 +488,7 @@ struct SectionLabel: View {
 
     var body: some View {
         Text(title.uppercased())
-            .font(.system(size: 11, weight: .semibold))
+            .font(.system(size: 12, weight: .semibold))
             .tracking(0.8)
             .foregroundStyle(Theme.ink3)
     }

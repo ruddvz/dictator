@@ -36,12 +36,12 @@ struct TrainView: View {
         return VStack(spacing: 0) {
             HStack {
                 Text("VOCABULARY")
-                    .font(.caption.weight(.semibold))
+                    .font(.hkCaption.weight(.semibold))
                     .tracking(0.8)
                     .foregroundStyle(.secondary)
                 Spacer()
                 Text("\(model.dataset.vocabulary.count) words")
-                    .font(.caption.monospacedDigit())
+                    .font(.hkCaption.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
             .padding(.horizontal, 12)
@@ -90,7 +90,7 @@ struct TrainView: View {
                 .pickerStyle(.segmented)
                 HStack {
                     Label("Session \(model.experimentSessionID.uuidString.prefix(8))", systemImage: "square.stack.3d.up")
-                        .font(.caption.monospaced())
+                        .font(.hkCaption.monospaced())
                         .foregroundStyle(.secondary)
                     Button("New session", systemImage: "plus") { model.beginNewExperimentSession() }
                     Spacer()
@@ -106,7 +106,7 @@ struct TrainView: View {
                     onEnd: model.capture.end)
                 if model.motion.status != .streaming {
                     Label(model.motion.status.label, systemImage: "headphones")
-                        .font(.caption)
+                        .font(.hkCaption)
                         .foregroundStyle(.orange)
                 }
             }
@@ -148,7 +148,7 @@ struct TrainView: View {
         } else {
             GroupBox("Start with a word") {
                 Label("Add a short word in the vocabulary list, then choose it to capture examples.", systemImage: "plus.circle")
-                    .font(.callout)
+                    .font(.hkCallout)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
                     .padding(8)
@@ -173,13 +173,13 @@ private struct TakeTile: View {
                        minScale: 0.05, height: 44, showsHeader: false)
             HStack {
                 Text(String(format: "%.2f s · %d", template.duration, template.samples.count))
-                    .font(.caption2.monospacedDigit())
+                    .font(.hkMeta.monospacedDigit())
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button("Delete", systemImage: "trash", role: .destructive, action: onDelete)
                     .labelStyle(.iconOnly)
                     .buttonStyle(.borderless)
-                    .font(.caption)
+                    .font(.hkCaption)
             }
         }
         .padding(6)

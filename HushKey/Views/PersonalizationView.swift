@@ -157,7 +157,7 @@ struct PersonalizationView: View {
                 } else if section == .vocabulary {
                     Label("Your saved terms are prioritized ahead of optional mode, nearby-text, and Silent Lab hints. Up to 100 hints go to on-device Speech per capture; recognition can still misspell unfamiliar names.",
                           systemImage: "info.circle")
-                        .font(.caption)
+                        .font(.hkCaption)
                         .foregroundStyle(.secondary)
                 } else {
                     advancedCorrectionEditor
@@ -165,7 +165,7 @@ struct PersonalizationView: View {
 
                 Label("HushKey uses personalization entries locally. It does not upload your words, corrections, or snippets.",
                       systemImage: "lock.shield")
-                    .font(.caption)
+                    .font(.hkCaption)
                     .foregroundStyle(.secondary)
             }
             .pageLayout()
@@ -199,8 +199,8 @@ struct PersonalizationView: View {
             ForEach(filteredSnippets) { entry in
                 HStack(alignment: .center, spacing: 14) {
                     VStack(alignment: .leading, spacing: 5) {
-                        Text(entry.cue).font(.headline)
-                        Text(entry.expansion).font(.body).foregroundStyle(.secondary).lineLimit(2)
+                        Text(entry.cue).font(.hkHeadline)
+                        Text(entry.expansion).font(.hkBody).foregroundStyle(.secondary).lineLimit(2)
                     }
                     Spacer(minLength: 12)
                     Button("Edit \(entry.cue)", systemImage: "pencil") {
@@ -234,7 +234,7 @@ struct PersonalizationView: View {
             ForEach(filteredVocabulary, id: \.self) { term in
                 HStack(spacing: 12) {
                     Image(systemName: "character.book.closed").foregroundStyle(.secondary)
-                    Text(term).font(.body)
+                    Text(term).font(.hkBody)
                     Spacer()
                     Button("Edit \(term)", systemImage: "pencil") {
                         editor = PersonalizationEditorRequest(section: .vocabulary, snippet: nil, term: term)
@@ -269,9 +269,9 @@ struct PersonalizationView: View {
             ForEach(filteredCorrections) { rule in
                 HStack(alignment: .center, spacing: 14) {
                     VStack(alignment: .leading, spacing: 5) {
-                        Text(rule.cue).font(.headline)
+                        Text(rule.cue).font(.hkHeadline)
                         Label(rule.expansion, systemImage: "arrow.right")
-                            .font(.body)
+                            .font(.hkBody)
                             .foregroundStyle(.secondary)
                             .lineLimit(2)
                     }
@@ -299,20 +299,20 @@ struct PersonalizationView: View {
         @Bindable var model = model
         return DisclosureGroup("Advanced snippet list") {
             TextEditor(text: $model.dictationSnippets)
-                .font(.body.monospaced())
+                .font(.hkBody.monospaced())
                 .frame(minHeight: 90)
                 .padding(5)
                 .background(.background, in: RoundedRectangle(cornerRadius: 8))
                 .padding(.top, 8)
             Text("One per line: spoken cue => expanded phrase. Use this editor to repair malformed older entries.")
-                .font(.caption)
+                .font(.hkCaption)
                 .foregroundStyle(.secondary)
             let validation = DictationSnippetExpander.validation(for: model.dictationSnippets)
             Label(validation.invalidLines.isEmpty
                   ? "\(validation.validCount) ready"
                   : "\(validation.validCount) ready · check line\(validation.invalidLines.count == 1 ? "" : "s") \(validation.invalidLines.map(String.init).joined(separator: ", "))",
                   systemImage: validation.invalidLines.isEmpty ? "checkmark.circle" : "exclamationmark.circle")
-                .font(.caption)
+                .font(.hkCaption)
                 .foregroundStyle(validation.invalidLines.isEmpty ? Color.secondary : Theme.danger)
         }
         .padding(12)
@@ -323,20 +323,20 @@ struct PersonalizationView: View {
         @Bindable var model = model
         return DisclosureGroup("Advanced correction list") {
             TextEditor(text: $model.dictationCorrectionRules)
-                .font(.body.monospaced())
+                .font(.hkBody.monospaced())
                 .frame(minHeight: 90)
                 .padding(5)
                 .background(.background, in: RoundedRectangle(cornerRadius: 8))
                 .padding(.top, 8)
             Text("One per line: recognized phrase => corrected phrase. Matches are case-insensitive and respect whole-word boundaries. Raw recognition remains available to restore.")
-                .font(.caption)
+                .font(.hkCaption)
                 .foregroundStyle(.secondary)
             let validation = DictationCorrectionRules.validation(for: model.dictationCorrectionRules)
             Label(validation.invalidLines.isEmpty
                   ? "\(validation.validCount) ready"
                   : "\(validation.validCount) ready · check line\(validation.invalidLines.count == 1 ? "" : "s") \(validation.invalidLines.map(String.init).joined(separator: ", "))",
                   systemImage: validation.invalidLines.isEmpty ? "checkmark.circle" : "exclamationmark.circle")
-                .font(.caption)
+                .font(.hkCaption)
                 .foregroundStyle(validation.invalidLines.isEmpty ? Color.secondary : Color.orange)
         }
         .padding(12)
@@ -346,12 +346,12 @@ struct PersonalizationView: View {
     private func summaryCard(title: String, count: Int, symbol: String) -> some View {
         GroupBox {
             HStack(spacing: 12) {
-                Image(systemName: symbol).font(.title2).foregroundStyle(Theme.ink)
+                Image(systemName: symbol).font(.hkTitle2).foregroundStyle(Theme.ink)
                     .frame(width: 40, height: 40)
                     .background(Theme.ink.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(title).font(.caption).foregroundStyle(.secondary)
-                    Text("\(count)").font(.title3.weight(.semibold).monospacedDigit())
+                    Text(title).font(.hkCaption).foregroundStyle(.secondary)
+                    Text("\(count)").font(.hkTitle3.weight(.semibold).monospacedDigit())
                 }
                 Spacer(minLength: 0)
             }
@@ -478,7 +478,7 @@ private struct PersonalizationEntryEditor: View {
                         Text(section == .corrections
                              ? "Corrects complete word or phrase matches in the recognized transcript."
                              : "HushKey matches the full cue at the end of a spoken phrase.")
-                            .font(.caption)
+                            .font(.hkCaption)
                             .foregroundStyle(.secondary)
                     }
                     Section(section == .corrections ? "Use instead" : "Expanded phrase") {
@@ -489,13 +489,13 @@ private struct PersonalizationEntryEditor: View {
                         TextField("For example: HushKey", text: $term)
                     }
                     Text("This stays on this Mac and is provided as an on-device recognition hint.")
-                        .font(.caption)
+                        .font(.hkCaption)
                         .foregroundStyle(.secondary)
                 }
                 if let validationMessage {
                     Label(validationMessage, systemImage: "exclamationmark.triangle")
                         .foregroundStyle(.orange)
-                        .font(.callout)
+                        .font(.hkCallout)
                 }
             }
             .formStyle(.grouped)

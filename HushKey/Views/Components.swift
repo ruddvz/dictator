@@ -12,11 +12,11 @@ struct PageHeader: View {
                 SectionLabel(title: eyebrow)
             }
             Text(title)
-                .font(.display(30))
+                .font(.hkTitle1)
                 .accessibilityIdentifier("page.header")
                 .tracking(-0.3)
             Text(subtitle)
-                .font(.system(size: 13.5))
+                .font(.system(size: 15))
                 .foregroundStyle(Theme.ink2)
                 .lineSpacing(2)
                 .frame(maxWidth: 560, alignment: .leading)
@@ -42,7 +42,7 @@ struct CardGroupBoxStyle: GroupBoxStyle {
     func makeBody(configuration: Configuration) -> some View {
         VStack(alignment: .leading, spacing: Theme.s3) {
             configuration.label
-                .font(.system(size: 13.5, weight: .semibold))
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Theme.ink)
                 .labelStyle(.titleOnly)
             configuration.content
@@ -92,16 +92,16 @@ struct SignalPlot: View {
         VStack(alignment: .leading, spacing: 4) {
             if showsHeader {
                 HStack(spacing: 10) {
-                    Text(title).font(.caption.weight(.semibold))
+                    Text(title).font(.hkCaption.weight(.semibold))
                     ForEach(channels, id: \.name) { channel in
                         Label(channel.name, systemImage: "circle.fill")
                             .labelStyle(.titleAndIcon)
-                            .font(.caption2)
+                            .font(.hkMeta)
                             .foregroundStyle(channel.color)
                     }
                     Spacer()
                     Text("±\(scale, specifier: "%.3f")")
-                        .font(.caption2.monospacedDigit())
+                        .font(.hkMeta.monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
             }
@@ -170,9 +170,9 @@ struct HoldToCaptureButton: View {
                 .font(.system(size: 30, weight: .medium))
                 .symbolEffect(.pulse, isActive: isCapturing)
             Text(isCapturing ? "Capturing…" : title)
-                .font(.headline)
+                .font(.hkHeadline)
             Text("Hold \(shortcut) or press and hold here")
-                .font(.caption)
+                .font(.hkCaption)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, minHeight: 120)
@@ -216,7 +216,7 @@ struct MotionStatusBadge: View {
     var body: some View {
         Label {
             Text(status == .streaming ? "Motion · \(Int(rate.rounded())) Hz" : status.label)
-                .font(.callout.monospacedDigit())
+                .font(.hkCallout.monospacedDigit())
         } icon: {
             Image(systemName: symbol)
                 .foregroundStyle(color)

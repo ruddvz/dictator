@@ -56,7 +56,7 @@ private struct ResearchReportsCard: View {
         GroupBox("Reports, local models & licenses") {
             VStack(alignment: .leading, spacing: 8) {
                 Text("The supplied comparison and HushKey's competitor notes are bundled with this app and open locally.")
-                    .font(.caption)
+                    .font(.hkCaption)
                     .foregroundStyle(.secondary)
                 Button("Open Wispr Flow vs TypeWhisper report", systemImage: "doc.text.magnifyingglass") {
                     openResource("Wispr_Flow_vs_TypeWhisper_Research_Report_2026-11-01", extension: "pdf")
@@ -80,7 +80,7 @@ private struct ResearchReportsCard: View {
                     openResource("ARGMAX-NOTICES", extension: "txt")
                 }
                 if let status {
-                    Text(status).font(.caption).foregroundStyle(.secondary)
+                    Text(status).font(.hkCaption).foregroundStyle(.secondary)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -115,28 +115,28 @@ private struct DictationSettingsCard: View {
                 }
                 .frame(maxWidth: 340, alignment: .leading)
                 Text("Only languages supported for on-device recognition on this Mac appear here. No remote fallback is used.")
-                    .font(.caption)
+                    .font(.hkCaption)
                     .foregroundStyle(.secondary)
                 Toggle("Show the dictation pill at the bottom of the screen", isOn: $model.showsFloatingPill)
                 Text("A small on-screen indicator that shows when HushKey is listening. Click it to start or stop dictation without leaving your app.")
-                    .font(.caption)
+                    .font(.hkCaption)
                     .foregroundStyle(.secondary)
                 Toggle("Apply explicit spoken corrections", isOn: $model.appliesSpokenCorrections)
                 Text("Recognizes cues such as “scratch that” or “actually” after a pause. Personal phrase replacements under Snippets & Vocabulary → Corrections are separate local rules. The original recognition stays available to restore.")
-                    .font(.caption)
+                    .font(.hkCaption)
                     .foregroundStyle(.secondary)
                 Toggle("Remove common filler words", isOn: $model.cleansDictationFillers)
                 Text("Optional local cleanup removes only standalone “um”, “uh”, and “erm”. It does not rewrite your wording, and the raw transcript can be restored.")
-                    .font(.caption)
+                    .font(.hkCaption)
                     .foregroundStyle(.secondary)
                 Toggle("Use nearby text as optional vocabulary hints", isOn: $model.usesNearbyTextHints)
                 Text("When started with the global shortcut in another app, HushKey can read a small slice around the cursor in a supported text field. It extracts terms locally for on-device recognition, then discards the slice. Off by default.")
-                    .font(.caption)
+                    .font(.hkCaption)
                     .foregroundStyle(.secondary)
                 HStack(spacing: 10) {
                     Button("Check local context access…") { model.requestNearbyTextAccess() }
                     Text(model.insertion.contextAccessStatus)
-                        .font(.caption)
+                        .font(.hkCaption)
                         .foregroundStyle(.secondary)
                 }
                 DictationAppProfilesEditor()
@@ -152,7 +152,7 @@ private struct DictationSettingsCard: View {
                     .frame(maxWidth: 360)
                 }
                 Text(model.dictationShortcutStatus)
-                    .font(.caption)
+                    .font(.hkCaption)
                     .foregroundStyle(model.dictationShortcutNeedsAttention ? Theme.danger : .secondary)
                 if model.dictationShortcut.usesFunctionKey, model.dictationShortcutNeedsAttention {
                     HStack(spacing: Theme.s2) {
@@ -175,10 +175,10 @@ private struct DictationSettingsCard: View {
                 }
                 .frame(maxWidth: 280, alignment: .leading)
                 Text("Select text in another app, then hold this shortcut and speak an edit instruction. The selected text is read only for that action. Review the local preview in Transforms before applying. Requires Accessibility insertion to be enabled below.")
-                    .font(.caption)
+                    .font(.hkCaption)
                     .foregroundStyle(.secondary)
                 Text(model.selectedTextEditShortcutStatus)
-                    .font(.caption)
+                    .font(.hkCaption)
                     .foregroundStyle(.secondary)
 
                 Button {
@@ -188,11 +188,11 @@ private struct DictationSettingsCard: View {
                 }
                 .buttonStyle(.bordered)
                 Text("Add recognition hints and reusable phrases in one searchable workspace.")
-                    .font(.caption)
+                    .font(.hkCaption)
                     .foregroundStyle(.secondary)
                 Toggle("Save recent transcripts on this Mac", isOn: $model.savesDictationHistory)
                 Text("Turn this off to stop adding new dictations to history. Clear saved text from the Dictation screen.")
-                    .font(.caption)
+                    .font(.hkCaption)
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -231,18 +231,18 @@ private struct DictationAppProfilesEditor: View {
         VStack(alignment: .leading, spacing: 8) {
             Divider()
             Text("App profiles")
-                .font(.headline)
+                .font(.hkHeadline)
             Text("When writing mode is Automatic, use a profile’s format and vocabulary in that app. App names and terms stay on this Mac. HushKey does not read app text unless nearby text hints are separately enabled.")
-                .font(.caption)
+                .font(.hkCaption)
                 .foregroundStyle(.secondary)
 
             if !model.dictationAppProfiles.isEmpty {
                 ForEach(model.dictationAppProfiles) { profile in
                     HStack(alignment: .center, spacing: 8) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(profile.appName).font(.subheadline.weight(.medium))
+                            Text(profile.appName).font(.hkCallout.weight(.medium))
                             Text("\(profile.mode.rawValue) · \(profile.bundleIdentifier)")
-                                .font(.caption.monospaced())
+                                .font(.hkCaption.monospaced())
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
@@ -290,7 +290,7 @@ private struct DictationAppProfilesEditor: View {
                     Button("Cancel") { resetForm() }
                 }
                 if !status.isEmpty {
-                    Text(status).font(.caption).foregroundStyle(.secondary)
+                    Text(status).font(.hkCaption).foregroundStyle(.secondary)
                 }
             }
         }
@@ -342,7 +342,7 @@ private struct ShortcutSettingsCard: View {
                 }
                 .frame(maxWidth: 260, alignment: .leading)
                 Text("Use it in Train to capture a word, or in Use after the evidence gate passes. While a synchronized session is recording, it can also mark utterances from any HushKey screen. It does not intercept Space in other apps.")
-                    .font(.caption)
+                    .font(.hkCaption)
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -372,16 +372,16 @@ private struct TextInsertionSettingsCard: View {
                 Toggle("Paste in apps that block direct typing, then restore the clipboard", isOn: $insertion.allowsPasteFallback)
                     .disabled(!insertion.isEnabled)
                 Label(insertion.status, systemImage: insertion.isEnabled ? "checkmark.shield" : "lock.shield")
-                    .font(.caption)
+                    .font(.hkCaption)
                     .foregroundStyle(.secondary)
                 Text("If the destination field remains focused and unchanged, press ⌥⇧U immediately after insertion to undo it. Undo is fail-closed if the target or text changes.")
-                    .font(.caption)
+                    .font(.hkCaption)
                     .foregroundStyle(.secondary)
                 Text("When enabled, the insertion shortcut adds your reviewed voice transcript, or the latest accepted silent word, to a supported text field in the frontmost app. Password fields are rejected. Explicit insertion does not use the clipboard. Silent Use still needs evidence to unlock.")
-                    .font(.caption)
+                    .font(.hkCaption)
                     .foregroundStyle(.secondary)
                 Text("For the Dictation screen’s one-click Insert button, start dictation with the global shortcut while the destination field is focused. HushKey remembers that field only in memory and returns to it only if the same app, field, and text selection are still unchanged.")
-                    .font(.caption)
+                    .font(.hkCaption)
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -409,14 +409,14 @@ private struct MicrophoneCard: View {
                 }
                 if let name = audio.activeDeviceName {
                     Label("Listening with \(name)", systemImage: "mic.fill")
-                        .font(.caption)
+                        .font(.hkCaption)
                         .foregroundStyle(.secondary)
                 }
                 if let error = audio.error ?? model.transcriber.error {
-                    Text(error).font(.caption).foregroundStyle(.red)
+                    Text(error).font(.hkCaption).foregroundStyle(.red)
                 }
                 Text("Choose an input for Dictation and Meeting notes. On-device recognition stays on this Mac. Dictation and meeting capture do not save microphone audio; the separate research recorder saves audio only when you explicitly start a session.")
-                    .font(.caption)
+                    .font(.hkCaption)
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -462,10 +462,10 @@ private struct RecordingCard: View {
                     }
                 }
                 Text("This writes synchronized motion CSV and optional microphone audio to your local Sessions folder. It is separate from per-word templates. While recording, use \(model.captureShortcut.label) to mark an utterance.")
-                    .font(.caption)
+                    .font(.hkCaption)
                     .foregroundStyle(.secondary)
                 if let error = recorder.error {
-                    Text(error).font(.caption).foregroundStyle(.red)
+                    Text(error).font(.hkCaption).foregroundStyle(.red)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -483,7 +483,7 @@ private struct DataManagementCard: View {
         GroupBox("Local files & privacy") {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Templates stay in Application Support. Session CSV and optional audio stay in Documents. HushKey sends no recordings or templates anywhere.")
-                    .font(.caption)
+                    .font(.hkCaption)
                     .foregroundStyle(.secondary)
                 HStack {
                     Button("Export dataset…", systemImage: "square.and.arrow.up") { model.exportDataset() }
@@ -497,7 +497,7 @@ private struct DataManagementCard: View {
                     .disabled(model.recorder.isRecording)
                 }
                 if let message = model.dataMessage {
-                    Text(message).font(.caption).textSelection(.enabled)
+                    Text(message).font(.hkCaption).textSelection(.enabled)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -519,9 +519,9 @@ private struct AppearanceCard: View {
         GroupBox("Appearance") {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Theme").font(.system(size: 13, weight: .medium))
+                    Text("Theme").font(.system(size: 14, weight: .medium))
                     Text("Light uses warm paper; Dark keeps the same layout for night use.")
-                        .font(.system(size: 12))
+                        .font(.system(size: 13))
                         .foregroundStyle(Theme.ink2)
                 }
                 Spacer()

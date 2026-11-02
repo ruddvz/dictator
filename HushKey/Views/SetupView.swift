@@ -32,12 +32,12 @@ struct SetupView: View {
                     .padding(.top, 10)
                 } label: {
                     Label("Motion diagnostics", systemImage: "waveform.path.ecg")
-                        .font(.headline)
+                        .font(.hkHeadline)
                 }
 
                 Label("Headphone motion is not an inward-facing microphone or a lip-reading sensor.",
                       systemImage: "info.circle")
-                    .font(.callout)
+                    .font(.hkCallout)
                     .foregroundStyle(.secondary)
             }
             .pageLayout()
@@ -52,15 +52,15 @@ struct SetupView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: statusSymbol)
-                        .font(.title2)
+                        .font(.hkTitle2)
                         .foregroundStyle(statusColor)
                         .frame(width: 28)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(statusTitle)
-                            .font(.headline)
+                            .font(.hkHeadline)
                         Text(statusMessage)
-                            .font(.callout)
+                            .font(.hkCallout)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -184,10 +184,10 @@ struct SetupView: View {
     private func metric(_ title: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(title)
-                .font(.caption)
+                .font(.hkCaption)
                 .foregroundStyle(.secondary)
             Text(value)
-                .font(.title3.monospacedDigit().weight(.semibold))
+                .font(.hkTitle3.monospacedDigit().weight(.semibold))
         }
     }
 }
@@ -204,13 +204,13 @@ private struct StudyStep: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: state == .done ? "checkmark.circle.fill" : "circle")
                 .foregroundStyle(state == .done ? Color.green : state == .current ? Theme.ink : Color.secondary)
-                .font(.title3)
+                .font(.hkTitle3)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(number)  \(title)")
-                    .font(.callout.weight(state == .current ? .semibold : .medium))
+                    .font(.hkCallout.weight(state == .current ? .semibold : .medium))
                 Text(detail)
-                    .font(.caption)
+                    .font(.hkCaption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }

@@ -786,8 +786,8 @@ final class AppModel {
     func deleteDictation(_ entry: DictationHistoryEntry) {
         let remaining = dictationHistory.filter { $0.id != entry.id }
         do {
-            if remaining.isEmpty { try DictationHistoryStore.delete() }
-            else { try DictationHistoryStore.save(remaining) }
+            if remaining.isEmpty { try DictationHistoryStore.delete(at: dictationHistoryURL) }
+            else { try DictationHistoryStore.save(remaining, to: dictationHistoryURL) }
             dictationHistory = remaining
             dictationHistoryMessage = nil
         } catch {

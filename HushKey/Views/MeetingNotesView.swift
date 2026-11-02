@@ -52,7 +52,7 @@ struct MeetingNotesView: View {
 
             if let message = service.message {
                 Label(message, systemImage: "exclamationmark.circle")
-                    .font(.callout)
+                    .font(.hkCallout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -108,7 +108,7 @@ struct MeetingNotesView: View {
                         .frame(maxWidth: 120)
                         .accessibilityLabel("Meeting audio input level")
                     Text(durationLabel(service.activeDuration))
-                        .font(.caption.monospacedDigit())
+                        .font(.hkCaption.monospacedDigit())
                         .foregroundStyle(.secondary)
                     Spacer()
                     Button("Stop and save", systemImage: "stop.fill") { service.stop() }
@@ -136,7 +136,7 @@ struct MeetingNotesView: View {
                         .frame(maxWidth: 360)
 
                         Text(audioSourceDescription)
-                            .font(.caption)
+                            .font(.hkCaption)
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
@@ -168,13 +168,13 @@ struct MeetingNotesView: View {
                 }
                 ForEach(filteredNotes) { note in
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(note.title).font(.headline).lineLimit(1)
+                        Text(note.title).font(.hkHeadline).lineLimit(1)
                         Text(note.transcript.isEmpty ? "No transcript" : note.transcript)
-                            .font(.caption)
+                            .font(.hkCaption)
                             .foregroundStyle(.secondary)
                             .lineLimit(2)
                         Text(note.createdAt.formatted(date: .abbreviated, time: .shortened))
-                            .font(.caption2)
+                            .font(.hkMeta)
                             .foregroundStyle(.tertiary)
                     }
                     .padding(.vertical, 4)
@@ -206,15 +206,15 @@ struct MeetingNotesView: View {
         VStack(alignment: .leading, spacing: 12) {
             Label(service.isFinalizing ? "Saving meeting transcript" : "Live transcript",
                   systemImage: service.isFinalizing ? "ellipsis.circle" : "waveform")
-                .font(.headline)
+                .font(.hkHeadline)
             TextEditor(text: .constant(service.transcriber.text))
-                .font(.body)
+                .font(.hkBody)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(6)
                 .background(.background, in: RoundedRectangle(cornerRadius: 8))
                 .disabled(true)
             Text("Live text is temporary until you stop the capture. No microphone audio is written to disk.")
-                .font(.caption)
+                .font(.hkCaption)
                 .foregroundStyle(.secondary)
         }
         .padding(10)
@@ -224,7 +224,7 @@ struct MeetingNotesView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 TextField("Meeting title", text: binding(for: note, keyPath: \.title))
-                    .font(.title3.weight(.semibold))
+                    .font(.hkTitle3.weight(.semibold))
                     .textFieldStyle(.plain)
                 Spacer(minLength: 4)
                 Menu {
@@ -240,18 +240,18 @@ struct MeetingNotesView: View {
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
-                        .font(.title3)
+                        .font(.hkTitle3)
                 }
                 .menuStyle(.borderlessButton)
                 .help("More meeting note actions")
             }
             Text("\(note.createdAt.formatted(date: .complete, time: .shortened)) · \(durationLabel(note.duration)) · Stored on this Mac")
-                .font(.caption)
+                .font(.hkCaption)
                 .foregroundStyle(.secondary)
 
             if service.isGenerating {
                 ProgressView("Creating a local draft…")
-                    .font(.caption)
+                    .font(.hkCaption)
                     .padding(.vertical, 2)
             }
 
@@ -259,7 +259,7 @@ struct MeetingNotesView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Label("Summary", systemImage: "text.alignleft")
-                            .font(.headline)
+                            .font(.hkHeadline)
                         Spacer()
                         Button("Create summary", systemImage: "sparkles") {
                             Task { await service.generateSummary(for: note.id, with: model.localTransformService) }
@@ -270,7 +270,7 @@ struct MeetingNotesView: View {
                         .frame(minHeight: 86)
                         .disabled(service.isGenerating)
                     Text(model.localTransformService.availabilityMessage)
-                        .font(.caption)
+                        .font(.hkCaption)
                         .foregroundStyle(.secondary)
                 }
                 .padding(6)
@@ -280,7 +280,7 @@ struct MeetingNotesView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Label("Action items", systemImage: "checklist")
-                            .font(.headline)
+                            .font(.hkHeadline)
                         Spacer()
                         Button("Extract action items", systemImage: "list.bullet.clipboard") {
                             Task { await service.generateActionItems(for: note.id, with: model.localTransformService) }
@@ -297,13 +297,13 @@ struct MeetingNotesView: View {
             GroupBox {
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Transcript", systemImage: "waveform")
-                        .font(.headline)
+                        .font(.hkHeadline)
                     TextEditor(text: binding(for: note, keyPath: \.transcript))
-                        .font(.body)
+                        .font(.hkBody)
                         .frame(minHeight: 160)
                         .disabled(service.isGenerating)
                     Text("\(note.transcript.count.formatted()) characters · Edit to correct recognition before generating notes.")
-                        .font(.caption)
+                        .font(.hkCaption)
                         .foregroundStyle(.secondary)
                 }
                 .padding(6)
@@ -340,7 +340,7 @@ struct MeetingNotesView: View {
     private var privacyNote: some View {
         Label("Start capture explicitly. Both sides combines your microphone with sound playing from apps. macOS may ask separately for microphone and System Audio Recording access. Speech recognition and notes stay on this Mac; audio is not saved and speakers are not identified.",
               systemImage: "lock.shield")
-            .font(.caption)
+            .font(.hkCaption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
     }

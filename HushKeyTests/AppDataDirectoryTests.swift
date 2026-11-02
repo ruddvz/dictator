@@ -34,4 +34,10 @@ final class AppDataDirectoryTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: current.appending(path: "meeting-notes.json"), encoding: .utf8), "new")
         XCTAssertTrue(fm.fileExists(atPath: legacy.appending(path: "meeting-notes.json").path))
     }
+
+    func testUnitTestsNeverUseTheRealDataFolder() {
+        XCTAssertTrue(AppDataDirectory.isRunningTests)
+        XCTAssertFalse(AppDataDirectory.url.path.contains("Application Support"), AppDataDirectory.url.path)
+        XCTAssertFalse(DictationHistoryStore.url.path.contains("Application Support"))
+    }
 }

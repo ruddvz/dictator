@@ -36,7 +36,7 @@ struct DictationView: View {
         HStack(alignment: .center, spacing: Theme.s4) {
             VStack(alignment: .leading, spacing: Theme.s2) {
                 Text("Hey \(firstName)")
-                    .font(.display(32))
+                    .font(.display(34))
                     .tracking(-0.4)
                 HStack(spacing: Theme.s2) {
                     Text(holds ? "Hold" : "Press")
@@ -45,11 +45,11 @@ struct DictationView: View {
                          ? "anywhere and talk. Double-tap for hands-free."
                          : holds ? "anywhere and talk. Let go to finish." : "anywhere to start and stop.")
                 }
-                .font(.system(size: 14))
+                .font(.system(size: 15))
                 .foregroundStyle(Theme.ink2)
                 if let problem {
                     Label(problem, systemImage: "exclamationmark.triangle.fill")
-                        .font(.system(size: 12.5, weight: .medium))
+                        .font(.system(size: 13.5, weight: .medium))
                         .foregroundStyle(Theme.finishing)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -128,7 +128,7 @@ struct DictationView: View {
                 Text(model.isSelectedTextEditCapturing ? "Listening for your edit"
                      : model.isFinalizingSelectedTextEdit ? "Applying your edit"
                      : model.audio.isRunning ? "Listening" : isFinishing ? "Transcribing" : "Latest dictation")
-                    .font(.system(size: 13.5, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                 modeMenu
                 if !model.rawDictationText.isEmpty, let target = model.activeDictationTarget {
                     StatusChip(title: target, systemImage: "macwindow")
@@ -166,7 +166,7 @@ struct DictationView: View {
                 Spacer()
                 if !model.insertion.status.isEmpty {
                     Text(model.insertion.status)
-                        .font(.system(size: 12))
+                        .font(.system(size: 13))
                         .foregroundStyle(Theme.ink3)
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -190,7 +190,7 @@ struct DictationView: View {
             .pickerStyle(.inline)
         } label: {
             Label(model.dictationMode.rawValue, systemImage: model.dictationMode.symbol)
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
@@ -209,7 +209,7 @@ struct DictationView: View {
                 Text(model.transcriber.text.isEmpty
                      ? (isFinishing ? "Finishing up…" : "Start talking…")
                      : model.transcriber.text)
-                    .font(.system(size: 16))
+                    .font(.system(size: 17))
                     .lineSpacing(3)
                     .foregroundStyle(model.transcriber.text.isEmpty ? Theme.ink3 : Theme.ink)
                     .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -218,7 +218,7 @@ struct DictationView: View {
             .frame(minHeight: 72, maxHeight: 220)
         } else {
             TextEditor(text: transcriptBinding)
-                .font(.system(size: 16))
+                .font(.system(size: 17))
                 .lineSpacing(3)
                 .scrollContentBackground(.hidden)
                 .frame(minHeight: 72, maxHeight: 220)
@@ -247,12 +247,12 @@ struct DictationView: View {
     private func statRow(value: String, label: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: Theme.s2) {
             Text(value)
-                .font(.display(28))
+                .font(.display(30))
                 .monospacedDigit()
                 .contentTransition(.numericText())
                 .animation(Theme.gentle, value: value)
             Text(label)
-                .font(.system(size: 13))
+                .font(.system(size: 14))
                 .foregroundStyle(Theme.ink2)
         }
     }
@@ -262,7 +262,7 @@ struct DictationView: View {
     private var historySection: some View {
         VStack(alignment: .leading, spacing: Theme.s3) {
             HStack(spacing: Theme.s2) {
-                Text("History").font(.system(size: 15, weight: .semibold))
+                Text("History").font(.system(size: 16, weight: .semibold))
                 Spacer()
                 if !model.dictationHistory.isEmpty {
                     if searching || !historySearch.isEmpty {
@@ -287,7 +287,7 @@ struct DictationView: View {
 
             if let message = model.dictationHistoryMessage {
                 Text(message)
-                    .font(.system(size: 12))
+                    .font(.system(size: 13))
                     .foregroundStyle(message.hasPrefix("Could not") || message.hasPrefix("This transcript")
                                      ? Theme.finishing : Theme.ink3)
                     .textSelection(.enabled)
@@ -330,11 +330,11 @@ struct DictationView: View {
                 .frame(width: 36, height: 36)
                 .foregroundStyle(Theme.ink3)
             Text(model.savesDictationHistory ? "Your dictations collect here" : "History is off")
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 15, weight: .semibold))
             Text(model.savesDictationHistory
                  ? "Each one is kept on this Mac, grouped by day, ready to copy or edit again."
                  : "Turn it on in Settings to keep recent dictations on this Mac.")
-                .font(.system(size: 13))
+                .font(.system(size: 14))
                 .foregroundStyle(Theme.ink2)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 340)
@@ -363,7 +363,7 @@ struct DictationView: View {
             .buttonStyle(.plain)
             .foregroundStyle(Theme.ink3)
         }
-        .font(.system(size: 13))
+        .font(.system(size: 14))
         .padding(.horizontal, Theme.s3)
         .frame(height: 30)
         .background(Theme.well, in: Capsule())
@@ -458,10 +458,10 @@ private struct NextStepBanner: View {
                 HStack(alignment: .bottom, spacing: Theme.s4) {
                     VStack(alignment: .leading, spacing: Theme.s2) {
                         Text(step.title)
-                            .font(.display(24))
+                            .font(.display(26))
                             .tracking(-0.2)
                         Text(step.detail)
-                            .font(.system(size: 13))
+                            .font(.system(size: 14))
                             .foregroundStyle(Theme.ink2)
                             .fixedSize(horizontal: false, vertical: true)
                         Button(step.action) { step.perform(model) }
@@ -481,7 +481,7 @@ private struct NextStepBanner: View {
                 }
                 .labelStyle(.iconOnly)
                 .buttonStyle(.plain)
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(Theme.ink3)
                 .frame(width: 28, height: 28)
                 .contentShape(Rectangle())
@@ -533,11 +533,11 @@ private struct HistoryRow: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: Theme.s4) {
             Text(entry.createdAt.formatted(date: .omitted, time: .shortened))
-                .font(.system(size: 12.5).monospacedDigit())
+                .font(.system(size: 13.5).monospacedDigit())
                 .foregroundStyle(Theme.ink3)
                 .frame(width: 64, alignment: .leading)
             Text(entry.text)
-                .font(.system(size: 13.5))
+                .font(.system(size: 15))
                 .lineSpacing(2)
                 .lineLimit(3)
                 .frame(maxWidth: .infinity, alignment: .leading)

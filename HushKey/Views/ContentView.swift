@@ -12,7 +12,7 @@ struct ContentView: View {
     var body: some View {
         HStack(spacing: 0) {
             sidebar
-                .frame(width: 216)
+                .frame(width: 232)
             page
                 .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: Theme.r1, style: .continuous)
@@ -23,6 +23,7 @@ struct ContentView: View {
         .background(Theme.paper)
         .ignoresSafeArea()
         .foregroundStyle(Theme.ink)
+        .font(.hkBody)
         .groupBoxStyle(CardGroupBoxStyle())
         .tint(Theme.ink)
         .preferredColorScheme(appearance.colorScheme)
@@ -74,7 +75,7 @@ struct ContentView: View {
                 .frame(width: 22, height: 22)
                 .foregroundStyle(model.audio.isRunning ? Theme.listening : Theme.ink)
             Text("HushKey")
-                .font(.system(size: 17, weight: .semibold))
+                .font(.system(size: 18, weight: .semibold))
                 .tracking(-0.2)
         }
         .accessibilityElement(children: .combine)
@@ -105,7 +106,7 @@ struct ContentView: View {
 
             if Self.labScreens.contains(model.screen) {
                 MotionStatusBadge(status: model.motion.status, rate: model.motion.sampleRate)
-                    .font(.system(size: 12))
+                    .font(.system(size: 13))
                     .padding(.horizontal, Theme.s3)
                     .frame(height: 26)
                     .background(Theme.well, in: Capsule())
@@ -147,11 +148,11 @@ private struct SidebarRow: View {
         } label: {
             HStack(spacing: Theme.s3) {
                 Image(systemName: screen.symbol)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: 15, weight: .medium))
                     .frame(width: 18)
                     .symbolEffect(.bounce, value: isSelected)
                 Text(screen.sidebarTitle)
-                    .font(.system(size: 13.5, weight: isSelected ? .semibold : .medium))
+                    .font(.system(size: 15, weight: isSelected ? .semibold : .medium))
                 Spacer(minLength: 0)
             }
             .foregroundStyle(isSelected ? Theme.ink : Theme.ink.opacity(0.82))
@@ -198,10 +199,10 @@ private struct SetupChecklist: View {
             if completed < steps.count {
                 VStack(alignment: .leading, spacing: Theme.s2) {
                     HStack {
-                        Text("Get set up").font(.system(size: 12.5, weight: .semibold))
+                        Text("Get set up").font(.system(size: 13.5, weight: .semibold))
                         Spacer()
                         Text("\(completed) of \(steps.count)")
-                            .font(.system(size: 11, weight: .medium).monospacedDigit())
+                            .font(.system(size: 12, weight: .medium).monospacedDigit())
                             .foregroundStyle(Theme.ink3)
                     }
                     GeometryReader { geo in
@@ -222,11 +223,11 @@ private struct SetupChecklist: View {
                         } label: {
                             HStack(spacing: Theme.s2) {
                                 Image(systemName: step.isDone ? "checkmark.circle.fill" : "circle")
-                                    .font(.system(size: 13))
+                                    .font(.system(size: 14))
                                     .foregroundStyle(step.isDone ? Theme.ink : Theme.ink3)
                                     .contentTransition(.symbolEffect(.replace))
                                 Text(step.title)
-                                    .font(.system(size: 12))
+                                    .font(.system(size: 13))
                                     .foregroundStyle(step.isDone ? Theme.ink3 : Theme.ink)
                                     .strikethrough(step.isDone, color: Theme.ink3)
                                 Spacer(minLength: 0)

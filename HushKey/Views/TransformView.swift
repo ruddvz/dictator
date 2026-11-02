@@ -60,7 +60,7 @@ struct TransformView: View {
 
                 Label("Text transforms use Apple’s on-device Foundation Model when it is available. HushKey has no cloud fallback, and generated text is always shown for review before it replaces your transcript.",
                       systemImage: "lock.shield")
-                    .font(.caption)
+                    .font(.hkCaption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -99,7 +99,7 @@ struct TransformView: View {
             VStack(alignment: .leading, spacing: 12) {
                 if model.selectedTextEditOriginal.isEmpty {
                     Text("Select text in another app, then hold \(model.selectedTextEditShortcut.label) and say what you want changed. The selected text stays on this Mac and is only read for that shortcut.")
-                        .font(.subheadline)
+                        .font(.hkCallout)
                         .fixedSize(horizontal: false, vertical: true)
                     if !model.insertion.isEnabled {
                         Button("Enable safe text access…") { model.screen = .settings }
@@ -108,7 +108,7 @@ struct TransformView: View {
                 } else {
                     HStack {
                         Label("Selection from \(model.selectedTextEditTargetName ?? "another app")", systemImage: "text.cursor")
-                            .font(.subheadline.weight(.semibold))
+                            .font(.hkCallout.weight(.semibold))
                         Spacer()
                         Button(model.selectedTextEditApplied ? "Done" : "Discard", systemImage: "xmark") {
                             model.clearSelectedTextEdit()
@@ -117,7 +117,7 @@ struct TransformView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 5) {
-                        Text("Original selection").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                        Text("Original selection").font(.hkCaption.weight(.semibold)).foregroundStyle(.secondary)
                         Text(model.selectedTextEditOriginal)
                             .textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -127,7 +127,7 @@ struct TransformView: View {
 
                     VStack(alignment: .leading, spacing: 5) {
                         Text(model.isSelectedTextEditCapturing ? "Live edit instruction" : "Edit instruction")
-                            .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                            .font(.hkCaption.weight(.semibold)).foregroundStyle(.secondary)
                         if model.isSelectedTextEditCapturing {
                             Text(model.selectedTextEditLiveInstruction.isEmpty
                                  ? "Listening…"
@@ -139,7 +139,7 @@ struct TransformView: View {
                             TextEditor(text: Binding(
                                 get: { model.selectedTextEditInstruction },
                                 set: { model.updateSelectedTextEditInstruction($0) }))
-                                .font(.body)
+                                .font(.hkBody)
                                 .frame(minHeight: 75, maxHeight: 120)
                                 .disabled(model.isFinalizingSelectedTextEdit || model.isGeneratingSelectedTextEdit || model.isApplyingSelectedTextEdit)
                                 .padding(4)
@@ -160,7 +160,7 @@ struct TransformView: View {
                         if !model.selectedTextEditDraft.isEmpty {
                             if model.selectedTextEditApplied {
                                 Label("Applied once · undo with ⌥⇧U in the target field", systemImage: "checkmark.circle")
-                                    .font(.caption)
+                                    .font(.hkCaption)
                                     .foregroundStyle(.secondary)
                             } else {
                                 Button("Apply to \(model.selectedTextEditTargetName ?? "original app")",
@@ -175,11 +175,11 @@ struct TransformView: View {
 
                     if !model.selectedTextEditDraft.isEmpty {
                         VStack(alignment: .leading, spacing: 5) {
-                            Text("Preview · review before applying").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                            Text("Preview · review before applying").font(.hkCaption.weight(.semibold)).foregroundStyle(.secondary)
                             TextEditor(text: Binding(
                                 get: { model.selectedTextEditDraft },
                                 set: { model.updateSelectedTextEditDraft($0) }))
-                                .font(.body)
+                                .font(.hkBody)
                                 .frame(minHeight: 90, maxHeight: 180)
                                 .disabled(model.isApplyingSelectedTextEdit || model.selectedTextEditApplied)
                                 .padding(4)
@@ -189,7 +189,7 @@ struct TransformView: View {
 
                     if let status = model.selectedTextEditStatus {
                         Label(status, systemImage: model.selectedTextEditApplied ? "checkmark.circle" : "info.circle")
-                            .font(.caption)
+                            .font(.hkCaption)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -197,17 +197,17 @@ struct TransformView: View {
 
                 if !model.localTransformService.modelIsAvailable {
                     Label(model.localTransformService.availabilityMessage, systemImage: "info.circle")
-                        .font(.caption)
+                        .font(.hkCaption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Text(model.selectedTextEditShortcutStatus)
-                    .font(.caption)
+                    .font(.hkCaption)
                     .foregroundStyle(.secondary)
                 Label("Requires Accessibility insertion to be enabled. HushKey uses the selected text and your spoken instruction for an on-device preview; neither is added to dictation history or sent to a server. Apply rechecks the original app, field, text, and selection.",
                       systemImage: "lock.shield")
-                    .font(.caption)
+                    .font(.hkCaption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -229,14 +229,14 @@ struct TransformView: View {
                         .frame(minHeight: 140)
                 } else {
                     TextEditor(text: transcriptBinding)
-                        .font(.body)
+                        .font(.hkBody)
                         .frame(minHeight: 150)
                         .disabled(isBusy)
                         .padding(4)
                         .background(.background, in: RoundedRectangle(cornerRadius: 8))
                     HStack {
                         Text("\(currentText.count.formatted()) characters")
-                            .font(.caption.monospacedDigit())
+                            .font(.hkCaption.monospacedDigit())
                             .foregroundStyle(.secondary)
                         Spacer()
                         Button("Open Dictation", systemImage: "arrow.up.right") {
@@ -268,13 +268,13 @@ struct TransformView: View {
                         } label: {
                             HStack(alignment: .top, spacing: 12) {
                                 Image(systemName: action.symbol)
-                                    .font(.title3)
+                                    .font(.hkTitle3)
                                     .foregroundStyle(selectedStyle == nil && selectedAction == action ? Theme.ink : Color.secondary)
                                     .frame(width: 26)
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text(action.rawValue).font(.headline)
+                                    Text(action.rawValue).font(.hkHeadline)
                                     Text(action.description)
-                                        .font(.caption)
+                                        .font(.hkCaption)
                                         .foregroundStyle(.secondary)
                                         .fixedSize(horizontal: false, vertical: true)
                                 }
@@ -297,12 +297,12 @@ struct TransformView: View {
                 if selectedStyle != nil || selectedAction.requiresLanguageModel {
                     Label(model.localTransformService.availabilityMessage,
                           systemImage: model.localTransformService.modelIsAvailable ? "checkmark.circle" : "info.circle")
-                        .font(.caption)
+                        .font(.hkCaption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 } else {
                     Label("This cleanup runs locally with text rules and does not need a language model.", systemImage: "checkmark.circle")
-                        .font(.caption)
+                        .font(.hkCaption)
                         .foregroundStyle(.secondary)
                 }
 
@@ -317,7 +317,7 @@ struct TransformView: View {
                     .disabled(!canGenerate)
 
                     if let statusMessage {
-                        Text(statusMessage).font(.caption).foregroundStyle(.secondary)
+                        Text(statusMessage).font(.hkCaption).foregroundStyle(.secondary)
                     }
                     Spacer()
                 }
@@ -332,10 +332,10 @@ struct TransformView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Label("Your writing styles", systemImage: "textformat")
-                    .font(.headline)
+                    .font(.hkHeadline)
                 Spacer()
                 Text("\(customStyles.count)/\(WritingStylePreset.maximumCount)")
-                    .font(.caption.monospacedDigit())
+                    .font(.hkCaption.monospacedDigit())
                     .foregroundStyle(.secondary)
                 Button("Add style", systemImage: "plus") {
                     styleEditorRequest = WritingStyleEditorRequest(preset: nil)
@@ -345,7 +345,7 @@ struct TransformView: View {
 
             if customStyles.isEmpty {
                 Text("Create a style for a tone, format, or translation. It will run locally and appear here next time.")
-                    .font(.caption)
+                    .font(.hkCaption)
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(customStyles) { style in
@@ -358,8 +358,8 @@ struct TransformView: View {
                                 Image(systemName: "textformat")
                                     .foregroundStyle(selectedStyleID == style.id ? Theme.ink : Color.secondary)
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text(style.name).font(.subheadline.weight(.semibold))
-                                    Text(style.instructions).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                                    Text(style.name).font(.hkCallout.weight(.semibold))
+                                    Text(style.instructions).font(.hkCaption).foregroundStyle(.secondary).lineLimit(2)
                                 }
                                 Spacer(minLength: 0)
                             }
@@ -382,7 +382,7 @@ struct TransformView: View {
                             }
                         } label: {
                             Image(systemName: "ellipsis.circle")
-                                .font(.title3)
+                                .font(.hkTitle3)
                                 .foregroundStyle(.secondary)
                                 .frame(width: 32, height: 40)
                                 .contentShape(Rectangle())
@@ -394,7 +394,7 @@ struct TransformView: View {
                 }
             }
             Text("Styles are saved on this Mac. The selected instruction and transcript are sent only to Apple’s on-device model; HushKey has no cloud fallback.")
-                .font(.caption)
+                .font(.hkCaption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -405,19 +405,19 @@ struct TransformView: View {
         GroupBox {
             VStack(alignment: .leading, spacing: 12) {
                 TextEditor(text: $draft)
-                    .font(.body)
+                    .font(.hkBody)
                     .frame(minHeight: 180)
                     .padding(4)
                     .background(.background, in: RoundedRectangle(cornerRadius: 8))
                 if normalizedDraft == normalizedSourceSnapshot {
                     Label("This preview matches your transcript; there is nothing to apply.", systemImage: "checkmark.circle")
-                        .font(.caption)
+                        .font(.hkCaption)
                         .foregroundStyle(.secondary)
                 }
                 if sourceSnapshot != currentText {
                     Label("The transcript changed after this preview. Generate a fresh preview before applying it.",
                           systemImage: "exclamationmark.triangle")
-                        .font(.caption)
+                        .font(.hkCaption)
                         .foregroundStyle(.orange)
                 }
                 HStack(spacing: 10) {
@@ -571,26 +571,26 @@ private struct WritingStylePresetEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text(name.isEmpty ? "New writing style" : "Edit writing style")
-                .font(.title2.weight(.semibold))
+                .font(.hkTitle2.weight(.semibold))
             TextField("Name, for example: Warm and concise", text: $name)
                 .textFieldStyle(.roundedBorder)
                 .accessibilityLabel("Writing style name")
             VStack(alignment: .leading, spacing: 6) {
-                Text("Instruction").font(.headline)
+                Text("Instruction").font(.hkHeadline)
                 TextEditor(text: $instructions)
                     .frame(minHeight: 120)
                     .overlay(RoundedRectangle(cornerRadius: 7).stroke(.quaternary, lineWidth: 1))
                     .accessibilityLabel("Writing style instruction")
                 Text("Describe the tone or format. Example: Translate into French, keep product names unchanged, and return only the translation.")
-                    .font(.caption)
+                    .font(.hkCaption)
                     .foregroundStyle(.secondary)
             }
             if let validationMessage {
-                Text(validationMessage).font(.caption).foregroundStyle(.orange)
+                Text(validationMessage).font(.hkCaption).foregroundStyle(.orange)
             }
             HStack {
                 Text("Up to 32 characters for the name and 500 for the instruction.")
-                    .font(.caption)
+                    .font(.hkCaption)
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }

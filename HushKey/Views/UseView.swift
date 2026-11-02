@@ -18,7 +18,7 @@ struct UseView: View {
                 transcriptPanel
                 if model.insertion.isEnabled {
                     Label("Accessibility insertion is enabled · \(model.insertion.shortcut.label)", systemImage: "checkmark.shield")
-                        .font(.caption)
+                        .font(.hkCaption)
                         .foregroundStyle(.secondary)
                 }
                 DisclosureGroup("Advanced diagnostics and comparison") {
@@ -37,13 +37,13 @@ struct UseView: View {
     private var eligibilityCard: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "lock.shield")
-                .font(.title2)
+                .font(.hkTitle2)
                 .foregroundStyle(.orange)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
-                Text("Silent use is locked").font(.headline)
+                Text("Silent use is locked").font(.hkHeadline)
                 Text(eligibilityMessage)
-                    .font(.callout)
+                    .font(.hkCallout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -126,7 +126,7 @@ struct UseView: View {
                 } else {
                     Label("Auto capture is locked until silent-motion evidence passes and a live motion stream is available.",
                           systemImage: "lock.shield")
-                        .font(.callout)
+                        .font(.hkCallout)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -144,7 +144,7 @@ struct UseView: View {
                     }
                     .padding(.top, 8)
                 }
-                .font(.caption)
+                .font(.hkCaption)
             }
             .padding(6)
         }
@@ -160,14 +160,14 @@ struct UseView: View {
                 }
                 .disabled(capture.isCalibrating || model.motion.status != .streaming)
                 if let floor = capture.noiseFloor {
-                    Text(String(format: "floor %.4f", floor)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                    Text(String(format: "floor %.4f", floor)).font(.hkCaption.monospacedDigit()).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Circle()
                     .fill(capture.isCapturing ? Theme.signal : Color.secondary.opacity(0.3))
                     .frame(width: 10, height: 10)
                 Text(capture.isCapturing ? "Capturing" : "Listening")
-                    .font(.caption)
+                    .font(.hkCaption)
             }
             LevelMeter(value: capture.energy / scaleMax,
                        marker: capture.threshold.map { $0 / scaleMax },
@@ -176,10 +176,10 @@ struct UseView: View {
                 Slider(value: $capture.triggerRatio, in: 1.5...10).frame(width: 160)
                 Text(String(format: "%.1f×", capture.triggerRatio)).monospacedDigit()
             }
-            .font(.callout)
+            .font(.hkCallout)
             if capture.noiseFloor == nil {
                 Text("Calibrate first: keep still for 2 s so the detector learns your resting motion.")
-                    .font(.caption)
+                    .font(.hkCaption)
                     .foregroundStyle(.secondary)
             }
         }
@@ -197,17 +197,17 @@ struct UseView: View {
                 }
                 if model.decoded.isEmpty {
                     Text(model.isMotionInferenceEnabled ? "Mouth a trained word…" : "Complete the evidence checks to begin.")
-                        .font(.title)
+                        .font(.hkTitle2)
                         .foregroundStyle(.tertiary)
                         .frame(maxWidth: .infinity, minHeight: 80, alignment: .topLeading)
                 } else {
                     decodedText
-                        .font(.title)
+                        .font(.hkTitle2)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, minHeight: 80, alignment: .topLeading)
                 }
                 Text("Accepted words appear normally. Rejected matches stay faded and will not be inserted.")
-                    .font(.caption2)
+                    .font(.hkMeta)
                     .foregroundStyle(.secondary)
             }
             .padding(6)
@@ -234,19 +234,19 @@ struct UseView: View {
                             LevelMeter(value: 1 - candidate.distance / max(worst * 1.2, 1e-6),
                                        tint: candidate == prediction.best ? .green : .gray)
                             Text(String(format: "%.2f", candidate.distance))
-                                .font(.caption.monospacedDigit())
+                                .font(.hkCaption.monospacedDigit())
                                 .frame(width: 40, alignment: .trailing)
                         }
                     }
                     Text(String(format: "Confidence %.2f · %@", prediction.confidence,
                                 prediction.accepted ? "accepted" : "rejected"))
-                        .font(.caption)
+                        .font(.hkCaption)
                         .foregroundStyle(.secondary)
                     SignalPlot(title: "Rotation rate", samples: model.lastSegment,
                                channels: SignalPlot.rotation, minScale: 0.05, height: 60)
                 } else {
                     Text("DTW distance to each word's closest take appears here.")
-                        .font(.caption)
+                        .font(.hkCaption)
                         .foregroundStyle(.secondary)
                 }
             }

@@ -227,14 +227,14 @@ struct FloatingPillView: View {
                     MorphIcon(phase: .working, lineWidth: 1.8)
                         .frame(width: 16, height: 16)
                         .foregroundStyle(Self.glow)
-                    Text("Writing it up").font(.system(size: 12, weight: .medium))
+                    Text("Writing it up").font(.system(size: 13, weight: .medium))
                 case .error:
                     if let notice = model.dictationNotice { errorContent(notice) }
                 case .done:
                     MorphIcon(phase: .done, lineWidth: 2)
                         .frame(width: 16, height: 16)
                         .foregroundStyle(Self.glow)
-                    Text(model.didInsertCurrentDictation ? "Typed" : "Ready in HushKey").font(.system(size: 12, weight: .medium))
+                    Text(model.didInsertCurrentDictation ? "Typed" : "Ready in HushKey").font(.system(size: 13, weight: .medium))
                 default:
                     MorphIcon(phase: .idle, lineWidth: 1.8)
                         .frame(width: 16, height: 16)
@@ -244,7 +244,7 @@ struct FloatingPillView: View {
                         Text(model.dictationShortcut.label).fontWeight(.semibold)
                         Text("or click to talk")
                     }
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 13, weight: .medium))
                 }
             }
             .padding(.leading, phase == .listening ? 6 : phase == .error ? 10 : 12)
@@ -274,7 +274,7 @@ struct FloatingPillView: View {
                 Spacer(minLength: 8)
                 if let hint {
                     Text(hint)
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.white.opacity(0.5))
                         .lineLimit(1)
                 }
@@ -283,7 +283,7 @@ struct FloatingPillView: View {
                 }
             }
             Text(text.isEmpty ? "Listening…" : text)
-                .font(.system(size: 17, weight: .medium))
+                .font(.system(size: 18, weight: .medium))
                 .foregroundStyle(.white.opacity(text.isEmpty ? 0.4 : 1))
                 .lineLimit(3)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -316,10 +316,10 @@ struct FloatingPillView: View {
     @ViewBuilder
     private func errorContent(_ notice: DictationNotice) -> some View {
         Image(systemName: "exclamationmark.circle.fill")
-            .font(.system(size: 13, weight: .semibold))
+            .font(.system(size: 14, weight: .semibold))
             .foregroundStyle(Theme.danger)
         Text(notice.message)
-            .font(.system(size: 12, weight: .medium))
+            .font(.system(size: 13, weight: .medium))
             .foregroundStyle(Theme.danger)
             .lineLimit(1)
             .truncationMode(.tail)
@@ -360,7 +360,7 @@ struct FloatingPillView: View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             let seconds = Int(context.date.timeIntervalSince(model.dictationStartedAt ?? context.date))
             Text(String(format: "%d:%02d", seconds / 60, seconds % 60))
-                .font(.system(size: 11, weight: .medium).monospacedDigit())
+                .font(.system(size: 12, weight: .medium).monospacedDigit())
                 .foregroundStyle(.white.opacity(0.6))
                 .frame(minWidth: 28)
         }
@@ -391,9 +391,9 @@ private struct PillIconButton: View {
         Button(action: action) {
             HStack(spacing: 4) {
                 Image(systemName: systemImage)
-                    .font(.system(size: 9, weight: .bold))
+                    .font(.system(size: 10, weight: .bold))
                 if let title {
-                    Text(title).font(.system(size: 11, weight: .semibold))
+                    Text(title).font(.system(size: 12, weight: .semibold))
                 }
             }
             .foregroundStyle(tint.opacity(hovering ? 0.95 : 0.65))

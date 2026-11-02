@@ -13,7 +13,12 @@ enum AppDataDirectory {
     static let ownedItems = ["dictation-history.json", "file-transcription-history.json",
                              "meeting-notes.json", "dataset.json", "WhisperKitModels"]
 
-    static var url: URL { url(in: .applicationSupportDirectory) }
+    static var url: URL { url(in: isRunningTests ? testBase : .applicationSupportDirectory) }
+
+    /// Unit tests run inside a copy of the app; they must never read or delete the user's real data.
+    static let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    private static let testBase = FileManager.default.temporaryDirectory
+        .appending(path: "hushkey-tests-\(ProcessInfo.processInfo.processIdentifier)", directoryHint: .isDirectory)
 
     static func url(in base: URL, fileManager: FileManager = .default) -> URL {
         let directory = base.appending(path: folderName, directoryHint: .isDirectory)
