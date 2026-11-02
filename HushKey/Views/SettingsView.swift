@@ -43,6 +43,9 @@ private struct ResearchReportsCard: View {
                 Button("Open HushKey competitor notes", systemImage: "list.bullet.rectangle") {
                     openResource("COMPETITOR_RESEARCH", extension: "md")
                 }
+                Button("Open dictation alternatives research", systemImage: "text.magnifyingglass") {
+                    openResource("COMPETITOR_RESEARCH_ADDENDUM_2026-11-01", extension: "md")
+                }
                 Button("Open local speech model notes", systemImage: "waveform") {
                     openResource("LOCAL_MODEL_EVALUATION", extension: "md")
                 }

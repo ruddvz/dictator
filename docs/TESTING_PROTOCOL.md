@@ -57,6 +57,13 @@ Run this separately from the AirPods motion study:
 6. In TextEdit and one other supported app, insert once, confirm the clipboard did not change, then press `⌥⇧U` immediately while the same field is unchanged. Confirm that the insert is removed; change focus or edit the field and confirm undo fails closed.
 7. Reload the local history entry, restore raw recognition, clear the current draft, and clear history. Confirm microphone audio is never stored by ordinary dictation.
 
+## Local writing style acceptance
+
+1. With Apple's on-device language model available, create a named writing style such as a warm concise tone or a translation instruction. Confirm blank/overlong names and instructions are rejected, duplicate names are blocked, and no more than 12 styles can be saved.
+2. Preview the style on a transcript. Confirm the draft is editable, the source transcript remains unchanged until Apply, changed source text invalidates the preview, and Undo restores the original.
+3. Quit and reopen HushKey. Confirm styles remain available on this Mac; edit and delete one, then confirm the changes persist. Confirm no style or transcript is sent to a cloud service.
+4. When Apple's model is unavailable, confirm custom styles explain that a local model is unavailable and do not run a remote fallback. Deterministic filler removal should still work.
+
 ## Local file transcription acceptance
 
 1. Import a short consented audio file and transcribe it with Apple Speech. Confirm HushKey refuses remote fallback when the selected language lacks on-device support.

@@ -197,3 +197,17 @@ With the user present, verify transcript editing and recovery plus the voice, fi
 ## Next item — manual runtime acceptance
 
 With the user present, verify the packaged app's Dictation and Meeting Notes flows, including the hint behavior, and complete the remaining voice, file, and insertion checks in docs/TESTING_PROTOCOL.md. Recheck the running app path when Computer Use can bind; source tests do not prove live microphone, Accessibility insertion, or System Audio Recording behavior.
+
+## Completed — alternative research and local writing styles
+
+- Reviewed FreeFlow, OpenWhispr, OpenTypeless, SpeakType (the separate project linked by the Reddit post), and the Voibe, LumeVoice, and AssemblyAI roundups. The sourced comparison distinguishes repository-backed features from vendor claims and Reddit anecdotes, and ranks HushKey's next opportunities.
+- Added [the alternatives research addendum](docs/COMPETITOR_RESEARCH_ADDENDUM_2026-11-01.md) and linked it from Settings, the research index, and the packaged app. No competitor source code or assets were copied.
+- Added up to 12 user-defined writing styles to Transforms, including local persistence, name/instruction validation, duplicate-name rejection, edit/delete, confirmation, and preview-first local execution. A style can specify tone, formatting, or translation; only Apple's on-device Foundation Model is used, with no cloud fallback.
+- Updated README, product plan, competitor notes, and the local style acceptance checklist.
+- `xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build test`: 44 passed, 0 failed, 0 skipped; the custom-style model test ran successfully on this Mac.
+- Refreshed `dist/HushKey.app`, confirmed the research addendum is bundled, and passed strict code-signature verification. The bundle display name and identifier remain HushKey / `com.ruddvz.hushkey`.
+- The new Transforms UI was not visually checked in Computer Use; microphone, permissions, insertion, and meeting workflows were not exercised.
+
+## Next item — manual voice acceptance, then selected-text editing
+
+In a fresh session, follow the non-AirPods voice acceptance checks in docs/TESTING_PROTOCOL.md with user-approved microphone/Speech and Accessibility access, fix any runtime failures, then design a preview-first selected-text edit that rechecks the original app and selection before replacing anything.

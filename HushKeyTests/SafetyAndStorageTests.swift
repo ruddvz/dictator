@@ -457,6 +457,25 @@ final class SafetyAndStorageTests: XCTestCase {
             DictationContextHints.maximumCount)
     }
 
+    func testWritingStyleValidationAndLocalPersistenceAreBounded() throws {
+        let suiteName = "HushKeyWritingStyleTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let style = WritingStylePreset(name: "Warm and concise", instructions: "Use a friendly tone and keep it brief.")
+        XCTAssertNil(WritingStylePreset.validationIssue(name: style.name, instructions: style.instructions))
+        XCTAssertNotNil(WritingStylePreset.validationIssue(name: "  ", instructions: "Keep it brief."))
+        XCTAssertNotNil(WritingStylePreset.validationIssue(name: "Short", instructions: "  "))
+        XCTAssertNotNil(WritingStylePreset.validationIssue(name: String(repeating: "x", count: 33), instructions: "Keep it brief."))
+        XCTAssertNotNil(WritingStylePreset.validationIssue(name: "Short", instructions: String(repeating: "x", count: 501)))
+
+        try WritingStylePresetStore.save([style], to: defaults)
+        XCTAssertEqual(WritingStylePresetStore.load(from: defaults), [style])
+        XCTAssertThrowsError(try WritingStylePresetStore.save(
+            Array(repeating: style, count: WritingStylePreset.maximumCount + 1), to: defaults))
+        XCTAssertEqual(WritingStylePresetStore.load(from: defaults), [style])
+    }
+
     @MainActor
     func testLocalFillerTransformRunsWithoutTheLanguageModel() async throws {
         let service = LocalTransformService()
@@ -472,6 +491,18 @@ final class SafetyAndStorageTests: XCTestCase {
             throw XCTSkip("Apple's on-device language model is not available on this Mac.")
         }
         let result = try await service.transform("Please send me the meeting notes tomorrow.", using: .concise)
+        XCTAssertFalse(result.isEmpty)
+        XCTAssertFalse(service.isTransforming)
+    }
+
+    @MainActor
+    func testCustomWritingStyleUsesOnDeviceModelWhenAvailable() async throws {
+        let service = LocalTransformService()
+        guard service.modelIsAvailable else {
+            throw XCTSkip("Apple's on-device model is not available on this Mac.")
+        }
+        let style = WritingStylePreset(name: "Plain language", instructions: "Use simple, direct wording.")
+        let result = try await service.transform("Please send me the meeting notes tomorrow.", using: style)
         XCTAssertFalse(result.isEmpty)
         XCTAssertFalse(service.isTransforming)
     }
