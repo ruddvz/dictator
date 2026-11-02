@@ -10,6 +10,8 @@ struct TransformView: View {
     @Environment(AppModel.self) private var model
     @State private var selectedAction: LocalWritingTransform = .polish
     @State private var selectedStyleID: UUID?
+    @State private var selectedStyleCameFromProfile = false
+    @State private var lastSynchronizedDictationGeneration: Int?
     @State private var previewAction: LocalWritingTransform?
     @State private var previewLabel: String?
     @State private var draft = ""
@@ -93,6 +95,8 @@ struct TransformView: View {
             guard oldText != newText else { return }
             invalidatePreviewForTranscriptChange()
         }
+        .onAppear { syncAutomaticProfileStyle() }
+        .onChange(of: model.dictationResultGeneration) { _, _ in syncAutomaticProfileStyle() }
     }
 
     private var selectedTextEditCard: some View {
@@ -301,6 +305,7 @@ struct TransformView: View {
                                   isSelected: selectedStyle == nil && selectedAction == action) {
                         selectedAction = action
                         selectedStyleID = nil
+                        selectedStyleCameFromProfile = false
                         clearPreview()
                     }
                     .disabled(model.localTransformService.isTransforming)
@@ -309,6 +314,7 @@ struct TransformView: View {
                     TransformCard(symbol: "textformat", title: style.name, detail: style.instructions,
                                   badge: "Your style", isSelected: selectedStyleID == style.id) {
                         selectedStyleID = style.id
+                        selectedStyleCameFromProfile = false
                         clearPreview()
                     }
                     .disabled(model.localTransformService.isTransforming)
@@ -475,6 +481,21 @@ struct TransformView: View {
         statusMessage = nil
     }
 
+    private func syncAutomaticProfileStyle() {
+        let generation = model.dictationResultGeneration
+        guard lastSynchronizedDictationGeneration != generation else { return }
+        lastSynchronizedDictationGeneration = generation
+        if model.activeDictationProfileName != nil, let requestedID = model.activeDictationWritingStylePresetID,
+           model.writingStylePresets.contains(where: { $0.id == requestedID }) {
+            selectedStyleID = requestedID
+            selectedStyleCameFromProfile = true
+        } else if selectedStyleCameFromProfile {
+            selectedStyleID = nil
+            selectedStyleCameFromProfile = false
+        }
+        clearPreview()
+    }
+
     private func saveStyle(name: String, instructions: String, editing: WritingStylePreset?) -> String? {
         if let issue = WritingStylePreset.validationIssue(name: name, instructions: instructions) { return issue }
         let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -493,6 +514,7 @@ struct TransformView: View {
         do {
             try model.saveWritingStylePresets(updated)
             selectedStyleID = preset.id
+            selectedStyleCameFromProfile = false
             clearPreview()
             return nil
         } catch {
@@ -504,7 +526,11 @@ struct TransformView: View {
         let updated = model.writingStylePresets.filter { $0.id != style.id }
         do {
             try model.saveWritingStylePresets(updated)
-            if selectedStyleID == style.id { selectedStyleID = nil }
+            model.clearAppProfileStyleReference(style.id)
+            if selectedStyleID == style.id {
+                selectedStyleID = nil
+                selectedStyleCameFromProfile = false
+            }
             clearPreview()
         } catch {
             errorTitle = "Couldn’t delete style"

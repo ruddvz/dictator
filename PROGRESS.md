@@ -1,5 +1,14 @@
 # HushKey progress
 
+## Completed — app-specific Automatic dictation profiles (2026-11-02)
+
+- Automatic profiles can now override on-device language, snippets, deterministic corrections, filler cleanup and a saved Transform style in addition to writing mode and vocabulary. Explicit dictation modes keep global preferences.
+- Added a collapsed Optional app-specific overrides editor in Settings & Data. It validates local language availability and snippet/correction rules; the profile uses the frontmost app’s bundle identifier and never reads app text. Profile style references clear when their saved style is deleted or removed by backup replacement.
+- Transform styles remain preview-first: a matching profile selects its style for the new transcript, while user-selected styles remain under user control.
+- Added resolver tests for Automatic-only behavior, global fallbacks, legacy profile decoding, round-trip persistence and input validation.
+- `xcodebuild ... test`: 137 passed, 2 skipped, 0 failed. Release packaging succeeded; strict code-signature verification passed. Opened the updated `dist/HushKey.app`.
+- Next fresh-session engineering item: include app profiles in personal-data backup and test migration. Live insertion acceptance still awaits user-enabled Accessibility.
+
 ## Completed — preserve open dictation during backup replacement (2026-11-02)
 
 - Replacing a personal-data backup now keeps the open transcript in local history when transcript saving is enabled, and marks it saved only when it is actually present in the restored archive. With history saving off, the editor stays open and the transcript remains correctly unsaved without changing that privacy setting.

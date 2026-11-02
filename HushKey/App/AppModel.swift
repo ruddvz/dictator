@@ -184,6 +184,7 @@ final class AppModel {
     }
     private(set) var activeDictationMode: DictationMode = .natural
     private(set) var activeDictationProfileName: String?
+    private(set) var activeDictationWritingStylePresetID: UUID?
     private(set) var activeDictationTarget: String?
     private(set) var capturedInsertionTargetName: String?
     private(set) var isInsertingDictation = false
@@ -206,6 +207,7 @@ final class AppModel {
     private(set) var dictationNotice: DictationNotice?
     /// Bumped each time a dictation ends with text, so the pill can flash its done state.
     private(set) var completedDictationCount = 0
+    private(set) var dictationResultGeneration = 0
     /// Whether the running or last dictation has a text field to type into.
     private(set) var dictationHasTarget = false
     /// The app dictation started in, used to paste when its field refuses direct typing.
@@ -236,6 +238,12 @@ final class AppModel {
     @ObservationIgnored private let retainedAudio = RetainedDictationAudio()
     @ObservationIgnored private var retainedAudioSinkID: UUID?
     @ObservationIgnored private var lastDictationContextualStrings: [String] = []
+    @ObservationIgnored private var activeDictationLanguageIdentifier = "en-US"
+    @ObservationIgnored private var activeDictationSnippets = ""
+    @ObservationIgnored private var activeDictationCorrectionRules = ""
+    @ObservationIgnored private var activeDictationCleansFillers = false
+    @ObservationIgnored private var captureDictationProfileName: String?
+    @ObservationIgnored private var captureDictationWritingStylePresetID: UUID?
 
     // MARK: Decoding
 
@@ -665,6 +673,16 @@ final class AppModel {
             dictationTerms = DictationVocabulary.encode(resolved.vocabulary)
             dictationSnippets = resolved.snippets
             dictationCorrectionRules = resolved.correctionRules
+            let validStyleIDs = Set(resolved.writingStyles.map(\.id))
+            dictationAppProfiles = dictationAppProfiles.map { profile in
+                guard let styleID = profile.writingStylePresetID, !validStyleIDs.contains(styleID) else { return profile }
+                var updated = profile
+                updated.writingStylePresetID = nil
+                return updated
+            }
+            if let activeStyleID = activeDictationWritingStylePresetID, !validStyleIDs.contains(activeStyleID) {
+                activeDictationWritingStylePresetID = nil
+            }
             let activeEntry = preservedActiveEntryID.flatMap { id in
                 resolved.dictationHistory.first { $0.id == id && $0.text == currentText }
             } ?? resolved.dictationHistory.first(where: {
@@ -699,6 +717,18 @@ final class AppModel {
     func saveWritingStylePresets(_ presets: [WritingStylePreset]) throws {
         try WritingStylePresetStore.save(presets)
         writingStylePresets = presets
+    }
+
+    func clearAppProfileStyleReference(_ styleID: UUID) {
+        dictationAppProfiles = dictationAppProfiles.map { profile in
+            guard profile.writingStylePresetID == styleID else { return profile }
+            var updated = profile
+            updated.writingStylePresetID = nil
+            return updated
+        }
+        if activeDictationWritingStylePresetID == styleID {
+            activeDictationWritingStylePresetID = nil
+        }
     }
 
     func exportSessions() {
@@ -1183,14 +1213,27 @@ final class AppModel {
 
     @discardableResult
     func saveDictationAppProfile(appName: String, bundleIdentifier: String, mode: DictationMode,
-                                 vocabulary: String) -> Bool {
+                                 vocabulary: String, languageIdentifier: String? = nil,
+                                 snippets: String? = nil, correctionRules: String? = nil,
+                                 cleansFillers: Bool? = nil, writingStylePresetID: UUID? = nil) -> Bool {
         let name = appName.trimmingCharacters(in: .whitespacesAndNewlines)
         let identifier = bundleIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty, name.count <= 80,
               DictationAppProfile.isValidBundleIdentifier(identifier),
-              mode != .automatic, vocabulary.utf8.count <= 4_000 else { return false }
+              mode != .automatic, vocabulary.utf8.count <= 4_000,
+              languageIdentifier.map({ language in
+                  DictationLanguage.onDevice.contains { $0.identifier == language }
+              }) ?? true,
+              snippets.map({ $0.utf8.count <= 4_000 && DictationSnippetExpander.validation(for: $0).invalidLines.isEmpty }) ?? true,
+              correctionRules.map({ $0.utf8.count <= 4_000 && DictationCorrectionRules.validation(for: $0).invalidLines.isEmpty }) ?? true,
+              writingStylePresetID.map({ id in writingStylePresets.contains { $0.id == id } }) ?? true else { return false }
         let profile = DictationAppProfile(appName: name, bundleIdentifier: identifier,
-                                          mode: mode, vocabulary: vocabulary)
+                                          mode: mode, vocabulary: vocabulary,
+                                          languageIdentifier: languageIdentifier,
+                                          snippets: snippets,
+                                          correctionRules: correctionRules,
+                                          cleansFillers: cleansFillers,
+                                          writingStylePresetID: writingStylePresetID)
         dictationAppProfiles = DictationAppProfile.upserting(profile, into: dictationAppProfiles)
         return true
     }
@@ -1229,15 +1272,26 @@ final class AppModel {
         dictationTargetApp = isHushKey ? nil : target
         dictationHasTarget = insertion.isEnabled && (capturedInsertionTarget != nil || capturedPasteTarget != nil)
         let targetBundleIdentifier = isHushKey ? nil : target?.bundleIdentifier
-        let activeProfile = DictationAppProfile.profile(for: targetBundleIdentifier, in: dictationAppProfiles)
-        activeDictationProfileName = activeProfile?.appName
-        activeDictationMode = DictationAppProfile.resolvedMode(requested: dictationMode,
-                                                                bundleIdentifier: targetBundleIdentifier,
-                                                                profiles: dictationAppProfiles)
+        let profileSettings = DictationAppProfile.resolve(
+            requestedMode: dictationMode,
+            bundleIdentifier: targetBundleIdentifier,
+            profiles: dictationAppProfiles,
+            globalVocabulary: dictationTerms,
+            globalLanguageIdentifier: dictationLanguage,
+            globalSnippets: dictationSnippets,
+            globalCorrectionRules: dictationCorrectionRules,
+            globalCleansFillers: cleansDictationFillers)
+        activeDictationMode = profileSettings.mode
+        activeDictationLanguageIdentifier = profileSettings.languageIdentifier
+        activeDictationSnippets = profileSettings.snippets
+        activeDictationCorrectionRules = profileSettings.correctionRules
+        activeDictationCleansFillers = profileSettings.cleansFillers
+        captureDictationProfileName = profileSettings.appName
+        captureDictationWritingStylePresetID = profileSettings.writingStylePresetID
         let nearbyHints = usesNearbyTextHints ? insertion.nearbyContextHints() : []
         usedNearbyTextHints = !nearbyHints.isEmpty
 
-        let speechReady = await transcriber.prepare(localeIdentifier: dictationLanguage)
+        let speechReady = await transcriber.prepare(localeIdentifier: activeDictationLanguageIdentifier)
         guard generation == dictationStartGeneration else {
             captureGate.release(.dictation)
             return
@@ -1263,8 +1317,7 @@ final class AppModel {
         retainedAudioSinkID = audio.sink.add { [retainedAudio] buffer, _ in retainedAudio.append(buffer) }
         dictationStartedAt = Date()
         lastDictationDuration = nil
-        let customWords = DictationVocabulary.terms(from: dictationTerms) +
-            DictationAppProfile.vocabulary(for: targetBundleIdentifier, in: dictationAppProfiles)
+        let customWords = profileSettings.vocabulary
         let modeHints: [String]
         switch activeDictationMode {
         case .message: modeHints = ["DM", "FYI", "ASAP", "RSVP", "TL;DR"]
@@ -1276,7 +1329,7 @@ final class AppModel {
                                                                            modeHints: modeHints,
                                                                            nearbyHints: nearbyHints,
                                                                            learnedWords: dataset.vocabulary)
-        let started = await transcriber.start(sink: audio.sink, localeIdentifier: dictationLanguage,
+        let started = await transcriber.start(sink: audio.sink, localeIdentifier: activeDictationLanguageIdentifier,
                                               contextualStrings: lastDictationContextualStrings)
         guard generation == dictationStartGeneration, audio.isRunning else {
             transcriber.stop()
@@ -1318,11 +1371,16 @@ final class AppModel {
     private func finishDictation(rawText: String) async {
         rawDictationText = rawText
         let processed = DictationTranscriptProcessor.process(rawText, mode: activeDictationMode,
-                                                              snippets: dictationSnippets,
+                                                              snippets: activeDictationSnippets,
                                                               applyCorrections: appliesSpokenCorrections,
-                                                              cleanupFillers: cleansDictationFillers,
-                                                              correctionRules: dictationCorrectionRules)
+                                                              cleanupFillers: activeDictationCleansFillers,
+                                                              correctionRules: activeDictationCorrectionRules)
         transcriber.replaceText(processed)
+        if !processed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            activeDictationProfileName = captureDictationProfileName
+            activeDictationWritingStylePresetID = captureDictationWritingStylePresetID
+            dictationResultGeneration += 1
+        }
         saveCurrentDictation()
         if let notice = DictationRecovery.notice(audioError: nil, transcriberError: transcriber.error,
                                                  transcript: processed, hasRetainedAudio: retainedAudio.isUsable) {
@@ -1410,7 +1468,7 @@ final class AppModel {
         }
         dictationNotice = nil
         isFinalizingDictation = true
-        let started = await transcriber.transcribe(recorded: recorded, localeIdentifier: dictationLanguage,
+        let started = await transcriber.transcribe(recorded: recorded, localeIdentifier: activeDictationLanguageIdentifier,
                                                    contextualStrings: lastDictationContextualStrings)
         guard started else {
             isFinalizingDictation = false

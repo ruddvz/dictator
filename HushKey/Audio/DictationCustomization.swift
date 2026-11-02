@@ -52,6 +52,11 @@ struct DictationAppProfile: Codable, Identifiable, Equatable {
     var bundleIdentifier: String
     var mode: DictationMode
     var vocabulary: String
+    var languageIdentifier: String? = nil
+    var snippets: String? = nil
+    var correctionRules: String? = nil
+    var cleansFillers: Bool? = nil
+    var writingStylePresetID: UUID? = nil
 
     var id: String { Self.normalizedBundleIdentifier(bundleIdentifier) }
 
@@ -93,6 +98,47 @@ struct DictationAppProfile: Codable, Identifiable, Equatable {
         guard let profile = profile(for: bundleIdentifier, in: profiles) else { return [] }
         return DictationVocabulary.terms(from: profile.vocabulary)
     }
+
+    static func resolve(requestedMode: DictationMode,
+                        bundleIdentifier: String?,
+                        profiles: [DictationAppProfile],
+                        globalVocabulary: String,
+                        globalLanguageIdentifier: String,
+                        globalSnippets: String,
+                        globalCorrectionRules: String,
+                        globalCleansFillers: Bool) -> DictationAppProfileResolution {
+        let profile = requestedMode == .automatic ? profile(for: bundleIdentifier, in: profiles) : nil
+        let mode: DictationMode
+        if requestedMode != .automatic {
+            mode = requestedMode
+        } else if let profile, profile.mode != .automatic {
+            mode = profile.mode
+        } else {
+            mode = DictationMode.resolved(.automatic, bundleIdentifier: bundleIdentifier)
+        }
+        let vocabulary = DictationVocabulary.terms(
+            from: (profile?.vocabulary ?? "") + "\n" + globalVocabulary)
+        return DictationAppProfileResolution(
+            appName: profile?.appName,
+            mode: mode,
+            vocabulary: vocabulary,
+            languageIdentifier: profile?.languageIdentifier ?? globalLanguageIdentifier,
+            snippets: profile?.snippets ?? globalSnippets,
+            correctionRules: profile?.correctionRules ?? globalCorrectionRules,
+            cleansFillers: profile?.cleansFillers ?? globalCleansFillers,
+            writingStylePresetID: profile?.writingStylePresetID)
+    }
+}
+
+struct DictationAppProfileResolution: Equatable {
+    var appName: String?
+    var mode: DictationMode
+    var vocabulary: [String]
+    var languageIdentifier: String
+    var snippets: String
+    var correctionRules: String
+    var cleansFillers: Bool
+    var writingStylePresetID: UUID?
 }
 
 enum DictationContextHintExtractor {

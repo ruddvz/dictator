@@ -706,6 +706,101 @@ final class SafetyAndStorageTests: XCTestCase {
         XCTAssertEqual(updated.first?.mode, .code)
     }
 
+    func testAppProfileOverridesResolveOnlyInAutomaticModeAndRoundTrip() throws {
+        let styleID = UUID()
+        let profile = DictationAppProfile(
+            appName: "Slack", bundleIdentifier: "com.tinyspeck.slackmacgap", mode: .message,
+            vocabulary: "HushKey, channel sync", languageIdentifier: "fr-CA",
+            snippets: "email signoff => Merci beaucoup", correctionRules: "hush key => HushKey",
+            cleansFillers: true, writingStylePresetID: styleID)
+        let profiles = [profile]
+        let globalSettings = (
+            globalVocabulary: "GlobalTerm",
+            globalLanguageIdentifier: "en-US",
+            globalSnippets: "signature => Best regards",
+            globalCorrectionRules: "teh => the",
+            globalCleansFillers: false)
+
+        let automatic = DictationAppProfile.resolve(
+            requestedMode: .automatic, bundleIdentifier: "COM.TINYSPECK.SLACKMACGAP", profiles: profiles,
+            globalVocabulary: globalSettings.globalVocabulary,
+            globalLanguageIdentifier: globalSettings.globalLanguageIdentifier,
+            globalSnippets: globalSettings.globalSnippets,
+            globalCorrectionRules: globalSettings.globalCorrectionRules,
+            globalCleansFillers: globalSettings.globalCleansFillers)
+        XCTAssertEqual(automatic.appName, "Slack")
+        XCTAssertEqual(automatic.mode, .message)
+        XCTAssertEqual(automatic.vocabulary, ["HushKey", "channel sync", "GlobalTerm"])
+        XCTAssertEqual(automatic.languageIdentifier, "fr-CA")
+        XCTAssertEqual(automatic.snippets, "email signoff => Merci beaucoup")
+        XCTAssertEqual(automatic.correctionRules, "hush key => HushKey")
+        XCTAssertTrue(automatic.cleansFillers)
+        XCTAssertEqual(automatic.writingStylePresetID, styleID)
+
+        let explicit = DictationAppProfile.resolve(
+            requestedMode: .email, bundleIdentifier: profile.bundleIdentifier, profiles: profiles,
+            globalVocabulary: globalSettings.globalVocabulary,
+            globalLanguageIdentifier: globalSettings.globalLanguageIdentifier,
+            globalSnippets: globalSettings.globalSnippets,
+            globalCorrectionRules: globalSettings.globalCorrectionRules,
+            globalCleansFillers: globalSettings.globalCleansFillers)
+        XCTAssertNil(explicit.appName)
+        XCTAssertEqual(explicit.mode, .email)
+        XCTAssertEqual(explicit.vocabulary, ["GlobalTerm"])
+        XCTAssertEqual(explicit.languageIdentifier, "en-US")
+        XCTAssertEqual(explicit.snippets, "signature => Best regards")
+        XCTAssertEqual(explicit.correctionRules, "teh => the")
+        XCTAssertFalse(explicit.cleansFillers)
+        XCTAssertNil(explicit.writingStylePresetID)
+
+        let encoded = try JSONEncoder().encode(profile)
+        XCTAssertEqual(try JSONDecoder().decode(DictationAppProfile.self, from: encoded), profile)
+
+        let legacy = Data(#"{"appName":"Mail","bundleIdentifier":"com.apple.mail","mode":"Email","vocabulary":"Alice"}"#.utf8)
+        let legacyProfile = try JSONDecoder().decode(DictationAppProfile.self, from: legacy)
+        XCTAssertNil(legacyProfile.languageIdentifier)
+        XCTAssertNil(legacyProfile.snippets)
+        XCTAssertNil(legacyProfile.correctionRules)
+        XCTAssertNil(legacyProfile.cleansFillers)
+        XCTAssertNil(legacyProfile.writingStylePresetID)
+    }
+
+    @MainActor
+    func testAppProfileSaveValidatesOptionalSnippetAndCorrectionOverrides() {
+        let priorProfiles = UserDefaults.standard.data(forKey: "dictationAppProfiles")
+        let dictationURL = FileManager.default.temporaryDirectory
+            .appending(path: "hushkey-profile-validation-\(UUID().uuidString).json")
+        let filesURL = FileManager.default.temporaryDirectory
+            .appending(path: "hushkey-profile-validation-files-\(UUID().uuidString).json")
+        defer {
+            try? FileManager.default.removeItem(at: dictationURL)
+            try? FileManager.default.removeItem(at: filesURL)
+            if let priorProfiles { UserDefaults.standard.set(priorProfiles, forKey: "dictationAppProfiles") }
+            else { UserDefaults.standard.removeObject(forKey: "dictationAppProfiles") }
+        }
+        let model = AppModel(dictationHistoryURL: dictationURL, fileTranscriptionHistoryURL: filesURL)
+        let bundleIdentifier = "com.example.hushkeyprofiletest"
+        let language = DictationLanguage.onDevice.first?.identifier
+
+        XCTAssertTrue(model.saveDictationAppProfile(
+            appName: "Profile Test", bundleIdentifier: bundleIdentifier, mode: .natural,
+            vocabulary: "HushKey", languageIdentifier: language,
+            snippets: "signature => Best wishes", correctionRules: "hush key => HushKey",
+            cleansFillers: false))
+        let profile = model.dictationAppProfiles.first { $0.bundleIdentifier == bundleIdentifier }
+        XCTAssertEqual(profile?.snippets, "signature => Best wishes")
+        XCTAssertEqual(profile?.correctionRules, "hush key => HushKey")
+        XCTAssertEqual(profile?.cleansFillers, false)
+        XCTAssertEqual(profile?.languageIdentifier, language)
+
+        XCTAssertFalse(model.saveDictationAppProfile(
+            appName: "Profile Test", bundleIdentifier: bundleIdentifier, mode: .natural,
+            vocabulary: "HushKey", snippets: "invalid snippet", correctionRules: "hush key => HushKey"))
+        XCTAssertFalse(model.saveDictationAppProfile(
+            appName: "Profile Test", bundleIdentifier: bundleIdentifier, mode: .natural,
+            vocabulary: "HushKey", snippets: "signature => Best wishes", correctionRules: "invalid correction"))
+    }
+
     func testDictationHistoryLoadsEntriesWithoutRawTranscriptField() throws {
         let data = Data(#"[{"id":"00000000-0000-0000-0000-000000000001","createdAt":0,"text":"saved phrase"}]"#.utf8)
         let url = FileManager.default.temporaryDirectory.appending(path: "hushkey-legacy-\(UUID().uuidString).json")

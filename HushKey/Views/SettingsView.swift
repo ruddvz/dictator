@@ -179,7 +179,7 @@ private struct GeneralSettings: View {
         }
 
         SettingsGroup(title: "App profiles",
-                      footer: "In Automatic mode, HushKey writes in each app’s style. App names stay on this Mac.") {
+                      footer: "In Automatic mode, profiles can set writing mode, vocabulary, language, snippets, corrections, filler cleanup and a writing style. App names stay on this Mac.") {
             DictationAppProfilesEditor()
         }
 
@@ -404,6 +404,29 @@ private struct AboutSettings: View {
 }
 
 private struct DictationAppProfilesEditor: View {
+    private enum CleanupOverride: String, CaseIterable, Identifiable, Hashable {
+        case useDefault = "Use default"
+        case removeFillers = "Remove fillers"
+        case keepFillers = "Keep fillers"
+
+        var id: String { rawValue }
+        var value: Bool? {
+            switch self {
+            case .useDefault: nil
+            case .removeFillers: true
+            case .keepFillers: false
+            }
+        }
+
+        init(value: Bool?) {
+            switch value {
+            case true: self = .removeFillers
+            case false: self = .keepFillers
+            case nil: self = .useDefault
+            }
+        }
+    }
+
     private struct CommonApp: Identifiable {
         var name: String
         var bundleIdentifier: String
@@ -415,6 +438,13 @@ private struct DictationAppProfilesEditor: View {
     @State private var bundleIdentifier = ""
     @State private var mode: DictationMode = .natural
     @State private var vocabulary = ""
+    @State private var languageIdentifier: String?
+    @State private var snippets = ""
+    @State private var usesAppSnippets = false
+    @State private var correctionRules = ""
+    @State private var usesAppCorrections = false
+    @State private var cleanupOverride = CleanupOverride.useDefault
+    @State private var writingStylePresetID: UUID?
     @State private var editingIdentifier: String?
     @State private var status = ""
 
@@ -467,6 +497,68 @@ private struct DictationAppProfilesEditor: View {
                            width: 160)
                 field("Extra names or terms, comma separated", text: $vocabulary)
             }
+            DisclosureGroup("Optional app-specific overrides") {
+                VStack(alignment: .leading, spacing: Theme.s3) {
+                    HStack(spacing: Theme.s2) {
+                        Menu {
+                            Button("Use default language") { languageIdentifier = nil }
+                            ForEach(DictationLanguage.onDevice) { language in
+                                Button(language.name) { languageIdentifier = language.identifier }
+                            }
+                        } label: {
+                            Label(languageTitle, systemImage: "globe")
+                        }
+                        .menuStyle(.button)
+                        .buttonStyle(SecondaryButtonStyle())
+                        MenuPicker(selection: $cleanupOverride,
+                                   options: CleanupOverride.allCases.map { ($0, $0.rawValue) }, width: 180)
+                    }
+                    Menu {
+                        Button("Use global transform selection") { writingStylePresetID = nil }
+                        ForEach(model.writingStylePresets) { preset in
+                            Button(preset.name) { writingStylePresetID = preset.id }
+                        }
+                    } label: {
+                        Label(writingStyleTitle, systemImage: "textformat")
+                    }
+                    .menuStyle(.button)
+                    .buttonStyle(SecondaryButtonStyle())
+
+                    Toggle("Use app-specific snippets", isOn: $usesAppSnippets)
+                    if usesAppSnippets {
+                        TextEditor(text: $snippets)
+                            .font(.hkBody.monospaced())
+                            .frame(minHeight: 70, maxHeight: 110)
+                            .padding(5)
+                            .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: Theme.r3, style: .continuous)
+                                .strokeBorder(Theme.hairline, lineWidth: 1))
+                        Text("One per line: spoken cue => expanded phrase. An empty list disables global snippets for this app.")
+                            .font(.hkCaption)
+                            .foregroundStyle(Theme.ink2)
+                    }
+
+                    Toggle("Use app-specific corrections", isOn: $usesAppCorrections)
+                    if usesAppCorrections {
+                        TextEditor(text: $correctionRules)
+                            .font(.hkBody.monospaced())
+                            .frame(minHeight: 70, maxHeight: 110)
+                            .padding(5)
+                            .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: Theme.r3, style: .continuous)
+                                .strokeBorder(Theme.hairline, lineWidth: 1))
+                        Text("One per line: recognized phrase => corrected phrase. The global correction switch remains the master control.")
+                            .font(.hkCaption)
+                            .foregroundStyle(Theme.ink2)
+                    }
+                    Text("These settings apply only when Dictation mode is Automatic. Default language uses your global choice; default cleanup follows Settings.")
+                        .font(.hkCaption)
+                        .foregroundStyle(Theme.ink2)
+                }
+                .padding(.top, Theme.s2)
+            }
+            .font(.hkCallout)
+            .tint(Theme.ink2)
             HStack(spacing: Theme.s2) {
                 Button(editingIdentifier == nil ? "Add profile" : "Save profile") { save() }
                     .buttonStyle(PrimaryButtonStyle())
@@ -500,14 +592,26 @@ private struct DictationAppProfilesEditor: View {
         bundleIdentifier = profile.bundleIdentifier
         mode = profile.mode
         vocabulary = profile.vocabulary
+        languageIdentifier = profile.languageIdentifier
+        snippets = profile.snippets ?? ""
+        usesAppSnippets = profile.snippets != nil
+        correctionRules = profile.correctionRules ?? ""
+        usesAppCorrections = profile.correctionRules != nil
+        cleanupOverride = CleanupOverride(value: profile.cleansFillers)
+        writingStylePresetID = profile.writingStylePresetID
         editingIdentifier = profile.id
         status = "Editing \(profile.appName)."
     }
 
     private func save() {
         guard model.saveDictationAppProfile(appName: appName, bundleIdentifier: bundleIdentifier,
-                                            mode: mode, vocabulary: vocabulary) else {
-            status = "Check the app name, bundle identifier, and vocabulary length."
+                                            mode: mode, vocabulary: vocabulary,
+                                            languageIdentifier: languageIdentifier,
+                                            snippets: usesAppSnippets ? snippets : nil,
+                                            correctionRules: usesAppCorrections ? correctionRules : nil,
+                                            cleansFillers: cleanupOverride.value,
+                                            writingStylePresetID: writingStylePresetID) else {
+            status = "Check the app details, choose an available on-device language, and fix any invalid snippet or correction lines."
             return
         }
         if let editingIdentifier,
@@ -523,8 +627,25 @@ private struct DictationAppProfilesEditor: View {
         bundleIdentifier = ""
         mode = .natural
         vocabulary = ""
+        languageIdentifier = nil
+        snippets = ""
+        usesAppSnippets = false
+        correctionRules = ""
+        usesAppCorrections = false
+        cleanupOverride = .useDefault
+        writingStylePresetID = nil
         editingIdentifier = nil
         status = message
+    }
+
+    private var languageTitle: String {
+        guard let languageIdentifier else { return "Use default language" }
+        return DictationLanguage.onDevice.first { $0.identifier == languageIdentifier }?.name ?? languageIdentifier
+    }
+
+    private var writingStyleTitle: String {
+        guard let writingStylePresetID else { return "Use global transform selection" }
+        return model.writingStylePresets.first { $0.id == writingStylePresetID }?.name ?? "Choose a writing style"
     }
 }
 
