@@ -97,7 +97,7 @@ private struct DictationSettingsCard: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Toggle("Apply explicit spoken corrections", isOn: $model.appliesSpokenCorrections)
-                Text("Recognizes cues such as “scratch that” or “actually” after a pause. The original recognition stays available to restore.")
+                Text("Recognizes cues such as “scratch that” or “actually” after a pause. Personal phrase replacements under Snippets & Vocabulary → Corrections are separate local rules. The original recognition stays available to restore.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Toggle("Remove common filler words", isOn: $model.cleansDictationFillers)

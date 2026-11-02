@@ -223,7 +223,7 @@ struct DictationView: View {
                         model.restoreRawTranscript()
                     }
                     .buttonStyle(.link)
-                    Text("The original on-device recognition is kept locally so you can recover it after spoken corrections or code formatting.")
+                    Text("The original on-device recognition is kept locally so you can restore it after correction rules, spoken edits, or formatting.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -343,7 +343,7 @@ struct DictationView: View {
     private func modeDescription(_ mode: DictationMode) -> String {
         switch mode {
         case .automatic: "HushKey selects a writing style from the app in front."
-        case .natural: "Keeps the on-device transcript with your vocabulary, snippets, and optional spoken corrections."
+        case .natural: "Keeps the on-device transcript with your vocabulary, snippets, and local correction rules."
         case .message: "Adds common message terms as local recognition hints and turns “new line” into a line break."
         case .email: "Adds email terms as local recognition hints; “new paragraph” starts a new paragraph."
         case .code: "Formats spoken programming tokens such as parentheses, underscores, arrows, and new lines."

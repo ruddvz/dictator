@@ -120,6 +120,9 @@ final class AppModel {
     var dictationSnippets = UserDefaults.standard.string(forKey: "dictationSnippets") ?? "" {
         didSet { UserDefaults.standard.set(dictationSnippets, forKey: "dictationSnippets") }
     }
+    var dictationCorrectionRules = UserDefaults.standard.string(forKey: "dictationCorrectionRules") ?? "" {
+        didSet { UserDefaults.standard.set(dictationCorrectionRules, forKey: "dictationCorrectionRules") }
+    }
     var dictationLanguage = UserDefaults.standard.string(forKey: "dictationLanguage") ?? "en-US" {
         didSet { UserDefaults.standard.set(dictationLanguage, forKey: "dictationLanguage") }
     }
@@ -940,7 +943,8 @@ final class AppModel {
             let processed = DictationTranscriptProcessor.process(rawText, mode: activeDictationMode,
                                                                   snippets: dictationSnippets,
                                                                   applyCorrections: appliesSpokenCorrections,
-                                                                  cleanupFillers: cleansDictationFillers)
+                                                                  cleanupFillers: cleansDictationFillers,
+                                                                  correctionRules: dictationCorrectionRules)
             transcriber.replaceText(processed)
             saveCurrentDictation()
             isFinalizingDictation = false
