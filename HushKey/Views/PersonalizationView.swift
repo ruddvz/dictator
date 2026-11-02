@@ -14,6 +14,14 @@ private enum PersonalizationSection: String, CaseIterable, Identifiable {
         case .corrections: "arrow.left.arrow.right"
         }
     }
+
+    var addTitle: String {
+        switch self {
+        case .vocabulary: "Add word"
+        case .snippets: "Add snippet"
+        case .corrections: "Add correction"
+        }
+    }
 }
 
 private struct SnippetEntry: Identifiable, Equatable {
@@ -92,8 +100,8 @@ struct PersonalizationView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.s5) {
-                PageHeader(eyebrow: "", title: "Vocabulary", subtitle: "") {
-                    Button("Add new", systemImage: "plus") {
+                PageHeader(eyebrow: "", title: section.rawValue, subtitle: "") {
+                    Button(section.addTitle, systemImage: "plus") {
                         editor = PersonalizationEditorRequest(section: section, snippet: nil, term: nil)
                     }
                     .buttonStyle(PrimaryButtonStyle())
@@ -198,22 +206,20 @@ struct PersonalizationView: View {
                 .font(.hkCallout)
                 .foregroundStyle(Theme.ink2)
                 .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: Theme.s2) {
-                Button("Add \(section == .vocabulary ? "word" : section == .snippets ? "snippet" : "correction")") {
-                    editor = PersonalizationEditorRequest(section: section, snippet: nil, term: nil)
+            if !examples.isEmpty {
+                HStack(spacing: Theme.s2) {
+                    ForEach(examples, id: \.self) { example in
+                        Text(example)
+                            .font(.hkControl)
+                            .lineLimit(1)
+                            .padding(.horizontal, Theme.s3)
+                            .frame(height: Theme.controlHeight)
+                            .background(Theme.sheet.opacity(0.7),
+                                        in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
+                    }
                 }
-                .buttonStyle(PrimaryButtonStyle())
-                ForEach(examples, id: \.self) { example in
-                    Text(example)
-                        .font(.hkControl)
-                        .lineLimit(1)
-                        .padding(.horizontal, Theme.s3)
-                        .frame(height: Theme.controlHeight)
-                        .background(Theme.sheet.opacity(0.7),
-                                    in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
-                }
+                .padding(.top, Theme.s1)
             }
-            .padding(.top, Theme.s1)
         }
         .padding(Theme.s6 - 4)
         .frame(maxWidth: .infinity, alignment: .leading)

@@ -494,3 +494,10 @@ Same as above, plus: start a dictation with no field focused, click into TextEdi
 - Verified the packaged app’s accessibility state: Data & privacy no longer contains recording controls; Silent Lab Setup shows the audio option off and Start disabled while headphones are unavailable. No permissions were accepted and no recording was made.
 - `xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build test`: 119 passed, 2 skipped, 0 failed. Release packaging and strict signature verification passed; only `/Users/rudra/Projects/HushKey/dist/HushKey.app` remains open.
 - Next: user-approved live microphone, insertion, meeting, and export acceptance in a fresh session.
+
+## Completed — make personalization sections match their navigation (2026-11-02)
+
+- Vocabulary, Snippets, and Corrections now each show the selected section as the page title and a matching single add action. Removed the duplicate add button from the explanatory banner.
+- Checked the packaged app’s accessibility tree across all three tabs: titles and add actions match the selected section, and empty states are clear.
+- `xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build test`: 119 passed, 2 skipped, 0 failed. Release packaging and strict signature verification passed.
+- Next: live user-approved microphone, insertion, meeting, and export acceptance; this UI-only task did not change permissions or personal data.
