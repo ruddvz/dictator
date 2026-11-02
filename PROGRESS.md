@@ -1,5 +1,17 @@
 # HushKey progress
 
+## Completed — compact recording pill and level meter (2026-11-02)
+
+- Wrote `docs/PILL_UX_ANALYSIS.md`, a gap analysis against Wispr Flow (user screenshots plus Wispr help-center docs). Main findings: the recording pill was about 2.5× Wispr's footprint, the `VoiceRibbon` barely moved with ordinary speech, the shape jumped between preparing, listening and finishing, hold and hands-free looked the same, and hints were full sentences or slow system tooltips.
+- New `PillMeter`: 13 dense level bars, full-contrast `ink` on dark. They are centre-weighted, each wobbles on its own, and they are scaled by √(speech) from `SpeechEnvelope`, rising fast and falling slowly. Silence rests as breathing dots. Waiting and transcribing sweep a highlight instead of swapping in a spinner and text.
+- The recording pill is now a 28 pt capsule: × · meter · ✓ (filled sage, the finish action). While fn or the custom shortcut is held, it is the meter only (`dictationShortcutHeld` is now observed). The timer appears only after 30 s.
+- A `PillHint` tooltip above the pill shows "Dictate" plus the shortcut on hover, "Cancel · esc" or "Finish · fn" over the controls, and "Waiting for microphone" or "Preparing locally" while starting. Before any words arrive, the no-target card is a one-line strip; the big faded "Listening…" is gone.
+- The pill and card now use Theme tokens only (`paper`, `ink`, `ink2`, `hairline`, `well`, `signal`, `danger`); the hard-coded `#141B17` and `#9CCBB4` are removed. Updated `docs/DESIGN_SYSTEM.md`.
+- Added `PillMeterTests` (4). `xcodebuild ... test`: 146 passed, 2 skipped, 0 failed (148). Packaged and opened `dist/HushKey.app`.
+- **Seen live** (packaged app, screenshots through background accessibility): idle bar; click to start → "Preparing locally" hint with × · dots · dimmed ✓; listening capsule (127 × 28) with the one-line "No text box selected. Talk, then copy." strip; ✓ with no speech → "Didn't catch that" + Retry; dismiss → idle; × during listening → idle.
+- **Not seen live:** the meter moving with real speech (the mic didn't pick up `say` through the speakers, so the bars stayed at rest), hover and tooltip states (background control can't hover), Esc, hold-to-talk meter-only mode, the transcribing sweep (too brief to capture), the done check, and the live-text card with words.
+- Next (P1 in the analysis): "We couldn't hear you" / "Microphone unavailable" errors with Sound settings and mic-picker actions, Undo after cancel, and a right-click mic menu on the pill.
+
 ## Completed — vocabulary word list import/export (2026-11-02)
 
 - Committed the finished v3 app-profile backup work that was left uncommitted (22e3a36) after re-running the suite.

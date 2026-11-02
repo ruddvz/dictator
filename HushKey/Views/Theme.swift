@@ -515,6 +515,91 @@ struct VoiceRibbon: View {
     }
 }
 
+/// Dense level bars for the floating pill. Each bar wobbles on its own, scaled by how much
+/// someone is speaking, so the meter reads at a glance even for quiet speech. Silence rests
+/// as dots that breathe slightly; waiting and transcribing sweep a highlight across them.
+struct PillMeter: View {
+    enum Mode: Equatable { case live, waiting, working }
+
+    var level: Float
+    var mode: Mode
+    var barCount = 13
+    var tint: Color = Theme.ink
+
+    /// Per-frame smoothing state; a class so the Canvas can update it without re-rendering.
+    private final class Smoother {
+        var envelope = SpeechEnvelope()
+        var target: Double = 0
+        var value: Double = 0
+        var lastFrame: TimeInterval?
+    }
+    @State private var smoother = Smoother()
+
+    static let barWidth: CGFloat = 2.5
+    static let spacing: CGFloat = 2
+    /// A resting bar is a dot this fraction of the meter's height.
+    static let restHeight = 0.18
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1 / 60)) { context in
+            let time = context.date.timeIntervalSinceReferenceDate
+            Canvas { graphics, size in
+                let energy = mode == .live ? advance(to: time) : 0
+                let heights = Self.heights(count: barCount, energy: energy, mode: mode, time: time)
+                let width = Self.barWidth
+                let start = (size.width - CGFloat(barCount) * width - CGFloat(barCount - 1) * Self.spacing) / 2
+                for (index, height) in heights.enumerated() {
+                    let barHeight = max(width, size.height * CGFloat(height))
+                    let rect = CGRect(x: start + CGFloat(index) * (width + Self.spacing),
+                                      y: (size.height - barHeight) / 2, width: width, height: barHeight)
+                    let opacity = 0.45 + 0.55 * min(1, (height - Self.restHeight) / 0.5)
+                    graphics.fill(Path(roundedRect: rect, cornerRadius: width / 2), with: .color(tint.opacity(opacity)))
+                }
+            }
+        }
+        .frame(width: CGFloat(barCount) * Self.barWidth + CGFloat(barCount - 1) * Self.spacing)
+        .onChange(of: level) { _, newValue in
+            guard mode == .live else { return }
+            smoother.target = Double(smoother.envelope.amount(for: newValue, at: Date.timeIntervalSinceReferenceDate))
+        }
+        .onChange(of: mode) { _, _ in smoother = Smoother() }
+        .accessibilityHidden(true)
+    }
+
+    /// Bar heights as fractions of the meter, `restHeight`…1. `energy` is 0…1 from `SpeechEnvelope`.
+    static func heights(count: Int, energy: Double, mode: Mode, time: TimeInterval) -> [Double] {
+        let center = Double(count - 1) / 2
+        return (0..<count).map { index in
+            let i = Double(index)
+            switch mode {
+            case .live:
+                // Centre bars reach higher; each bar has its own slow wobble so speech looks alive.
+                let distance = (i - center) / max(1, center)
+                let profile = 0.5 + 0.5 * exp(-distance * distance * 2.2)
+                let wobble = 0.7 + 0.3 * sin(time * (6.5 + (i * 1.7).truncatingRemainder(dividingBy: 3.1)) + i * 2.3)
+                let breath = 0.05 * (1 + sin(time * 2.4 - i * 0.55)) / 2
+                let spoken = pow(min(1, max(0, energy)), 0.5)
+                return min(1, restHeight + breath + (1 - restHeight) * spoken * profile * wobble)
+            case .waiting, .working:
+                // A soft highlight travels across the dots: slower while waiting, brisker while working.
+                let speed = mode == .waiting ? 0.7 : 1.4
+                let position = (time * speed).truncatingRemainder(dividingBy: 1) * Double(count + 4) - 2
+                let offset = i - position
+                return restHeight + (mode == .waiting ? 0.22 : 0.4) * exp(-offset * offset / 2.5)
+            }
+        }
+    }
+
+    /// Eases toward the latest level: quick to rise with a syllable, slower to fall.
+    private func advance(to time: TimeInterval) -> Double {
+        let dt = min(0.05, time - (smoother.lastFrame ?? time))
+        smoother.lastFrame = time
+        let rate = smoother.target > smoother.value ? 28.0 : 7.0
+        smoother.value += (smoother.target - smoother.value) * min(1, rate * dt)
+        return smoother.value
+    }
+}
+
 // MARK: - Small pieces
 
 /// Small rounded chip for status and context such as the active writing mode.

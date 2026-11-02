@@ -263,7 +263,8 @@ final class AppModel {
     @ObservationIgnored private let selectedTextEditHotKey = GlobalHotKeyRegistration(id: 4)
     @ObservationIgnored private var started = false
     @ObservationIgnored private var motionStarted = false
-    @ObservationIgnored private var dictationShortcutHeld = false
+    /// The dictation key is held down (hold to talk). Observed so the pill can drop its buttons.
+    private(set) var dictationShortcutHeld = false
     @ObservationIgnored private var selectedTextEditShortcutHeld = false
     @ObservationIgnored private var dictationStartGeneration = 0
     @ObservationIgnored private var selectedTextEditGeneration = 0

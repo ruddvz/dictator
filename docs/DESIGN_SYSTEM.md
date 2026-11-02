@@ -87,7 +87,7 @@ Each color has a light and dark value (`Theme.dynamic`). Light is the default; S
 | `finishing` | #6F8796 | #9AB2C0 | slate: transcribing |
 | `success` / `danger` | #3F7A5C / #B5534A | #8CC4A5 / #E0877E | done / errors and conflicts |
 
-Pill surface is always dark: #141B17 with sage #9CCBB4 strokes. The system accent color is not used. Sage is the only accent; red appears only for errors.
+The pill panel is forced dark, so the pill and its card use the dark values of `paper`, `ink`, `ink2`, `hairline`, `well` and `signal`, with no colours of their own. The system accent color is not used. Sage is the only accent; red appears only for errors.
 
 ## Type
 
@@ -119,7 +119,7 @@ Matched to Wispr's measured sizes; SF Pro / SF Pro Rounded instead of Wispr's sa
 - **Page switch:** fade + 8 pt rise on insert, fade on removal.
 - **Morph icon (`MorphIcon`):** one 25-point stroked line that blends between hush → waveform → spinner → check over 0.45 s (ease-out cubic). Used in the brand mark, the Dictate button, the composer header, the empty history state, and the floating pill.
 - **Speech envelope (`SpeechEnvelope`):** the ribbon, the bars and the morph icon all measure speech the same way: level above a room-noise floor that falls at once and rises 0.02 per second, gate 0.06, span 0.4. Silence stays calm; a long sentence keeps moving.
-- **Pill:** idle sage bar → hover hint → listening (cancel ×, `VoiceRibbon`, elapsed time, stop) → "Writing it up" → check with "Typed" (or "Ready in HushKey") for 1.4 s → idle. Errors replace the done state: `Theme.danger` icon, short message and dismiss ×, plus Retry and/or Paste again as titled `PillIconButton` capsules. The error stays until it is dismissed or acted on. **Transcript card:** a 340 pt dark card (#141B17, radius `r1`) sits 8 pt above the pill with a sage glyph, an optional grey hint, ×, and the last three lines of text at 17 pt white; the finished no-target card adds a dark-on-sage Copy (⌘C) and, when typing into apps is off, a "Type for me next time" link to Settings → Insertion. A dictation started with no text field focused is still typed if a field has focus when it finishes. `VoiceRibbon` is three flowing lines that swell with speech above an adaptive noise floor (fast rise, slow fall), so silence stays calm instead of looking like a broken meter.
+- **Pill:** see `docs/PILL_UX_ANALYSIS.md`. Idle sage bar → hover: a small mic capsule and a `PillHint` tooltip ("Dictate" + shortcut) → recording: a 28 pt capsule with × · `PillMeter` · ✓ (filled `signal`). While the shortcut is held, it is the meter only. The timer appears after 30 s. Preparing and transcribing keep the same capsule: the meter sweeps while it waits (a hint names the wait) and runs a brisker highlight while it works. Done shows a check with "Typed" (or "Ready in HushKey") for 1.4 s. Hovering × or ✓ shows "Cancel · esc" or "Finish · fn" straight away. Errors use the `Theme.danger` icon, a short message and dismiss ×, plus Retry and/or Paste again as titled `PillIconButton` capsules, and stay until handled. **Transcript card:** before any words, a one-line strip (glyph, hint, ×). With text, a 320 pt `paper` card (radius `r2`) with the last three lines at 16 pt. The finished no-target card adds a sage Copy (⌘C) and, when typing into apps is off, "Type for me next time". **`PillMeter`:** 13 bars, 2.5 wide and 2 apart, centre-weighted. Each bar wobbles on its own, scaled by √(speech) from `SpeechEnvelope`. They rise fast (28/s), fall slower (7/s), and rest as breathing dots.
 - **Sidebar:** icon bounces on selection; rows fade their fill on hover.
 - **History:** rows slide in from the top, delete animates out, hover actions slide in 6 pt.
 
@@ -130,10 +130,10 @@ Matched to Wispr's measured sizes; SF Pro / SF Pro Rounded instead of Wispr's sa
 - **Controls:** `PrimaryButtonStyle(tint:foreground:)`, `SecondaryButtonStyle(minWidth:)`, `DestructiveButtonStyle`, `IconButtonStyle`, `MenuPicker`, `RowToggle`, `UnderlineTabs`, `Keycap` / `KeycapShortcut`.
 - **Page:** `PageHeader` (title, optional subtitle, trailing actions), `pageLayout(maxWidth:)`, `EmptyState`.
 - **Silent Lab:** `LabProgress` (Connect → Train → Evaluate → Silent Use strip on every lab page), `LabHero`, `HeroMetric`.
-- **Motion:** `MorphIcon`, `VoiceRibbon`, `LiveWaveform`, `StatusChip`, `SectionLabel`, `ActivityHeatmap`.
+- **Motion:** `MorphIcon`, `PillMeter`, `VoiceRibbon`, `LiveWaveform`, `StatusChip`, `SectionLabel`, `ActivityHeatmap`.
 
 ## Open items
 
 - Sheets (writing-style editor, vocabulary entry editor) still use stock form layout.
-- Hover and listening states of the pill and the transcript card were not screenshot-checked; they need a live dictation.
+- Pill hover hints, Esc, hold-to-talk (meter only) and the meter moving with real speech still need checking live, with a person speaking.
 - Check `signalSoft` hero contrast in dark mode by eye.

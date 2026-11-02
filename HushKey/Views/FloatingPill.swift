@@ -126,12 +126,14 @@ struct FloatingPillView: View {
     @Environment(AppModel.self) private var model
 
     @State private var isHovering = false
+    @State private var hoveredControl: PillControl?
     @State private var showsDone = false
     @State private var doneToken = 0
     @State private var cardCollapsed = false
     @State private var copied = false
 
     private enum Phase { case idle, hover, preparing, listening, finishing, error, done }
+    private enum PillControl { case cancel, finish }
 
     private var isFinishing: Bool { model.isFinalizingDictation || model.transcriber.isFinalizing }
 
@@ -144,6 +146,12 @@ struct FloatingPillView: View {
         return isHovering ? .hover : .idle
     }
 
+    /// Hold to talk keeps a hand on the key, so the pill is just the meter; click and
+    /// hands-free dictation get cancel and finish controls.
+    private var showsControls: Bool {
+        (phase == .listening || phase == .preparing) && !model.dictationShortcutHeld
+    }
+
     private var cardState: TranscriptCard.State {
         TranscriptCard.state(isCapturing: model.audio.isRunning || isFinishing, hasTarget: model.dictationHasTarget,
                              transcript: model.transcriber.text, isCollapsed: cardCollapsed,
@@ -151,10 +159,14 @@ struct FloatingPillView: View {
     }
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Theme.s2) {
             if cardState != .hidden {
                 transcriptCard
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
+            if let hint {
+                PillHint(title: hint.title, shortcut: hint.shortcut)
+                    .transition(.opacity.combined(with: .offset(y: 4)))
             }
             pill
         }
@@ -162,12 +174,15 @@ struct FloatingPillView: View {
             .fixedSize()
             .animation(.spring(response: 0.34, dampingFraction: 0.78), value: phase)
             .animation(.spring(response: 0.34, dampingFraction: 0.78), value: cardState)
+            .animation(.spring(response: 0.34, dampingFraction: 0.78), value: showsControls)
+            .animation(Theme.snappy, value: hint)
             .onChange(of: model.audio.isRunning) { _, running in
                 if running {
                     cardCollapsed = false
                     copied = false
                 }
             }
+            .onChange(of: phase) { hoveredControl = nil }
             .onChange(of: model.completedDictationCount) {
                 doneToken += 1
                 let token = doneToken
@@ -179,27 +194,19 @@ struct FloatingPillView: View {
             }
     }
 
-    private static let surface = Color(red: 0.078, green: 0.106, blue: 0.09)   // #141B17 sage-black
-    private static let glow = Color(red: 0.61, green: 0.80, blue: 0.71)        // #9CCBB4 sage on dark
-
     private var pill: some View {
         content
-            .foregroundStyle(.white)
-            .background(Capsule().fill(Self.surface.opacity(phase == .idle ? 0.55 : 0.96)))
-            .overlay(Capsule().strokeBorder(stroke, lineWidth: phase == .listening || phase == .error ? 1 : 0.5))
-            .shadow(color: shadow, radius: phase == .listening ? 12 : 8, y: 3)
+            .foregroundStyle(Theme.ink)
+            .background(Capsule().fill(Theme.paper.opacity(phase == .idle ? 0.55 : 1)))
+            .overlay(Capsule().strokeBorder(stroke, lineWidth: phase == .error ? 1 : 0.5))
+            .shadow(color: .black.opacity(phase == .idle ? 0 : 0.3), radius: 8, y: 3)
             .contentShape(Capsule())
             .onHover { isHovering = $0 }
             .onTapGesture { press() }
-            .help(help)
             .accessibilityElement(children: .contain)
             .accessibilityLabel(accessibilityLabel)
             .accessibilityAddTraits(.isButton)
             .accessibilityAction { press() } // VoiceOver and other assistive presses
-    }
-
-    private var shadow: Color {
-        phase == .listening ? Self.glow.opacity(0.25) : .black.opacity(phase == .idle ? 0 : 0.28)
     }
 
     private func press() {
@@ -210,134 +217,185 @@ struct FloatingPillView: View {
 
     @ViewBuilder
     private var content: some View {
-        if phase == .idle {
-            Capsule().fill(Self.glow.opacity(0.7))
+        switch phase {
+        case .idle:
+            Capsule().fill(Theme.signal.opacity(0.7))
                 .frame(width: 24, height: 3)
                 .padding(.horizontal, 11)
                 .padding(.vertical, 5)
                 .transition(.opacity)
-        } else {
+        case .hover:
+            MorphIcon(phase: .idle, lineWidth: 1.8)
+                .frame(width: 16, height: 16)
+                .foregroundStyle(Theme.signal)
+                .padding(.horizontal, 14)
+                .frame(height: Self.height)
+                .transition(.opacity.combined(with: .scale(scale: 0.9)))
+        case .preparing, .listening, .finishing:
+            recorder
+        case .error:
             HStack(spacing: 10) {
-                switch phase {
-                case .preparing:
-                    MorphIcon(phase: .working, lineWidth: 1.8)
-                        .frame(width: 16, height: 16)
-                        .foregroundStyle(Self.glow)
-                    Text(model.audio.isStarting ? "Waiting for microphone" : "Preparing locally")
-                        .font(.system(size: 13, weight: .medium))
-                    PillIconButton(systemImage: "xmark", title: "Cancel", help: "Cancel before the microphone starts") {
-                        model.cancelDictation()
-                    }
-                case .listening:
-                    PillIconButton(systemImage: "xmark", help: "Cancel. Nothing is typed") { model.cancelDictation() }
-                    VoiceRibbon(level: model.audio.level, isActive: true, tint: Self.glow)
-                        .frame(width: 92, height: 20)
-                    elapsed
-                    PillIconButton(systemImage: "stop.fill", help: "Finish and type it") {
-                        Task { await model.toggleDictation() }
-                    }
-                case .finishing:
-                    MorphIcon(phase: .working, lineWidth: 1.8)
-                        .frame(width: 16, height: 16)
-                        .foregroundStyle(Self.glow)
-                    Text("Writing it up").font(.system(size: 13, weight: .medium))
-                case .error:
-                    if let notice = model.dictationNotice { errorContent(notice) }
-                case .done:
-                    MorphIcon(phase: .done, lineWidth: 2)
-                        .frame(width: 16, height: 16)
-                        .foregroundStyle(Self.glow)
-                    Text(model.didInsertCurrentDictation ? "Typed" : "Ready in HushKey").font(.system(size: 13, weight: .medium))
-                default:
-                    MorphIcon(phase: .idle, lineWidth: 1.8)
-                        .frame(width: 16, height: 16)
-                        .foregroundStyle(Self.glow)
-                    HStack(spacing: 4) {
-                        Text(model.dictationShortcut.usesFunctionKey || model.dictationCaptureBehavior == .hold ? "Hold" : "Press")
-                        Text(model.dictationShortcut.label).fontWeight(.semibold)
-                        Text("or click to talk")
-                    }
-                    .font(.system(size: 13, weight: .medium))
-                }
+                if let notice = model.dictationNotice { errorContent(notice) }
             }
-            .padding(.leading, phase == .listening ? 6 : phase == .error ? 10 : 12)
-            .padding(.trailing, phase == .listening || phase == .error ? 6 : 12)
-            .padding(.vertical, phase == .listening || phase == .error ? 4 : 8)
+            .padding(.leading, 10)
+            .padding(.trailing, 6)
+            .padding(.vertical, 4)
             .transition(.opacity.combined(with: .scale(scale: 0.9)))
+        case .done:
+            HStack(spacing: Theme.s2) {
+                MorphIcon(phase: .done, lineWidth: 2)
+                    .frame(width: 14, height: 14)
+                    .foregroundStyle(Theme.signal)
+                Text(model.didInsertCurrentDictation ? "Typed" : "Ready in HushKey").font(.system(size: 13, weight: .medium))
+            }
+            .padding(.horizontal, Theme.s3)
+            .frame(height: Self.height)
+            .transition(.opacity.combined(with: .scale(scale: 0.9)))
+        }
+    }
+
+    private static let height: CGFloat = 28
+
+    /// One capsule from the first press to the typed text: the meter waits, listens, then works,
+    /// so the pill never jumps between shapes mid-dictation.
+    private var recorder: some View {
+        HStack(spacing: 6) {
+            if showsControls {
+                PillIconButton(systemImage: "xmark", help: phase == .preparing ? "Cancel before the microphone starts" : "Cancel. Nothing is typed",
+                               onHover: { hoveredControl = $0 ? .cancel : nil }) {
+                    model.cancelDictation()
+                }
+                .transition(.opacity.combined(with: .scale(scale: 0.6)))
+            }
+            PillMeter(level: model.audio.level,
+                      mode: phase == .listening ? .live : phase == .preparing ? .waiting : .working)
+                .frame(height: 16)
+                .padding(.horizontal, showsControls ? 2 : 6)
+            if phase == .listening { elapsed }
+            if showsControls {
+                PillIconButton(systemImage: "checkmark", help: "Finish and type it", prominent: true,
+                               onHover: { hoveredControl = $0 ? .finish : nil }) {
+                    Task { await model.toggleDictation() }
+                }
+                .disabled(phase == .preparing)
+                .opacity(phase == .preparing ? 0.35 : 1)
+                .transition(.opacity.combined(with: .scale(scale: 0.6)))
+            }
+        }
+        .padding(.horizontal, showsControls ? 4 : 8)
+        .frame(height: Self.height)
+        .transition(.opacity.combined(with: .scale(scale: 0.9)))
+    }
+
+    /// Short tooltip above the pill: what a hovered control does and its key, or what the pill
+    /// is waiting for. Shown at once, unlike a system tooltip in a non-activating panel.
+    private var hint: PillHint.Content? {
+        switch hoveredControl {
+        case .cancel?: return .init(title: "Cancel", shortcut: "esc")
+        case .finish?: return .init(title: "Finish", shortcut: model.dictationShortcut.label)
+        case nil: break
+        }
+        switch phase {
+        case .hover: return .init(title: "Dictate", shortcut: model.dictationShortcut.label)
+        case .preparing: return .init(title: model.audio.isStarting ? "Waiting for microphone" : "Preparing locally", shortcut: nil)
+        default: return nil
         }
     }
 
     /// Live text above the pill while talking; with no text field to type into, it stays up
     /// after finishing with Copy and close.
+    @ViewBuilder
     private var transcriptCard: some View {
-        let state = cardState
-        let isFinished: Bool
-        let hint: String?
-        switch state {
-        case .finished(let value): isFinished = true; hint = value
-        case .live(let value): isFinished = false; hint = value
-        case .hidden: isFinished = false; hint = nil
+        let (isFinished, hint): (Bool, String?) = switch cardState {
+        case .finished(let value): (true, value)
+        case .live(let value): (false, value)
+        case .hidden: (false, nil)
         }
         let text = TranscriptCard.tail(model.transcriber.text)
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                MorphIcon(phase: isFinished ? .done : .listening, lineWidth: 1.8)
-                    .frame(width: 16, height: 16)
-                    .foregroundStyle(Self.glow)
-                Spacer(minLength: 8)
-                if let hint = model.insertion.isEnabled || !isFinished ? hint : "Typing into apps is off" {
-                    Text(hint)
+        let shownHint = model.insertion.isEnabled || !isFinished ? hint : "Typing into apps is off"
+        if text.isEmpty {
+            // Nothing said yet: a one-line strip, not an empty card with a placeholder headline.
+            HStack(spacing: Theme.s2) {
+                MorphIcon(phase: .listening, level: model.audio.level, lineWidth: 1.6)
+                    .frame(width: 14, height: 14)
+                    .foregroundStyle(Theme.signal)
+                if let shownHint {
+                    Text(shownHint)
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(Theme.ink2)
                         .lineLimit(1)
                 }
-                PillIconButton(systemImage: "xmark", help: isFinished ? "Close (Esc)" : "Hide live text") {
-                    if isFinished { model.dismissFinishedTranscript() } else { cardCollapsed = true }
-                }
+                PillIconButton(systemImage: "xmark", help: "Hide live text", size: 18) { cardCollapsed = true }
             }
-            Text(text.isEmpty ? "Listening…" : text)
-                .font(.system(size: 18, weight: .medium))
-                .foregroundStyle(.white.opacity(text.isEmpty ? 0.4 : 1))
-                .lineLimit(3)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .fixedSize(horizontal: false, vertical: true)
-                .contentTransition(.opacity)
-            if isFinished {
-                HStack(spacing: 8) {
-                    if !model.insertion.isEnabled {
-                        Button("Type for me next time") {
-                            UserDefaults.standard.set(SettingsView.Section.insertion.rawValue, forKey: "settingsSection")
-                            model.screen = .settings
-                            NSApp.activate(ignoringOtherApps: true)
-                            model.dismissFinishedTranscript()
+            .padding(.leading, Theme.s3)
+            .padding(.trailing, 5)
+            .padding(.vertical, 5)
+            .background(Capsule().fill(Theme.paper))
+            .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 0.5))
+            .shadow(color: .black.opacity(0.3), radius: 8, y: 3)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Live transcript")
+        } else {
+            VStack(alignment: .leading, spacing: Theme.s2) {
+                HStack(spacing: Theme.s2) {
+                    MorphIcon(phase: isFinished ? .done : .listening, level: model.audio.level, lineWidth: 1.6)
+                        .frame(width: 14, height: 14)
+                        .foregroundStyle(Theme.signal)
+                    if let shownHint {
+                        Text(shownHint)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Theme.ink2)
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: Theme.s2)
+                    PillIconButton(systemImage: "xmark", help: isFinished ? "Close (Esc)" : "Hide live text", size: 18) {
+                        if isFinished { model.dismissFinishedTranscript() } else { cardCollapsed = true }
+                    }
+                }
+                Text(text)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Theme.ink)
+                    .lineLimit(3)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .contentTransition(.opacity)
+                if isFinished {
+                    HStack(spacing: Theme.s2) {
+                        if !model.insertion.isEnabled {
+                            Button("Type for me next time") {
+                                UserDefaults.standard.set(SettingsView.Section.insertion.rawValue, forKey: "settingsSection")
+                                model.screen = .settings
+                                NSApp.activate(ignoringOtherApps: true)
+                                model.dismissFinishedTranscript()
+                            }
+                            .buttonStyle(.plain)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Theme.signal)
+                            .help("Turn on typing into the focused text box")
                         }
-                        .buttonStyle(.plain)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Self.glow)
-                        .help("Turn on typing into the focused text box")
+                        Spacer()
+                        Button {
+                            model.copyDictationText()
+                            copied = true
+                        } label: {
+                            Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
+                                .contentTransition(.symbolEffect(.replace))
+                        }
+                        .buttonStyle(PrimaryButtonStyle(tint: Theme.signal, foreground: Theme.paper))
+                        .keyboardShortcut("c", modifiers: .command)
+                        .help("Copy to the clipboard (⌘C)")
                     }
-                    Spacer()
-                    Button {
-                        model.copyDictationText()
-                        copied = true
-                    } label: {
-                        Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
-                            .contentTransition(.symbolEffect(.replace))
-                    }
-                    .buttonStyle(PrimaryButtonStyle(tint: Self.glow, foreground: Self.surface))
-                    .keyboardShortcut("c", modifiers: .command)
-                    .help("Copy to the clipboard (⌘C)")
                 }
             }
+            .padding(Theme.s3)
+            .frame(width: 320)
+            .background(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous).fill(Theme.paper))
+            .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
+                .strokeBorder(Theme.hairline, lineWidth: 0.5))
+            .shadow(color: .black.opacity(0.3), radius: 8, y: 3)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel(isFinished ? "Finished transcript" : "Live transcript")
         }
-        .padding(14)
-        .frame(width: 340)
-        .background(RoundedRectangle(cornerRadius: Theme.r1, style: .continuous).fill(Self.surface.opacity(0.96)))
-        .overlay(RoundedRectangle(cornerRadius: Theme.r1, style: .continuous)
-            .strokeBorder(.white.opacity(0.1), lineWidth: 0.5))
-        .shadow(color: .black.opacity(0.28), radius: 8, y: 3)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(isFinished ? "Finished transcript" : "Live transcript")
     }
 
     @ViewBuilder
@@ -351,6 +409,7 @@ struct FloatingPillView: View {
             .lineLimit(1)
             .truncationMode(.tail)
             .frame(maxWidth: 190, alignment: .leading)
+            .help(notice.detail)
         if notice.canRetry {
             PillIconButton(systemImage: "arrow.clockwise", title: "Retry",
                            help: "Transcribe the last recording again") {
@@ -370,29 +429,22 @@ struct FloatingPillView: View {
 
     private var stroke: Color {
         switch phase {
-        case .listening: Self.glow.opacity(0.35)
         case .error: Theme.danger.opacity(0.45)
-        case .idle: .white.opacity(0.22)
-        default: .white.opacity(0.1)
+        case .idle: Theme.ink.opacity(0.22)
+        default: Theme.ink.opacity(0.12)
         }
     }
 
-    private var help: String {
-        switch phase {
-        case .listening: "Click to finish"
-        case .preparing: "Preparing local speech recognition. Click to cancel."
-        case .error: model.dictationNotice?.detail ?? ""
-        default: "Start dictation (\(model.dictationShortcut.menuTitle))"
-        }
-    }
-
+    /// Elapsed time, only once a dictation runs long enough for it to help.
     private var elapsed: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             let seconds = Int(context.date.timeIntervalSince(model.dictationStartedAt ?? context.date))
-            Text(String(format: "%d:%02d", seconds / 60, seconds % 60))
-                .font(.system(size: 12, weight: .medium).monospacedDigit())
-                .foregroundStyle(.white.opacity(0.6))
-                .frame(minWidth: 28)
+            if seconds >= 30 {
+                Text(String(format: "%d:%02d", seconds / 60, seconds % 60))
+                    .font(.system(size: 11, weight: .medium).monospacedDigit())
+                    .foregroundStyle(Theme.ink2)
+                    .padding(.trailing, 2)
+            }
         }
     }
 
@@ -400,7 +452,7 @@ struct FloatingPillView: View {
         switch phase {
         case .idle, .hover: "Start dictation"
         case .preparing: "Preparing local speech recognition. Cancel dictation startup"
-        case .listening: "Listening. Stop dictation"
+        case .listening: model.dictationShortcutHeld ? "Listening. Release \(model.dictationShortcut.label) to finish" : "Listening. Stop dictation"
         case .finishing: "Transcribing"
         case .error: "Dictation problem: \(model.dictationNotice?.message ?? ""). \(model.dictationNotice?.detail ?? "")"
         case .done: "Dictation finished"
@@ -408,13 +460,51 @@ struct FloatingPillView: View {
     }
 }
 
+/// The tooltip that floats above the pill.
+private struct PillHint: View {
+    struct Content: Equatable {
+        var title: String
+        var shortcut: String?
+    }
+
+    var title: String
+    var shortcut: String?
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(title)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Theme.ink)
+            if let shortcut {
+                Text(shortcut)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Theme.ink2)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(Theme.well))
+            }
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
+        .background(Capsule().fill(Theme.paper))
+        .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 0.5))
+        .shadow(color: .black.opacity(0.3), radius: 6, y: 2)
+        .accessibilityHidden(true) // the controls carry their own labels
+    }
+}
+
 /// Small round control inside the pill. Its own hit area, so it does not toggle dictation.
-/// With a title it becomes a short capsule in the same style, for recovery actions.
+/// Prominent controls are filled sage (the one primary action); with a title it becomes a
+/// short capsule in the same style, for recovery actions.
 private struct PillIconButton: View {
     var systemImage: String
     var title: String? = nil
     var help: String
-    var tint: Color = .white
+    var tint: Color = Theme.ink
+    var prominent = false
+    var size: CGFloat = 20
+    /// Reports hover to the pill, which shows its own hint instead of a slow system tooltip.
+    var onHover: ((Bool) -> Void)? = nil
     var action: () -> Void
     @State private var hovering = false
 
@@ -422,20 +512,23 @@ private struct PillIconButton: View {
         Button(action: action) {
             HStack(spacing: 4) {
                 Image(systemName: systemImage)
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: prominent ? 10 : 9, weight: .bold))
                 if let title {
                     Text(title).font(.system(size: 12, weight: .semibold))
                 }
             }
-            .foregroundStyle(tint.opacity(hovering ? 0.95 : 0.65))
-            .frame(minWidth: 24, minHeight: 24)
+            .foregroundStyle(prominent ? Theme.paper : tint.opacity(hovering ? 0.95 : 0.7))
+            .frame(minWidth: title == nil ? size : 24, minHeight: title == nil ? size : 24)
             .padding(.horizontal, title == nil ? 0 : 9)
-            .background(Capsule().fill(tint.opacity(hovering ? 0.16 : 0.08)))
+            .background(Capsule().fill(prominent ? Theme.signal.opacity(hovering ? 1 : 0.9) : tint.opacity(hovering ? 0.18 : 0.1)))
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .help(help)
+        .onHover { inside in
+            hovering = inside
+            onHover?(inside)
+        }
+        .help(onHover == nil ? help : "")
         .accessibilityLabel(help)
     }
 }
