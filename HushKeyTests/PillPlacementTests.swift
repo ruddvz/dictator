@@ -26,6 +26,12 @@ final class PillPlacementTests: XCTestCase {
         XCTAssertEqual(PillPlacement.fraction(centerX: -500, width: 120, in: visible), 0.068, accuracy: 0.0001)
     }
 
+    func testDropNearTheMiddleSnapsToCentre() {
+        XCTAssertEqual(PillPlacement.snapped(0.46), 0.5)
+        XCTAssertEqual(PillPlacement.snapped(0.55), 0.5)
+        XCTAssertEqual(PillPlacement.snapped(0.35), 0.35)
+    }
+
     func testSecondScreenUsesItsOwnFrame() {
         let right = CGRect(x: 1000, y: 0, width: 800, height: 600)
         let origin = PillPlacement.origin(size: size, in: right, centerFraction: 0.5)

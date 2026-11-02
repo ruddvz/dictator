@@ -1,5 +1,13 @@
 # HushKey progress
 
+## Completed — pill crash and off-centre placement (2026-11-02)
+
+- **Crash:** five "HushKey quit unexpectedly" reports today, all the same AppKit exception: the pill's `NSHostingView` (`sizingOptions = [.intrinsicContentSize]`, as the window's content view) re-requested a constraint pass from inside one, and AppKit aborts the app. The hosting view now sits in a plain container with no sizing options; SwiftUI reports the pill size (`onGeometryChange`) and the controller resizes the panel on the next run-loop turn.
+- **Off-centre:** the saved position was 35% across the screen, probably from a click that moved slightly and became a drag. Drags now need 10 pt, a drop near the middle snaps to centre (`PillPlacement.snapped`, 1 test), and the right-click menu has "Move to the centre". The stored position on this Mac was reset.
+- **Seen live (packaged app):** the pill opens at bottom centre (x 847–881 of 1728, 10 pt above the bottom); no new crash report since.
+- **Not verified live:** the pill growing on hover or during a dictation (the synthetic hover didn't reach it), so the resize path that crashed has not been run live yet.
+- `xcodebuild ... test`: 184 passed, 2 skipped.
+
 ## Completed — first live end-to-end check, and fixes it turned up (2026-11-02)
 
 - **Seen live (packaged app, fn held by the user):** two dictations at 11:42 were typed into a TextEdit document and saved to History. Mic, Speech, Accessibility, the fn key and insertion all worked together.

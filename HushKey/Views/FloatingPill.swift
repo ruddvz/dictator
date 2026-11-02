@@ -90,16 +90,23 @@ final class FloatingPillController {
         panel.hidesOnDeactivate = false
         panel.isMovable = false
         panel.appearance = NSAppearance(named: .darkAqua) // the pill is always dark, so tokens resolve to dark values
-        let root = FloatingPillView(onDrag: { [weak self] in self?.drag(ended: $0) }).environment(model)
+        let root = FloatingPillView(onDrag: { [weak self] in self?.drag(ended: $0) },
+                                    onCentre: { [weak self] in self?.moveToCentre() },
+                                    onSize: { [weak self] size in
+                                        // After the layout pass that measured it: resizing the panel
+                                        // from inside AppKit's constraint pass aborts the app.
+                                        DispatchQueue.main.async { self?.resize(to: size) }
+                                    })
+            .environment(model)
         let hosting = FirstMouseHostingView(rootView: root)
-        // Report size changes but let the controller own the frame, so the pill grows upward
-        // from the bottom edge instead of downward from its top.
-        hosting.sizingOptions = [.intrinsicContentSize]
-        hosting.onIntrinsicSizeChange = { [weak self, weak hosting] in
-            guard let hosting else { return }
-            self?.resize(to: hosting.fittingSize)
-        }
-        panel.contentView = hosting
+        // The controller owns the frame, so the pill grows upward from the bottom edge. With no
+        // sizing options the hosting view never drives the window size or constraints itself.
+        hosting.sizingOptions = []
+        hosting.autoresizingMask = [.width, .height]
+        let container = NSView(frame: CGRect(origin: .zero, size: contentSize))
+        hosting.frame = container.bounds
+        container.addSubview(hosting)
+        panel.contentView = container
         self.panel = panel
         screen = PillPlacement.screenUnderPointer()
         resize(to: hosting.fittingSize)
@@ -121,7 +128,15 @@ final class FloatingPillController {
     private func place() {
         guard let panel, let screen = screen ?? NSScreen.main ?? NSScreen.screens.first else { return }
         let origin = PillPlacement.origin(size: contentSize, in: screen.visibleFrame, centerFraction: centerFraction)
-        panel.setFrame(CGRect(origin: origin, size: contentSize), display: true)
+        let frame = CGRect(origin: origin, size: contentSize)
+        guard panel.frame != frame else { return }
+        panel.setFrame(frame, display: false)
+    }
+
+    private func moveToCentre() {
+        centerFraction = 0.5
+        PillPlacement.storedFraction = centerFraction
+        place()
     }
 
     /// Slides the pill along the bottom edge with the pointer, then remembers where it was left.
@@ -131,8 +146,8 @@ final class FloatingPillController {
         let mouseX = NSEvent.mouseLocation.x
         let start = dragStart ?? (mouseX, panel.frame.midX)
         dragStart = ended ? nil : start
-        centerFraction = PillPlacement.fraction(centerX: start.centerX + mouseX - start.mouseX,
-                                                width: contentSize.width, in: visible)
+        centerFraction = PillPlacement.snapped(PillPlacement.fraction(centerX: start.centerX + mouseX - start.mouseX,
+                                                                      width: contentSize.width, in: visible))
         place()
         if ended { PillPlacement.storedFraction = centerFraction }
     }
@@ -165,6 +180,11 @@ enum PillPlacement {
         return (clamped - visible.minX) / visible.width
     }
 
+    /// Dropped near the middle, the pill clicks back to the centre.
+    static func snapped(_ fraction: CGFloat) -> CGFloat {
+        abs(fraction - 0.5) < 0.06 ? 0.5 : fraction
+    }
+
     static func screenUnderPointer() -> NSScreen? {
         let point = NSEvent.mouseLocation
         return NSScreen.screens.first { NSMouseInRect(point, $0.frame, false) } ?? NSScreen.main
@@ -172,20 +192,17 @@ enum PillPlacement {
 }
 
 private final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
-    var onIntrinsicSizeChange: (() -> Void)?
-
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-
-    override func invalidateIntrinsicContentSize() {
-        super.invalidateIntrinsicContentSize()
-        DispatchQueue.main.async { [weak self] in self?.onIntrinsicSizeChange?() }
-    }
 }
 
 struct FloatingPillView: View {
     @Environment(AppModel.self) private var model
     /// Dragging slides the pill along the bottom edge; `true` when the drag ends.
     var onDrag: (Bool) -> Void = { _ in }
+    /// Puts the pill back in the middle of the bottom edge.
+    var onCentre: () -> Void = {}
+    /// The pill's measured size, so the panel can fit it.
+    var onSize: (CGSize) -> Void = { _ in }
 
     @State private var isHovering = false
     /// After a few quiet seconds the idle bar shrinks to a dot, out of the way.
@@ -237,6 +254,7 @@ struct FloatingPillView: View {
         }
             .padding(6) // room for the shadow inside the transparent panel
             .fixedSize()
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { onSize($0) }
             .animation(.spring(response: 0.34, dampingFraction: 0.78), value: phase)
             .animation(.spring(response: 0.34, dampingFraction: 0.78), value: cardState)
             .animation(.spring(response: 0.34, dampingFraction: 0.78), value: showsControls)
@@ -277,7 +295,7 @@ struct FloatingPillView: View {
                 if inside { model.audio.refreshDevices() }
             }
             .onTapGesture { press() }
-            .gesture(DragGesture(minimumDistance: 4)
+            .gesture(DragGesture(minimumDistance: 10) // a slightly shaky click should not move it
                 .onChanged { _ in onDrag(false) }
                 .onEnded { _ in onDrag(true) })
             .contextMenu { pillMenu }
@@ -567,6 +585,7 @@ struct FloatingPillView: View {
         Toggle("Start and stop sounds", isOn: Binding(get: { model.playsDictationSounds },
                                                        set: { model.playsDictationSounds = $0 }))
         Divider()
+        Button("Move to the centre") { onCentre() }
         Button("Meeting notes") { model.openMeetingNotes() }
         Button("Open HushKey") {
             model.screen = .dictation
