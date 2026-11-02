@@ -1,5 +1,6 @@
 import AppKit
 import Carbon.HIToolbox
+import CoreAudio
 import SwiftUI
 
 /// Always-on-top dictation indicator at the bottom of the screen. It is a non-activating panel,
@@ -10,6 +11,13 @@ final class FloatingPillController {
     private weak var model: AppModel?
     private var contentSize = CGSize(width: 60, height: 14)
     private var escapeMonitors: [Any] = []
+    /// The screen the pill sits on: wherever the pointer was when it appeared or a dictation began.
+    private var screen: NSScreen?
+    private var wasCapturing = false
+    /// Pointer x and pill centre when a drag began.
+    private var dragStart: (mouseX: CGFloat, centerX: CGFloat)?
+    /// Where along the bottom edge the pill sits, 0…1 of the screen width; remembered.
+    private var centerFraction = PillPlacement.storedFraction
 
     func attach(to model: AppModel) {
         guard self.model == nil else { return }
@@ -30,6 +38,12 @@ final class FloatingPillController {
                 self?.observe()
             }
         }
+        let capturing = model.audio.isRunning || model.audio.isStarting || model.isStartingDictation
+        if capturing, !wasCapturing {
+            screen = PillPlacement.screenUnderPointer()
+            place()
+        }
+        wasCapturing = capturing
         model.showsFloatingPill ? show() : hide()
         let cardIsUp = model.showsFloatingPill && model.showsFinishedTranscript
         cardIsUp || model.audio.isRunning || model.isStartingDictation ? watchEscape() : stopWatchingEscape()
@@ -44,7 +58,7 @@ final class FloatingPillController {
             guard event.keyCode == UInt16(kVK_Escape) else { return false }
             Task { @MainActor in
                 guard let model = self?.model else { return }
-                if model.isStartingDictation || model.audio.isRunning { model.cancelDictation() }
+                if model.isStartingDictation || model.audio.isRunning { model.cancelDictation(offersUndo: true) }
                 else { model.dismissFinishedTranscript() }
             }
             return true
@@ -76,7 +90,7 @@ final class FloatingPillController {
         panel.hidesOnDeactivate = false
         panel.isMovable = false
         panel.appearance = NSAppearance(named: .darkAqua) // the pill is always dark, so tokens resolve to dark values
-        let root = FloatingPillView().environment(model)
+        let root = FloatingPillView(onDrag: { [weak self] in self?.drag(ended: $0) }).environment(model)
         let hosting = FirstMouseHostingView(rootView: root)
         // Report size changes but let the controller own the frame, so the pill grows upward
         // from the bottom edge instead of downward from its top.
@@ -87,6 +101,7 @@ final class FloatingPillController {
         }
         panel.contentView = hosting
         self.panel = panel
+        screen = PillPlacement.screenUnderPointer()
         resize(to: hosting.fittingSize)
         place()
         panel.orderFrontRegardless()
@@ -104,10 +119,55 @@ final class FloatingPillController {
     }
 
     private func place() {
-        guard let panel, let screen = NSScreen.main ?? NSScreen.screens.first else { return }
-        let visible = screen.visibleFrame
-        let origin = CGPoint(x: visible.midX - contentSize.width / 2, y: visible.minY + 10)
+        guard let panel, let screen = screen ?? NSScreen.main ?? NSScreen.screens.first else { return }
+        let origin = PillPlacement.origin(size: contentSize, in: screen.visibleFrame, centerFraction: centerFraction)
         panel.setFrame(CGRect(origin: origin, size: contentSize), display: true)
+    }
+
+    /// Slides the pill along the bottom edge with the pointer, then remembers where it was left.
+    private func drag(ended: Bool) {
+        guard let panel, let screen = screen ?? NSScreen.main else { return }
+        let visible = screen.visibleFrame
+        let mouseX = NSEvent.mouseLocation.x
+        let start = dragStart ?? (mouseX, panel.frame.midX)
+        dragStart = ended ? nil : start
+        centerFraction = PillPlacement.fraction(centerX: start.centerX + mouseX - start.mouseX,
+                                                width: contentSize.width, in: visible)
+        place()
+        if ended { PillPlacement.storedFraction = centerFraction }
+    }
+}
+
+/// Where the pill sits: centred on a remembered fraction of the screen width, 10 pt above the
+/// bottom of the visible frame, and never past either edge.
+enum PillPlacement {
+    static let bottomInset: CGFloat = 10
+    static let edgeInset: CGFloat = 8
+    private static let key = "pillCenterFraction"
+
+    static var storedFraction: CGFloat {
+        get { (UserDefaults.standard.object(forKey: key) as? Double).map { CGFloat($0) } ?? 0.5 }
+        set { UserDefaults.standard.set(Double(newValue), forKey: key) }
+    }
+
+    static func origin(size: CGSize, in visible: CGRect, centerFraction: CGFloat) -> CGPoint {
+        let centerX = visible.minX + visible.width * min(1, max(0, centerFraction))
+        let lowest = visible.minX + edgeInset
+        let highest = max(lowest, visible.maxX - edgeInset - size.width)
+        return CGPoint(x: min(highest, max(lowest, centerX - size.width / 2)), y: visible.minY + bottomInset)
+    }
+
+    /// The fraction for a pill centred at `centerX`, clamped so the pill stays on screen.
+    static func fraction(centerX: CGFloat, width: CGFloat, in visible: CGRect) -> CGFloat {
+        guard visible.width > 0 else { return 0.5 }
+        let half = width / 2 + edgeInset
+        let clamped = min(visible.maxX - half, max(visible.minX + half, centerX))
+        return (clamped - visible.minX) / visible.width
+    }
+
+    static func screenUnderPointer() -> NSScreen? {
+        let point = NSEvent.mouseLocation
+        return NSScreen.screens.first { NSMouseInRect(point, $0.frame, false) } ?? NSScreen.main
     }
 }
 
@@ -124,8 +184,12 @@ private final class FirstMouseHostingView<Content: View>: NSHostingView<Content>
 
 struct FloatingPillView: View {
     @Environment(AppModel.self) private var model
+    /// Dragging slides the pill along the bottom edge; `true` when the drag ends.
+    var onDrag: (Bool) -> Void = { _ in }
 
     @State private var isHovering = false
+    /// After a few quiet seconds the idle bar shrinks to a dot, out of the way.
+    @State private var idleIsCompact = false
     @State private var hoveredControl: PillControl?
     @State private var showsDone = false
     @State private var doneToken = 0
@@ -133,7 +197,7 @@ struct FloatingPillView: View {
     @State private var copied = false
 
     private enum Phase { case idle, hover, preparing, listening, finishing, error, done }
-    private enum PillControl { case cancel, finish }
+    private enum PillControl { case cancel, finish, notes }
 
     private var isFinishing: Bool { model.isFinalizingDictation || model.transcriber.isFinalizing }
 
@@ -183,6 +247,12 @@ struct FloatingPillView: View {
                 }
             }
             .onChange(of: phase) { hoveredControl = nil }
+            .task(id: phase) {
+                idleIsCompact = false
+                guard phase == .idle else { return }
+                try? await Task.sleep(for: .seconds(5))
+                if !Task.isCancelled { idleIsCompact = true }
+            }
             .onChange(of: model.completedDictationCount) {
                 doneToken += 1
                 let token = doneToken
@@ -198,11 +268,18 @@ struct FloatingPillView: View {
         content
             .foregroundStyle(Theme.ink)
             .background(Capsule().fill(Theme.paper.opacity(phase == .idle ? 0.55 : 1)))
-            .overlay(Capsule().strokeBorder(stroke, lineWidth: phase == .error ? 1 : 0.5))
+            .overlay(Capsule().strokeBorder(stroke, lineWidth: phase == .error && model.dictationNotice?.isNeutral != true ? 1 : 0.5))
             .shadow(color: .black.opacity(phase == .idle ? 0 : 0.3), radius: 8, y: 3)
             .contentShape(Capsule())
-            .onHover { isHovering = $0 }
+            .onHover { inside in
+                isHovering = inside
+                if inside { model.audio.refreshDevices() }
+            }
             .onTapGesture { press() }
+            .gesture(DragGesture(minimumDistance: 4)
+                .onChanged { _ in onDrag(false) }
+                .onEnded { _ in onDrag(true) })
+            .contextMenu { pillMenu }
             .accessibilityElement(children: .contain)
             .accessibilityLabel(accessibilityLabel)
             .accessibilityAddTraits(.isButton)
@@ -219,18 +296,26 @@ struct FloatingPillView: View {
     private var content: some View {
         switch phase {
         case .idle:
-            Capsule().fill(Theme.signal.opacity(0.7))
-                .frame(width: 24, height: 3)
-                .padding(.horizontal, 11)
-                .padding(.vertical, 5)
+            Capsule().fill(Theme.signal.opacity(idleIsCompact ? 0.5 : 0.7))
+                .frame(width: idleIsCompact ? 10 : 24, height: 3)
+                .padding(.horizontal, idleIsCompact ? 6 : 11)
+                .padding(.vertical, idleIsCompact ? 4 : 5)
+                .animation(Theme.gentle, value: idleIsCompact)
                 .transition(.opacity)
         case .hover:
-            MorphIcon(phase: .idle, lineWidth: 1.8)
-                .frame(width: 16, height: 16)
-                .foregroundStyle(Theme.signal)
-                .padding(.horizontal, 14)
-                .frame(height: Self.height)
-                .transition(.opacity.combined(with: .scale(scale: 0.9)))
+            HStack(spacing: 6) {
+                MorphIcon(phase: .idle, lineWidth: 1.8)
+                    .frame(width: 16, height: 16)
+                    .foregroundStyle(Theme.signal)
+                    .padding(.leading, 8)
+                PillIconButton(systemImage: "person.2.wave.2", help: "Open Meeting notes",
+                               onHover: { hoveredControl = $0 ? .notes : nil }) {
+                    model.openMeetingNotes()
+                }
+            }
+            .padding(.horizontal, 4)
+            .frame(height: Self.height)
+            .transition(.opacity.combined(with: .scale(scale: 0.9)))
         case .preparing, .listening, .finishing:
             recorder
         case .error:
@@ -263,7 +348,7 @@ struct FloatingPillView: View {
             if showsControls {
                 PillIconButton(systemImage: "xmark", help: phase == .preparing ? "Cancel before the microphone starts" : "Cancel. Nothing is typed",
                                onHover: { hoveredControl = $0 ? .cancel : nil }) {
-                    model.cancelDictation()
+                    model.cancelDictation(offersUndo: true)
                 }
                 .transition(.opacity.combined(with: .scale(scale: 0.6)))
             }
@@ -293,6 +378,7 @@ struct FloatingPillView: View {
         switch hoveredControl {
         case .cancel?: return .init(title: "Cancel", shortcut: "esc")
         case .finish?: return .init(title: "Finish", shortcut: model.dictationShortcut.label)
+        case .notes?: return .init(title: "Meeting notes", shortcut: nil)
         case nil: break
         }
         switch phase {
@@ -400,20 +486,42 @@ struct FloatingPillView: View {
 
     @ViewBuilder
     private func errorContent(_ notice: DictationNotice) -> some View {
-        Image(systemName: "exclamationmark.circle.fill")
+        let tint = notice.isNeutral ? Theme.ink2 : Theme.danger
+        Image(systemName: notice.isNeutral ? "arrow.uturn.backward.circle" : "exclamationmark.circle.fill")
             .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(Theme.danger)
+            .foregroundStyle(tint)
         Text(notice.message)
             .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(Theme.danger)
+            .foregroundStyle(tint)
             .lineLimit(1)
             .truncationMode(.tail)
             .frame(maxWidth: 190, alignment: .leading)
             .help(notice.detail)
-        if notice.canRetry {
+        if notice.kind == .cancelled {
+            PillIconButton(systemImage: "arrow.uturn.backward", title: "Undo",
+                           help: "Transcribe what you said and type it") {
+                Task { await model.retryDictation() }
+            }
+        } else if notice.canRetry {
             PillIconButton(systemImage: "arrow.clockwise", title: "Retry",
                            help: "Transcribe the last recording again") {
                 Task { await model.retryDictation() }
+            }
+        }
+        if notice.offersMicrophoneHelp {
+            Menu {
+                microphoneChoices
+            } label: {
+                Label("Mic", systemImage: "mic")
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.visible)
+            .fixedSize()
+            .font(.system(size: 12, weight: .semibold))
+            .help("Choose the microphone")
+            .accessibilityLabel("Choose the microphone")
+            PillIconButton(systemImage: "slider.horizontal.3", help: "Open Sound settings to check the input") {
+                model.openSoundInputSettings()
             }
         }
         if notice.canPasteAgain {
@@ -424,12 +532,41 @@ struct FloatingPillView: View {
                 Task { await model.pasteLastDictationAgain() }
             }
         }
-        PillIconButton(systemImage: "xmark", help: "Dismiss", tint: Theme.danger) { model.dismissDictationNotice() }
+        PillIconButton(systemImage: "xmark", help: "Dismiss", tint: tint) { model.dismissDictationNotice() }
+    }
+
+    /// The inputs HushKey can listen to, with the current one checked.
+    @ViewBuilder
+    private var microphoneChoices: some View {
+        Picker("Microphone", selection: Binding(get: { model.audio.selectedDeviceID },
+                                                set: { model.audio.selectedDeviceID = $0 })) {
+            Text("System default").tag(AudioDeviceID?.none)
+            ForEach(model.audio.devices) { device in
+                Text(device.name).tag(Optional(device.id))
+            }
+        }
+        .pickerStyle(.inline)
+    }
+
+    /// Right-click menu: microphone, sounds, and getting back to HushKey.
+    @ViewBuilder
+    private var pillMenu: some View {
+        microphoneChoices
+        Toggle("Start and stop sounds", isOn: Binding(get: { model.playsDictationSounds },
+                                                       set: { model.playsDictationSounds = $0 }))
+        Divider()
+        Button("Meeting notes") { model.openMeetingNotes() }
+        Button("Open HushKey") {
+            model.screen = .dictation
+            model.openMainWindow?()
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        Button("Hide the dictation bar") { model.showsFloatingPill = false }
     }
 
     private var stroke: Color {
         switch phase {
-        case .error: Theme.danger.opacity(0.45)
+        case .error: model.dictationNotice?.isNeutral == true ? Theme.ink.opacity(0.12) : Theme.danger.opacity(0.45)
         case .idle: Theme.ink.opacity(0.22)
         default: Theme.ink.opacity(0.12)
         }
@@ -454,7 +591,10 @@ struct FloatingPillView: View {
         case .preparing: "Preparing local speech recognition. Cancel dictation startup"
         case .listening: model.dictationShortcutHeld ? "Listening. Release \(model.dictationShortcut.label) to finish" : "Listening. Stop dictation"
         case .finishing: "Transcribing"
-        case .error: "Dictation problem: \(model.dictationNotice?.message ?? ""). \(model.dictationNotice?.detail ?? "")"
+        case .error:
+            model.dictationNotice?.isNeutral == true
+                ? "Dictation cancelled. \(model.dictationNotice?.detail ?? "")"
+                : "Dictation problem: \(model.dictationNotice?.message ?? ""). \(model.dictationNotice?.detail ?? "")"
         case .done: "Dictation finished"
         }
     }
@@ -515,6 +655,8 @@ private struct PillIconButton: View {
                     .font(.system(size: prominent ? 10 : 9, weight: .bold))
                 if let title {
                     Text(title).font(.system(size: 12, weight: .semibold))
+                        .lineLimit(1)
+                        .fixedSize()
                 }
             }
             .foregroundStyle(prominent ? Theme.paper : tint.opacity(hovering ? 0.95 : 0.7))

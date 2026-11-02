@@ -170,6 +170,10 @@ final class AppModel {
     var showsFloatingPill = UserDefaults.standard.object(forKey: "showFloatingPill") as? Bool ?? true {
         didSet { UserDefaults.standard.set(showsFloatingPill, forKey: "showFloatingPill") }
     }
+    /// A soft system sound when dictation starts listening and when it stops. Off by default.
+    var playsDictationSounds = UserDefaults.standard.bool(forKey: "playDictationSounds") {
+        didSet { UserDefaults.standard.set(playsDictationSounds, forKey: "playDictationSounds") }
+    }
     var savesDictationHistory = UserDefaults.standard.object(forKey: "saveDictationHistory") as? Bool ?? true {
         didSet { UserDefaults.standard.set(savesDictationHistory, forKey: "saveDictationHistory") }
     }
@@ -217,6 +221,11 @@ final class AppModel {
     @ObservationIgnored private(set) var lastSavedDictationText: String?
     @ObservationIgnored private(set) var dictationStartedAt: Date?
     @ObservationIgnored private var lastDictationDuration: TimeInterval?
+    /// The input the last dictation used, for "We couldn't hear you".
+    @ObservationIgnored private var lastDictationMicrophoneName: String?
+    @ObservationIgnored private var cancelNoticeToken = 0
+    /// Set by the app scene, so views outside it (the pill) can bring the main window back.
+    @ObservationIgnored var openMainWindow: (() -> Void)?
 
     var dictationStats: DictationStats { DictationStats(entries: dictationHistory) }
     var canClearDictationHistory: Bool {
@@ -1369,6 +1378,8 @@ final class AppModel {
             return
         }
         retainedAudioSinkID = audio.sink.add { [retainedAudio] buffer, _ in retainedAudio.append(buffer) }
+        lastDictationMicrophoneName = audio.activeDeviceName
+        playDictationSound("Tink")
         dictationStartedAt = Date()
         lastDictationDuration = nil
         let customWords = profileSettings.vocabulary
@@ -1410,6 +1421,7 @@ final class AppModel {
         else { transcriber.stop() }
         audio.stop()
         stopRetainingAudio(keep: true)
+        playDictationSound("Pop")
         functionKey.reset()
         lastDictationDuration = dictationStartedAt.map { Date().timeIntervalSince($0) }
         dictationStartedAt = nil
@@ -1437,7 +1449,9 @@ final class AppModel {
         }
         saveCurrentDictation()
         if let notice = DictationRecovery.notice(audioError: nil, transcriberError: transcriber.error,
-                                                 transcript: processed, hasRetainedAudio: retainedAudio.isUsable) {
+                                                 transcript: processed, hasRetainedAudio: retainedAudio.isUsable,
+                                                 heardSound: audio.peakLevel >= DictationRecovery.silenceLevel,
+                                                 microphoneName: lastDictationMicrophoneName) {
             dictationNotice = notice
         } else {
             retainedAudio.reset()
@@ -1850,8 +1864,10 @@ final class AppModel {
         }
     }
 
-    /// Stops listening and throws the audio away: nothing is transcribed, saved, inserted, or kept.
-    func cancelDictation() {
+    /// Stops listening; nothing is transcribed, saved or inserted. With `offersUndo` (the pill's ×
+    /// and Esc), a recording of a second or more stays in memory for a few seconds so the pill's
+    /// Undo can transcribe it anyway; otherwise, or once that passes, the audio is dropped.
+    func cancelDictation(offersUndo: Bool = false) {
         let wasStarting = isStartingDictation
         let wasListening = audio.isRunning
         dictationShortcutHeld = false
@@ -1860,7 +1876,9 @@ final class AppModel {
         guard wasStarting || wasListening else { return }
         transcriber.cancelPendingAuthorization()
         audio.stop()
-        stopRetainingAudio(keep: false)
+        let recorded = dictationStartedAt.map { Date().timeIntervalSince($0) } ?? 0
+        let keepsAudio = offersUndo && wasListening && recorded >= DictationRecovery.minimumUndoSeconds
+        stopRetainingAudio(keep: keepsAudio)
         guard wasListening else {
             captureGate.release(.dictation)
             return
@@ -1869,6 +1887,38 @@ final class AppModel {
         transcriber.clear()
         dictationStartedAt = nil
         captureGate.release(.dictation)
+        guard keepsAudio, retainedAudio.isUsable else {
+            retainedAudio.reset()
+            return
+        }
+        lastDictationDuration = recorded
+        dictationNotice = DictationRecovery.cancelled()
+        cancelNoticeToken += 1
+        let token = cancelNoticeToken
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(5))
+            guard let self, token == cancelNoticeToken, dictationNotice?.kind == .cancelled else { return }
+            dismissDictationNotice()
+        }
+    }
+
+    /// Opens the input tab of Sound settings, for a muted or missing microphone.
+    func openSoundInputSettings() {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.Sound-Settings.extension?input") else { return }
+        NSWorkspace.shared.open(url)
+    }
+
+    /// Brings HushKey forward on Meeting notes, from the pill.
+    func openMeetingNotes() {
+        screen = .meetings
+        openMainWindow?()
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func playDictationSound(_ name: String) {
+        guard playsDictationSounds, let sound = NSSound(named: NSSound.Name(name)) else { return }
+        sound.volume = 0.35
+        sound.play()
     }
 
 }

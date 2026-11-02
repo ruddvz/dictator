@@ -20,8 +20,16 @@ enum AudioDevices {
 
         return ids.compactMap { id in
             guard inputChannelCount(id) > 0 else { return nil }
-            return Device(id: id, name: name(of: id) ?? "Device \(id)")
+            let deviceName = name(of: id) ?? "Device \(id)"
+            guard isUserFacing(deviceName) else { return nil }
+            return Device(id: id, name: deviceName)
         }
+    }
+
+    /// Core Audio creates private aggregate devices (for example while another app records the
+    /// system output); they are not microphones a person would pick.
+    static func isUserFacing(_ name: String) -> Bool {
+        !name.hasPrefix("CADefaultDeviceAggregate")
     }
 
     static func defaultInputID() -> AudioDeviceID? {

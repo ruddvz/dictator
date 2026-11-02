@@ -141,6 +141,9 @@ private struct GeneralSettings: View {
             SettingsRow(title: "Dictation bar", detail: "The small bar at the bottom of your screen.") {
                 RowToggle(isOn: $model.showsFloatingPill, label: "Show the dictation bar")
             }
+            SettingsRow(title: "Start and stop sounds", detail: "A soft click when the mic opens and when it closes.") {
+                RowToggle(isOn: $model.playsDictationSounds, label: "Play start and stop sounds")
+            }
         }
 
         SettingsGroup(title: "Cleanup") {

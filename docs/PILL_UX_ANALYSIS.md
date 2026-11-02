@@ -44,15 +44,18 @@ _2026-11-02. Sources: the user's screenshots of HushKey (idle, recording) and Wi
 6. **Lighter no-target card.** Before words arrive it is a one-line hint strip, not a 340 pt card with a placeholder headline. Live text appears at 16 pt in a 320 pt card once there is something to read.
 7. **Tokens only.** The pill uses `Theme.paper`, `Theme.signal`, `Theme.ink` and `Theme.hairline`, which resolve to their dark values because the panel is forced dark.
 
-**P1, next**
+**P1 and P2, done in the second pass**
 
-- "We couldn't hear you" and "Microphone unavailable" errors with **Open Sound settings** / **Choose microphone** actions, and a right-click mic picker on the pill.
-- **Undo after cancel:** keep the cancelled audio for a few seconds and offer "Transcribe anyway".
-- Start/stop sounds (optional, off by default).
+- **"We couldn't hear you".** An empty result from a recording whose peak level never rose above −54 dBFS is blamed on the input, not the speaker. It, and "Mic didn't start", offer a **Mic** menu (inputs, with the current one checked) and a **Sound settings** button.
+- **Undo after cancel.** × or Esc on a recording of a second or more shows a neutral "Cancelled · Undo" for 5 s. Undo transcribes the in-memory audio and types it as usual; otherwise the audio is dropped.
+- **Right-click menu** on the pill: choose the microphone, start/stop sounds, Meeting notes, Open HushKey, and hide the bar.
+- **Start and stop sounds**: optional and off by default (Settings → Dictation, the menu bar and the pill menu).
+- **Idle dot.** After 5 quiet seconds the idle bar shrinks to a dot; hovering expands it.
+- **Drag to place.** Drag the pill along the bottom edge; the position is remembered. It never goes past either side.
+- **Follows the pointer's screen** when it appears and when a dictation starts.
+- **Meeting notes button** in the hover capsule, with its own hint.
+- Private Core Audio aggregate devices are hidden from microphone lists.
 
-**P2**
+**Still open**
 
-- Auto-shrink the idle bar to a dot, an option to hide it, and drag-to-edge placement that is remembered.
-- Follow the screen with the mouse or the key window instead of `NSScreen.main`.
-- A Meeting notes button in the hover capsule (HushKey's equivalent of Notetaker).
-- A long-session warning before any time limit.
+- A long-session warning. HushKey has no recording limit; Retry stops being available after 5 minutes because longer audio is not kept, which the pill doesn't say.

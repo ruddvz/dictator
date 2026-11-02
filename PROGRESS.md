@@ -1,5 +1,14 @@
 # HushKey progress
 
+## Completed — pill recovery, Undo, mic menu and placement (2026-11-02)
+
+- "We couldn't hear you" when the recording's peak level stayed under −54 dBFS (`AudioService.peakLevel`, `DictationRecovery.silenceLevel`). It and "Mic didn't start" offer a Mic picker and Sound settings.
+- Cancel with × or Esc keeps the audio in memory for 5 s with a neutral "Cancelled · Undo"; Undo runs the normal retry path. Recordings under 1 s, and cancels from other paths (fn tap, toggle while starting), drop the audio at once.
+- Right-click menu, optional start/stop sounds (off by default; also in Settings and the menu bar), idle dot after 5 s, drag along the bottom edge (remembered as `pillCenterFraction`), follows the pointer's screen, Meeting notes button on hover. Core Audio's private aggregate devices are hidden from mic lists.
+- Tests: `PillPlacementTests`, a device-filter test, and 5 recovery tests. `xcodebuild ... test`: 156 passed, 2 skipped. One earlier run aborted in an unrelated test while `dist/HushKey.app` was still open; it passed after quitting it.
+- **Seen live (packaged app):** idle dot (34 × 23 panel); hover tooltips "Dictate fn" and "Meeting notes"; right-click menu (it then showed a duplicate header and a `CADefaultDeviceAggregate` entry, both fixed after; the fixed menu wasn't reopened); × → "Cancelled · Undo" → Undo → transcribing sweep → "Didn't catch that" (quiet room); drag moved the pill left and kept it there.
+- **Not seen live:** "We couldn't hear you" (needs a muted input, and I didn't change sound settings), the sounds, Esc, hold mode, and the Sound settings button (its link was checked with `open`). One start sat at "Preparing locally" while a system alert from UserNotificationCenter was in front; × cancelled it. Not investigated.
+
 ## Completed — compact recording pill and level meter (2026-11-02)
 
 - Wrote `docs/PILL_UX_ANALYSIS.md`, a gap analysis against Wispr Flow (user screenshots plus Wispr help-center docs). Main findings: the recording pill was about 2.5× Wispr's footprint, the `VoiceRibbon` barely moved with ordinary speech, the shape jumped between preparing, listening and finishing, hold and hands-free looked the same, and hints were full sentences or slow system tooltips.

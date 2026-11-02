@@ -35,6 +35,44 @@ final class DictationRecoveryTests: XCTestCase {
         XCTAssertEqual(notice?.canRetry, true)
     }
 
+    func testSilentMicrophoneIsBlamedOnTheInput() {
+        let notice = DictationRecovery.notice(audioError: nil, transcriberError: nil, transcript: "",
+                                              hasRetainedAudio: true, heardSound: false, microphoneName: "AirPods")
+        XCTAssertEqual(notice?.kind, .silentMicrophone)
+        XCTAssertEqual(notice?.message, "We couldn't hear you")
+        XCTAssertEqual(notice?.canRetry, false)
+        XCTAssertEqual(notice?.offersMicrophoneHelp, true)
+        XCTAssertTrue(notice?.detail.contains("AirPods") == true)
+    }
+
+    func testSoundThatWasNotSpeechIsStillNothingHeard() {
+        let notice = DictationRecovery.notice(audioError: nil, transcriberError: nil, transcript: "",
+                                              hasRetainedAudio: true, heardSound: true)
+        XCTAssertEqual(notice?.kind, .nothingHeard)
+        XCTAssertEqual(notice?.offersMicrophoneHelp, false)
+    }
+
+    func testTextWinsOverASilentPeak() {
+        XCTAssertNil(DictationRecovery.notice(audioError: nil, transcriberError: nil, transcript: "hi",
+                                              hasRetainedAudio: true, heardSound: false))
+    }
+
+    func testMicrophoneThatDidNotStartOffersHelp() {
+        let notice = DictationRecovery.notice(audioError: "Input device has no usable format.", transcriberError: nil,
+                                              transcript: "", hasRetainedAudio: false)
+        XCTAssertEqual(notice?.offersMicrophoneHelp, true)
+    }
+
+    func testCancelledNoticeIsNeutralAndOffersUndo() {
+        let notice = DictationRecovery.cancelled()
+        XCTAssertEqual(notice.kind, .cancelled)
+        XCTAssertTrue(notice.isNeutral)
+        XCTAssertTrue(notice.canRetry)
+        XCTAssertFalse(notice.offersMicrophoneHelp)
+        XCTAssertFalse(DictationRecovery.notice(audioError: "x", transcriberError: nil, transcript: "",
+                                                hasRetainedAudio: false)!.isNeutral)
+    }
+
     func testInsertionAndFocusNoticesOfferPasteAgain() {
         let failed = DictationRecovery.insertionFailed("Focus changed before insertion. Nothing was inserted.",
                                                        canPasteAgain: true)

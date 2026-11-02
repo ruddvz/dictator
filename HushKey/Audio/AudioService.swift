@@ -48,6 +48,8 @@ final class AudioService {
     private(set) var isRunning = false
     private(set) var isStarting = false
     private(set) var level: Float = 0
+    /// Loudest level since the last start, so an empty result can tell a silent mic from silence.
+    @ObservationIgnored private(set) var peakLevel: Float = 0
     private(set) var devices: [AudioDevices.Device] = []
     private(set) var activeDeviceName: String?
     private(set) var error: String?
@@ -79,6 +81,7 @@ final class AudioService {
             if generation == startGeneration { isStarting = false }
         }
         error = nil
+        peakLevel = 0
 
         let requestID = UUID()
         permissionRequestID = requestID
@@ -125,7 +128,10 @@ final class AudioService {
         }
 
         sink.setLevelHandler { [weak self] level in
-            Task { @MainActor in self?.level = level }
+            Task { @MainActor in
+                self?.level = level
+                self?.peakLevel = max(self?.peakLevel ?? 0, level)
+            }
         }
         input.installTap(onBus: 0, bufferSize: 1024, format: format, block: Self.tapBlock(for: sink))
 

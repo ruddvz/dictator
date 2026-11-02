@@ -10,6 +10,10 @@ struct DictationNotice: Equatable {
         case recognition
         /// Recognition finished but heard nothing.
         case nothingHeard
+        /// The microphone ran but stayed silent the whole time: muted, wrong input, or blocked.
+        case silentMicrophone
+        /// The person cancelled; the audio is kept briefly so Undo can transcribe it anyway.
+        case cancelled
         /// The transcript is ready but could not be typed into the original field.
         case insertion
         /// "Paste again" was refused because the original app or field is not focused.
@@ -23,13 +27,22 @@ struct DictationNotice: Equatable {
     let detail: String
     let canRetry: Bool
     let canPasteAgain: Bool
+
+    /// Mic problems offer Sound settings and a microphone picker instead of a retry.
+    var offersMicrophoneHelp: Bool { kind == .microphone || kind == .silentMicrophone }
+    /// Not a failure: shown in neutral ink instead of the danger colour.
+    var isNeutral: Bool { kind == .cancelled }
 }
 
 enum DictationRecovery {
     /// Decides whether a finished dictation needs a notice. Text always wins over a stale
     /// recognition error, because Speech reports transient errors between its tasks.
+    ///
+    /// `heardSound` is false when the microphone level never rose above `silenceLevel`, so an
+    /// empty result is blamed on the input rather than on the speaker.
     static func notice(audioError: String?, transcriberError: String?, transcript: String,
-                       hasRetainedAudio: Bool) -> DictationNotice? {
+                       hasRetainedAudio: Bool, heardSound: Bool = true,
+                       microphoneName: String? = nil) -> DictationNotice? {
         if let audioError, !audioError.isEmpty {
             return DictationNotice(kind: .microphone, message: "Mic didn't start", detail: audioError,
                                    canRetry: false, canPasteAgain: false)
@@ -39,9 +52,28 @@ enum DictationRecovery {
             return DictationNotice(kind: .recognition, message: "Couldn't transcribe", detail: transcriberError,
                                    canRetry: hasRetainedAudio, canPasteAgain: false)
         }
+        if !heardSound {
+            let source = microphoneName.map { "“\($0)”" } ?? "The microphone"
+            return DictationNotice(kind: .silentMicrophone, message: "We couldn't hear you",
+                                   detail: "\(source) stayed silent the whole time. Check that it isn't muted, or choose another microphone.",
+                                   canRetry: false, canPasteAgain: false)
+        }
         return DictationNotice(kind: .nothingHeard, message: "Didn't catch that",
                                detail: "No speech was recognized in the last recording.",
                                canRetry: hasRetainedAudio, canPasteAgain: false)
+    }
+
+    /// Peak microphone level (0…1 over −60…0 dBFS) below which a recording counts as silent.
+    /// A quiet room sits near 0.25; a muted or disconnected input reads close to 0.
+    static let silenceLevel: Float = 0.1
+
+    /// Recordings shorter than this are accidental taps, so cancelling them offers no Undo.
+    static let minimumUndoSeconds: Double = 1
+
+    static func cancelled() -> DictationNotice {
+        DictationNotice(kind: .cancelled, message: "Cancelled",
+                        detail: "Nothing was typed. Undo transcribes what you said and types it.",
+                        canRetry: true, canPasteAgain: false)
     }
 
     static func insertionFailed(_ reason: String, canPasteAgain: Bool) -> DictationNotice {

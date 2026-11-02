@@ -12,6 +12,7 @@ struct HushKeyApp: App {
                 .environment(model)
                 .frame(minWidth: 980, minHeight: 680)
                 .task {
+                    model.openMainWindow = { openWindow(id: "main") }
                     model.start()
                     pill.attach(to: model)
                 }
@@ -41,6 +42,9 @@ struct HushKeyApp: App {
             Toggle("Show dictation pill", isOn: Binding(
                 get: { model.showsFloatingPill },
                 set: { model.showsFloatingPill = $0 }))
+            Toggle("Start and stop sounds", isOn: Binding(
+                get: { model.playsDictationSounds },
+                set: { model.playsDictationSounds = $0 }))
             Divider()
             Label(model.motion.status.label, systemImage: model.motion.isConnected ? "headphones" : "headphones.slash")
             Text(model.meetingNotes.isCapturing ? "Meeting capture is active · Audio stays on this Mac" : "Local dictation · Silent lab")
