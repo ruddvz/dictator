@@ -72,14 +72,23 @@ struct MeetingNotesView: View {
                 }
             }
 
-            HStack(alignment: .top, spacing: Theme.s5) {
-                notesList
-                    .frame(width: 280)
-                    .frame(maxHeight: .infinity, alignment: .top)
-                detail
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            if hasNoNotesYet {
+                // One empty state, not one per column.
+                EmptyState(systemImage: "waveform.and.text", title: "Your notes stay here",
+                           message: "Start a meeting. The transcript, summary and action items appear here, and nothing leaves this Mac.")
+                    .frame(maxWidth: .infinity, minHeight: 320)
+                    .card(padding: 0, style: .outlined)
+                Spacer(minLength: 0)
+            } else {
+                HStack(alignment: .top, spacing: Theme.s5) {
+                    notesList
+                        .frame(width: 280)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                    detail
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                }
+                .frame(minHeight: 390, maxHeight: .infinity)
             }
-            .frame(minHeight: 390, maxHeight: .infinity)
         }
         .frame(maxWidth: Theme.homeWidth)
         .padding(.horizontal, Theme.s7 - 8)
@@ -237,6 +246,10 @@ struct MeetingNotesView: View {
         }
         .padding(Theme.s5)
         .background(Theme.signalSoft, in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
+    }
+
+    private var hasNoNotesYet: Bool {
+        filteredNotes.isEmpty && searchText.isEmpty && !service.isCapturing && !service.isFinalizing
     }
 
     private var notesList: some View {

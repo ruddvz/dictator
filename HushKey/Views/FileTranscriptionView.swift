@@ -34,9 +34,12 @@ struct FileTranscriptionView: View {
             VStack(alignment: .leading, spacing: Theme.s6) {
                 PageHeader(eyebrow: "", title: "Files",
                            subtitle: "Turn a recording into text and subtitles, on this Mac.") {
-                    Button("Choose file…", systemImage: "folder") { chooseFile() }
-                        .buttonStyle(SecondaryButtonStyle())
-                        .disabled(isBusy)
+                    // The source card offers "Choose file…" until a file is picked.
+                    if workspace.selectedURL != nil {
+                        Button("Choose another…", systemImage: "folder") { chooseFile() }
+                            .buttonStyle(SecondaryButtonStyle())
+                            .disabled(isBusy)
+                    }
                 }
 
                 sourceCard
@@ -52,9 +55,8 @@ struct FileTranscriptionView: View {
                     }
                     SettingsRow(title: "Language", detail: nil) {
                         if workspace.engine == .apple {
-                            MenuPicker(selection: Binding(get: { model.dictationLanguage },
-                                                          set: { model.dictationLanguage = $0 }),
-                                       options: DictationLanguage.onDevice.map { ($0.identifier, $0.name) })
+                            LanguageButton(selection: Binding(get: { model.dictationLanguage },
+                                                              set: { model.dictationLanguage = $0 }))
                                 .disabled(isBusy)
                         } else {
                             MenuPicker(selection: $whisper.selectedLanguage,

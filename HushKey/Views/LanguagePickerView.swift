@@ -1,5 +1,25 @@
 import SwiftUI
 
+/// Shows the current language and opens the grid to change it.
+struct LanguageButton: View {
+    @Binding var selection: String
+    @State private var choosing = false
+
+    var body: some View {
+        Button {
+            choosing = true
+        } label: {
+            Label(DictationLanguage.named(selection).name, systemImage: "globe")
+                .lineLimit(1)
+        }
+        .buttonStyle(SecondaryButtonStyle())
+        .accessibilityHint("Opens the language list")
+        .sheet(isPresented: $choosing) {
+            LanguagePickerSheet(selection: $selection)
+        }
+    }
+}
+
 /// The dictation language as a searchable grid, each language shown in your language and its own.
 /// One language at a time: on-device recognition has no auto-detect.
 struct LanguagePickerSheet: View {

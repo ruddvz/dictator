@@ -60,10 +60,19 @@ struct DictationView: View {
                 .font(.hkCallout)
                 .foregroundStyle(Theme.ink2)
                 if let problem {
-                    Label(problem, systemImage: "exclamationmark.triangle.fill")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(Theme.finishing)
-                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: Theme.s2) {
+                        Label(problem, systemImage: "exclamationmark.triangle.fill")
+                            .font(.hkCallout.weight(.medium))
+                            .foregroundStyle(Theme.finishing)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if problemIsAccessibility {
+                            Button("Open Settings") {
+                                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+                            }
+                            .buttonStyle(SecondaryButtonStyle())
+                            .controlSize(.small)
+                        }
+                    }
                 }
             }
             Spacer(minLength: Theme.s4)
@@ -80,6 +89,12 @@ struct DictationView: View {
         return full.split(separator: " ").first.map(String.init) ?? NSUserName()
     }
 
+    /// The fn key needs Accessibility access, which only the person can grant.
+    private var problemIsAccessibility: Bool {
+        model.audio.error == nil && model.transcriber.error == nil && model.dictationShortcutNeedsAttention
+            && model.dictationShortcutStatus.contains("Accessibility")
+    }
+
     private var problem: String? {
         if let error = model.audio.error ?? model.transcriber.error { return error }
         return model.dictationShortcutNeedsAttention ? model.dictationShortcutStatus : nil
@@ -93,9 +108,9 @@ struct DictationView: View {
                 MorphIcon(phase: morphPhase, level: model.audio.level, lineWidth: 1.8)
                     .frame(width: 16, height: 16)
                 Text(isFinishing ? "Transcribing"
-                     : model.isStartingDictation ? "Cancel"
-                     : model.isStartingSelectedTextEdit ? "Cancel"
-                     : model.audio.isRunning ? "Stop" : "Dictate")
+                     : model.audio.isRunning ? "Stop"
+                     : model.isStartingDictation || model.isStartingSelectedTextEdit ? "Cancel"
+                     : "Dictate")
                     .contentTransition(.interpolate)
             }
             .frame(minWidth: 96)
@@ -103,8 +118,8 @@ struct DictationView: View {
         .buttonStyle(PrimaryButtonStyle(tint: model.audio.isRunning ? Theme.ink : Theme.signal))
         .disabled(isFinishing)
         .animation(Theme.snappy, value: model.audio.isRunning)
-        .help(model.isStartingDictation ? "Cancel dictation startup"
-              : model.audio.isRunning ? "Stop dictation" : "Start dictation")
+        .help(model.audio.isRunning ? "Stop dictation"
+              : model.isStartingDictation ? "Cancel dictation startup" : "Start dictation")
     }
 
     // MARK: State
@@ -245,20 +260,36 @@ struct DictationView: View {
 
     // MARK: Stats
 
+    /// Lifetime numbers from the same ledger as Insights, so the two always agree.
     private var statsCard: some View {
-        let stats = model.dictationStats
-        return VStack(alignment: .leading, spacing: Theme.s4) {
-            statRow(value: stats.totalWords.formatted(), label: "words dictated")
-            statRow(value: stats.wordsPerMinute.map { "\($0)" } ?? "–", label: "words per minute")
-            statRow(value: "\(stats.dayStreak)", label: stats.dayStreak == 1 ? "day streak" : "days in a row")
-            Rectangle().fill(Theme.hairline).frame(height: 1)
-            VStack(alignment: .leading, spacing: Theme.s2) {
-                SectionLabel(title: "Last 12 weeks")
-                ActivityHeatmap(entries: model.dictationHistory)
+        let ledger = model.usageLedger
+        let streak = ledger.currentStreak()
+        return Button {
+            model.screen = .insights
+        } label: {
+            VStack(alignment: .leading, spacing: Theme.s4) {
+                statRow(value: ledger.totalWords.formatted(), label: ledger.totalWords == 1 ? "word dictated" : "words dictated")
+                statRow(value: ledger.wordsPerMinute.map { "\($0)" } ?? "–", label: "words per minute")
+                statRow(value: "\(streak)", label: "day streak")
+                Rectangle().fill(Theme.hairline).frame(height: 1)
+                VStack(alignment: .leading, spacing: Theme.s2) {
+                    HStack {
+                        SectionLabel(title: "Last 12 weeks")
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Theme.ink3)
+                    }
+                    ActivityHeatmap(counts: ledger.dailyCounts())
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .contentShape(Rectangle())
         }
-        .card(padding: Theme.s5)
+        .buttonStyle(StatsCardStyle())
+        .help("Open Insights")
         .accessibilityElement(children: .combine)
+        .accessibilityHint("Opens Insights")
     }
 
     private func statRow(value: String, label: String) -> some View {
@@ -489,6 +520,7 @@ private struct NextStepBanner: View {
         if let step {
             ZStack(alignment: .topTrailing) {
                 HStack(alignment: .bottom, spacing: Theme.s4) {
+                    // Title at the top, action at the bottom, whatever height the stats card sets.
                     VStack(alignment: .leading, spacing: Theme.s2) {
                         Text(step.title)
                             .font(.display(28))
@@ -497,10 +529,11 @@ private struct NextStepBanner: View {
                             .font(.hkCallout)
                             .foregroundStyle(Theme.ink2)
                             .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: Theme.s4)
                         Button(step.action) { step.perform(model) }
                             .buttonStyle(PrimaryButtonStyle())
-                            .padding(.top, Theme.s2)
                     }
+                    .frame(maxHeight: .infinity, alignment: .topLeading)
                     Spacer(minLength: 0)
                     BannerWave()
                         .frame(width: 150, height: 80)
@@ -522,7 +555,8 @@ private struct NextStepBanner: View {
                 .help("Hide this suggestion")
             }
             .foregroundStyle(Theme.ink)
-            .frame(maxWidth: .infinity, minHeight: 180, alignment: .leading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .frame(minHeight: 180)
             .background(Theme.signalSoft, in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
             .id(step.id)
             .transition(.opacity.combined(with: .scale(scale: 0.98)))
@@ -657,5 +691,21 @@ private struct CancelledDictationRow: View {
             .strokeBorder(Theme.hairline, style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Cancelled dictation, \(cancelled.durationLabel)")
+    }
+}
+
+/// The home stats card: a card that lifts slightly on hover and opens Insights.
+private struct StatsCardStyle: ButtonStyle {
+    @State private var hovering = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .card(padding: Theme.s5)
+            .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
+                .strokeBorder(Theme.hairline, lineWidth: hovering ? 1 : 0))
+            .scaleEffect(configuration.isPressed ? 0.99 : 1)
+            .onHover { hovering = $0 }
+            .animation(Theme.snappy, value: hovering)
+            .animation(Theme.snappy, value: configuration.isPressed)
     }
 }

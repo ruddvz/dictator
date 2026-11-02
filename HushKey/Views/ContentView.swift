@@ -31,6 +31,10 @@ struct ContentView: View {
 
     // MARK: Sidebar
 
+    /// The lab is research tooling, so it stays folded away unless opened or in use.
+    @AppStorage("showsSilentLab") private var showsLab = false
+    private var labIsOpen: Bool { showsLab || Self.labScreens.contains(model.screen) }
+
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 0) {
             brand
@@ -41,18 +45,34 @@ struct ContentView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.s1) {
                     ForEach(Self.mainScreens) { SidebarRow(screen: $0) }
-                    HStack {
-                        SectionLabel(title: "Silent lab")
-                        Spacer()
-                        if model.motion.isConnected {
-                            Circle().fill(Theme.success).frame(width: 6, height: 6)
-                                .help(model.motion.status.label)
+                    Button {
+                        withAnimation(Theme.snappy) { showsLab.toggle() }
+                    } label: {
+                        HStack(spacing: Theme.s1) {
+                            SectionLabel(title: "Silent lab")
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundStyle(Theme.ink3)
+                                .rotationEffect(.degrees(labIsOpen ? 90 : 0))
+                            Spacer()
+                            if model.motion.isConnected {
+                                Circle().fill(Theme.success).frame(width: 6, height: 6)
+                                    .help(model.motion.status.label)
+                            }
                         }
+                        .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
                     .padding(.horizontal, Theme.s3 - 2)
                     .padding(.top, Theme.s5)
                     .padding(.bottom, 2)
-                    ForEach(Self.labScreens) { SidebarRow(screen: $0) }
+                    .help(labIsOpen ? "Hide the Silent lab" : "Show the Silent lab: AirPods gestures and silent words")
+                    .accessibilityLabel("Silent lab")
+                    .accessibilityValue(labIsOpen ? "Expanded" : "Collapsed")
+                    if labIsOpen {
+                        ForEach(Self.labScreens) { SidebarRow(screen: $0) }
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
                 }
                 .padding(.horizontal, Theme.s3)
             }

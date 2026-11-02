@@ -40,9 +40,11 @@ extension PageHeader where Actions == EmptyView {
 }
 
 extension View {
-    /// The one page layout: a centered 800 pt column, 48 pt from the top of the sheet.
+    /// The one page layout: a column up to `maxWidth`, 48 pt from the top of the sheet. Every
+    /// page starts at the home page's left edge, so titles don't jump when you switch pages.
     func pageLayout(maxWidth: CGFloat = Theme.pageWidth) -> some View {
         frame(maxWidth: maxWidth, alignment: .leading)
+            .frame(maxWidth: Theme.homeWidth, alignment: .leading)
             .padding(.horizontal, Theme.s7 - 8)
             .padding(.top, Theme.s7)
             .padding(.bottom, Theme.s6)
