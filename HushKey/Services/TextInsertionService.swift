@@ -8,6 +8,20 @@ import Observation
 /// HushKey never writes to or replaces the clipboard.
 @MainActor @Observable
 final class TextInsertionService {
+    struct InsertionTarget {
+        let processIdentifier: pid_t
+        let bundleIdentifier: String?
+        let applicationName: String
+        let element: AXUIElement
+        let fieldValue: String
+        let selectedRange: CFRange
+    }
+
+    struct SelectedTextTarget {
+        let insertionTarget: InsertionTarget
+        let selectedText: String
+    }
+
     private(set) var isEnabled = false
     private(set) var status = "Text insertion is off."
     private(set) var contextAccessStatus = "Nearby text hints are off."
@@ -80,6 +94,50 @@ final class TextInsertionService {
         return DictationContextHintExtractor.extract(from: nearby)
     }
 
+    /// Captures an explicit, supported text target while another app is frontmost.
+    /// The snapshot is kept only in memory and is revalidated before later insertion.
+    func captureInsertionTarget() -> InsertionTarget? {
+        guard isEnabled, AXIsProcessTrusted(),
+              let app = NSWorkspace.shared.frontmostApplication,
+              app.processIdentifier != NSRunningApplication.current.processIdentifier,
+              app.bundleIdentifier != "com.ruddvz.hushkey" else { return nil }
+        let systemWide = AXUIElementCreateSystemWide()
+        var focusedValue: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedValue) == .success,
+              let focusedValue, CFGetTypeID(focusedValue) == AXUIElementGetTypeID() else { return nil }
+        let focused = focusedValue as! AXUIElement
+        var focusedPID: pid_t = 0
+        guard AXUIElementGetPid(focused, &focusedPID) == .success,
+              focusedPID == app.processIdentifier else { return nil }
+        let role = stringAttribute(kAXRoleAttribute, of: focused) ?? ""
+        let subrole = stringAttribute(kAXSubroleAttribute, of: focused) ?? ""
+        guard Self.isSupportedTextTarget(role: role, subrole: subrole),
+              let fieldValue = stringAttribute(kAXValueAttribute, of: focused),
+              fieldValue.utf16.count <= 20_000,
+              let selectedRange = selectedTextRange(of: focused),
+              selectedRange.location <= fieldValue.utf16.count,
+              selectedRange.length <= fieldValue.utf16.count - selectedRange.location else { return nil }
+        var settable = DarwinBoolean(false)
+        guard AXUIElementIsAttributeSettable(focused, kAXSelectedTextAttribute as CFString, &settable) == .success,
+              settable.boolValue else { return nil }
+        return InsertionTarget(processIdentifier: app.processIdentifier,
+                               bundleIdentifier: app.bundleIdentifier,
+                               applicationName: app.localizedName ?? "the original app",
+                               element: focused,
+                               fieldValue: fieldValue,
+                               selectedRange: selectedRange)
+    }
+
+    /// Captures only a non-empty selection in an explicitly supported text field.
+    /// The selection and its containing field stay in memory and are revalidated before Apply.
+    func captureSelectedTextTarget() -> SelectedTextTarget? {
+        guard let target = captureInsertionTarget(),
+              let selectedText = Self.selectedText(in: target.fieldValue, range: target.selectedRange),
+              !selectedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              selectedText.count <= 12_000 else { return nil }
+        return SelectedTextTarget(insertionTarget: target, selectedText: selectedText)
+    }
+
     func enable() {
         let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
         let trusted = AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary)
@@ -127,8 +185,7 @@ final class TextInsertionService {
         let systemWide = AXUIElementCreateSystemWide()
         var focusedValue: CFTypeRef?
         guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedValue) == .success,
-              let focusedValue,
-              CFGetTypeID(focusedValue) == AXUIElementGetTypeID() else {
+              let focusedValue, CFGetTypeID(focusedValue) == AXUIElementGetTypeID() else {
             status = "Could not inspect the focused control. Nothing was inserted."
             return false
         }
@@ -165,29 +222,47 @@ final class TextInsertionService {
             return false
         }
 
-        let originalValue = stringAttribute(kAXValueAttribute, of: focused)
-        let originalRange = selectedTextRange(of: focused)
-        let possibleUndo = Self.makeUndoRecord(
-            processIdentifier: app.processIdentifier,
-            bundleIdentifier: app.bundleIdentifier,
-            element: focused,
-            originalValue: originalValue,
-            selectedRange: originalRange,
-            insertedText: text)
+        return performInsertion(text, app: app, element: focused,
+                                originalValue: stringAttribute(kAXValueAttribute, of: focused),
+                                selectedRange: selectedTextRange(of: focused))
+    }
 
-        guard AXUIElementSetAttributeValue(focused, kAXSelectedTextAttribute as CFString, text as CFString) == .success else {
-            status = "The focused app declined safe insertion. Nothing was inserted."
+    /// Returns to the captured app only after an explicit user action, then verifies the
+    /// exact field and selection before replacing text. A stale target always fails closed.
+    @discardableResult
+    func insert(_ text: String, into target: InsertionTarget) async -> Bool {
+        guard isEnabled, AXIsProcessTrusted() else {
+            isEnabled = false
+            status = "Accessibility access is unavailable. Text was not inserted."
             return false
         }
-        if let possibleUndo,
-           stringAttribute(kAXValueAttribute, of: focused).map(Self.fingerprint) == possibleUndo.expectedFingerprint {
-            undoRecord = possibleUndo
-            status = "Inserted once. Press ⌥⇧U now to undo while this field stays focused and unchanged."
-        } else {
-            undoRecord = nil
-            status = "Inserted once into the current text selection. This field does not expose a safe undo record."
+        guard !text.isEmpty,
+              let app = NSRunningApplication(processIdentifier: target.processIdentifier),
+              !app.isTerminated,
+              app.bundleIdentifier == target.bundleIdentifier else {
+            status = "The original app is no longer available. Nothing was inserted."
+            return false
         }
-        return true
+        if NSWorkspace.shared.frontmostApplication?.processIdentifier != target.processIdentifier {
+            guard app.activate(options: []) else {
+                status = "Could not return to \(target.applicationName). Nothing was inserted."
+                return false
+            }
+            try? await Task.sleep(nanoseconds: 180_000_000)
+        }
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == target.processIdentifier,
+              let focused = focusedElement(), CFEqual(target.element, focused),
+              let role = stringAttribute(kAXRoleAttribute, of: focused),
+              Self.isSupportedTextTarget(role: role, subrole: stringAttribute(kAXSubroleAttribute, of: focused) ?? ""),
+              let currentValue = stringAttribute(kAXValueAttribute, of: focused),
+              let currentRange = selectedTextRange(of: focused),
+              Self.selectionContextMatches(originalValue: target.fieldValue, originalRange: target.selectedRange,
+                                           currentValue: currentValue, currentRange: currentRange) else {
+            status = "The original field or selection changed. Nothing was inserted."
+            return false
+        }
+        return performInsertion(text, app: app, element: focused,
+                                originalValue: currentValue, selectedRange: currentRange)
     }
 
     @discardableResult
@@ -234,6 +309,23 @@ final class TextInsertionService {
         return [kAXTextFieldRole as String, kAXTextAreaRole as String, kAXComboBoxRole as String].contains(role)
     }
 
+    nonisolated static func selectionContextMatches(originalValue: String, originalRange: CFRange,
+                                                   currentValue: String, currentRange: CFRange) -> Bool {
+        originalValue == currentValue &&
+            originalRange.location == currentRange.location &&
+            originalRange.length == currentRange.length
+    }
+
+    nonisolated static func selectedText(in fieldValue: String, range: CFRange,
+                                         maximumCharacters: Int = 12_000) -> String? {
+        let field = fieldValue as NSString
+        guard range.location >= 0, range.length > 0,
+              range.location <= field.length,
+              range.length <= field.length - range.location,
+              range.length <= maximumCharacters else { return nil }
+        return field.substring(with: NSRange(location: range.location, length: range.length))
+    }
+
     private func registerShortcut() {
         let result = hotKey.register(keyCode: shortcut.keyCode, modifiers: shortcut.carbonModifiers) { [weak self] in
             self?.onInsertShortcut?()
@@ -241,6 +333,57 @@ final class TextInsertionService {
         status = result == noErr
             ? "Enabled. Insert with \(shortcut.label); undo immediately with ⌥⇧U while the same field stays focused."
             : "Could not register \(shortcut.label) (system status \(result))."
+    }
+
+    private func focusedElement() -> AXUIElement? {
+        let systemWide = AXUIElementCreateSystemWide()
+        var focusedValue: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedValue) == .success,
+              let focusedValue, CFGetTypeID(focusedValue) == AXUIElementGetTypeID() else { return nil }
+        return (focusedValue as! AXUIElement)
+    }
+
+    private func performInsertion(_ text: String, app: NSRunningApplication, element: AXUIElement,
+                                  originalValue: String?, selectedRange: CFRange?) -> Bool {
+        var focusedPID: pid_t = 0
+        var settable = DarwinBoolean(false)
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier,
+              let currentElement = focusedElement(), CFEqual(element, currentElement),
+              AXUIElementGetPid(currentElement, &focusedPID) == .success,
+              focusedPID == app.processIdentifier,
+              Self.isSupportedTextTarget(role: stringAttribute(kAXRoleAttribute, of: currentElement) ?? "",
+                                         subrole: stringAttribute(kAXSubroleAttribute, of: currentElement) ?? ""),
+              AXUIElementIsAttributeSettable(currentElement, kAXSelectedTextAttribute as CFString, &settable) == .success,
+              settable.boolValue,
+              let originalValue,
+              let currentValue = stringAttribute(kAXValueAttribute, of: currentElement),
+              let selectedRange,
+              let currentRange = selectedTextRange(of: currentElement),
+              Self.selectionContextMatches(originalValue: originalValue, originalRange: selectedRange,
+                                           currentValue: currentValue, currentRange: currentRange) else {
+            status = "Focus or text changed before insertion. Nothing was inserted."
+            return false
+        }
+        let possibleUndo = Self.makeUndoRecord(
+            processIdentifier: app.processIdentifier,
+            bundleIdentifier: app.bundleIdentifier,
+            element: currentElement,
+            originalValue: currentValue,
+            selectedRange: currentRange,
+            insertedText: text)
+        guard AXUIElementSetAttributeValue(currentElement, kAXSelectedTextAttribute as CFString, text as CFString) == .success else {
+            status = "The focused app declined safe insertion. Nothing was inserted."
+            return false
+        }
+        if let possibleUndo,
+           stringAttribute(kAXValueAttribute, of: currentElement).map(Self.fingerprint) == possibleUndo.expectedFingerprint {
+            undoRecord = possibleUndo
+            status = "Inserted once. Press ⌥⇧U now to undo while this field stays focused and unchanged."
+        } else {
+            undoRecord = nil
+            status = "Inserted once into the current text selection. This field does not expose a safe undo record."
+        }
+        return true
     }
 
     private func stringAttribute(_ attribute: String, of element: AXUIElement) -> String? {

@@ -64,6 +64,9 @@ private struct ResearchReportsCard: View {
                 Button("Open HushKey competitor notes", systemImage: "list.bullet.rectangle") {
                     openResource("COMPETITOR_RESEARCH", extension: "md")
                 }
+                Button("Open dictation alternatives research", systemImage: "text.magnifyingglass") {
+                    openResource("COMPETITOR_RESEARCH_ADDENDUM_2026-11-01", extension: "md")
+                }
                 Button("Open local speech model notes", systemImage: "waveform") {
                     openResource("LOCAL_MODEL_EVALUATION", extension: "md")
                 }
@@ -149,6 +152,17 @@ private struct DictationSettingsCard: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
+                Picker("Voice edit selected text", selection: $model.selectedTextEditShortcut) {
+                    ForEach(SelectedTextEditShortcut.allCases) { Text($0.label).tag($0) }
+                }
+                .frame(maxWidth: 280, alignment: .leading)
+                Text("Select text in another app, then hold this shortcut and speak an edit instruction. The selected text is read only for that action. Review the local preview in Transforms before applying. Requires Accessibility insertion to be enabled below.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(model.selectedTextEditShortcutStatus)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                 Button {
                     model.screen = .personalization
                 } label: {
@@ -217,6 +231,9 @@ private struct TextInsertionSettingsCard: View {
                 Text("When enabled, the insertion shortcut adds your reviewed voice transcript, or the latest accepted silent word, to a supported text field in the frontmost app. Password fields are rejected. Explicit insertion does not use the clipboard. Silent Use still needs evidence to unlock.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                Text("For the Dictation screen’s one-click Insert button, start dictation with the global shortcut while the destination field is focused. HushKey remembers that field only in memory and returns to it only if the same app, field, and text selection are still unchanged.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(8)
@@ -249,7 +266,7 @@ private struct MicrophoneCard: View {
                 if let error = audio.error ?? model.transcriber.error {
                     Text(error).font(.caption).foregroundStyle(.red)
                 }
-                Text("Choose an input here, then start dictation from the Dictation screen. Recognition stays on this Mac when on-device speech is available; dictation audio is not saved. The separate research recorder saves audio only when you explicitly start a session.")
+                Text("Choose an input for Dictation and Meeting notes. On-device recognition stays on this Mac. Dictation and meeting capture do not save microphone audio; the separate research recorder saves audio only when you explicitly start a session.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

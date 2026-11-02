@@ -299,3 +299,35 @@ enum DictationVocabulary {
             .joined(separator: "\n")
     }
 }
+
+enum DictationContextHints {
+    static let maximumCount = 100
+
+    static func prioritized(
+        customWords: [String],
+        modeHints: [String] = [],
+        nearbyHints: [String] = [],
+        learnedWords: [String] = [],
+        limit: Int = maximumCount
+    ) -> [String] {
+        guard limit > 0 else { return [] }
+        let boundedLimit = min(limit, maximumCount)
+        let groups = [customWords, modeHints, nearbyHints, learnedWords]
+        var seen = Set<String>()
+        var result: [String] = []
+        result.reserveCapacity(boundedLimit)
+
+        for group in groups {
+            for candidate in group {
+                let term = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !term.isEmpty else { continue }
+                let key = term.folding(options: [.caseInsensitive, .diacriticInsensitive],
+                                       locale: Locale(identifier: "en_US_POSIX"))
+                guard seen.insert(key).inserted else { continue }
+                result.append(term)
+                if result.count == boundedLimit { return result }
+            }
+        }
+        return result
+    }
+}

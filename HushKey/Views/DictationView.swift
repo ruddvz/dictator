@@ -74,7 +74,9 @@ struct DictationView: View {
             HStack(spacing: Theme.s2) {
                 MorphIcon(phase: morphPhase, level: model.audio.level, lineWidth: 1.8)
                     .frame(width: 16, height: 16)
-                Text(isFinishing ? "Transcribing" : model.audio.isRunning ? "Stop" : "Dictate")
+                Text(isFinishing ? "Transcribing"
+                     : model.isStartingSelectedTextEdit ? "Cancel"
+                     : model.audio.isRunning ? "Stop" : "Dictate")
                     .contentTransition(.interpolate)
             }
             .frame(minWidth: 96)
@@ -87,17 +89,23 @@ struct DictationView: View {
 
     // MARK: State
 
-    private var isBusy: Bool {
-        model.audio.isRunning || model.isFinalizingDictation || model.transcriber.isFinalizing
+    private var isEditingSelection: Bool {
+        model.isStartingSelectedTextEdit || model.isSelectedTextEditCapturing || model.isFinalizingSelectedTextEdit
     }
 
-    private var isFinishing: Bool { model.isFinalizingDictation || model.transcriber.isFinalizing }
+    private var isBusy: Bool {
+        model.audio.isRunning || model.isFinalizingDictation || model.transcriber.isFinalizing || isEditingSelection
+    }
+
+    private var isFinishing: Bool {
+        model.isFinalizingDictation || model.transcriber.isFinalizing || model.isFinalizingSelectedTextEdit
+    }
 
     private var hasText: Bool {
         !model.transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    private var showsComposer: Bool { isBusy || hasText }
+    private var showsComposer: Bool { (isBusy && !isEditingSelection) || hasText }
 
     private var morphPhase: MorphIcon.Phase {
         model.audio.isRunning ? .listening : isFinishing ? .working : .idle
@@ -111,7 +119,9 @@ struct DictationView: View {
                 MorphIcon(phase: morphPhase == .idle ? .done : morphPhase, level: model.audio.level, lineWidth: 2)
                     .frame(width: 18, height: 18)
                     .foregroundStyle(model.audio.isRunning ? Theme.listening : Theme.ink)
-                Text(model.audio.isRunning ? "Listening" : isFinishing ? "Transcribing" : "Latest dictation")
+                Text(model.isSelectedTextEditCapturing ? "Listening for your edit"
+                     : model.isFinalizingSelectedTextEdit ? "Applying your edit"
+                     : model.audio.isRunning ? "Listening" : isFinishing ? "Transcribing" : "Latest dictation")
                     .font(.system(size: 13.5, weight: .semibold))
                 modeMenu
                 if !model.rawDictationText.isEmpty, let target = model.activeDictationTarget {
@@ -383,7 +393,7 @@ struct DictationView: View {
     }
 
     private var transcriptBinding: Binding<String> {
-        Binding(get: { model.transcriber.text }, set: { model.transcriber.replaceText($0) })
+        Binding(get: { model.transcriber.text }, set: { model.editCurrentDictation($0) })
     }
 
     private func modeDescription(_ mode: DictationMode) -> String {

@@ -128,7 +128,7 @@ struct PersonalizationView: View {
                 if section == .snippets {
                     advancedSnippetEditor
                 } else {
-                    Label("Vocabulary words are passed as local recognition hints. Speech recognition may still misspell unfamiliar names.",
+                    Label("Your saved terms are prioritized ahead of optional mode, nearby-text, and Silent Lab hints. Up to 100 hints go to on-device Speech per capture; recognition can still misspell unfamiliar names.",
                           systemImage: "info.circle")
                         .font(.caption)
                         .foregroundStyle(.secondary)

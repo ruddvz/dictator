@@ -54,16 +54,43 @@ Run this separately from the AirPods motion study:
 3. Try an explicit “scratch that” correction, restore the original recognition, and confirm history keeps the processed text and raw text separately.
 4. Test Code formatting in a code editor and the Automatic mapping from TextEdit, Mail, Messages, and an editor using the global shortcut. Confirm the last-capture status shows the selected mode and app.
 5. Leave nearby text hints off first. If the user enables them, grant Accessibility access separately, confirm a supported non-secure text field is required, then verify HushKey only reports extracted terms and saves no surrounding text.
-6. In TextEdit and one other supported app, insert once, confirm the clipboard did not change, then press `⌥⇧U` immediately while the same field is unchanged. Confirm that the insert is removed; change focus or edit the field and confirm undo fails closed.
+6. In TextEdit and one other supported app, start dictation with the target field focused using the global shortcut, finish, then use the Dictation screen's named-target Insert button. Confirm HushKey returns to that app and inserts once only if the same field and selection remain unchanged. Change the target or field contents before pressing the button and confirm it fails closed. Also insert with the global `⌥⇧I` shortcut, confirm the clipboard did not change, then press `⌥⇧U` immediately while the same field is unchanged. Confirm undo removes the insert; changed focus or content must fail closed.
 7. Reload the local history entry, restore raw recognition, clear the current draft, and clear history. Confirm microphone audio is never stored by ordinary dictation.
+
+## Selected-text voice-edit acceptance
+
+1. Enable text insertion and Accessibility. In TextEdit, select a short non-secure phrase and hold the configured voice-edit shortcut (`⌥⇧E` by default); speak one clear instruction and release. Confirm the live capture stops and the instruction appears in **Transforms**, not dictation history.
+2. Confirm only the selected phrase is shown as source. Preview the edit and verify the source stays unchanged. Edit the recognized instruction and confirm the old preview is invalidated. Confirm HushKey uses Apple's on-device model only and gives a clear unavailable message without a remote fallback.
+3. Apply once. Confirm only the original selection is replaced, then use `⌥⇧U` in the same unchanged field to undo. Confirm changed focus, field contents, selection, process, or a secure/password field prevents replacement.
+4. Try the shortcut without a selection, in an unsupported control, after denying Accessibility, and while meeting capture is active. Confirm no text is read or replaced, no competing audio engine starts, and the UI explains what to do next. Confirm the spoken instruction and selected text are not written to history or audio files.
+
+## Local writing style acceptance
+
+1. With Apple's on-device language model available, create a named writing style such as a warm concise tone or a translation instruction. Confirm blank/overlong names and instructions are rejected, duplicate names are blocked, and no more than 12 styles can be saved.
+2. Preview the style on a transcript. Confirm the draft is editable, the source transcript remains unchanged until Apply, changed source text invalidates the preview, and Undo restores the original.
+3. Quit and reopen HushKey. Confirm styles remain available on this Mac; edit and delete one, then confirm the changes persist. Confirm no style or transcript is sent to a cloud service.
+4. When Apple's model is unavailable, confirm custom styles explain that a local model is unavailable and do not run a remote fallback. Deterministic filler removal should still work.
 
 ## Local file transcription acceptance
 
 1. Import a short consented audio file and transcribe it with Apple Speech. Confirm HushKey refuses remote fallback when the selected language lacks on-device support.
 2. Edit the transcript, save TXT, and export SRT and WebVTT. Check subtitle timestamps against the source audio and confirm the source file remains unchanged.
-3. Choose a WhisperKit model and explicitly download it. Verify the download state reaches completion and the model appears in `~/Library/Application Support/HushKey/WhisperKitModels/`.
-4. Disconnect from the network after download and transcribe a local file with WhisperKit. Reopen HushKey to confirm the model remains available, then remove it and confirm the model files are deleted.
-5. Repeat with files of increasing length. Watch memory use and report engine, model variant, language, file duration, first-run download time, transcription time, and qualitative errors. Do not claim a model is more accurate without a representative benchmark.
+3. Confirm a completed job appears in searchable Recent file transcripts. Edit its text, switch screens, return, restore it, and verify the edited text and original timed cues remain. Choose a second source file and verify the first job remains recoverable.
+4. Delete one saved job, then clear all saved file transcripts. Confirm deletion persists after reopening HushKey and that source audio was never copied into Application Support.
+5. Choose a WhisperKit model and explicitly download it. Verify the download state reaches completion and the model appears in `~/Library/Application Support/HushKey/WhisperKitModels/`.
+6. Disconnect from the network after download and transcribe a local file with WhisperKit. Reopen HushKey to confirm the model remains available, then remove it and confirm the model files are deleted.
+7. Repeat with files of increasing length. Watch memory use and report engine, model variant, language, file duration, first-run download time, transcription time, and qualitative errors. Do not claim a model is more accurate without a representative benchmark.
+
+## Meeting notes acceptance
+
+1. Start capture explicitly and grant only the selected source's permission (Microphone/Speech, System Audio Recording/Speech, or both for Both sides). Confirm no capture begins merely by opening the page, selecting a note, or opening the menu-bar item.
+2. Use the configured microphone for a short consented conversation. Confirm the live transcript updates, stop produces a saved note, and microphone audio is not present in HushKey's Application Support data.
+3. Edit the title and transcript, search for text in the transcript, export transcript and all notes as TXT, restart HushKey, and confirm the edited note is still available.
+4. With Apple's on-device model available, create summary and action-item drafts, edit them, and confirm they persist locally. Include a transcript longer than 12,000 characters to verify chunking. With the model unavailable, confirm the app explains that it did not send transcript text elsewhere.
+5. Start dictation and meeting capture in both orders; verify the capture gate prevents two microphone engines from starting. Test stop during speech and confirm final words are retained.
+6. On macOS 14.2 or later, choose System audio and capture a short consented call/test sound. Confirm the System Audio Recording prompt appears only after Start meeting, remote app playback is recognized, and microphone speech is not included unless it is played into system output.
+7. On macOS 14.2 or later, choose Both sides. Confirm the microphone prompt appears only after Start meeting, speak into the selected microphone while playing a separate consented voice from an app, and verify both are represented in one transcript. Stop and confirm the audio engine/tap ends and the capture gate is released. Confirm a denied microphone or System Audio Recording permission stops capture, releases the gate, and leaves System audio-only capture available. Repeat with audio routed to headphones and speakers. HushKey does not provide speaker labels.
+8. With Accessibility insertion enabled, press the global insert shortcut from Meeting Notes, Files, Settings, and Snippets/Vocabulary; it must not insert an old Silent Lab prediction. Press it from Silent Use with an accepted prediction; confirm it inserts that prediction once. Confirm insertion is blocked during meeting capture.
 
 ## Build and test
 
