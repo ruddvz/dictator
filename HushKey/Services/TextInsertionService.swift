@@ -161,10 +161,21 @@ final class TextInsertionService {
         return SelectedTextTarget(insertionTarget: target, selectedText: selectedText)
     }
 
-    func enable() {
+    private static let enabledKey = "typesIntoApps"
+
+    /// Turns typing back on at launch, and once Accessibility is granted, unless the user turned
+    /// it off. It is on by default, so a focused text field gets the text without a visit to Settings.
+    func restore() {
+        guard !isEnabled, UserDefaults.standard.object(forKey: Self.enabledKey) as? Bool ?? true,
+              AXIsProcessTrusted() else { return }
+        enable(prompting: false)
+    }
+
+    func enable(prompting: Bool = true) {
         let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
-        let trusted = AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary)
+        let trusted = AXIsProcessTrustedWithOptions([promptKey: prompting] as CFDictionary)
         isEnabled = trusted
+        if prompting { UserDefaults.standard.set(true, forKey: Self.enabledKey) }
         if trusted {
             registerShortcut()
             let undoStatus = undoHotKey.register(keyCode: UInt32(kVK_ANSI_U),
@@ -180,6 +191,7 @@ final class TextInsertionService {
     }
 
     func disable() {
+        UserDefaults.standard.set(false, forKey: Self.enabledKey)
         isEnabled = false
         hotKey.unregister()
         undoHotKey.unregister()

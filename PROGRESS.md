@@ -1,5 +1,11 @@
 # HushKey progress
 
+## Completed — typing into apps stays on across restarts (2026-11-02)
+
+- With a text box focused, a dictation showed the "Typing into apps is off" card instead of typing. `TextInsertionService.isEnabled` started false on every launch and was never saved, so each restart (including every crash or rebuild) turned typing off until Settings was visited.
+- The switch is now saved (`typesIntoApps`). It's on unless the user turns it off, and it comes back on at launch, or as soon as HushKey is active again once Accessibility is granted, with no extra prompt (`TextInsertionService.restore()`).
+- **Not verified live:** a dictation into a focused field after relaunch. `xcodebuild ... test`: 184 passed, 2 skipped.
+
 ## Completed — pill crash and off-centre placement (2026-11-02)
 
 - **Crash:** five "HushKey quit unexpectedly" reports today, all the same AppKit exception: the pill's `NSHostingView` (`sizingOptions = [.intrinsicContentSize]`, as the window's content view) re-requested a constraint pass from inside one, and AppKit aborts the app. The hosting view now sits in a plain container with no sizing options; SwiftUI reports the pill size (`onGeometryChange`) and the controller resizes the panel on the next run-loop turn.

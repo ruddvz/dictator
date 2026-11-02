@@ -419,10 +419,14 @@ final class AppModel {
         installKeyMonitor()
         installDictationShortcut()
         installSelectedTextEditShortcut()
+        insertion.restore()
         updateMotionActivity()
         NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification,
                                                object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.refreshFunctionKeyStatus() }
+            MainActor.assumeIsolated {
+                self?.refreshFunctionKeyStatus()
+                self?.insertion.restore()
+            }
         }
     }
 
