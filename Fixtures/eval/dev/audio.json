@@ -1,0 +1,22 @@
+{
+  "clips": [
+    { "id": "d01-plain", "reference": "Can you send the quarterly report to Priya before Friday",
+      "checks": { "Natural": { "contains": ["quarterly report", "Priya", "Friday"] } } },
+    { "id": "d02-code-tokens", "reference": "let user underscore id equals open parenthesis value close parenthesis",
+      "checks": { "Code": { "contains": ["user_id", "= (value)"], "absent": ["underscore", "parenthesis"] } } },
+    { "id": "d03-message-line", "reference": "Hey team new line the build is green",
+      "checks": { "Message": { "contains": ["\n"], "absent": ["new line"] },
+                  "Natural": { "contains": ["new line"] } } },
+    { "id": "d04-email-paragraph", "reference": "Hi Sam new paragraph thanks for the update",
+      "checks": { "Email": { "contains": ["\n\n"], "absent": ["new paragraph"] } } },
+    { "id": "d05-correction", "reference": "Send it to Alice, actually Bob",
+      "checks": { "Natural": { "contains": ["Bob"], "absent": ["Alice", "actually"] } } },
+    { "id": "d06-snippet", "reference": "Please reply to my email address",
+      "snippets": "my email address => person@example.com",
+      "checks": { "Natural": { "contains": ["person@example.com"] } } },
+    { "id": "d07-fillers", "reference": "Um I think we should uh ship it today", "cleanupFillers": true,
+      "checks": { "Natural": { "contains": ["ship it today"], "absent": ["um", "uh"] } } },
+    { "id": "d08-plain-names", "reference": "Please schedule a review with the design team next week",
+      "checks": { "Natural": { "contains": ["design team", "next week"] } } }
+  ]
+}

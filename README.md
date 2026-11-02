@@ -37,6 +37,14 @@ xcodegen generate
 xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build test
 ```
 
+Run the local dictation eval (dev and holdout splits, Apple on-device Speech plus any WhisperKit model already downloaded in HushKey):
+
+```sh
+./Scripts/eval.sh
+```
+
+It writes [docs/eval/report.md](docs/eval/report.md) and `report.json`. Processor checks are deterministic and also run in `xcodebuild test`; recognition scores are reported, not gated. The first run asks for Speech recognition permission for the test host. Fixtures, splits, and how to add consented recordings are described in [Fixtures/eval/README.md](Fixtures/eval/README.md).
+
 HushKey opens as a normal Mac app window and also offers a menu-bar shortcut. Voice dictation does not require AirPods or Motion permission. To try the Silent Lab, open **Setup**, connect compatible headphones, choose them as the Mac's active audio output, and check for a live stream. If Motion access is denied, change it in **System Settings → Privacy & Security → Motion**.
 
 The packaged app is at `dist/HushKey.app`. The packaging script builds in an isolated temporary directory and replaces only this app bundle; it leaves other Xcode build products untouched.
