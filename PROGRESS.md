@@ -342,3 +342,17 @@ Navigate to Snippets & Vocabulary and validate rule creation/deletion, then dict
 ## Next item — consented recordings and processor gaps
 
 Record the 14 clip references as consented audio in `Fixtures/eval/<split>/audio/` with the user and rerun `./Scripts/eval.sh` for real-speech WER. Optionally download a WhisperKit model in the app to add a second engine. Then fix dev known gaps against the dev split only, and confirm holdout aggregates do not drop.
+
+## Completed — everything merged into `feature/flow-style-ui`
+
+- Merged into one branch in `~/Projects/HushKey`: the Fog & sage redesign with the fn key; pill recovery with the transcript card; Codex's per-app dictation profiles and local correction rules (`origin/feature/hushkey-macos-prototype` at ce524cc); and the eval harness (PR #2, `rudx/eval-harness`).
+- Conflicts were resolved by keeping both sides. Dictation start now picks the per-app profile's mode and vocabulary and also records whether there is a text target. Finishing a dictation applies correction rules before the pill's recovery checks. Settings shows the app profiles editor above the fn key picker. The sidebar and page header keep Codex's accessibility identifiers (`sidebar.<screen>`, `page.header`) on the new layout.
+- 73 tests ran: 72 passed, 1 skipped (eval holdout data), 0 failed. The first run after regenerating the project reported a failure that didn't reproduce on two reruns.
+- Checked live in the main-checkout build: the home screen and the Settings Insertion tab render. The app profiles editor (Settings → General) and Codex's correction-rules UI were not looked at, because the background controls can't switch the Settings tabs.
+- Location: `~/Documents/ChatGPT/HushKey` is a **different repository** (`amirrsyed/hushkey`, MIT, with a Swift app plus a Python backend). Codex has uncommitted work there on `ruex/voice-dictation-features`. It is not this project, so it was left untouched. Codex's work on *this* project arrives through `origin/feature/hushkey-macos-prototype`.
+
+## Next items
+
+1. Push `feature/flow-style-ui` and open a PR (or retarget PR #1).
+2. Live acceptance: the fn key in other apps, pill error/Retry/Paste again, Esc closing the card.
+3. Settings rewrite (one-line labels and right-aligned controls), including the Codex profile and correction-rule editors in Fog & sage.
