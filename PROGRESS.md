@@ -91,6 +91,7 @@
 - Added tests for merge/dedupe/skip, limit and unusable-file rejection, and export round-trip. Latest test result: 142 passed, 2 skipped, 0 failed (144 total). Release packaging and strict code-signature verification passed; opened the updated `dist/HushKey.app`.
 - Vocabulary Import/Export buttons, panels, and alert still need a live click-through. Run the Vocabulary word-list step in the backup section in `docs/TESTING_PROTOCOL.md`.
 - Live microphone smoke check: Microphone and Speech Recognition were already enabled in macOS Settings, so no OS prompts appeared. After restarting the packaged app, Start Dictate entered Listening. Synthetic speech was not recognized; a later live capture produced text that did not match the test phrase. Capture was stopped. Dictation accuracy and insertion remain unverified; do not treat this as acceptance.
+- Follow-up phrase check: the packaged app showed Listening for a fresh attempt, but no new transcript appeared and the app returned to idle. The requested phrase was not verified; capture is off.
 - Next fresh-session step: live acceptance workflows (permission-gated dictation/insertion, local model use, meeting capture) with the user present.
 
 ## Completed — portable Automatic app profiles (2026-11-02)
