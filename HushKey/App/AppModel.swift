@@ -61,6 +61,7 @@ final class AppModel {
     let localTransformService = LocalTransformService()
     let fileTranscriber = LocalFileTranscriber()
     let whisperFileTranscriber = WhisperKitFileTranscriber()
+    let fileTranscriptionWorkspace = FileTranscriptionWorkspace()
     let insertion = TextInsertionService()
     let capture = CaptureController()
     let recorder = SessionRecorder()

@@ -739,6 +739,51 @@ final class SafetyAndStorageTests: XCTestCase {
         XCTAssertTrue(model.fileTranscriptionHistoryMessage?.lowercased().contains("delete") == true)
     }
 
+    @MainActor
+    func testFileTranscriptDraftSurvivesPageRecreationAfterSaveFailure() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "hushkey-file-reopen-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let historyURL = directory.appending(path: "file-transcripts.json")
+        let older = FileTranscriptionSession(sourceName: "older.m4a", engine: .apple,
+                                             languageIdentifier: "en-US", text: "Older saved transcript.", cues: [])
+        try FileTranscriptionSessionStore.save([older], to: historyURL)
+        let model = AppModel(dictationHistoryURL: directory.appending(path: "dictation.json"),
+                             fileTranscriptionHistoryURL: historyURL)
+        let workspace = model.fileTranscriptionWorkspace
+        let draftID = UUID()
+        workspace.activeSessionID = draftID
+        workspace.activeSourceName = "newer.m4a"
+        workspace.activeLanguageIdentifier = "en-US"
+        model.fileTranscriber.replaceText("New unsaved transcript.")
+
+        try FileManager.default.removeItem(at: historyURL)
+        try FileManager.default.createDirectory(at: historyURL, withIntermediateDirectories: false)
+        let draft = try XCTUnwrap(FileTranscriptionSessionSnapshot.make(
+            activeSessionID: workspace.activeSessionID,
+            sourceName: workspace.activeSourceName ?? "Audio transcript",
+            engine: workspace.engine, languageIdentifier: workspace.activeLanguageIdentifier,
+            modelVariant: workspace.activeModelVariant, text: model.fileTranscriber.text,
+            cues: model.fileTranscriber.cues))
+
+        XCTAssertFalse(model.saveFileTranscriptionSession(draft))
+        XCTAssertFalse(workspace.shouldRestoreLatest(isBusy: false))
+
+        // A recreated Files view uses this same gate before restoring the older history row.
+        if workspace.shouldRestoreLatest(isBusy: false), let latest = model.fileTranscriptionSessions.first {
+            model.fileTranscriber.restore(latest)
+        }
+        XCTAssertEqual(workspace.activeSessionID, draftID)
+        XCTAssertEqual(model.fileTranscriber.text, "New unsaved transcript.")
+
+        try FileManager.default.removeItem(at: historyURL)
+        XCTAssertTrue(model.saveFileTranscriptionSession(draft))
+        XCTAssertEqual(model.fileTranscriptionSessions.first?.id, draftID)
+        XCTAssertEqual(FileTranscriptionSessionStore.load(from: historyURL)?.first?.text,
+                       "New unsaved transcript.")
+    }
+
     func testFileTranscriptionSessionSwitchSnapshotsEditsAndSkipsTheCurrentRow() throws {
         let activeID = UUID()
         let targetID = UUID()

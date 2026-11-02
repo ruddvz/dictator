@@ -1,4 +1,19 @@
 import Foundation
+import Observation
+
+@MainActor @Observable
+final class FileTranscriptionWorkspace {
+    var selectedURL: URL?
+    var activeSessionID: UUID?
+    var activeSourceName: String?
+    var activeLanguageIdentifier = ""
+    var activeModelVariant: String?
+    var engine: FileTranscriptionEngine = .apple
+
+    func shouldRestoreLatest(isBusy: Bool) -> Bool {
+        !isBusy && selectedURL == nil && activeSessionID == nil && activeSourceName == nil
+    }
+}
 
 enum FileTranscriptionEngine: String, CaseIterable, Codable, Identifiable {
     case apple = "Apple Speech"

@@ -1,5 +1,14 @@
 # HushKey progress
 
+## Completed — preserve unsaved file transcript drafts across navigation (2026-11-02)
+
+- Moved the active file, transcript session metadata, and selected engine from view-local state into the app model. Recreating the Files page no longer resets an active draft and restores an older saved transcript over it.
+- The latest-history auto-restore now checks whether an active workspace already exists. If saving fails on page exit, the draft remains visible on return and can be saved after storage recovers.
+- Added a regression test that starts with older saved history, forces a write failure, simulates page recreation, confirms the newer draft remains, then verifies a successful retry.
+- `xcodebuild test` on the MacBook Pro: **128 passed, 2 skipped, 0 failed**. Xcode reported the existing outdated CoreSimulator warning; macOS tests passed.
+- Rebuilt `dist/HushKey.app`, passed `codesign --verify --deep --strict`, and opened the packaged app. Only this packaged HushKey process is running. No audio, model download, or Accessibility capture was started.
+- Next fresh-session step: perform the documented live file transcription and save-failure recovery check with the user’s audio file, then continue the broader voice and meeting acceptance checklist.
+
 ## Completed — bound meeting summary reduction (2026-11-02)
 
 - Fixed a non-terminating local Meeting Notes transform path: when chunk summaries remain over the size limit, HushKey now requires actual shrinkage and stops after at most four reduction passes.

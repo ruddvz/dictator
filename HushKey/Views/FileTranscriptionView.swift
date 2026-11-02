@@ -4,25 +4,20 @@ import UniformTypeIdentifiers
 
 struct FileTranscriptionView: View {
     @Environment(AppModel.self) private var model
-    @State private var selectedURL: URL?
     @State private var exportMessage: String?
     @State private var historySearch = ""
-    @State private var activeSessionID: UUID?
-    @State private var activeSourceName: String?
-    @State private var activeLanguageIdentifier = ""
-    @State private var activeModelVariant: String?
     @State private var pendingSaveTask: Task<Void, Never>?
     @State private var confirmClearHistory = false
-    @State private var engine: FileTranscriptionEngine = .apple
 
+    private var workspace: FileTranscriptionWorkspace { model.fileTranscriptionWorkspace }
     private var transcription: LocalFileTranscriber { model.fileTranscriber }
     private var whisper: WhisperKitFileTranscriber { model.whisperFileTranscriber }
     private var historySessions: [FileTranscriptionSession] { model.fileTranscriptionSessions }
     private var isBusy: Bool { transcription.isTranscribing || whisper.isTranscribing || whisper.isDownloading }
-    private var currentText: String { engine == .apple ? transcription.text : whisper.text }
-    private var currentCues: [SubtitleCue] { engine == .apple ? transcription.cues : whisper.cues }
-    private var currentStatus: String? { engine == .apple ? transcription.status : whisper.status }
-    private var currentError: String? { engine == .apple ? transcription.error : whisper.error }
+    private var currentText: String { workspace.engine == .apple ? transcription.text : whisper.text }
+    private var currentCues: [SubtitleCue] { workspace.engine == .apple ? transcription.cues : whisper.cues }
+    private var currentStatus: String? { workspace.engine == .apple ? transcription.status : whisper.status }
+    private var currentError: String? { workspace.engine == .apple ? transcription.error : whisper.error }
     private var filteredSessions: [FileTranscriptionSession] {
         let query = historySearch.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return historySessions }
@@ -48,14 +43,15 @@ struct FileTranscriptionView: View {
 
                 SettingsGroup(title: "Engine") {
                     SettingsRow(title: "Speech engine",
-                                detail: engine == .apple ? "Apple Speech. Nothing to download."
+                                detail: workspace.engine == .apple ? "Apple Speech. Nothing to download."
                                     : "WhisperKit. Downloads a model once, then runs offline.") {
-                        MenuPicker(selection: $engine,
+                        MenuPicker(selection: Binding(get: { workspace.engine },
+                                                     set: { workspace.engine = $0 }),
                                    options: FileTranscriptionEngine.allCases.map { ($0, $0.rawValue) })
                             .disabled(isBusy || !currentText.isEmpty)
                     }
                     SettingsRow(title: "Language", detail: nil) {
-                        if engine == .apple {
+                        if workspace.engine == .apple {
                             MenuPicker(selection: Binding(get: { model.dictationLanguage },
                                                           set: { model.dictationLanguage = $0 }),
                                        options: DictationLanguage.onDevice.map { ($0.identifier, $0.name) })
@@ -66,7 +62,7 @@ struct FileTranscriptionView: View {
                                 .disabled(isBusy)
                         }
                     }
-                    if engine == .whisperKit {
+                    if workspace.engine == .whisperKit {
                         SettingsRow(title: "Model",
                                     detail: whisper.selectedModelIsDownloaded ? "On this Mac." : "Not downloaded yet.") {
                             HStack(spacing: Theme.s2) {
@@ -109,12 +105,12 @@ struct FileTranscriptionView: View {
             .pageLayout()
         }
         .onAppear {
-            if activeSessionID == nil, !isBusy, selectedURL == nil, let latest = historySessions.first {
+            if workspace.shouldRestoreLatest(isBusy: isBusy), let latest = historySessions.first {
                 restore(latest)
             }
         }
         .onChange(of: model.fileTranscriptionSessions.first?.id) { _, _ in
-            if activeSessionID == nil, !isBusy, selectedURL == nil, let latest = historySessions.first {
+            if workspace.shouldRestoreLatest(isBusy: isBusy), let latest = historySessions.first {
                 restore(latest)
             }
         }
@@ -141,13 +137,15 @@ struct FileTranscriptionView: View {
     }
 
     private var transcriptBinding: Binding<String> {
-        Binding(get: { currentText }, set: { engine == .apple ? transcription.replaceText($0) : whisper.replaceText($0) })
+        Binding(get: { currentText }, set: {
+            workspace.engine == .apple ? transcription.replaceText($0) : whisper.replaceText($0)
+        })
     }
 
     /// The file and its one action, like Wispr's hero cards: big, calm, obvious.
     private var sourceCard: some View {
         @Bindable var whisper = model.whisperFileTranscriber
-        let sourceName = selectedURL?.lastPathComponent ?? activeSourceName
+        let sourceName = workspace.selectedURL?.lastPathComponent ?? workspace.activeSourceName
         return HStack(spacing: Theme.s4) {
             Image(systemName: sourceName == nil ? "waveform.badge.plus" : "waveform")
                 .font(.system(size: 22, weight: .medium))
@@ -174,15 +172,15 @@ struct FileTranscriptionView: View {
                 .lineLimit(2)
             }
             Spacer(minLength: Theme.s4)
-            if engine == .apple && transcription.isTranscribing {
+            if workspace.engine == .apple && transcription.isTranscribing {
                 Button("Cancel") { transcription.cancel() }
                     .buttonStyle(SecondaryButtonStyle())
-            } else if engine == .whisperKit && whisper.isTranscribing {
+            } else if workspace.engine == .whisperKit && whisper.isTranscribing {
                 Button("Cancel") { whisper.cancelTranscription() }
                     .buttonStyle(SecondaryButtonStyle())
                     .disabled(whisper.status == "Cancelling transcription…")
             }
-            if selectedURL == nil && !isBusy {
+            if workspace.selectedURL == nil && !isBusy {
                 Button("Choose file…") { chooseFile() }
                     .buttonStyle(PrimaryButtonStyle())
             } else {
@@ -190,8 +188,8 @@ struct FileTranscriptionView: View {
                     Label(isBusy ? "Working…" : "Transcribe", systemImage: isBusy ? "hourglass" : "waveform")
                 }
                 .buttonStyle(PrimaryButtonStyle())
-                .disabled(selectedURL == nil || isBusy ||
-                          (engine == .whisperKit && !whisper.selectedModelIsDownloaded))
+                .disabled(workspace.selectedURL == nil || isBusy ||
+                          (workspace.engine == .whisperKit && !whisper.selectedModelIsDownloaded))
             }
         }
         .padding(Theme.s5)
@@ -318,18 +316,18 @@ struct FileTranscriptionView: View {
     }
 
     private func startTranscription() {
-        guard let selectedURL else { return }
+        guard let selectedURL = workspace.selectedURL else { return }
         guard persistActiveSession() else { return }
         pendingSaveTask?.cancel()
         let sessionID = UUID()
-        activeSessionID = sessionID
-        activeSourceName = selectedURL.lastPathComponent
-        activeLanguageIdentifier = engine == .apple ? model.dictationLanguage : whisper.selectedLanguage
-        activeModelVariant = engine == .whisperKit ? whisper.selectedVariant.rawValue : nil
-        let languageIdentifier = activeLanguageIdentifier
+        workspace.activeSessionID = sessionID
+        workspace.activeSourceName = selectedURL.lastPathComponent
+        workspace.activeLanguageIdentifier = workspace.engine == .apple ? model.dictationLanguage : whisper.selectedLanguage
+        workspace.activeModelVariant = workspace.engine == .whisperKit ? whisper.selectedVariant.rawValue : nil
+        let languageIdentifier = workspace.activeLanguageIdentifier
         exportMessage = nil
 
-        if engine == .apple {
+        if workspace.engine == .apple {
             Task {
                 await transcription.transcribe(file: selectedURL, localeIdentifier: languageIdentifier,
                                                sessionID: sessionID)
@@ -342,7 +340,7 @@ struct FileTranscriptionView: View {
     }
 
     private func scheduleSessionSave() {
-        guard !isBusy, activeSessionID != nil else { return }
+        guard !isBusy, workspace.activeSessionID != nil else { return }
         pendingSaveTask?.cancel()
         pendingSaveTask = Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(500))
@@ -355,22 +353,22 @@ struct FileTranscriptionView: View {
     private func persistActiveSession(switchingTo targetSessionID: UUID? = nil) -> Bool {
         pendingSaveTask?.cancel()
         guard let session = FileTranscriptionSessionSnapshot.make(
-            activeSessionID: activeSessionID, switchingTo: targetSessionID,
-            sourceName: activeSourceName ?? selectedURL?.lastPathComponent ?? "Audio transcript",
-            engine: engine, languageIdentifier: activeLanguageIdentifier,
-            modelVariant: activeModelVariant, text: currentText, cues: currentCues) else { return true }
+            activeSessionID: workspace.activeSessionID, switchingTo: targetSessionID,
+            sourceName: workspace.activeSourceName ?? workspace.selectedURL?.lastPathComponent ?? "Audio transcript",
+            engine: workspace.engine, languageIdentifier: workspace.activeLanguageIdentifier,
+            modelVariant: workspace.activeModelVariant, text: currentText, cues: currentCues) else { return true }
         return model.saveFileTranscriptionSession(session)
     }
 
     private func restore(_ session: FileTranscriptionSession) {
-        guard !isBusy, activeSessionID != session.id else { return }
+        guard !isBusy, workspace.activeSessionID != session.id else { return }
         guard persistActiveSession(switchingTo: session.id) else { return }
-        engine = session.engine
-        selectedURL = nil
-        activeSessionID = session.id
-        activeSourceName = session.sourceName
-        activeLanguageIdentifier = session.languageIdentifier
-        activeModelVariant = session.modelVariant
+        workspace.engine = session.engine
+        workspace.selectedURL = nil
+        workspace.activeSessionID = session.id
+        workspace.activeSourceName = session.sourceName
+        workspace.activeLanguageIdentifier = session.languageIdentifier
+        workspace.activeModelVariant = session.modelVariant
         exportMessage = "Restored saved transcript. The original audio file is not stored by HushKey."
         if session.engine == .apple {
             transcription.restore(session)
@@ -380,14 +378,14 @@ struct FileTranscriptionView: View {
     }
 
     private func delete(_ session: FileTranscriptionSession) {
-        if model.deleteFileTranscriptionSession(session), activeSessionID == session.id {
-            activeSessionID = nil
+        if model.deleteFileTranscriptionSession(session), workspace.activeSessionID == session.id {
+            workspace.activeSessionID = nil
         }
     }
 
     private func clearHistory() {
         if model.clearFileTranscriptionHistory() {
-            activeSessionID = nil
+            workspace.activeSessionID = nil
         }
     }
 
@@ -403,9 +401,11 @@ struct FileTranscriptionView: View {
                 saveCurrentSession: { persistActiveSession() },
                 switchSource: {
                     pendingSaveTask?.cancel()
-                    selectedURL = url
-                    activeSessionID = nil
-                    activeSourceName = nil
+                    workspace.selectedURL = url
+                    workspace.activeSessionID = nil
+                    workspace.activeSourceName = nil
+                    workspace.activeLanguageIdentifier = ""
+                    workspace.activeModelVariant = nil
                     exportMessage = nil
                     transcription.clear()
                     whisper.clear()
@@ -416,7 +416,7 @@ struct FileTranscriptionView: View {
     private func save(content: String, fileExtension: String, type: UTType) {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [type]
-        let sourceName = selectedURL?.lastPathComponent ?? activeSourceName ?? "HushKey-transcript"
+        let sourceName = workspace.selectedURL?.lastPathComponent ?? workspace.activeSourceName ?? "HushKey-transcript"
         let sourceStem = URL(fileURLWithPath: sourceName).deletingPathExtension().lastPathComponent
         panel.nameFieldStringValue = sourceStem + ".\(fileExtension)"
         panel.prompt = "Export"
