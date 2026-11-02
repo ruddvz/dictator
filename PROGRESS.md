@@ -22,9 +22,9 @@
   - Parakeet's misses were code dictation ("process dot nv.key"), "new line" heard as "new lines", and one dropped word. Apple's were names and grammar ("a quarterly report", "The builders green"). Apple's eval time is its file path, not the live stream.
 - Tests: `xcodebuild ... test` passed 196 (2 skipped) with the usual `-skip-testing:` for the on-device writing-style test. `swift test` in `Packages/HushKeyParakeet` passed 5, with the timing test skipped unless a model path is given. `Scripts/eval.sh` now signs its test host with "HushKey Local Signing", so the eval asks for no permission and leaves dist's grants alone.
 - **Packaged** `dist/HushKey.app` (in this worktree) is signed with the stable identity, and `codesign --verify --deep --strict` passes. The model download was started from the Settings button in that build. It showed the progress bar and "Finding the model files…", and finished at 451 MB on disk.
-- **Not yet verified live:** a real fn dictation with Parakeet, including speed, accuracy on the user's voice, and the Apple preview and fallback.
+- **Verified live by the user:** fn dictation with Parakeet selected in the packaged worktree build. The Apple Speech fallback path has not been forced live.
 - Other agents' `quit app "HushKey"` calls (before their test or package runs) closed the packaged app twice during this work. Only one HushKey can run, so coordinate before a live check.
-- **Next:** check fn dictation live with Parakeet. Record a few consented clips of the user's own voice into `Fixtures/eval/*/audio/` for a real WER. Consider FluidAudio's CTC vocabulary boosting (an extra ~130 MB model) if name accuracy still lags.
+- **Next:** record a few consented clips of the user's own voice into `Fixtures/eval/*/audio/` for a real WER. Consider FluidAudio's CTC vocabulary boosting (an extra ~130 MB model) if name accuracy still lags.
 
 ## Completed: home redesign, ambient hero and breath ribbon (2026-11-02)
 
