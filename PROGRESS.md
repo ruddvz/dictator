@@ -1,13 +1,14 @@
 # HushKey progress
 
-## In progress — verify text insertion before reporting success (2026-11-02)
+## Completed — verify text insertion before reporting success (2026-11-02)
 
 - The user reported that HushKey shows a transcript and an insertion-success message, but the target field stays empty.
 - Root cause: direct Accessibility insertion treated `AXUIElementSetAttributeValue` success as proof of delivery without checking the field's new value. This could bypass the verified paste fallback.
 - Direct insertion now compares the target field with the exact expected result. A confirmed unchanged field can use the existing paste path, which preserves the clipboard and verifies delivery. If the field changed ambiguously, HushKey asks for review and does not retry automatically.
 - The explicit Insert action now targets the app and field captured when dictation began, and uses the verified paste fallback if direct insertion made no change. Added tests for verified, unchanged, and unexpected field values.
-- `xcodebuild ... test`: 183 passed, 2 skipped, 0 failed. Live validation of this fix in the packaged app is still pending.
-- Next: package the fix and verify delivery to a blank TextEdit field, then test the reported target app if safely accessible.
+- `xcodebuild ... test` on the current checkout: 184 passed, 2 skipped, 0 failed. Release packaging and strict signature verification passed; the updated `/Users/rudra/Projects/HushKey/dist/HushKey.app` is open.
+- Live insertion remains unverified: computer-use key input did not trigger HushKey's global shortcut from TextEdit, so no delivery test was completed. The temporary shortcut was restored to fn; no microphone capture was started.
+- Next fresh-session step: test with the physical fn key in a blank TextEdit field, then repeat in the reported target app and confirm the target field's contents.
 
 ## Completed — typing into Electron apps such as Claude (2026-11-02)
 
