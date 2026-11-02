@@ -570,6 +570,8 @@ struct LabProgress: View {
                         Text(step.title)
                             .font(.system(size: 14, weight: current ? .semibold : .regular))
                             .foregroundStyle(current ? Theme.ink : Theme.ink2)
+                            .lineLimit(1)
+                            .fixedSize()
                     }
                     .padding(.horizontal, Theme.s3)
                     .frame(height: 34)

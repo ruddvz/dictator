@@ -272,7 +272,7 @@ struct FloatingPillView: View {
                     .frame(width: 16, height: 16)
                     .foregroundStyle(Self.glow)
                 Spacer(minLength: 8)
-                if let hint {
+                if let hint = model.insertion.isEnabled || !isFinished ? hint : "Typing into apps is off" {
                     Text(hint)
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.white.opacity(0.5))
@@ -290,16 +290,30 @@ struct FloatingPillView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .contentTransition(.opacity)
             if isFinished {
-                HStack {
+                HStack(spacing: 8) {
+                    if !model.insertion.isEnabled {
+                        Button("Type for me next time") {
+                            UserDefaults.standard.set(SettingsView.Section.insertion.rawValue, forKey: "settingsSection")
+                            model.screen = .settings
+                            NSApp.activate(ignoringOtherApps: true)
+                            model.dismissFinishedTranscript()
+                        }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Self.glow)
+                        .help("Turn on typing into the focused text box")
+                    }
                     Spacer()
                     Button {
                         model.copyDictationText()
                         copied = true
                     } label: {
                         Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
+                            .contentTransition(.symbolEffect(.replace))
                     }
-                    .buttonStyle(PrimaryButtonStyle(tint: Self.glow))
-                    .help("Copy to the clipboard")
+                    .buttonStyle(PrimaryButtonStyle(tint: Self.glow, foreground: Self.surface))
+                    .keyboardShortcut("c", modifiers: .command)
+                    .help("Copy to the clipboard (⌘C)")
                 }
             }
         }

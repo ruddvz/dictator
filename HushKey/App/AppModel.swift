@@ -1067,9 +1067,10 @@ final class AppModel {
             dictationNotice = notice
         } else {
             retainedAudio.reset()
+            let finished = processed.trimmingCharacters(in: .whitespacesAndNewlines)
             if dictationHasTarget {
-                await typeFinishedDictation(processed.trimmingCharacters(in: .whitespacesAndNewlines))
-            } else {
+                await typeFinishedDictation(finished)
+            } else if !typeIntoFieldFocusedNow(finished) {
                 showsFinishedTranscript = true
             }
             completedDictationCount += 1
@@ -1100,6 +1101,18 @@ final class AppModel {
         } else {
             showsFinishedTranscript = true
         }
+    }
+
+    /// No text field had focus when dictation began. If one has focus now, because the person
+    /// clicked into it while talking, type there; otherwise the card stays up with Copy.
+    private func typeIntoFieldFocusedNow(_ text: String) -> Bool {
+        guard insertion.isEnabled, !didInsertCurrentDictation, !text.isEmpty,
+              let target = insertion.captureInsertionTarget(),
+              insertion.insert(text, ifStillFocused: target) else { return false }
+        capturedInsertionTarget = target
+        capturedInsertionTargetName = target.applicationName
+        didInsertCurrentDictation = true
+        return true
     }
 
     /// Runs recognition again over the failed dictation's audio, which was kept in memory.

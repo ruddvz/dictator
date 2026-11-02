@@ -20,7 +20,7 @@ struct EvaluateView: View {
                            subtitle: "Does the motion really tell your words apart? Tested against chance and held-out sessions.") {
                     MenuPicker(selection: $model.trainingCondition,
                                options: SessionRecorder.Condition.allCases.map { ($0, $0.rawValue) },
-                               width: 140)
+                               width: 176)
                 }
                 LabProgress()
 

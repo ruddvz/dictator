@@ -87,7 +87,7 @@ struct TrainView: View {
                 Spacer(minLength: Theme.s3)
                 MenuPicker(selection: $model.trainingCondition,
                            options: SessionRecorder.Condition.allCases.map { ($0, $0.rawValue) },
-                           width: 140)
+                           width: 176)
             }
             HoldToCaptureButton(
                 title: "Capture “\(word)”",

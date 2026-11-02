@@ -116,13 +116,14 @@ extension View {
 /// Sage rounded button for the one main action on a surface (Wispr: 36 pt, radius 10).
 struct PrimaryButtonStyle: ButtonStyle {
     var tint: Color = Theme.signal
+    var foreground: Color = Theme.inverseInk
     @Environment(\.isEnabled) private var isEnabled
     @State private var hovering = false
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.hkControl)
-            .foregroundStyle(Theme.inverseInk)
+            .foregroundStyle(foreground)
             .padding(.horizontal, Theme.s4)
             .frame(height: Theme.controlHeight)
             .background(tint.opacity(isEnabled ? (hovering ? 0.88 : 1) : 0.35),
@@ -261,6 +262,23 @@ struct MorphIcon: View {
     @State private var previous: Phase?
     @State private var changedAt = Date.distantPast
     @State private var settled = true
+    @State private var speech = SpeechMeter()
+
+    /// Speech amount eased per frame: quick to rise with a syllable, slower to fall.
+    private final class SpeechMeter {
+        var envelope = SpeechEnvelope()
+        var target: Double = 0
+        var value: Double = 0
+        var lastFrame: TimeInterval?
+
+        func advance(to time: TimeInterval) -> Double {
+            let dt = min(0.05, time - (lastFrame ?? time))
+            lastFrame = time
+            let rate = target > value ? 18.0 : 6.0
+            value += (target - value) * min(1, rate * dt)
+            return value
+        }
+    }
 
     private static let morphDuration: TimeInterval = 0.45
 
@@ -270,12 +288,18 @@ struct MorphIcon: View {
             let time = context.date.timeIntervalSinceReferenceDate
             let raw = min(1, context.date.timeIntervalSince(changedAt) / Self.morphDuration)
             let eased = 1 - pow(1 - raw, 3)
-            let target = Self.points(for: phase, time: time, level: level)
-            let vector = previous.map { Self.points(for: $0, time: time, level: level).blended(to: target, by: eased) } ?? target
+            let spoken = phase == .listening ? speech.advance(to: time) : 0
+            let target = Self.points(for: phase, time: time, speech: spoken)
+            let vector = previous.map { Self.points(for: $0, time: time, speech: spoken).blended(to: target, by: eased) } ?? target
             MorphLine(vector: vector)
                 .stroke(style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round))
         }
-        .onChange(of: phase) { old, _ in
+        .onChange(of: level) { _, newValue in
+            guard phase == .listening else { return }
+            speech.target = Double(speech.envelope.amount(for: newValue, at: Date.timeIntervalSinceReferenceDate))
+        }
+        .onChange(of: phase) { old, new in
+            if new != .listening { speech = SpeechMeter() }
             previous = old
             changedAt = Date()
             settled = false
@@ -289,7 +313,8 @@ struct MorphIcon: View {
 
     static let count = 25
 
-    static func points(for phase: Phase, time: TimeInterval, level: Float) -> AnimatableVector {
+    /// `speech` is 0…1 from `SpeechEnvelope`, already eased; only the listening state uses it.
+    static func points(for phase: Phase, time: TimeInterval, speech: Double) -> AnimatableVector {
         var values: [Double] = []
         values.reserveCapacity(count * 2)
         for index in 0..<count {
@@ -299,8 +324,7 @@ struct MorphIcon: View {
             case .idle:
                 point = (0.14 + 0.72 * t, 0.5 + 0.07 * sin(2 * .pi * t))
             case .listening:
-                let speech = Double(min(1, max(0, (level - 0.3) / 0.5)))
-                let amplitude = 0.08 + 0.26 * speech
+                let amplitude = 0.05 + 0.29 * speech
                 let envelope = sin(.pi * t)
                 point = (0.1 + 0.8 * t, 0.5 + amplitude * envelope * sin(2 * .pi * (2.2 * t - time * 1.6)))
             case .working:
@@ -388,8 +412,8 @@ struct LiveWaveform: View {
     var tint: Color = Theme.ink
 
     @State private var history: [CGFloat] = []
-    /// Adaptive room-noise floor on the 0…1 dB-mapped level, so bars move with speech, not hiss.
-    @State private var noiseFloor: Float?
+    /// Speech above the room's noise floor, so bars move with speech, not hiss.
+    @State private var envelope = SpeechEnvelope()
 
     var body: some View {
         GeometryReader { geo in
@@ -410,7 +434,7 @@ struct LiveWaveform: View {
         .onChange(of: isActive) { _, active in
             if !active {
                 history = []
-                noiseFloor = nil
+                envelope.reset()
             }
         }
         .accessibilityHidden(true)
@@ -418,12 +442,7 @@ struct LiveWaveform: View {
 
     private func push(_ newValue: Float) {
         guard isActive else { return }
-        // The level maps -60…0 dBFS to 0…1. Measure speech above a slowly rising noise floor
-        // so a quiet room stays flat and normal speech spans roughly half to full height.
-        let floor = min(newValue, (noiseFloor ?? newValue) + 0.003)
-        noiseFloor = floor
-        let aboveFloor = max(0, newValue - floor - 0.04) / 0.45
-        let shaped = CGFloat(min(1, aboveFloor))
+        let shaped = CGFloat(envelope.amount(for: newValue, at: Date.timeIntervalSinceReferenceDate))
         var next = history
         next.append(max(0.1, shaped))
         if next.count > barCount { next.removeFirst(next.count - barCount) }
@@ -440,7 +459,7 @@ struct VoiceRibbon: View {
 
     /// Per-frame smoothing state; a class so the Canvas can update it without re-rendering.
     private final class Smoother {
-        var floor: Float?
+        var envelope = SpeechEnvelope()
         var target: CGFloat = 0
         var value: CGFloat = 0
         var lastFrame: TimeInterval?
@@ -483,10 +502,7 @@ struct VoiceRibbon: View {
 
     private func listen(_ newValue: Float) {
         guard isActive else { return }
-        // Same noise-floor rule as LiveWaveform: measure speech above a slowly rising floor.
-        let floor = min(newValue, (smoother.floor ?? newValue) + 0.003)
-        smoother.floor = floor
-        smoother.target = CGFloat(min(1, max(0, newValue - floor - 0.04) / 0.45))
+        smoother.target = CGFloat(smoother.envelope.amount(for: newValue, at: Date.timeIntervalSinceReferenceDate))
     }
 
     /// Eases toward the latest level: quick to rise with a syllable, slower to fall.
