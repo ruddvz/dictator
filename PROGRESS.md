@@ -1,5 +1,10 @@
 # HushKey progress
 
+## Completed — typing into Electron apps such as Claude (2026-11-02)
+
+- Even with typing on, dictating into Claude's prompt box still showed the card. Electron apps (Claude, Slack, VS Code, Notion…) hide their text fields from accessibility until a client sets `AXManualAccessibility`, so HushKey saw no focused field. `TextInsertionService` now sets it on each app as it comes to the front, and again before capturing a target.
+- Built and tested in a clean worktree because the redesign session was editing this checkout: 184 passed, 2 skipped. **Not verified live:** a dictation into Claude's box (needs the user to speak).
+
 ## Completed — typing into apps stays on across restarts (2026-11-02)
 
 - With a text box focused, a dictation showed the "Typing into apps is off" card instead of typing. `TextInsertionService.isEnabled` started false on every launch and was never saved, so each restart (including every crash or rebuild) turned typing off until Settings was visited.

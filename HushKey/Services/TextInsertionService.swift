@@ -42,6 +42,8 @@ final class TextInsertionService {
     }
 
     private(set) var isEnabled = false
+    @ObservationIgnored private var activationObserver: NSObjectProtocol?
+    @ObservationIgnored private var exposedProcesses: Set<pid_t> = []
     /// Paste through the clipboard in apps that refuse direct typing; the clipboard is restored.
     var allowsPasteFallback = UserDefaults.standard.object(forKey: "allowsPasteFallback") as? Bool ?? true {
         didSet { UserDefaults.standard.set(allowsPasteFallback, forKey: "allowsPasteFallback") }
@@ -93,6 +95,7 @@ final class TextInsertionService {
               let app = NSWorkspace.shared.frontmostApplication,
               app.processIdentifier != NSRunningApplication.current.processIdentifier,
               app.bundleIdentifier != "com.ruddvz.hushkey" else { return [] }
+        exposeWebContent(of: app)
 
         let systemWide = AXUIElementCreateSystemWide()
         var focusedValue: CFTypeRef?
@@ -124,6 +127,7 @@ final class TextInsertionService {
               let app = NSWorkspace.shared.frontmostApplication,
               app.processIdentifier != NSRunningApplication.current.processIdentifier,
               app.bundleIdentifier != "com.ruddvz.hushkey" else { return nil }
+        exposeWebContent(of: app)
         let systemWide = AXUIElementCreateSystemWide()
         var focusedValue: CFTypeRef?
         guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedValue) == .success,
@@ -177,6 +181,7 @@ final class TextInsertionService {
         isEnabled = trusted
         if prompting { UserDefaults.standard.set(true, forKey: Self.enabledKey) }
         if trusted {
+            watchActivations()
             registerShortcut()
             let undoStatus = undoHotKey.register(keyCode: UInt32(kVK_ANSI_U),
                                                  modifiers: UInt32(optionKey | shiftKey)) { [weak self] in
@@ -348,8 +353,9 @@ final class TextInsertionService {
     /// paste validate that neither focus nor field contents changed while the user was speaking.
     func capturePasteTarget(into app: NSRunningApplication) -> PasteTarget? {
         guard isEnabled, allowsPasteFallback, AXIsProcessTrusted(), !app.isTerminated,
-              NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier,
-              let focused = focusedElement() else { return nil }
+              NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier else { return nil }
+        exposeWebContent(of: app)
+        guard let focused = focusedElement() else { return nil }
         var pid: pid_t = 0
         guard AXUIElementGetPid(focused, &pid) == .success, pid == app.processIdentifier else { return nil }
         let role = stringAttribute(kAXRoleAttribute, of: focused) ?? ""
@@ -556,6 +562,27 @@ final class TextInsertionService {
         status = result == noErr
             ? "Enabled. Insert with \(shortcut.label); undo immediately with ⌥⇧U while the same field stays focused."
             : "Could not register \(shortcut.label) (system status \(result))."
+    }
+
+    /// Electron apps (Claude, Slack, VS Code, Notion…) hide their text boxes from accessibility
+    /// until a client asks for them, so HushKey would see no focused field there. Ask as each app
+    /// comes to the front, so the field is ready by the time dictation starts.
+    private func watchActivations() {
+        guard activationObserver == nil else { return }
+        if let app = NSWorkspace.shared.frontmostApplication { exposeWebContent(of: app) }
+        activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] note in
+            guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
+            MainActor.assumeIsolated { self?.exposeWebContent(of: app) }
+        }
+    }
+
+    private func exposeWebContent(of app: NSRunningApplication) {
+        let pid = app.processIdentifier
+        guard isEnabled, pid != NSRunningApplication.current.processIdentifier,
+              !exposedProcesses.contains(pid) else { return }
+        exposedProcesses.insert(pid)
+        AXUIElementSetAttributeValue(AXUIElementCreateApplication(pid), "AXManualAccessibility" as CFString, kCFBooleanTrue)
     }
 
     private func focusedElement() -> AXUIElement? {
