@@ -552,6 +552,58 @@ final class AppModel {
         }
     }
 
+    /// Returns a status message, or nil when the user cancelled the panel.
+    func exportVocabularyWordList() -> String? {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.plainText]
+        panel.nameFieldStringValue = "HushKey-Vocabulary.txt"
+        panel.prompt = "Export Words"
+        guard panel.runModal() == .OK, let url = panel.url else { return nil }
+        let terms = DictationVocabulary.terms(from: dictationTerms)
+        do {
+            try DictationWordList.export(terms).write(to: url, options: .atomic)
+            return "Exported \(terms.count) \(terms.count == 1 ? "word" : "words") to \(url.lastPathComponent)."
+        } catch {
+            return "Word list export failed: \(error.localizedDescription)"
+        }
+    }
+
+    /// Returns a status message, or nil when the user cancelled the panel.
+    func importVocabularyWordList() -> String? {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.plainText, .commaSeparatedText]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.prompt = "Add Words"
+        guard panel.runModal() == .OK, let url = panel.url else { return nil }
+        let hasSecurityScope = url.startAccessingSecurityScopedResource()
+        defer { if hasSecurityScope { url.stopAccessingSecurityScopedResource() } }
+        do {
+            if let fileSize = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+               fileSize > DictationWordList.maximumFileBytes {
+                throw DictationWordList.ImportError.fileTooLarge
+            }
+            return importVocabularyWordList(try Data(contentsOf: url))
+        } catch {
+            return "Word list import failed: \(error.localizedDescription)"
+        }
+    }
+
+    func importVocabularyWordList(_ data: Data) -> String {
+        do {
+            let result = try DictationWordList.merge(data, into: DictationVocabulary.terms(from: dictationTerms))
+            dictationTerms = DictationVocabulary.encode(result.terms)
+            var parts = ["Added \(result.added) \(result.added == 1 ? "word" : "words")."]
+            if result.duplicates > 0 { parts.append("\(result.duplicates) already in your vocabulary.") }
+            if result.invalid > 0 {
+                parts.append("\(result.invalid) skipped for being longer than \(DictationWordList.maximumTermLength) characters.")
+            }
+            return parts.joined(separator: " ")
+        } catch {
+            return "Word list import failed: \(error.localizedDescription)"
+        }
+    }
+
     @discardableResult
     func selectPersonalDataBackup() -> Bool {
         guard captureGate.owner == nil, !audio.isRunning, !isFinalizingDictation, !transcriber.isFinalizing,

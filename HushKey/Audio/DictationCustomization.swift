@@ -488,6 +488,66 @@ enum DictationVocabulary {
     }
 }
 
+/// Plain-text word lists for sharing vocabulary with other apps: one term per line on export;
+/// lines or commas on import. Imports either fit entirely or change nothing.
+enum DictationWordList {
+    static let maximumFileBytes = 1_024 * 1_024
+    static let maximumTermLength = 128
+
+    struct MergeResult: Equatable {
+        var terms: [String]
+        var added: Int
+        var duplicates: Int
+        var invalid: Int
+    }
+
+    enum ImportError: LocalizedError, Equatable {
+        case fileTooLarge, notText, noTerms, tooManyTerms(limit: Int)
+
+        var errorDescription: String? {
+            switch self {
+            case .fileTooLarge: "The word list is larger than 1 MB."
+            case .notText: "The file isn’t UTF-8 text."
+            case .noTerms: "The file has no words or phrases to add."
+            case .tooManyTerms(let limit): "Adding these words would exceed the \(limit)-word limit. Nothing was changed."
+            }
+        }
+    }
+
+    static func export(_ terms: [String]) -> Data {
+        let body = DictationVocabulary.encode(terms)
+        return Data((body.isEmpty ? "" : body + "\n").utf8)
+    }
+
+    static func merge(_ data: Data, into existing: [String],
+                      limit: Int = HushKeyPersonalDataBackup.maximumVocabularyTerms) throws -> MergeResult {
+        guard data.count <= maximumFileBytes else { throw ImportError.fileTooLarge }
+        guard var text = String(data: data, encoding: .utf8) else { throw ImportError.notText }
+        if text.hasPrefix("\u{FEFF}") { text.removeFirst() }
+        let candidates = text
+            .split(whereSeparator: { $0 == "," || $0.isNewline })
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        guard !candidates.isEmpty else { throw ImportError.noTerms }
+
+        var seen = Set(existing.map(key))
+        var result = MergeResult(terms: existing, added: 0, duplicates: 0, invalid: 0)
+        for term in candidates {
+            guard term.count <= maximumTermLength else { result.invalid += 1; continue }
+            guard seen.insert(key(term)).inserted else { result.duplicates += 1; continue }
+            result.terms.append(term)
+            result.added += 1
+        }
+        guard result.terms.count <= limit else { throw ImportError.tooManyTerms(limit: limit) }
+        return result
+    }
+
+    private static func key(_ term: String) -> String {
+        term.trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+    }
+}
+
 enum DictationContextHints {
     static let maximumCount = 100
 

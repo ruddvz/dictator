@@ -1131,6 +1131,40 @@ final class SafetyAndStorageTests: XCTestCase {
         XCTAssertEqual(DictationVocabulary.encode([" Maya ", "", "HushKey"]), "Maya\nHushKey")
     }
 
+    func testWordListImportMergesDeduplicatesAndSkipsOverlongTerms() throws {
+        let longTerm = String(repeating: "x", count: DictationWordList.maximumTermLength + 1)
+        let data = Data("\u{FEFF}Kubernetes, hushkey\r\nCafé\n\ncafe\n\(longTerm)\nPostgres\n".utf8)
+        let result = try DictationWordList.merge(data, into: ["HushKey", "Maya"])
+        XCTAssertEqual(result.terms, ["HushKey", "Maya", "Kubernetes", "Café", "Postgres"])
+        XCTAssertEqual(result.added, 3)
+        XCTAssertEqual(result.duplicates, 2)
+        XCTAssertEqual(result.invalid, 1)
+    }
+
+    func testWordListImportRejectsWithoutChangesWhenItWouldExceedLimitOrIsUnusable() {
+        XCTAssertThrowsError(try DictationWordList.merge(Data("A\nB\nC".utf8), into: ["Z"], limit: 3)) {
+            XCTAssertEqual($0 as? DictationWordList.ImportError, .tooManyTerms(limit: 3))
+        }
+        XCTAssertThrowsError(try DictationWordList.merge(Data(" ,\n\n".utf8), into: [])) {
+            XCTAssertEqual($0 as? DictationWordList.ImportError, .noTerms)
+        }
+        XCTAssertThrowsError(try DictationWordList.merge(Data([0xFF, 0xFE, 0x00]), into: [])) {
+            XCTAssertEqual($0 as? DictationWordList.ImportError, .notText)
+        }
+        let oversized = Data(repeating: 0x61, count: DictationWordList.maximumFileBytes + 1)
+        XCTAssertThrowsError(try DictationWordList.merge(oversized, into: [])) {
+            XCTAssertEqual($0 as? DictationWordList.ImportError, .fileTooLarge)
+        }
+    }
+
+    func testWordListExportRoundTripsThroughImport() throws {
+        let terms = ["HushKey", "Café", "New York"]
+        let exported = DictationWordList.export(terms)
+        XCTAssertEqual(String(data: exported, encoding: .utf8), "HushKey\nCafé\nNew York\n")
+        XCTAssertEqual(try DictationWordList.merge(exported, into: []).terms, terms)
+        XCTAssertTrue(DictationWordList.export([]).isEmpty)
+    }
+
     func testSpeechContextHintsAreStablePrioritizedAndBounded() {
         let customWords = ["Café", "cafe"] + (1...94).map { "Custom\($0)" }
         let modeHints = ["Code", "code", "Email"]

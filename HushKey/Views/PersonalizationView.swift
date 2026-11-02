@@ -44,6 +44,7 @@ struct PersonalizationView: View {
     @State private var query = ""
     @State private var editor: PersonalizationEditorRequest?
     @State private var notice: String?
+    @State private var wordListMessage: String?
 
     private var snippets: [SnippetEntry] {
         model.dictationSnippets
@@ -101,6 +102,19 @@ struct PersonalizationView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.s5) {
                 PageHeader(eyebrow: "", title: section.rawValue, subtitle: "") {
+                    if section == .vocabulary {
+                        Button("Import…", systemImage: "square.and.arrow.down") {
+                            wordListMessage = model.importVocabularyWordList()
+                        }
+                        .buttonStyle(SecondaryButtonStyle())
+                        .help("Add words from a text or CSV file, one per line or separated by commas")
+                        Button("Export…", systemImage: "square.and.arrow.up") {
+                            wordListMessage = model.exportVocabularyWordList()
+                        }
+                        .buttonStyle(SecondaryButtonStyle())
+                        .disabled(vocabulary.isEmpty)
+                        .help("Save your vocabulary as a text file, one word per line")
+                    }
                     Button(section.addTitle, systemImage: "plus") {
                         editor = PersonalizationEditorRequest(section: section, snippet: nil, term: nil)
                     }
@@ -148,6 +162,12 @@ struct PersonalizationView: View {
             Button("OK", role: .cancel) { notice = nil }
         } message: {
             Text(notice ?? "Please try again.")
+        }
+        .alert("Word list", isPresented: Binding(
+            get: { wordListMessage != nil }, set: { if !$0 { wordListMessage = nil } })) {
+            Button("OK", role: .cancel) { wordListMessage = nil }
+        } message: {
+            Text(wordListMessage ?? "")
         }
     }
 

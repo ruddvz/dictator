@@ -1,5 +1,13 @@
 # HushKey progress
 
+## Completed — vocabulary word list import/export (2026-11-02)
+
+- Committed the finished v3 app-profile backup work that was left uncommitted (22e3a36) after re-running the suite.
+- The Vocabulary page now has **Import…** and **Export…**. Export writes a UTF-8 `.txt`, one term per line. Import accepts `.txt`/`.csv` (lines or commas, BOM tolerated, ≤1 MB), skips case/accent duplicates and terms over 128 characters, and reports the counts. An import that would exceed the 500-term limit changes nothing.
+- Added tests for merge/dedupe/skip, limit and unusable-file rejection, and export round-trip. `xcodebuild ... test`: 144 passed, 2 skipped, 0 failed. Release packaging and strict code-signature verification passed; opened the updated `dist/HushKey.app`.
+- Not checked live: background UI automation couldn't drive the HushKey window, so the buttons, panels, and alert were not clicked through. Run the Vocabulary word-list step in the backup section in `docs/TESTING_PROTOCOL.md`.
+- Next fresh-session step: live acceptance workflows (permission-gated dictation/insertion, local model use, meeting capture) with the user present.
+
 ## Completed — portable Automatic app profiles (2026-11-02)
 
 - Personal data backup format v3 now exports and imports Automatic app profiles, including every optional override. Existing version-1 and version-2 backups remain readable; Replace preserves app profiles that older formats did not contain.
