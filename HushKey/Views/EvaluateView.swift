@@ -15,65 +15,45 @@ struct EvaluateView: View {
     var body: some View {
         @Bindable var model = model
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                PageHeader(
-                    eyebrow: "Step 3 · Check evidence",
-                    title: "Evaluate the signal",
-                    subtitle: "Compare recognition with a majority baseline and test on sessions that were held out during training.")
-
-                GroupBox("Study condition") {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Picker("Evaluate", selection: $model.trainingCondition) {
-                            ForEach(SessionRecorder.Condition.allCases) { Text($0.rawValue).tag($0) }
-                        }
-                        .pickerStyle(.segmented)
-                        Text(conditionNote)
-                            .font(.hkCaption)
-                            .foregroundStyle(Theme.ink2)
-                    }
-                    .padding(8)
+            VStack(alignment: .leading, spacing: Theme.s5) {
+                PageHeader(eyebrow: "", title: "Evaluate",
+                           subtitle: "Does the motion really tell your words apart? Tested against chance and held-out sessions.") {
+                    MenuPicker(selection: $model.trainingCondition,
+                               options: SessionRecorder.Condition.allCases.map { ($0, $0.rawValue) },
+                               width: 140)
                 }
-
-                readinessCard
-                evaluationControls
+                LabProgress()
 
                 if let result = model.evaluation {
                     EvaluationResultView(result: result)
                 } else {
-                    ContentUnavailableView(
-                        "No evaluation yet",
-                        systemImage: "chart.bar.xaxis",
-                        description: Text(meetsTemplateProtocol
-                                          ? "Choose features and run Evaluate to see the results."
-                                          : "Collect at least 10 examples for each of 5 words in this condition."))
-                        .frame(maxWidth: .infinity, minHeight: 180)
+                    EmptyState(systemImage: "chart.bar.xaxis", title: "No result yet",
+                               message: meetsTemplateProtocol ? "Pick the motion features below, then evaluate."
+                                   : "Record 10 takes for each of 5 words in this condition first.")
+                        .card(padding: 0, style: .outlined)
                 }
+
+                evaluationControls
+                readinessCard
             }
             .pageLayout()
         }
     }
 
     private var readinessCard: some View {
-        GroupBox("Before a result can unlock silent use") {
-            VStack(alignment: .leading, spacing: 10) {
-                ReadinessRow(
-                    title: "5 or more words",
-                    detail: "\(model.dataset.vocabulary.count) words in the vocabulary",
-                    complete: model.dataset.vocabulary.count >= 5)
-                ReadinessRow(
-                    title: "10 examples per word",
-                    detail: "Fewest for any word: \(minimumWordCount)/10",
-                    complete: meetsTemplateProtocol)
-                ReadinessRow(
-                    title: "At least 2 sessions",
-                    detail: "\(uniqueSessions) distinct sessions in this condition",
-                    complete: uniqueSessions >= 2)
-                Text("Evaluation can run once the first two study-size checks pass. Silent use also requires significant permutation results and held-out session accuracy above baseline.")
-                    .font(.hkCaption)
-                    .foregroundStyle(Theme.ink2)
-                    .padding(.top, 2)
-            }
-            .padding(8)
+        SettingsGroup(title: "Evidence checks",
+                      footer: model.trainingCondition == .silent
+                          ? "Silent Use unlocks only when every check passes."
+                          : "Only silent results can unlock Silent Use.") {
+            ReadinessRow(title: "5 or more words",
+                         detail: "\(model.dataset.vocabulary.count) in your list",
+                         complete: model.dataset.vocabulary.count >= 5)
+            ReadinessRow(title: "10 takes per word",
+                         detail: "Fewest: \(minimumWordCount)/10",
+                         complete: meetsTemplateProtocol)
+            ReadinessRow(title: "2 or more sessions",
+                         detail: "\(uniqueSessions) recorded",
+                         complete: uniqueSessions >= 2)
         }
     }
 
@@ -85,39 +65,24 @@ struct EvaluateView: View {
 
     private var evaluationControls: some View {
         @Bindable var model = model
-        return GroupBox("Analysis") {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("Features")
-                        .font(.hkCallout.weight(.medium))
+        return SettingsGroup(title: "Analysis") {
+            SettingsRow(title: "Motion features", detail: "Which signals the classifier may use.") {
+                HStack(spacing: Theme.s2) {
                     FeatureToggle(title: "Acceleration", option: .acceleration)
                     FeatureToggle(title: "Rotation", option: .rotation)
                     FeatureToggle(title: "Attitude", option: .attitude)
-                    Spacer(minLength: 8)
-                    Button(model.isEvaluating ? "Evaluating…" : "Evaluate") {
-                        model.evaluate()
-                    }
-                    .buttonStyle(PrimaryButtonStyle())
-                    .disabled(model.isEvaluating || model.featureSet.isEmpty || !meetsTemplateProtocol)
-                }
-                if model.trainingCondition == .silent {
-                    Label(model.isMotionInferenceEnabled
-                          ? "Silent use is enabled by the current evidence."
-                          : "Silent use remains locked until every evidence check passes.",
-                          systemImage: model.isMotionInferenceEnabled ? "checkmark.shield" : "lock.shield")
-                        .font(.hkCaption)
-                        .foregroundStyle(model.isMotionInferenceEnabled ? .green : .secondary)
                 }
             }
-            .padding(8)
+            SettingsRow(title: model.isEvaluating ? "Evaluating…" : "Run the evaluation",
+                        detail: model.trainingCondition == .silent
+                            ? (model.isMotionInferenceEnabled ? "Silent Use is unlocked." : "Silent Use is locked until every check passes.")
+                            : "Compares this condition only.",
+                        detailTint: model.isMotionInferenceEnabled && model.trainingCondition == .silent ? Theme.success : Theme.ink2) {
+                Button(model.isEvaluating ? "Evaluating…" : "Evaluate") { model.evaluate() }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(model.isEvaluating || model.featureSet.isEmpty || !meetsTemplateProtocol)
+            }
         }
-    }
-
-    private var conditionNote: String {
-        if model.trainingCondition == .silent {
-            return "Only silent-mouthing results can enable the experimental Use screen. Voice and whisper results remain separate comparisons."
-        }
-        return "This result compares the selected condition only. It does not enable silent-mouthing inference."
     }
 }
 
@@ -127,30 +92,42 @@ private struct ReadinessRow: View {
     var complete: Bool
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Image(systemName: complete ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(complete ? Color.green : Theme.ink2)
-                .accessibilityHidden(true)
-            Text(title).font(.hkCallout.weight(.medium))
-            Spacer()
-            Text(detail).font(.hkCaption).foregroundStyle(Theme.ink2)
+        SettingsRow(title: title, detail: detail) {
+            Image(systemName: complete ? "checkmark.circle.fill" : "circle.dashed")
+                .font(.system(size: 20))
+                .foregroundStyle(complete ? Theme.signal : Theme.ink3)
+                .accessibilityLabel(complete ? "Done" : "Not yet")
         }
         .accessibilityElement(children: .combine)
     }
 }
 
+/// Selectable chip; reads better than three checkboxes in a row.
 private struct FeatureToggle: View {
     @Environment(AppModel.self) private var model
     var title: String
     var option: FeatureSet
 
     var body: some View {
-        Toggle(title, isOn: Binding(
-            get: { model.featureSet.contains(option) },
-            set: { on in
-                if on { model.featureSet.insert(option) } else { model.featureSet.remove(option) }
-            }))
-        .toggleStyle(.checkbox)
+        let on = model.featureSet.contains(option)
+        Button {
+            if on { model.featureSet.remove(option) } else { model.featureSet.insert(option) }
+        } label: {
+            HStack(spacing: 5) {
+                if on { Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)) }
+                Text(title)
+            }
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(on ? Theme.signal : Theme.ink2)
+            .padding(.horizontal, Theme.s3 - 2)
+            .frame(height: 30)
+            .background(on ? Theme.signalSoft : Theme.sheet, in: Capsule())
+            .overlay(Capsule().strokeBorder(on ? Theme.signal.opacity(0.5) : Theme.hairline, lineWidth: 1))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .animation(Theme.snappy, value: on)
+        .accessibilityAddTraits(on ? [.isSelected] : [])
     }
 }
 
@@ -158,16 +135,23 @@ private struct EvaluationResultView: View {
     var result: Evaluation
 
     var body: some View {
-        GroupBox("Results") {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 26) {
+        VStack(alignment: .leading, spacing: Theme.s4) {
+                HStack(spacing: Theme.s3) {
+                    Image(systemName: passesAllChecks ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(passesAllChecks ? Theme.signal : Theme.finishing)
+                    Text(verdict)
+                        .font(.hkRowTitle)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                RowDivider()
+                HStack(spacing: Theme.s6) {
                     metric("Leave-one-out", percent(result.accuracy), highlight: true)
                     metric("Majority baseline", percent(result.chance))
                     metric("Permutation p", result.pValue < 0.001 ? "< 0.001" : String(format: "%.3f", result.pValue))
                 }
                 if let holdout = result.sessionHoldoutAccuracy, let baseline = result.sessionHoldoutChance {
-                    Divider()
-                    HStack(spacing: 26) {
+                    HStack(spacing: Theme.s6) {
                         metric("Held-out sessions", percent(holdout), highlight: true)
                         metric("Holdout baseline", percent(baseline))
                         Text("\(result.sessionHoldoutSessions) folds")
@@ -179,18 +163,17 @@ private struct EvaluationResultView: View {
                         .font(.hkCaption)
                         .foregroundStyle(Theme.ink2)
                 }
-                Text(verdict)
-                    .font(.hkCallout.weight(.medium))
-                    .foregroundStyle(passesAllChecks ? .green : .orange)
                 DisclosureGroup("Confusion matrix · \(result.templateCount) examples") {
                     confusionMatrix
                         .padding(.top, 10)
                 }
                 .font(.hkCallout.weight(.medium))
+                .tint(Theme.ink2)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(10)
-        }
+            .padding(Theme.s6 - 4)
+            .background(passesAllChecks ? Theme.signalSoft : Theme.well,
+                        in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
     }
 
     private var confusionMatrix: some View {
@@ -248,7 +231,9 @@ private struct EvaluationResultView: View {
     private func metric(_ title: String, _ value: String, highlight: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(title).font(.hkCaption).foregroundStyle(Theme.ink2)
-            Text(value).font(highlight ? .title2.bold().monospacedDigit() : .title3.monospacedDigit())
+            Text(value)
+                .font(highlight ? .display(28).monospacedDigit() : .display(22, weight: .medium).monospacedDigit())
+                .foregroundStyle(highlight ? Theme.ink : Theme.ink2)
         }
     }
 
