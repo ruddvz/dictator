@@ -165,6 +165,7 @@ private struct SidebarRow: View {
         .onHover { hovering = $0 }
         .animation(.easeOut(duration: 0.12), value: hovering)
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+        .accessibilityIdentifier("sidebar.\(screen.id)")
     }
 }
 

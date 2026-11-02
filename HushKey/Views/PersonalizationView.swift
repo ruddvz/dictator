@@ -3,6 +3,7 @@ import SwiftUI
 private enum PersonalizationSection: String, CaseIterable, Identifiable {
     case snippets = "Snippets"
     case vocabulary = "Vocabulary"
+    case corrections = "Corrections"
 
     var id: String { rawValue }
 
@@ -10,6 +11,7 @@ private enum PersonalizationSection: String, CaseIterable, Identifiable {
         switch self {
         case .snippets: "text.quote"
         case .vocabulary: "character.book.closed"
+        case .corrections: "arrow.left.arrow.right"
         }
     }
 }
@@ -54,6 +56,21 @@ struct PersonalizationView: View {
             .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
 
+    private var corrections: [SnippetEntry] {
+        model.dictationCorrectionRules
+            .split(whereSeparator: \.isNewline)
+            .compactMap { rawLine in
+                let parts = rawLine.components(separatedBy: "=>")
+                guard parts.count >= 2 else { return nil }
+                let cue = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
+                let replacement = parts.dropFirst().joined(separator: "=>")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !cue.isEmpty, !replacement.isEmpty else { return nil }
+                return SnippetEntry(cue: cue, expansion: replacement)
+            }
+            .sorted { $0.cue.localizedStandardCompare($1.cue) == .orderedAscending }
+    }
+
     private var filteredSnippets: [SnippetEntry] {
         guard !query.isEmpty else { return snippets }
         return snippets.filter { $0.cue.localizedCaseInsensitiveContains(query) || $0.expansion.localizedCaseInsensitiveContains(query) }
@@ -64,17 +81,25 @@ struct PersonalizationView: View {
         return vocabulary.filter { $0.localizedCaseInsensitiveContains(query) }
     }
 
+    private var filteredCorrections: [SnippetEntry] {
+        guard !query.isEmpty else { return corrections }
+        return corrections.filter {
+            $0.cue.localizedCaseInsensitiveContains(query) || $0.expansion.localizedCaseInsensitiveContains(query)
+        }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 PageHeader(
                     eyebrow: "PERSONALIZE",
                     title: "Your words, your shortcuts",
-                    subtitle: "Teach HushKey the names you use and turn short spoken cues into phrases. These settings stay on this Mac.")
+                    subtitle: "Teach HushKey your vocabulary, phrase shortcuts, and preferred spellings. These settings stay on this Mac.")
 
                 HStack(spacing: 12) {
                     summaryCard(title: "Snippets", count: snippets.count, symbol: "text.quote")
                     summaryCard(title: "Vocabulary", count: vocabulary.count, symbol: "character.book.closed")
+                    summaryCard(title: "Corrections", count: corrections.count, symbol: "arrow.left.arrow.right")
                 }
 
                 GroupBox {
@@ -89,7 +114,7 @@ struct PersonalizationView: View {
 
                         HStack(spacing: 8) {
                             Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                            TextField(section == .snippets ? "Search snippets" : "Search vocabulary", text: $query)
+                            TextField("Search \(section.rawValue.lowercased())", text: $query)
                                 .textFieldStyle(.plain)
                                 .accessibilityLabel("Search \(section.rawValue.lowercased())")
                             if !query.isEmpty {
@@ -116,8 +141,10 @@ struct PersonalizationView: View {
                     VStack(alignment: .leading, spacing: 0) {
                         if section == .snippets {
                             snippetList
-                        } else {
+                        } else if section == .vocabulary {
                             vocabularyList
+                        } else {
+                            correctionList
                         }
                     }
                     .padding(8)
@@ -127,14 +154,16 @@ struct PersonalizationView: View {
 
                 if section == .snippets {
                     advancedSnippetEditor
-                } else {
+                } else if section == .vocabulary {
                     Label("Your saved terms are prioritized ahead of optional mode, nearby-text, and Silent Lab hints. Up to 100 hints go to on-device Speech per capture; recognition can still misspell unfamiliar names.",
                           systemImage: "info.circle")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                } else {
+                    advancedCorrectionEditor
                 }
 
-                Label("HushKey uses these entries locally. It does not upload your personal vocabulary or snippets.",
+                Label("HushKey uses personalization entries locally. It does not upload your words, corrections, or snippets.",
                       systemImage: "lock.shield")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -226,6 +255,46 @@ struct PersonalizationView: View {
         }
     }
 
+    @ViewBuilder
+    private var correctionList: some View {
+        if filteredCorrections.isEmpty {
+            ContentUnavailableView(
+                query.isEmpty ? "No correction rules yet" : "No matching corrections",
+                systemImage: query.isEmpty ? "arrow.left.arrow.right" : "magnifyingglass",
+                description: Text(query.isEmpty
+                                  ? "Add a recognized phrase and the exact phrase HushKey should use instead."
+                                  : "Try another recognized phrase or replacement."))
+                .frame(minHeight: 150)
+        } else {
+            ForEach(filteredCorrections) { rule in
+                HStack(alignment: .center, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(rule.cue).font(.headline)
+                        Label(rule.expansion, systemImage: "arrow.right")
+                            .font(.body)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                    Spacer(minLength: 12)
+                    Button("Edit correction for \(rule.cue)", systemImage: "pencil") {
+                        editor = PersonalizationEditorRequest(section: .corrections, snippet: rule, term: nil)
+                    }
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.borderless)
+                    .help("Edit correction")
+                    Button("Delete correction for \(rule.cue)", systemImage: "trash", role: .destructive) {
+                        removeCorrection(rule.cue)
+                    }
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.borderless)
+                    .help("Delete correction")
+                }
+                .padding(.vertical, 10)
+                Divider()
+            }
+        }
+    }
+
     private var advancedSnippetEditor: some View {
         @Bindable var model = model
         return DisclosureGroup("Advanced snippet list") {
@@ -245,6 +314,30 @@ struct PersonalizationView: View {
                   systemImage: validation.invalidLines.isEmpty ? "checkmark.circle" : "exclamationmark.circle")
                 .font(.caption)
                 .foregroundStyle(validation.invalidLines.isEmpty ? Color.secondary : Theme.danger)
+        }
+        .padding(12)
+        .background(.quaternary.opacity(0.22), in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    private var advancedCorrectionEditor: some View {
+        @Bindable var model = model
+        return DisclosureGroup("Advanced correction list") {
+            TextEditor(text: $model.dictationCorrectionRules)
+                .font(.body.monospaced())
+                .frame(minHeight: 90)
+                .padding(5)
+                .background(.background, in: RoundedRectangle(cornerRadius: 8))
+                .padding(.top, 8)
+            Text("One per line: recognized phrase => corrected phrase. Matches are case-insensitive and respect whole-word boundaries. Raw recognition remains available to restore.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            let validation = DictationCorrectionRules.validation(for: model.dictationCorrectionRules)
+            Label(validation.invalidLines.isEmpty
+                  ? "\(validation.validCount) ready"
+                  : "\(validation.validCount) ready · check line\(validation.invalidLines.count == 1 ? "" : "s") \(validation.invalidLines.map(String.init).joined(separator: ", "))",
+                  systemImage: validation.invalidLines.isEmpty ? "checkmark.circle" : "exclamationmark.circle")
+                .font(.caption)
+                .foregroundStyle(validation.invalidLines.isEmpty ? Color.secondary : Color.orange)
         }
         .padding(12)
         .background(.quaternary.opacity(0.22), in: RoundedRectangle(cornerRadius: 10))
@@ -291,17 +384,26 @@ struct PersonalizationView: View {
         let cue = primary.trimmingCharacters(in: .whitespacesAndNewlines)
         let expansion = (secondary ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         let candidate = "\(cue) => \(expansion)"
-        let validation = DictationSnippetExpander.validation(for: candidate)
+        let isCorrection = request.section == .corrections
+        let validation = isCorrection
+            ? DictationCorrectionRules.validation(for: candidate)
+            : DictationSnippetExpander.validation(for: candidate)
         guard validation.validCount == 1, validation.invalidLines.isEmpty else {
-            return "Enter a cue and its expanded phrase on one line."
+            return isCorrection
+                ? "Enter a recognized phrase and its correction on one line."
+                : "Enter a cue and its expanded phrase on one line."
         }
-        let duplicate = snippets.contains {
+        let existingEntries = isCorrection ? corrections : snippets
+        let duplicate = existingEntries.contains {
             $0.cue.compare(cue, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame &&
                 $0.cue.compare(request.snippet?.cue ?? "", options: [.caseInsensitive, .diacriticInsensitive]) != .orderedSame
         }
-        guard !duplicate else { return "A snippet with that cue already exists." }
+        guard !duplicate else {
+            return isCorrection ? "A correction for that phrase already exists." : "A snippet with that cue already exists."
+        }
 
-        var lines = model.dictationSnippets.components(separatedBy: .newlines)
+        let currentDefinitions = isCorrection ? model.dictationCorrectionRules : model.dictationSnippets
+        var lines = currentDefinitions.components(separatedBy: .newlines)
         if let oldCue = request.snippet?.cue {
             lines.removeAll { line in
                 let parts = line.components(separatedBy: "=>")
@@ -310,7 +412,9 @@ struct PersonalizationView: View {
             }
         }
         lines.append(candidate)
-        model.dictationSnippets = lines.filter { !$0.isEmpty }.joined(separator: "\n")
+        let updated = lines.filter { !$0.isEmpty }.joined(separator: "\n")
+        if isCorrection { model.dictationCorrectionRules = updated }
+        else { model.dictationSnippets = updated }
         return nil
     }
 
@@ -329,6 +433,16 @@ struct PersonalizationView: View {
             DictationVocabulary.terms(from: model.dictationTerms).filter {
                 $0.compare(term, options: [.caseInsensitive, .diacriticInsensitive]) != .orderedSame
             })
+    }
+
+    private func removeCorrection(_ cue: String) {
+        let lines = model.dictationCorrectionRules.components(separatedBy: .newlines).filter { line in
+            let parts = line.components(separatedBy: "=>")
+            guard parts.count >= 2 else { return true }
+            return parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
+                .compare(cue, options: [.caseInsensitive, .diacriticInsensitive]) != .orderedSame
+        }
+        model.dictationCorrectionRules = lines.joined(separator: "\n")
     }
 }
 
@@ -358,15 +472,17 @@ private struct PersonalizationEntryEditor: View {
     var body: some View {
         NavigationStack {
             Form {
-                if section == .snippets {
-                    Section("Spoken cue") {
-                        TextField("For example: my email", text: $cue)
-                        Text("HushKey matches the full cue at the end of a spoken phrase.")
+                if section != .vocabulary {
+                    Section(section == .corrections ? "Recognized phrase" : "Spoken cue") {
+                        TextField(section == .corrections ? "For example: Hush Key" : "For example: my email", text: $cue)
+                        Text(section == .corrections
+                             ? "Corrects complete word or phrase matches in the recognized transcript."
+                             : "HushKey matches the full cue at the end of a spoken phrase.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-                    Section("Expanded phrase") {
-                        TextField("Text to insert into the transcript", text: $expansion)
+                    Section(section == .corrections ? "Use instead" : "Expanded phrase") {
+                        TextField(section == .corrections ? "For example: HushKey" : "Text to insert into the transcript", text: $expansion)
                     }
                 } else {
                     Section("Word or phrase") {
@@ -390,9 +506,7 @@ private struct PersonalizationEntryEditor: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        let message = section == .snippets
-                            ? onSave(cue, expansion)
-                            : onSave(term, nil)
+                        let message = section == .vocabulary ? onSave(term, nil) : onSave(cue, expansion)
                         if let message { validationMessage = message }
                         else { dismiss() }
                     }
@@ -407,6 +521,7 @@ private struct PersonalizationEntryEditor: View {
         switch section {
         case .snippets: initialSnippet == nil ? "New snippet" : "Edit snippet"
         case .vocabulary: initialTerm == nil ? "Add word" : "Edit word"
+        case .corrections: initialSnippet == nil ? "New correction" : "Edit correction"
         }
     }
 }

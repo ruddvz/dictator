@@ -273,6 +273,32 @@ Validate named-target insertion, stale-target rejection, global shortcut inserti
 
 In a fresh session, use the packaged app to test the selected-text shortcut, local instruction capture, preview invalidation, Apply once, undo, stale-target rejection, unsupported/secure controls, and permission refusal in TextEdit and one other app. Record actual results in `docs/TESTING_PROTOCOL.md`; then proceed with voice dictation and remaining file/meeting acceptance.
 
+## Completed — competitor review and local app profiles
+
+- Checked the user-supplied FreeFlow, OpenWhispr, OpenTypeless, Voibe, LumeVoice, SpeakType Reddit, and AssemblyAI sources. The linked feature matrix and roadmap distinguish repository-backed behavior from vendor claims and Reddit anecdotes; no competitor code or assets were copied.
+- Added editable app profiles to **Settings & Data**. With writing mode set to Automatic, a profile selects Natural, Message, Email, or Code and adds local vocabulary hints when dictation starts from that app. Profiles match the frontmost app bundle identifier and stay in local preferences; reading nearby app text remains a separate opt-in.
+- Added validation, case-insensitive profile matching, duplicate replacement, local persistence, visible last-capture profile status, and unit coverage. Updated README, product plan, and competitor roadmap.
+- `xcodebuild ... test`: **48 passed, 0 failed, 0 skipped** on the MacBook Pro. The CoreSimulator framework warning remains environmental; macOS tests completed.
+- An exploratory macOS UI test encountered a system Automation permission prompt and unreliable offscreen sidebar geometry. No Automation permission was granted; the UI test target was removed so normal tests and CI remain usable. Manual navigation and live audio/insertion acceptance remain open.
+- Rebuilt `dist/HushKey.app`, verified its strict code signature and `com.ruddvz.hushkey` identity, closed the older `/Users/rudra/Projects/HushKey` build, and launched the packaged app. The only HushKey process now runs from this `dist` bundle.
+
+## Next item — live end-to-end acceptance
+
+With the user present, validate the latest packaged app in TextEdit and a second app: voice and whisper capture, profile selection, selected-text edit preview/apply/undo, guarded insertion/recovery, file transcription, and meeting sources. Record outcomes in `docs/TESTING_PROTOCOL.md`; do not treat unit tests as proof that device permissions or live capture passed.
+
+## Completed — local transcription correction rules
+
+- Added a Corrections section to **Snippets & Vocabulary** with add/edit/delete, search, an advanced list editor, malformed-line validation, and local preference storage.
+- Rules replace case-insensitive whole words or phrases before filler cleanup, writing-mode formatting, and snippet expansion. They do not change the raw recognition; the existing Restore original recognition action still returns it.
+- Added regression coverage for punctuation, whole-phrase boundaries, formatting order, malformed/duplicate rules, and the independent explicit spoken-correction setting. Updated README, acceptance protocol, product plan, and competitor roadmap.
+- `xcodebuild ... test`: **49 passed, 0 failed, 0 skipped** on the MacBook Pro. The CoreSimulator version warning remains unrelated to macOS test execution.
+- Rebuilt `dist/HushKey.app`; strict signature verification passed. Computer Use confirms the packaged app opens to Dictation with the microphone off and the latest bundle as the only running HushKey instance.
+- Both GitHub Actions build-and-test runs for commit `66c0f63` passed on PR #1.
+
+## Next item — live correction and voice acceptance
+
+Navigate to Snippets & Vocabulary and validate rule creation/deletion, then dictate a real phrase to confirm correction application and raw restore. Continue the outstanding microphone, insertion, file, and meeting acceptance checks. Do not claim these paths passed until verified in the live app.
+
 ## Completed — Fog & sage palette, fn key, voice ribbon pill
 
 - Replaced the warm paper/amber/serif look (too close to Wispr Flow) with **Fog & sage**: cool fog surfaces, charcoal ink, one sage `signal` accent, SF Pro Rounded display type. The next-step banner is now a light sage panel instead of a dark gradient. Stray reds/oranges/greens in Use, Evaluate, Vocabulary and the capture pad now use theme tokens. Tokens are in `docs/DESIGN_SYSTEM.md`.

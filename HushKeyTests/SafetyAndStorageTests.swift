@@ -299,6 +299,20 @@ final class SafetyAndStorageTests: XCTestCase {
         XCTAssertEqual(result, "Send my Hello team, my name is Rudra, please.")
     }
 
+    func testLocalCorrectionRulesFixWholePhrasesBeforeFormatting() {
+        XCTAssertEqual(DictationCorrectionRules.apply(
+            to: "I said hush key, not Hush Keybird. Gray.",
+            rules: "Hush Key => HushKey\nGray => grey"),
+            "I said HushKey, not Hush Keybird. grey.")
+        XCTAssertEqual(DictationTranscriptProcessor.process(
+            "Hush Key new line team", mode: .message, snippets: "",
+            applyCorrections: false, correctionRules: "Hush Key => HushKey"), "HushKey\nteam")
+        let validation = DictationCorrectionRules.validation(
+            for: "Hush Key => HushKey\nbad line\nhush key => another")
+        XCTAssertEqual(validation.validCount, 1)
+        XCTAssertEqual(validation.invalidLines, [2, 3])
+    }
+
     func testSpokenCorrectionsReplaceThePreviousPhraseAndKeepRawInputSeparate() {
         XCTAssertEqual(DictationBacktrack.apply(to: "Send it to Alice, actually Bob."), "Send it to Bob.")
         XCTAssertEqual(DictationBacktrack.apply(to: "Use the old route, scratch that, new route."), "Use the new route.")
@@ -352,6 +366,30 @@ final class SafetyAndStorageTests: XCTestCase {
         let hints = DictationContextHintExtractor.extract(from: "Deploy AlphaWidget with build_v3 to project Redwood", limit: 2)
         XCTAssertEqual(hints.count, 2)
         XCTAssertTrue(hints.allSatisfy { ["AlphaWidget", "build_v3", "Redwood"].contains($0) })
+    }
+
+    func testAppProfilesOverrideAutomaticModeAndAddLocalVocabulary() {
+        let profile = DictationAppProfile(appName: "Slack", bundleIdentifier: "com.tinyspeck.slackmacgap",
+                                          mode: .message, vocabulary: "HushKey, team sync\nhushkey")
+        XCTAssertEqual(DictationAppProfile.resolvedMode(requested: .automatic,
+                                                         bundleIdentifier: "COM.TINYSPECK.SLACKMACGAP",
+                                                         profiles: [profile]), .message)
+        XCTAssertEqual(DictationAppProfile.resolvedMode(requested: .email,
+                                                         bundleIdentifier: profile.bundleIdentifier,
+                                                         profiles: [profile]), .email)
+        XCTAssertEqual(DictationAppProfile.resolvedMode(requested: .automatic,
+                                                         bundleIdentifier: "com.apple.mail",
+                                                         profiles: [profile]), .email)
+        XCTAssertEqual(DictationAppProfile.vocabulary(for: profile.bundleIdentifier, in: [profile]),
+                       ["HushKey", "team sync"])
+        XCTAssertTrue(DictationAppProfile.isValidBundleIdentifier("com.example.editor"))
+        XCTAssertFalse(DictationAppProfile.isValidBundleIdentifier("editor"))
+
+        let replacement = DictationAppProfile(appName: "Slack", bundleIdentifier: profile.bundleIdentifier,
+                                              mode: .code, vocabulary: "PR-482")
+        let updated = DictationAppProfile.upserting(replacement, into: [profile])
+        XCTAssertEqual(updated.count, 1)
+        XCTAssertEqual(updated.first?.mode, .code)
     }
 
     func testDictationHistoryLoadsEntriesWithoutRawTranscriptField() throws {

@@ -13,6 +13,7 @@ struct PageHeader: View {
             }
             Text(title)
                 .font(.display(30))
+                .accessibilityIdentifier("page.header")
                 .tracking(-0.3)
             Text(subtitle)
                 .font(.system(size: 13.5))

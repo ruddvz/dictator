@@ -14,7 +14,7 @@ struct DictationLanguage: Identifiable, Hashable {
     .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
 }
 
-enum DictationMode: String, CaseIterable, Identifiable {
+enum DictationMode: String, CaseIterable, Identifiable, Codable {
     case automatic = "Automatic"
     case natural = "Natural"
     case message = "Message"
@@ -44,6 +44,54 @@ enum DictationMode: String, CaseIterable, Identifiable {
             bundle.contains("jetbrains") || bundle == "com.apple.terminal" ||
             bundle == "com.googlecode.iterm2" || bundle == "com.mitchellh.ghostty" { return .code }
         return .natural
+    }
+}
+
+struct DictationAppProfile: Codable, Identifiable, Equatable {
+    var appName: String
+    var bundleIdentifier: String
+    var mode: DictationMode
+    var vocabulary: String
+
+    var id: String { Self.normalizedBundleIdentifier(bundleIdentifier) }
+
+    static func normalizedBundleIdentifier(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    static func isValidBundleIdentifier(_ value: String) -> Bool {
+        guard value.utf8.count <= 255,
+              let expression = try? NSRegularExpression(pattern: #"^[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$"#) else { return false }
+        let range = NSRange(value.startIndex..., in: value)
+        return expression.firstMatch(in: value, range: range)?.range == range
+    }
+
+    static func profile(for bundleIdentifier: String?, in profiles: [DictationAppProfile]) -> DictationAppProfile? {
+        guard let bundleIdentifier else { return nil }
+        let key = normalizedBundleIdentifier(bundleIdentifier)
+        guard !key.isEmpty else { return nil }
+        return profiles.first { normalizedBundleIdentifier($0.bundleIdentifier) == key }
+    }
+
+    static func upserting(_ profile: DictationAppProfile, into profiles: [DictationAppProfile]) -> [DictationAppProfile] {
+        let key = normalizedBundleIdentifier(profile.bundleIdentifier)
+        guard !key.isEmpty else { return profiles }
+        var result = profiles.filter { normalizedBundleIdentifier($0.bundleIdentifier) != key }
+        result.append(profile)
+        return result.sorted { $0.appName.localizedStandardCompare($1.appName) == .orderedAscending }
+    }
+
+    static func resolvedMode(requested: DictationMode, bundleIdentifier: String?, profiles: [DictationAppProfile]) -> DictationMode {
+        guard requested == .automatic else { return requested }
+        if let profile = profile(for: bundleIdentifier, in: profiles), profile.mode != .automatic {
+            return profile.mode
+        }
+        return DictationMode.resolved(requested, bundleIdentifier: bundleIdentifier)
+    }
+
+    static func vocabulary(for bundleIdentifier: String?, in profiles: [DictationAppProfile]) -> [String] {
+        guard let profile = profile(for: bundleIdentifier, in: profiles) else { return [] }
+        return DictationVocabulary.terms(from: profile.vocabulary)
     }
 }
 
@@ -188,13 +236,26 @@ enum DictationModeFormatter {
 
 enum DictationTranscriptProcessor {
     static func process(_ raw: String, mode: DictationMode, snippets: String,
-                        applyCorrections: Bool = true, cleanupFillers: Bool = false) -> String {
+                        applyCorrections: Bool = true, cleanupFillers: Bool = false,
+                        correctionRules: String = "") -> String {
         var result = applyCorrections ? DictationBacktrack.apply(to: raw) : raw
+        result = DictationCorrectionRules.apply(to: result, rules: correctionRules)
         if cleanupFillers { result = DictationLocalCleanup.removeFillers(from: result) }
         if mode == .code { result = DictationCodeFormatter.format(result) }
         else { result = DictationModeFormatter.format(result, mode: mode) }
         return DictationSnippetExpander.expand(result, definitions: snippets)
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+enum DictationCorrectionRules {
+    static func validation(for rules: String) -> (validCount: Int, invalidLines: [Int]) {
+        DictationSnippetExpander.validation(for: rules)
+    }
+
+    /// Corrects complete words or phrases with local rules before formatting and snippet expansion.
+    static func apply(to text: String, rules: String) -> String {
+        DictationSnippetExpander.expand(text, definitions: rules)
     }
 }
 
