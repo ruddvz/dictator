@@ -1,5 +1,14 @@
 # HushKey progress
 
+## Completed — bound meeting summary reduction (2026-11-02)
+
+- Fixed a non-terminating local Meeting Notes transform path: when chunk summaries remain over the size limit, HushKey now requires actual shrinkage and stops after at most four reduction passes.
+- If the on-device model cannot condense the transcript enough, the transform returns a clear local error and leaves the transcript unchanged.
+- Added regression coverage for unchanged/expanded model output and the maximum pass limit.
+- `xcodebuild ... test`: 116 passed, 2 skipped, 0 failed. The existing CoreSimulator version warning remains; the macOS test run passed.
+- Rebuilt `dist/HushKey.app`, passed strict signature verification, and reopened the packaged app. No capture or permission prompts were started.
+- Next fresh-session step: complete consented live acceptance for microphone/Speech, Meeting Notes cancellation and summary, dictation shortcuts, selected-text editing/insertion, and file exports; record any failures here.
+
 ## Completed — persist file transcript edits before switching (2026-11-02)
 
 - Fixed the 500 ms autosave race: restoring another file transcript or starting transcription of a newly selected file now saves the active transcript first. Clicking the already active history row is a no-op, so it cannot reload stale text over an edit.

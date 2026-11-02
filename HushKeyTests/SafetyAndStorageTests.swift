@@ -384,6 +384,20 @@ final class SafetyAndStorageTests: XCTestCase {
         XCTAssertEqual(chunks.joined(separator: " "), source.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
+    func testMeetingSummaryReductionStopsWhenTheModelDoesNotCondense() {
+        XCTAssertEqual(LocalTransformService.meetingReductionDecision(
+            currentCharacterCount: 20_000, combinedCharacterCount: 20_000, reductionPass: 0), .noProgress)
+        XCTAssertEqual(LocalTransformService.meetingReductionDecision(
+            currentCharacterCount: 20_000, combinedCharacterCount: 20_001, reductionPass: 0), .noProgress)
+    }
+
+    func testMeetingSummaryReductionHasABoundedNumberOfPasses() {
+        XCTAssertEqual(LocalTransformService.meetingReductionDecision(
+            currentCharacterCount: 20_000, combinedCharacterCount: 19_999, reductionPass: 3), .continueReduction)
+        XCTAssertEqual(LocalTransformService.meetingReductionDecision(
+            currentCharacterCount: 20_000, combinedCharacterCount: 19_999, reductionPass: 4), .maximumPassesReached)
+    }
+
     @MainActor
     func testMeetingSummaryAndActionItemsRunWithLocalModelWhenAvailable() async throws {
         let transforms = LocalTransformService()
