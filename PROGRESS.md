@@ -385,3 +385,17 @@ Test Apple Speech and downloaded WhisperKit transcription, editing, TXT/SRT/WebV
 ## Next item — live acceptance with the user
 
 Give the build Accessibility access and set Globe to Do Nothing. Then, with the user speaking, check: fn hold and double-tap in TextEdit, Safari or Chrome, and Slack; the paste fallback and clipboard restore; Esc; Retry and Paste again. Record the results in `docs/TESTING_PROTOCOL.md`.
+
+## Completed — Wispr-level layout pass (2026-11-01)
+
+- **Measured Wispr Flow** (home, Dictionary, Snippets, Transforms, Notetaker, Settings, idle bar) and recorded a token table in `docs/DESIGN_SYSTEM.md`. Matched structure, spacing and type sizes; kept Fog & sage, SF Pro Rounded, MorphIcon and the voice ribbon.
+- **New shared pieces** (`Components.swift`): `SettingsGroup`/`SettingsRow`/`GroupRow`, `ListGroup`/`ListRow`, `MenuPicker`, `RowToggle`, `UnderlineTabs`, `EmptyState`, `LabProgress`, `LabHero`. Buttons are now 36 pt rounded rectangles; type scale is 28/22/18/16/15/13/12. No stock `GroupBox` remains in the pages.
+- **Pages:** Settings (section nav, grouped rows, privacy card, About with version), Dictation home (1040 column, 52 pt history rows), Transforms (card grid, text card with Preview, preview card), Files (hero, engine rows, recent list), Meeting notes (capture hero, note list, sectioned editor), Vocabulary (tabs with counts, hero with your own examples, hover rows), Silent Lab (shared progress strip; Setup hero with live metrics; Train word list and capture hero; Evaluate verdict card, feature chips, evidence rows; Silent Use lock hero and capture rows).
+- **Pill:** one `SpeechEnvelope` drives the ribbon, bars and morph icon. The morph icon used a fixed 0.3 threshold (noise moved it; quiet mics never did) and the ribbon floor rose per sample, flattening long sentences. A dictation started with no field focused is now typed if a field has focus when it ends; otherwise the card stays with Copy (⌘C) and, if typing is off, a link to turn it on.
+- Screenshot-checked side by side with Wispr: Settings, home, Transforms, Vocabulary vs Dictionary, Meeting notes vs Notetaker, idle bar. Files and Silent Lab have no Wispr equivalent and were checked on their own.
+- Tests: 95 ran, 93 passed, 2 skipped, 0 failed (6 new `SpeechEnvelopeTests`).
+- **Not verified live:** the pill's hover, listening, finished-card and error states, and the new "type into the field focused at the end" path. Both need a spoken dictation with Accessibility access.
+
+## Next item — live acceptance with the user (unchanged, now including the pill)
+
+Same as above, plus: start a dictation with no field focused, click into TextEdit while talking, and confirm it types there; with typing off, confirm the card shows Copy and the "Type for me next time" link.

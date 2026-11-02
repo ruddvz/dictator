@@ -1,6 +1,6 @@
 # HushKey design system
 
-_Fog & sage (replaced Warm editorial, which read too close to Wispr Flow). Updated 2026-11-01. Source of truth: `HushKey/Views/Theme.swift`._
+_Fog & sage (replaced Warm editorial, which read too close to Wispr Flow). Layout measured against Wispr Flow 1.6 on 2026-11-01. Source of truth: `HushKey/Views/Theme.swift` and `HushKey/Views/Components.swift`._
 
 The codes follow the dimensional-drawing convention (S spacing, R radius, H/I sizes, W width) so a spec sheet of any component can reference them directly. Values are points.
 
@@ -36,11 +36,37 @@ Nested corners: a card inside the sheet sits at least S4 from the sheet edge, so
 | Code | Token | Value | Use |
 | --- | --- | --- | --- |
 | W | `Theme.pageWidth` | 800 | page column, centered |
-| WS | sidebar | 216 | fixed sidebar |
-| H1 | `Theme.sidebarRow` | 34 | sidebar row |
-| H2 | `Theme.controlHeight` | 32 | primary/secondary buttons |
-| H3 | chip | 24 | status chips, mode menu |
-| I1 | `Theme.icon` | 16 | inline icons, morph icon in buttons |
+| WH | `Theme.homeWidth` | 1040 | Dictation home, Train, Meeting notes (main column + 248 side card) |
+| WS | `Theme.sidebarWidth` | 216 | fixed sidebar |
+| H1 | `Theme.sidebarRow` | 36 | sidebar and settings-nav rows, 4 pt apart |
+| H2 | `Theme.controlHeight` | 36 | buttons, menus, search fields |
+| H3 | `Theme.listRow` | 52 | minimum list row |
+| H4 | settings row | ≥ 64 | label + description + control, 18 pt vertical padding |
+| WM | `Theme.menuWidth` | 196 | right-aligned menus in settings rows |
+| RC | `Theme.controlRadius` | 10 | buttons, menus, fields |
+| I1 | `Theme.icon` | 18 | inline icons |
+
+## Wispr Flow measurements
+
+Measured from Wispr Flow 1.6 (Electron) in a 1350 × 850 pt window with background accessibility frames and 1.5× zooms. Values are points. Only structure and spacing are matched; HushKey keeps its own palette, type face, icon set, MorphIcon and voice ribbon.
+
+| Element | Wispr Flow | HushKey |
+| --- | --- | --- |
+| Sidebar | 216 wide; rows 192 × 36 at x 12, 40 pitch; icon 18; label ~15.5 regular | 216; rows 36, 4 gap; icon 16 regular; label 15 regular, semibold when selected |
+| Content sheet | Inset 8 from window edge, radius ~16, starts below a 45 pt toolbar strip | Inset 8, `r1` 16 |
+| Page column | 800 centered (Dictionary, Snippets, Transforms); home spans ~1040 with 40 margins | `pageWidth` 800; `homeWidth` 1040 |
+| Page title | 28 semibold sans; ~48 below the sheet top; actions right-aligned on the same line | `hkTitle1` 28 rounded semibold; `PageHeader` takes trailing actions |
+| Buttons | 36 high, radius ~10, 16 horizontal padding, 15–16 medium; primary filled dark, secondary neutral fill | 36, `controlRadius` 10, 16 padding, `hkControl` 15 medium; primary sage, secondary `hover` fill, destructive red text |
+| Tabs | Text tabs 16, 2 pt underline under the selected one, hairline under the bar | `UnderlineTabs` 15, 2 pt ink underline (matched geometry) |
+| Hero banner | Full-width, ~180 high, radius 16, 32 padding, 32 serif title, chips 36 high | `signalSoft` hero, 28 padding, 26–28 rounded title, example chips 36 high |
+| Lists | Outlined container, radius 12, 1 pt hairline, rows 52–53, text 16, 16 padding | `ListGroup` / `ListRow`, `r2` 12, rows ≥ 52, `hkBody` 16, 16 padding, hover fill + actions |
+| History row | Time column 82 + 16 gap, time 14 gray, text 16 on 20 line | Same: time 14 `ink2`, 82 wide; text 16, 3 pt line spacing |
+| Stats card | 248 wide, 24 padding, numbers 28, labels 16 | 248, 24 padding, `display(28)`, labels 15 |
+| Settings | Modal: 208 nav (caps section headers 11, rows 36) + content; serif 26 title; grouped filled card radius 12, 20 side padding; rows ~88 for two lines; label 16 medium, description 15 gray; controls 164 × 36 right-aligned | In-page: 176 nav + content; `SettingsGroup` (`well`, `r2`, 20 side padding), `SettingsRow` (`hkRowTitle` 16 medium, `hkCallout` 15, control right), `MenuPicker` 196 × 36, `RowToggle` |
+| Transform cards | 3-column grid, ~210 × 165, shortcut chip, 16 semibold title, 14 gray description, dashed "Create your own" | `TransformCard` 3 columns, min 132 high, badge chip, `hkHeadline`, `hkCaption`; dashed create card |
+| Toolbar icons | 28 × 28 | `IconButtonStyle` 30 × 30 |
+| Row hover | Fill plus trailing actions (play, copy, more) appear on hover | `ListRow`: `well` fill, actions fade and slide in 6 pt |
+| Idle dictation bar | ~40 × 8 capsule centered ~20 above the screen bottom | 46 × 13 sage-on-dark capsule |
 
 ## Color
 
@@ -65,9 +91,23 @@ Pill surface is always dark: #141B17 with sage #9CCBB4 strokes. The system accen
 
 ## Type
 
-- **Display:** SF Pro Rounded semibold (`Font.display`) for page titles (30), the greeting (32), banner titles (24), and stat numbers (28). The serif was dropped: it was Wispr's signature.
-- **Text:** SF Pro, 13.5 body, 13 controls, 12 metadata, 11 semibold tracked caps for section labels (`SectionLabel`).
-- Captions are for metadata, not instructions. If a control needs a paragraph to explain it, the control is wrong.
+Matched to Wispr's measured sizes; SF Pro / SF Pro Rounded instead of Wispr's sans and serif.
+
+| Token | Size / weight | Use |
+| --- | --- | --- |
+| `hkTitle1` | 28 rounded semibold | page titles, greeting |
+| `hkTitle2` | 22 rounded semibold | note titles, large values |
+| `hkTitle3` | 18 semibold | group and section titles |
+| `hkHeadline` | 16 semibold | card titles |
+| `hkRowTitle` | 16 medium | settings and list row labels |
+| `hkBody` | 16 | reading text, list rows, editors |
+| `hkCallout` | 15 | row descriptions, subtitles |
+| `hkControl` | 15 medium | buttons, menus |
+| `hkCaption` | 13 | status lines |
+| `hkMeta` | 12 | timestamps, counts |
+
+- **Display:** `Font.display` (SF Pro Rounded) for titles, hero copy and big numbers. The serif stays Wispr's.
+- Descriptions are one line, two at most. If a control needs a paragraph, the control is wrong.
 
 ## Motion
 
@@ -78,16 +118,22 @@ Pill surface is always dark: #141B17 with sage #9CCBB4 strokes. The system accen
 
 - **Page switch:** fade + 8 pt rise on insert, fade on removal.
 - **Morph icon (`MorphIcon`):** one 25-point stroked line that blends between hush → waveform → spinner → check over 0.45 s (ease-out cubic). Used in the brand mark, the Dictate button, the composer header, the empty history state, and the floating pill.
-- **Pill:** idle sage bar → hover hint → listening (cancel ×, `VoiceRibbon`, elapsed time, stop) → "Writing it up" → check with "Typed" (or "Ready in HushKey") for 1.4 s → idle. Errors replace the done state: `Theme.danger` icon, short message and dismiss ×, plus Retry and/or Paste again as titled `PillIconButton` capsules. The error stays until it is dismissed or acted on. **Transcript card:** a 340 pt dark card (#141B17, radius `r1`) sits 8 pt above the pill with a sage glyph, an optional grey hint, ×, and the last three lines of text at 17 pt white; the finished no-target card adds a sage `PrimaryButtonStyle` Copy. `VoiceRibbon` is three flowing lines that swell with speech above an adaptive noise floor (fast rise, slow fall), so silence stays calm instead of looking like a broken meter.
+- **Speech envelope (`SpeechEnvelope`):** the ribbon, the bars and the morph icon all measure speech the same way: level above a room-noise floor that falls at once and rises 0.02 per second, gate 0.06, span 0.4. Silence stays calm; a long sentence keeps moving.
+- **Pill:** idle sage bar → hover hint → listening (cancel ×, `VoiceRibbon`, elapsed time, stop) → "Writing it up" → check with "Typed" (or "Ready in HushKey") for 1.4 s → idle. Errors replace the done state: `Theme.danger` icon, short message and dismiss ×, plus Retry and/or Paste again as titled `PillIconButton` capsules. The error stays until it is dismissed or acted on. **Transcript card:** a 340 pt dark card (#141B17, radius `r1`) sits 8 pt above the pill with a sage glyph, an optional grey hint, ×, and the last three lines of text at 17 pt white; the finished no-target card adds a dark-on-sage Copy (⌘C) and, when typing into apps is off, a "Type for me next time" link to Settings → Insertion. A dictation started with no text field focused is still typed if a field has focus when it finishes. `VoiceRibbon` is three flowing lines that swell with speech above an adaptive noise floor (fast rise, slow fall), so silence stays calm instead of looking like a broken meter.
 - **Sidebar:** icon bounces on selection; rows fade their fill on hover.
 - **History:** rows slide in from the top, delete animates out, hover actions slide in 6 pt.
 
 ## Components
 
-`card(style: .well | .outlined)`, `PrimaryButtonStyle`, `SecondaryButtonStyle`, `IconButtonStyle`, `Keycap` / `KeycapShortcut`, `MorphIcon`, `VoiceRibbon`, `LiveWaveform`, `StatusChip`, `SectionLabel`, `ActivityHeatmap`, `PageHeader`, `pageLayout()`, `CardGroupBoxStyle` (applied to every `GroupBox`).
+- **Surfaces:** `card(style: .well | .outlined)`, `SettingsGroup`, `GroupRow`, `ListGroup`, `RowDivider`.
+- **Rows:** `SettingsRow` (label, one-line detail, right-aligned control), `ListRow` (hover fill and actions).
+- **Controls:** `PrimaryButtonStyle(tint:foreground:)`, `SecondaryButtonStyle(minWidth:)`, `DestructiveButtonStyle`, `IconButtonStyle`, `MenuPicker`, `RowToggle`, `UnderlineTabs`, `Keycap` / `KeycapShortcut`.
+- **Page:** `PageHeader` (title, optional subtitle, trailing actions), `pageLayout(maxWidth:)`, `EmptyState`.
+- **Silent Lab:** `LabProgress` (Connect → Train → Evaluate → Silent Use strip on every lab page), `LabHero`, `HeroMetric`.
+- **Motion:** `MorphIcon`, `VoiceRibbon`, `LiveWaveform`, `StatusChip`, `SectionLabel`, `ActivityHeatmap`.
 
 ## Open items
 
-- Settings rows still carry long explanatory captions from the old layout; convert them to label + one-line description + right-aligned control.
-- Transforms, Files, and the Silent Lab pages use the shared tokens through `GroupBox` and `pageLayout()`, but their inner controls haven't been individually redesigned.
-- Banner is now `signalSoft`; check its contrast in dark mode by eye.
+- Sheets (writing-style editor, vocabulary entry editor) still use stock form layout.
+- Hover and listening states of the pill and the transcript card were not screenshot-checked; they need a live dictation.
+- Check `signalSoft` hero contrast in dark mode by eye.
