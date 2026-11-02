@@ -191,7 +191,7 @@ With the user present, verify transcript editing and recovery plus the voice, fi
 - Applied the same prioritized list to Dictation and Meeting Notes; the 100-hint cap is centralized and enforced at the Speech boundary.
 - Updated Personalization to explain hint priority and the per-capture limit. Added overflow coverage for stable order, deduplication, and priority when the 100-term limit is reached.
 - xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build test: 42 passed, 0 failed, 0 skipped.
-- Release build succeeded and passed strict ad-hoc code-signature verification at .build/Build/Products/Release/HushKey.app.
+- Release build succeeded and passed strict ad-hoc code-signature verification at .build/Build/Products/Release/HushKey.app. scripts/package-app.sh refreshed dist/HushKey.app from that source and the packaged bundle also passed signature verification with HushKey display name and com.ruddvz.hushkey identifier.
 - Computer Use opened that Release app and confirmed the Dictation screen shows the microphone off until explicitly started. The UI pipe closed during navigation, so other screens were not visually checked.
 
 ## Next item — manual runtime acceptance
