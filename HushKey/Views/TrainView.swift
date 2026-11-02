@@ -5,123 +5,124 @@ struct TrainView: View {
     @State private var newWord = ""
 
     var body: some View {
-        VStack(spacing: 0) {
-            PageHeader(
-                eyebrow: "Step 2 · Collect examples",
-                title: "Train your vocabulary",
-                subtitle: "Record one word at a time under voice, whisper, or silent-mouthing conditions. Keep the sessions distinct for a fair holdout test.")
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 24)
-                .padding(.top, 22)
-                .padding(.bottom, 12)
-
-            HSplitView {
-                vocabulary
-                    .frame(minWidth: 210, idealWidth: 230, maxWidth: 290)
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Theme.s5) {
+                PageHeader(eyebrow: "", title: "Train",
+                           subtitle: "Ten takes of each word, five words or more. Keep sessions separate for a fair test.")
+                LabProgress()
+                HStack(alignment: .top, spacing: Theme.s5) {
+                    vocabulary.frame(width: 260)
+                    VStack(alignment: .leading, spacing: Theme.s5) {
                         capturePanel
                         takes
                     }
-                    .frame(maxWidth: 760, alignment: .leading)
-                    .padding(20)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(minWidth: 500)
             }
+            .pageLayout(maxWidth: Theme.homeWidth)
         }
     }
 
     private var vocabulary: some View {
         @Bindable var model = model
-        return VStack(spacing: 0) {
+        return VStack(alignment: .leading, spacing: Theme.s3) {
             HStack {
-                Text("VOCABULARY")
-                    .font(.hkCaption.weight(.semibold))
-                    .tracking(0.8)
-                    .foregroundStyle(Theme.ink2)
+                Text("Words").font(.hkTitle3)
                 Spacer()
-                Text("\(model.dataset.vocabulary.count) words")
-                    .font(.hkCaption.monospacedDigit())
-                    .foregroundStyle(Theme.ink2)
+                Text("\(model.dataset.vocabulary.count)")
+                    .font(.hkCallout.monospacedDigit())
+                    .foregroundStyle(Theme.ink3)
             }
-            .padding(.horizontal, 12)
-            .padding(.top, 12)
-            .padding(.bottom, 4)
-            List(selection: $model.selectedWord) {
-                ForEach(model.dataset.vocabulary, id: \.self) { word in
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            Text(word)
-                            Spacer()
-                            Text("\(min(model.templateCount(for: word, condition: model.trainingCondition), 10))/10")
-                                .monospacedDigit()
-                                .foregroundStyle(Theme.ink2)
-                        }
-                        ProgressView(value: min(Double(model.templateCount(for: word, condition: model.trainingCondition)), 10), total: 10)
-                    }
-                    .padding(.vertical, 2)
-                    .tag(word)
-                    .contextMenu {
-                        Button("Delete “\(word)” and its takes", role: .destructive) { model.removeWord(word) }
-                    }
-                }
-            }
-            HStack {
-                TextField("Add word", text: $newWord)
-                    .textFieldStyle(.roundedBorder)
+            HStack(spacing: Theme.s2) {
+                TextField("Add a word", text: $newWord)
+                    .textFieldStyle(.plain)
+                    .font(.hkBody)
                     .onSubmit(addWord)
                 Button("Add", systemImage: "plus", action: addWord)
-                    .labelStyle(.iconOnly)
+                    .buttonStyle(IconButtonStyle())
                     .accessibilityLabel("Add word to vocabulary")
                     .disabled(newWord.trimmingCharacters(in: .whitespaces).isEmpty)
             }
-            .padding(10)
+            .padding(.leading, Theme.s3)
+            .padding(.trailing, 3)
+            .frame(height: Theme.controlHeight)
+            .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
+                .strokeBorder(Theme.hairline, lineWidth: 1))
+
+            if model.dataset.vocabulary.isEmpty {
+                Text("Short, distinct words work best: yes, no, stop, next, send.")
+                    .font(.hkCallout)
+                    .foregroundStyle(Theme.ink2)
+                    .padding(.top, Theme.s1)
+            } else {
+                VStack(spacing: 2) {
+                    ForEach(model.dataset.vocabulary, id: \.self) { word in
+                        WordRow(word: word,
+                                count: model.templateCount(for: word, condition: model.trainingCondition),
+                                isSelected: model.selectedWord == word) {
+                            model.selectedWord = word
+                        }
+                        .contextMenu {
+                            Button("Delete “\(word)” and its takes", role: .destructive) { model.removeWord(word) }
+                        }
+                    }
+                }
+            }
         }
     }
 
     private var capturePanel: some View {
         @Bindable var model = model
-        let word = model.selectedWord ?? "—"
-        return GroupBox("Training setup") {
-            VStack(alignment: .leading, spacing: 10) {
-                Picker("Condition", selection: $model.trainingCondition) {
-                    ForEach(SessionRecorder.Condition.allCases) { Text($0.rawValue).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                HStack {
-                    Label("Session \(model.experimentSessionID.uuidString.prefix(8))", systemImage: "square.stack.3d.up")
-                        .font(.hkCaption.monospaced())
+        let word = model.selectedWord ?? "a word"
+        return VStack(alignment: .leading, spacing: Theme.s4) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("“\(word)”").font(.display(28)).tracking(-0.3)
+                    Text(conditionGuidance)
+                        .font(.hkCallout)
                         .foregroundStyle(Theme.ink2)
-                    Button("New session", systemImage: "plus") { model.beginNewExperimentSession() }
-                    Spacer()
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                Text(conditionGuidance)
-                    .foregroundStyle(Theme.ink2)
-                HoldToCaptureButton(
-                    title: "Capture “\(word)”",
-                    shortcut: model.captureShortcut.label,
-                    isCapturing: model.capture.isCapturing,
-                    isEnabled: model.selectedWord != nil && model.motion.status == .streaming,
-                    onBegin: model.capture.begin,
-                    onEnd: model.capture.end)
+                Spacer(minLength: Theme.s3)
+                MenuPicker(selection: $model.trainingCondition,
+                           options: SessionRecorder.Condition.allCases.map { ($0, $0.rawValue) },
+                           width: 140)
+            }
+            HoldToCaptureButton(
+                title: "Capture “\(word)”",
+                shortcut: model.captureShortcut.label,
+                isCapturing: model.capture.isCapturing,
+                isEnabled: model.selectedWord != nil && model.motion.status == .streaming,
+                onBegin: model.capture.begin,
+                onEnd: model.capture.end)
+            HStack(spacing: Theme.s2) {
                 if model.motion.status != .streaming {
                     Label(model.motion.status.label, systemImage: "headphones")
                         .font(.hkCaption)
                         .foregroundStyle(Theme.finishing)
+                } else {
+                    Label("Session \(model.experimentSessionID.uuidString.prefix(8))", systemImage: "square.stack.3d.up")
+                        .font(.hkCaption.monospaced())
+                        .foregroundStyle(Theme.ink3)
                 }
+                Spacer()
+                Button("New session", systemImage: "plus") { model.beginNewExperimentSession() }
+                    .buttonStyle(SecondaryButtonStyle())
             }
-            .padding(6)
         }
+        .padding(Theme.s6 - 4)
+        .background(Theme.signalSoft, in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
     }
 
     private var conditionGuidance: String {
         switch model.trainingCondition {
         case .normal:
-            "Say the selected word at a natural volume while holding capture. Aim for 10 takes across each of at least 5 words."
+            "Say it out loud while you hold capture."
         case .whisper:
-            "Whisper the selected word while holding capture. Keep this condition separate from normal voice and silent mouthing."
+            "Whisper it while you hold capture."
         case .silent:
-            "Mouth the word without voicing it. Collect 10 takes for each of at least 5 words, across multiple sessions."
+            "Mouth it without a sound while you hold capture."
         }
     }
 
@@ -129,30 +130,34 @@ struct TrainView: View {
     private var takes: some View {
         if let word = model.selectedWord {
             let takes = model.templates(for: word, condition: model.trainingCondition).reversed()
-            GroupBox("\(word) · \(takes.count) \(model.trainingCondition.rawValue.lowercased()) examples") {
+            VStack(alignment: .leading, spacing: Theme.s3) {
+                HStack {
+                    Text("Takes").font(.hkTitle3)
+                    Spacer()
+                    Text("\(takes.count) \(model.trainingCondition.rawValue.lowercased())")
+                        .font(.hkCallout.monospacedDigit())
+                        .foregroundStyle(Theme.ink3)
+                }
                 if takes.isEmpty {
-                    Text("No takes yet.")
-                        .foregroundStyle(Theme.ink2)
-                        .frame(maxWidth: .infinity, minHeight: 60)
+                    EmptyState(systemImage: "waveform.path", title: "No takes yet",
+                               message: "Hold capture and mouth “\(word)”. Each take appears here.")
+                        .card(padding: 0, style: .outlined)
                 } else {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 10)], spacing: 10) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: Theme.s3)], spacing: Theme.s3) {
                         ForEach(Array(takes)) { take in
                             TakeTile(template: take, isNew: take.id == model.lastTemplateID) {
                                 model.deleteTemplate(take.id)
                             }
+                            .transition(.scale(scale: 0.9).combined(with: .opacity))
                         }
                     }
-                    .padding(6)
+                    .animation(Theme.gentle, value: takes.count)
                 }
             }
         } else {
-            GroupBox("Start with a word") {
-                Label("Add a short word in the vocabulary list, then choose it to capture examples.", systemImage: "plus.circle")
-                    .font(.hkCallout)
-                    .foregroundStyle(Theme.ink2)
-                    .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
-                    .padding(8)
-            }
+            EmptyState(systemImage: "plus.circle", title: "Start with a word",
+                       message: "Add a short word on the left, then pick it to record takes.")
+                .card(padding: 0, style: .outlined)
         }
     }
 
@@ -162,13 +167,57 @@ struct TrainView: View {
     }
 }
 
+private struct WordRow: View {
+    var word: String
+    var count: Int
+    var isSelected: Bool
+    var action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(word).font(.hkBody.weight(isSelected ? .semibold : .regular))
+                    Spacer()
+                    if count >= 10 {
+                        Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.signal)
+                    } else {
+                        Text("\(count)/10")
+                            .font(.hkCaption.monospacedDigit())
+                            .foregroundStyle(Theme.ink2)
+                    }
+                }
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Theme.hairline)
+                        Capsule().fill(Theme.signal)
+                            .frame(width: geo.size.width * min(CGFloat(count), 10) / 10)
+                    }
+                }
+                .frame(height: 3)
+            }
+            .padding(.horizontal, Theme.s3)
+            .padding(.vertical, Theme.s2 + 2)
+            .background(isSelected ? Theme.selection : hovering ? Theme.hover : .clear,
+                        in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .animation(Theme.gentle, value: count)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+    }
+}
+
 private struct TakeTile: View {
     var template: Template
     var isNew: Bool
     var onDelete: () -> Void
+    @State private var hovering = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             SignalPlot(title: "", samples: template.samples, channels: SignalPlot.rotation,
                        minScale: 0.05, height: 44, showsHeader: false)
             HStack {
@@ -176,13 +225,16 @@ private struct TakeTile: View {
                     .font(.hkMeta.monospacedDigit())
                     .foregroundStyle(Theme.ink2)
                 Spacer()
-                Button("Delete", systemImage: "trash", role: .destructive, action: onDelete)
-                    .labelStyle(.iconOnly)
-                    .buttonStyle(.borderless)
-                    .font(.hkCaption)
+                Button("Delete", systemImage: "trash", action: onDelete)
+                    .buttonStyle(IconButtonStyle())
+                    .opacity(hovering ? 1 : 0)
             }
         }
-        .padding(6)
-        .background(RoundedRectangle(cornerRadius: 8).strokeBorder(isNew ? Theme.ink : .clear, lineWidth: 1.5))
+        .padding(Theme.s2 + 2)
+        .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
+            .strokeBorder(isNew ? Theme.signal : Theme.hairline, lineWidth: isNew ? 1.5 : 1))
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.12), value: hovering)
     }
 }

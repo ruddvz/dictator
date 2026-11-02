@@ -517,3 +517,133 @@ struct MotionStatusBadge: View {
         }
     }
 }
+
+// MARK: - Silent Lab
+
+/// The four lab steps as one clickable progress strip, shown on every lab page. Wispr has no
+/// equivalent; it keeps the AirPods study legible as a single path rather than four screens.
+struct LabProgress: View {
+    @Environment(AppModel.self) private var model
+
+    private struct Step: Identifiable {
+        var screen: AppModel.Screen
+        var title: String
+        var done: Bool
+        var id: String { title }
+    }
+
+    private var steps: [Step] {
+        let connected = model.motion.status == .streaming
+        let trained = model.dataset.vocabulary.count >= 5 &&
+            model.dataset.vocabulary.allSatisfy { model.templateCount(for: $0, condition: .silent) >= 10 }
+        let passed = model.isMotionInferenceEnabled
+        return [
+            Step(screen: .setup, title: "Connect", done: connected),
+            Step(screen: .train, title: "Train", done: trained),
+            Step(screen: .evaluate, title: "Evaluate", done: passed),
+            Step(screen: .use, title: "Silent Use", done: passed && model.screen == .use),
+        ]
+    }
+
+    var body: some View {
+        HStack(spacing: Theme.s2) {
+            ForEach(Array(steps.enumerated()), id: \.element.id) { index, step in
+                let current = model.screen == step.screen
+                Button {
+                    model.screen = step.screen
+                } label: {
+                    HStack(spacing: Theme.s2) {
+                        ZStack {
+                            Circle()
+                                .fill(step.done ? Theme.signal : current ? Theme.ink : Theme.well)
+                            if step.done {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(Theme.inverseInk)
+                            } else {
+                                Text("\(index + 1)")
+                                    .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                                    .foregroundStyle(current ? Theme.inverseInk : Theme.ink2)
+                            }
+                        }
+                        .frame(width: 20, height: 20)
+                        Text(step.title)
+                            .font(.system(size: 14, weight: current ? .semibold : .regular))
+                            .foregroundStyle(current ? Theme.ink : Theme.ink2)
+                    }
+                    .padding(.horizontal, Theme.s3)
+                    .frame(height: 34)
+                    .background(current ? Theme.sheet : .clear, in: Capsule())
+                    .overlay(Capsule().strokeBorder(current ? Theme.hairline : .clear, lineWidth: 1))
+                    .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                if index < steps.count - 1 {
+                    Rectangle()
+                        .fill(step.done ? Theme.signal.opacity(0.5) : Theme.hairline)
+                        .frame(height: 1)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+        }
+        .padding(3)
+        .background(Theme.well, in: Capsule())
+        .animation(Theme.snappy, value: model.screen)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Silent Lab progress")
+    }
+}
+
+/// Large lab hero: status glyph, title, one line, actions, and optional metrics on the right.
+struct LabHero<Actions: View, Metrics: View>: View {
+    var symbol: String
+    var tint: Color
+    var title: String
+    var message: String
+    @ViewBuilder var actions: Actions
+    @ViewBuilder var metrics: Metrics
+
+    var body: some View {
+        HStack(alignment: .center, spacing: Theme.s5) {
+            Image(systemName: symbol)
+                .font(.system(size: 26, weight: .medium))
+                .foregroundStyle(tint)
+                .contentTransition(.symbolEffect(.replace))
+                .frame(width: 60, height: 60)
+                .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
+            VStack(alignment: .leading, spacing: 6) {
+                Text(title).font(.display(24)).tracking(-0.2)
+                Text(message)
+                    .font(.hkCallout)
+                    .foregroundStyle(Theme.ink2)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: Theme.s2) { actions }
+                    .padding(.top, Theme.s2)
+            }
+            Spacer(minLength: Theme.s4)
+            metrics
+        }
+        .padding(Theme.s6 - 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.signalSoft, in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
+    }
+}
+
+/// Big number with a small label, for hero metrics.
+struct HeroMetric: View {
+    var value: String
+    var label: String
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 2) {
+            Text(value)
+                .font(.display(26))
+                .monospacedDigit()
+                .contentTransition(.numericText())
+            Text(label)
+                .font(.hkCaption)
+                .foregroundStyle(Theme.ink2)
+        }
+    }
+}
