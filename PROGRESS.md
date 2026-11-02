@@ -1,5 +1,19 @@
 # HushKey progress
 
+## Completed — first live end-to-end check, and fixes it turned up (2026-11-02)
+
+- **Seen live (packaged app, fn held by the user):** two dictations at 11:42 were typed into a TextEdit document and saved to History. Mic, Speech, Accessibility, the fn key and insertion all worked together.
+- **Fixed from that test:**
+  - Back-to-back dictations ran together ("going?I don't"). Insertion and paste now add a space when the character before the cursor is a word or punctuation, not after a space, an opening bracket, or before punctuation (`TextInsertionService.spaced`, `InsertionSpacingTests`, 3 tests).
+  - The setup card's Allow microphone and Allow speech recognition only switched page, so no macOS prompt ever appeared. They now request access, or open the Privacy pane once it has been denied.
+  - `Scripts/package-app.sh` signed every build with a cdhash requirement, so macOS dropped all permissions on each rebuild. It now signs with `identifier "com.ruddvz.hushkey"`. A rebuild kept mic and Speech access (seen live: still 3 of 4 after repackaging).
+- **Not verified live:**
+  - whether the first word survives a slow start (the user's test didn't use a marker word)
+  - whether "I don't wanna do" was the full sentence or lost its end
+  - the spacing fix in a real app
+- The home screen still warns that "Press 🌐 key to" starts Apple dictation. The user must set it to Do Nothing in Keyboard settings.
+- `xcodebuild ... test`: 183 passed, 2 skipped.
+
 ## Completed — dictation start-up, permissions and app-wide polish (2026-11-02)
 
 - **Behaviour:**

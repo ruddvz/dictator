@@ -363,6 +363,7 @@ final class TextInsertionService {
     /// Pastes only into the exact readable field captured before dictation. The operation is
     /// considered successful only after that field exposes the expected replacement text.
     func paste(_ text: String, into app: NSRunningApplication, target: PasteTarget) async -> PasteOutcome {
+        let text = Self.spacedInsertion(text, fieldValue: target.fieldValue, selectedRange: target.selectedRange)
         let name = target.applicationName
         guard !text.isEmpty, isEnabled, allowsPasteFallback, AXIsProcessTrusted(),
               !app.isTerminated, app.processIdentifier == target.processIdentifier,
@@ -574,6 +575,7 @@ final class TextInsertionService {
             status = "Focus or text changed before insertion. Nothing was inserted."
             return false
         }
+        let text = Self.spacedInsertion(text, fieldValue: currentValue, selectedRange: currentRange)
         let possibleUndo = Self.makeUndoRecord(
             processIdentifier: app.processIdentifier,
             bundleIdentifier: app.bundleIdentifier,
@@ -600,6 +602,23 @@ final class TextInsertionService {
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success else { return nil }
         return value as? String
+    }
+
+    /// Dictation placed right after a word or sentence gets a separating space, as if typed.
+    nonisolated static func spacedInsertion(_ text: String, fieldValue: String?, selectedRange: CFRange?) -> String {
+        guard let fieldValue, let selectedRange, selectedRange.location > 0 else { return text }
+        let value = fieldValue as NSString
+        guard selectedRange.location <= value.length else { return text }
+        let before = value.substring(with: value.rangeOfComposedCharacterSequence(at: selectedRange.location - 1))
+        return spaced(text, after: before.last)
+    }
+
+    nonisolated static func spaced(_ text: String, after preceding: Character?) -> String {
+        guard let preceding, let first = text.first,
+              !preceding.isWhitespace, !first.isWhitespace,
+              !"([{“‘/-–—@#\"'".contains(preceding),
+              !".,;:!?)]}…%’”".contains(first) else { return text }
+        return " " + text
     }
 
     private func selectedTextRange(of element: AXUIElement) -> CFRange? {
