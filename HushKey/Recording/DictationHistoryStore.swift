@@ -71,8 +71,14 @@ enum DictationHistoryStore {
     }
 
     static func load(from url: URL) -> [DictationHistoryEntry]? {
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        return try? JSONDecoder().decode([DictationHistoryEntry].self, from: data)
+        switch loadState(from: url) {
+        case .loaded(let entries): entries
+        case .missing, .unreadable: nil
+        }
+    }
+
+    static func loadState(from url: URL) -> JSONArchiveLoad<[DictationHistoryEntry]> {
+        LocalJSONArchive.load([DictationHistoryEntry].self, from: url)
     }
 
     static func save(_ entries: [DictationHistoryEntry]) throws {
@@ -80,7 +86,7 @@ enum DictationHistoryStore {
     }
 
     static func save(_ entries: [DictationHistoryEntry], to url: URL) throws {
-        try JSONEncoder().encode(entries).write(to: url, options: .atomic)
+        try LocalJSONArchive.save(entries, protectingExistingAs: [DictationHistoryEntry].self, to: url)
     }
 
     static func upsertingAndSaving(_ entry: DictationHistoryEntry,

@@ -43,8 +43,14 @@ enum FileTranscriptionSessionStore {
     }
 
     static func load(from url: URL) -> [FileTranscriptionSession]? {
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        return try? JSONDecoder().decode([FileTranscriptionSession].self, from: data)
+        switch loadState(from: url) {
+        case .loaded(let sessions): sessions
+        case .missing, .unreadable: nil
+        }
+    }
+
+    static func loadState(from url: URL) -> JSONArchiveLoad<[FileTranscriptionSession]> {
+        LocalJSONArchive.load([FileTranscriptionSession].self, from: url)
     }
 
     static func save(_ sessions: [FileTranscriptionSession]) throws {
@@ -52,8 +58,8 @@ enum FileTranscriptionSessionStore {
     }
 
     static func save(_ sessions: [FileTranscriptionSession], to url: URL) throws {
-        try JSONEncoder().encode(Array(sessions.sorted { $0.createdAt > $1.createdAt }.prefix(50)))
-            .write(to: url, options: .atomic)
+        try LocalJSONArchive.save(Array(sessions.sorted { $0.createdAt > $1.createdAt }.prefix(50)),
+                                  protectingExistingAs: [FileTranscriptionSession].self, to: url)
     }
 
     static func upserting(_ session: FileTranscriptionSession,

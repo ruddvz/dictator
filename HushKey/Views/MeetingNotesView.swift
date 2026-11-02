@@ -20,6 +20,7 @@ struct MeetingNotesView: View {
     @Environment(AppModel.self) private var model
     @State private var searchText = ""
     @State private var pendingDeleteID: UUID?
+    @State private var confirmRemoveUnreadableArchive = false
     @State private var exportDocument: MeetingNoteDocument?
     @State private var exportFilename = "HushKey Meeting Notes"
     @State private var isExporting = false
@@ -49,10 +50,16 @@ struct MeetingNotesView: View {
             captureControls
 
             if let message = service.message {
-                Label(message, systemImage: "exclamationmark.circle")
-                    .font(.hkCallout)
-                    .foregroundStyle(Theme.finishing)
-                    .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: Theme.s2) {
+                    Label(message, systemImage: "exclamationmark.circle")
+                        .font(.hkCallout)
+                        .foregroundStyle(Theme.finishing)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if service.archiveUnreadable {
+                        Button("Remove unreadable archive…") { confirmRemoveUnreadableArchive = true }
+                            .buttonStyle(SecondaryButtonStyle())
+                    }
+                }
             }
 
             HStack(alignment: .top, spacing: Theme.s5) {
@@ -86,6 +93,18 @@ struct MeetingNotesView: View {
             Button("Cancel", role: .cancel) { pendingDeleteID = nil }
         } message: {
             Text("This removes the transcript and generated notes from HushKey on this Mac.")
+        }
+        .confirmationDialog("Remove unreadable meeting notes archive?",
+                            isPresented: $confirmRemoveUnreadableArchive,
+                            titleVisibility: .visible) {
+            Button("Remove archive", role: .destructive) { service.removeUnreadableArchive() }
+            Button("Cancel", role: .cancel) { confirmRemoveUnreadableArchive = false }
+        } message: {
+            if let recoveryCopyURL = service.recoveryCopyURL {
+                Text("HushKey kept a recovery copy at \(recoveryCopyURL.path). Removing this unreadable file lets new meeting notes save normally.")
+            } else {
+                Text("HushKey could not make a recovery copy. The original file remains in place until you remove it.")
+            }
         }
         .onAppear {
             if service.selectedNoteID == nil { service.select(service.notes.first?.id) }

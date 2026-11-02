@@ -399,3 +399,11 @@ Give the build Accessibility access and set Globe to Do Nothing. Then, with the 
 ## Next item — live acceptance with the user (unchanged, now including the pill)
 
 Same as above, plus: start a dictation with no field focused, click into TextEdit while talking, and confirm it types there; with typing off, confirm the card shows Copy and the "Type for me next time" link.
+
+## Completed — protect unreadable local history archives (2026-11-01)
+
+- Dictation, file-transcript, and meeting-note stores now distinguish missing files from unreadable archives. On decode/read failure, HushKey preserves a recovery copy when possible and refuses to overwrite the unreadable original.
+- Each history page reports the problem and offers an explicit archive removal action. The backup remains in Application Support; subsequent saves resume after removal.
+- Added regression coverage for backup preservation, overwrite prevention, repeated corruption with different contents, visible recovery state, explicit reset, and successful writes afterward.
+- `xcodebuild ... test`: 98 tests ran, 96 passed, 2 skipped, 0 failed.
+- Live microphone, Accessibility insertion, and device validation remain unverified; use the acceptance checklist above.

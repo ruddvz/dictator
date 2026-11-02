@@ -33,8 +33,14 @@ enum MeetingNotesStore {
     }
 
     static func load(from url: URL) -> [MeetingNote]? {
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        return try? JSONDecoder().decode([MeetingNote].self, from: data)
+        switch loadState(from: url) {
+        case .loaded(let notes): notes
+        case .missing, .unreadable: nil
+        }
+    }
+
+    static func loadState(from url: URL) -> JSONArchiveLoad<[MeetingNote]> {
+        LocalJSONArchive.load([MeetingNote].self, from: url)
     }
 
     static func save(_ notes: [MeetingNote]) throws {
@@ -42,7 +48,7 @@ enum MeetingNotesStore {
     }
 
     static func save(_ notes: [MeetingNote], to url: URL) throws {
-        try JSONEncoder().encode(notes).write(to: url, options: .atomic)
+        try LocalJSONArchive.save(notes, protectingExistingAs: [MeetingNote].self, to: url)
     }
 
     static func delete(at url: URL = url) throws {

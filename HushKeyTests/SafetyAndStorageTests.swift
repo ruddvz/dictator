@@ -162,6 +162,78 @@ final class SafetyAndStorageTests: XCTestCase {
         XCTAssertEqual(DictationHistoryStore.load(from: url), entries)
     }
 
+    func testUnreadableHistoryArchivesAreBackedUpAndCannotBeOverwritten() throws {
+        let suffix = UUID().uuidString
+        let directory = FileManager.default.temporaryDirectory
+        let dictationURL = directory.appending(path: "hushkey-corrupt-dictation-\(suffix).json")
+        let filesURL = directory.appending(path: "hushkey-corrupt-files-\(suffix).json")
+        let meetingsURL = directory.appending(path: "hushkey-corrupt-meetings-\(suffix).json")
+        let urls = [dictationURL, filesURL, meetingsURL]
+        var extraBackupURL: URL?
+        defer {
+            for url in urls {
+                try? FileManager.default.removeItem(at: url)
+                try? FileManager.default.removeItem(at: url.deletingLastPathComponent()
+                    .appending(path: "\(url.deletingPathExtension().lastPathComponent).corrupt-backup.\(url.pathExtension)"))
+            }
+            if let extraBackupURL { try? FileManager.default.removeItem(at: extraBackupURL) }
+        }
+        let damagedBytes = Data("preserve these malformed bytes".utf8)
+        for url in urls { try damagedBytes.write(to: url) }
+
+        let dictationState = DictationHistoryStore.loadState(from: dictationURL)
+        let filesState = FileTranscriptionSessionStore.loadState(from: filesURL)
+        let meetingState = MeetingNotesStore.loadState(from: meetingsURL)
+        let dictationBackup = try XCTUnwrap(recoveryCopy(from: dictationState))
+        let filesBackup = try XCTUnwrap(recoveryCopy(from: filesState))
+        let meetingsBackup = try XCTUnwrap(recoveryCopy(from: meetingState))
+        XCTAssertEqual(try Data(contentsOf: dictationBackup), damagedBytes)
+        XCTAssertEqual(try Data(contentsOf: filesBackup), damagedBytes)
+        XCTAssertEqual(try Data(contentsOf: meetingsBackup), damagedBytes)
+
+        let newerDamage = Data("a later damaged archive".utf8)
+        try newerDamage.write(to: dictationURL)
+        let newerDictationBackup = try XCTUnwrap(recoveryCopy(from: DictationHistoryStore.loadState(from: dictationURL)))
+        extraBackupURL = newerDictationBackup
+        XCTAssertNotEqual(newerDictationBackup, dictationBackup)
+        XCTAssertEqual(try Data(contentsOf: newerDictationBackup), newerDamage)
+
+        XCTAssertThrowsError(try DictationHistoryStore.save([DictationHistoryEntry(text: "New")], to: dictationURL))
+        XCTAssertThrowsError(try FileTranscriptionSessionStore.save([], to: filesURL))
+        XCTAssertThrowsError(try MeetingNotesStore.save([], to: meetingsURL))
+        XCTAssertEqual(try Data(contentsOf: dictationURL), newerDamage)
+        XCTAssertEqual(try Data(contentsOf: filesURL), damagedBytes)
+        XCTAssertEqual(try Data(contentsOf: meetingsURL), damagedBytes)
+    }
+
+    @MainActor
+    func testAppModelReportsAndExplicitlyResetsUnreadableDictationAndFileArchives() throws {
+        let suffix = UUID().uuidString
+        let directory = FileManager.default.temporaryDirectory
+        let dictationURL = directory.appending(path: "hushkey-reset-dictation-\(suffix).json")
+        let filesURL = directory.appending(path: "hushkey-reset-files-\(suffix).json")
+        defer {
+            try? FileManager.default.removeItem(at: dictationURL)
+            try? FileManager.default.removeItem(at: filesURL)
+            try? FileManager.default.removeItem(at: directory.appending(path: "hushkey-reset-dictation-\(suffix).corrupt-backup.json"))
+            try? FileManager.default.removeItem(at: directory.appending(path: "hushkey-reset-files-\(suffix).corrupt-backup.json"))
+        }
+        try Data("bad dictation archive".utf8).write(to: dictationURL)
+        try Data("bad file archive".utf8).write(to: filesURL)
+        let model = AppModel(dictationHistoryURL: dictationURL, fileTranscriptionHistoryURL: filesURL)
+
+        XCTAssertTrue(model.dictationHistoryArchiveUnreadable)
+        XCTAssertTrue(model.fileTranscriptionHistoryArchiveUnreadable)
+        XCTAssertTrue(model.dictationHistoryMessage?.contains("recovery copy") == true)
+        XCTAssertTrue(model.fileTranscriptionHistoryMessage?.contains("recovery copy") == true)
+        XCTAssertTrue(model.clearFileTranscriptionHistory())
+        model.clearDictationHistory()
+        XCTAssertFalse(model.dictationHistoryArchiveUnreadable)
+        XCTAssertFalse(model.fileTranscriptionHistoryArchiveUnreadable)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: directory.appending(path: "hushkey-reset-dictation-\(suffix).corrupt-backup.json").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: directory.appending(path: "hushkey-reset-files-\(suffix).corrupt-backup.json").path))
+    }
+
     func testDictationHistoryDeleteRemovesMalformedFileAndMissingFileIsSuccess() throws {
         let url = FileManager.default.temporaryDirectory
             .appending(path: "hushkey-history-corrupt-\(UUID().uuidString).json")
@@ -212,6 +284,32 @@ final class SafetyAndStorageTests: XCTestCase {
         try MeetingNotesStore.delete(at: url)
         XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
         try MeetingNotesStore.delete(at: url)
+    }
+
+    @MainActor
+    func testMeetingServiceCanRemoveUnreadableArchiveAfterPreservingRecoveryCopy() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appending(path: "hushkey-meetings-reset-\(UUID().uuidString).json")
+        defer {
+            try? FileManager.default.removeItem(at: url)
+            try? FileManager.default.removeItem(at: url.deletingLastPathComponent()
+                .appending(path: "\(url.deletingPathExtension().lastPathComponent).corrupt-backup.\(url.pathExtension)"))
+        }
+        let damagedBytes = Data("bad meeting archive".utf8)
+        try damagedBytes.write(to: url)
+        let service = MeetingNotesService(captureGate: AudioCaptureGate(), notesURL: url)
+        let backup = try XCTUnwrap(service.recoveryCopyURL)
+        XCTAssertTrue(service.archiveUnreadable)
+        XCTAssertEqual(try Data(contentsOf: backup), damagedBytes)
+
+        service.removeUnreadableArchive()
+
+        XCTAssertFalse(service.archiveUnreadable)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+        XCTAssertEqual(try Data(contentsOf: backup), damagedBytes)
+        let note = MeetingNote(title: "Recovered", transcript: "New meeting note.")
+        try MeetingNotesStore.save([note], to: url)
+        XCTAssertEqual(MeetingNotesStore.load(from: url), [note])
     }
 
     @MainActor
@@ -654,5 +752,10 @@ final class SafetyAndStorageTests: XCTestCase {
         XCTAssertEqual(stats.wordsPerMinute, 90) // 6 timed words over 4 seconds
         XCTAssertEqual(stats.dayStreak, 2) // yesterday and the day before; today not yet dictated
         XCTAssertEqual(DictationStats(entries: [], now: now, calendar: calendar).wordsPerMinute, nil)
+    }
+
+    private func recoveryCopy<Value>(from state: JSONArchiveLoad<Value>) -> URL? {
+        if case .unreadable(let recoveryCopyURL) = state { return recoveryCopyURL }
+        return nil
     }
 }

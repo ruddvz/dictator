@@ -123,11 +123,20 @@ struct FileTranscriptionView: View {
             pendingSaveTask?.cancel()
             persistActiveSession()
         }
-        .confirmationDialog("Delete all saved file transcripts?", isPresented: $confirmClearHistory,
+        .confirmationDialog(!model.fileTranscriptionHistoryArchiveUnreadable
+                            ? "Delete all saved file transcripts?" : "Remove unreadable transcript archive?",
+                            isPresented: $confirmClearHistory,
                             titleVisibility: .visible) {
-            Button("Delete transcripts", role: .destructive) { clearHistory() }
+            Button(!model.fileTranscriptionHistoryArchiveUnreadable ? "Delete transcripts" : "Remove archive",
+                   role: .destructive) { clearHistory() }
         } message: {
-            Text("This removes HushKey’s saved transcript text and subtitle cues from this Mac. Original audio files are not stored here. Any transcription already running can still be exported, but will not be added back to history.")
+            if let recoveryCopyURL = model.fileTranscriptionHistoryRecoveryCopyURL {
+                Text("HushKey kept a recovery copy at \(recoveryCopyURL.path). Removing the unreadable file lets new transcripts save normally.")
+            } else if model.fileTranscriptionHistoryArchiveUnreadable {
+                Text("HushKey could not make a recovery copy. The original file remains in place until you remove it.")
+            } else {
+                Text("This removes HushKey’s saved transcript text and subtitle cues from this Mac. Original audio files are not stored here. Any transcription already running can still be exported, but will not be added back to history.")
+            }
         }
     }
 
@@ -252,8 +261,11 @@ struct FileTranscriptionView: View {
                     .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
                         .strokeBorder(Theme.hairline, lineWidth: 1))
+                }
+                if !historySessions.isEmpty || model.fileTranscriptionHistoryArchiveUnreadable {
                     Menu {
-                        Button("Delete all…", role: .destructive) { confirmClearHistory = true }
+                        Button(!model.fileTranscriptionHistoryArchiveUnreadable ? "Delete all…" : "Remove unreadable archive…",
+                               role: .destructive) { confirmClearHistory = true }
                     } label: {
                         Image(systemName: "ellipsis")
                     }

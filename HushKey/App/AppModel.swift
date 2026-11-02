@@ -92,8 +92,12 @@ final class AppModel {
     private(set) var experimentSessionID = UUID()
     var dataMessage: String?
     private(set) var dictationHistoryMessage: String?
+    private(set) var dictationHistoryRecoveryCopyURL: URL?
+    private(set) var dictationHistoryArchiveUnreadable = false
     private(set) var fileTranscriptionSessions: [FileTranscriptionSession]
     private(set) var fileTranscriptionHistoryMessage: String?
+    private(set) var fileTranscriptionHistoryRecoveryCopyURL: URL?
+    private(set) var fileTranscriptionHistoryArchiveUnreadable = false
 
     var captureShortcut: CaptureShortcut = CaptureShortcut(
         rawValue: UserDefaults.standard.string(forKey: CaptureShortcut.preferenceKey) ?? "") ?? .default {
@@ -247,9 +251,29 @@ final class AppModel {
     init(dictationHistoryURL: URL = DictationHistoryStore.url,
          fileTranscriptionHistoryURL: URL = FileTranscriptionSessionStore.url) {
         self.dictationHistoryURL = dictationHistoryURL
-        dictationHistory = DictationHistoryStore.load(from: dictationHistoryURL) ?? []
+        switch DictationHistoryStore.loadState(from: dictationHistoryURL) {
+        case .missing:
+            dictationHistory = []
+        case .loaded(let entries):
+            dictationHistory = entries
+        case .unreadable(let recoveryCopyURL):
+            dictationHistory = []
+            dictationHistoryRecoveryCopyURL = recoveryCopyURL
+            dictationHistoryArchiveUnreadable = true
+            dictationHistoryMessage = Self.archiveRecoveryMessage("Dictation history", copy: recoveryCopyURL)
+        }
         self.fileTranscriptionHistoryURL = fileTranscriptionHistoryURL
-        fileTranscriptionSessions = FileTranscriptionSessionStore.load(from: fileTranscriptionHistoryURL) ?? []
+        switch FileTranscriptionSessionStore.loadState(from: fileTranscriptionHistoryURL) {
+        case .missing:
+            fileTranscriptionSessions = []
+        case .loaded(let sessions):
+            fileTranscriptionSessions = sessions
+        case .unreadable(let recoveryCopyURL):
+            fileTranscriptionSessions = []
+            fileTranscriptionHistoryRecoveryCopyURL = recoveryCopyURL
+            fileTranscriptionHistoryArchiveUnreadable = true
+            fileTranscriptionHistoryMessage = Self.archiveRecoveryMessage("File transcript history", copy: recoveryCopyURL)
+        }
         let captureGate = AudioCaptureGate()
         self.captureGate = captureGate
         meetingNotes = MeetingNotesService(captureGate: captureGate)
@@ -271,7 +295,7 @@ final class AppModel {
         do {
             try FileTranscriptionSessionStore.save(updated, to: fileTranscriptionHistoryURL)
             fileTranscriptionSessions = updated
-            fileTranscriptionHistoryMessage = nil
+            if fileTranscriptionHistoryRecoveryCopyURL == nil { fileTranscriptionHistoryMessage = nil }
         } catch {
             fileTranscriptionHistoryMessage = "Couldn’t save this transcript locally: \(error.localizedDescription)"
         }
@@ -282,7 +306,7 @@ final class AppModel {
         do {
             try FileTranscriptionSessionStore.save(updated, to: fileTranscriptionHistoryURL)
             fileTranscriptionSessions = updated
-            fileTranscriptionHistoryMessage = nil
+            if fileTranscriptionHistoryRecoveryCopyURL == nil { fileTranscriptionHistoryMessage = nil }
         } catch {
             fileTranscriptionHistoryMessage = "Couldn’t delete this transcript: \(error.localizedDescription)"
         }
@@ -299,13 +323,17 @@ final class AppModel {
 
     @discardableResult
     func clearFileTranscriptionHistory(discardingActiveSessionIDs activeSessionIDs: Set<UUID>) -> Bool {
+        let recoveryCopyURL = fileTranscriptionHistoryRecoveryCopyURL
         do {
             try FileTranscriptionSessionStore.deleteAll(at: fileTranscriptionHistoryURL)
             fileTranscriptionSessionsDiscardedByClear.formUnion(activeSessionIDs)
             fileTranscriptionSessions.removeAll()
-            fileTranscriptionHistoryMessage = activeSessionIDs.isEmpty
+            fileTranscriptionHistoryRecoveryCopyURL = nil
+            fileTranscriptionHistoryArchiveUnreadable = false
+            let recoveryNotice = recoveryCopyURL.map { " Recovery copy: \($0.path)" } ?? ""
+            fileTranscriptionHistoryMessage = (activeSessionIDs.isEmpty
                 ? "Saved file transcript history was deleted from this Mac."
-                : "Saved history was deleted. The in-progress transcript can still be exported, but it will not be added back to history."
+                : "Saved history was deleted. The in-progress transcript can still be exported, but it will not be added back to history.") + recoveryNotice
             return true
         } catch {
             fileTranscriptionHistoryMessage = "Couldn’t delete saved transcripts: \(error.localizedDescription)"
@@ -862,13 +890,17 @@ final class AppModel {
     }
 
     func clearDictationHistory() {
+        let recoveryCopyURL = dictationHistoryRecoveryCopyURL
         do {
             try DictationHistoryStore.delete(at: dictationHistoryURL)
             cancelPendingDictationHistorySave()
             dictationHistory.removeAll()
+            dictationHistoryRecoveryCopyURL = nil
+            dictationHistoryArchiveUnreadable = false
             currentDictationHistoryEntryID = nil
             lastSavedDictationText = nil
-            dictationHistoryMessage = "Saved transcript history was deleted from this Mac."
+            dictationHistoryMessage = "Saved transcript history was deleted from this Mac." +
+                (recoveryCopyURL.map { " Recovery copy: \($0.path)" } ?? "")
         } catch {
             dictationHistoryMessage = "Could not delete transcript history: \(error.localizedDescription)"
             return
@@ -1202,10 +1234,17 @@ final class AppModel {
                 entry, to: dictationHistoryURL, existing: dictationHistory)
             currentDictationHistoryEntryID = entry.id
             lastSavedDictationText = text
-            dictationHistoryMessage = nil
+            if dictationHistoryRecoveryCopyURL == nil { dictationHistoryMessage = nil }
         } catch {
             dictationHistoryMessage = "This transcript could not be saved to history: \(error.localizedDescription)"
         }
+    }
+
+    private static func archiveRecoveryMessage(_ name: String, copy: URL?) -> String {
+        if let copy {
+            return "Saved \(name.lowercased()) could not be read. HushKey kept a recovery copy at \(copy.path). Remove the unreadable archive to continue saving history."
+        }
+        return "Saved \(name.lowercased()) could not be read. HushKey left the original file in place but could not make a recovery copy. Remove the unreadable archive to continue saving history."
     }
 
     private func scheduleCurrentDictationSave() {

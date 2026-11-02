@@ -26,8 +26,19 @@ struct DictationView: View {
             .animation(Theme.gentle, value: showsComposer)
         }
         .scrollIndicators(.automatic)
-        .confirmationDialog("Delete all recent dictations?", isPresented: $confirmClearHistory, titleVisibility: .visible) {
-            Button("Delete history", role: .destructive) { model.clearDictationHistory() }
+        .confirmationDialog(!model.dictationHistoryArchiveUnreadable
+                            ? "Delete all recent dictations?" : "Remove unreadable dictation archive?",
+                            isPresented: $confirmClearHistory, titleVisibility: .visible) {
+            Button(!model.dictationHistoryArchiveUnreadable ? "Delete history" : "Remove archive",
+                   role: .destructive) { model.clearDictationHistory() }
+        } message: {
+            if let recoveryCopyURL = model.dictationHistoryRecoveryCopyURL {
+                Text("HushKey kept a recovery copy at \(recoveryCopyURL.path). Removing the unreadable file lets new dictations save normally.")
+            } else if model.dictationHistoryArchiveUnreadable {
+                Text("HushKey could not make a recovery copy. The original file remains in place until you remove it.")
+            } else {
+                Text("This deletes saved dictations from this Mac. It does not delete training recordings.")
+            }
         }
     }
 
@@ -273,8 +284,11 @@ struct DictationView: View {
                             .buttonStyle(IconButtonStyle())
                             .help("Search history")
                     }
+                }
+                if !model.dictationHistory.isEmpty || model.dictationHistoryArchiveUnreadable {
                     Menu {
-                        Button("Delete all history…", role: .destructive) { confirmClearHistory = true }
+                        Button(!model.dictationHistoryArchiveUnreadable ? "Delete all history…" : "Remove unreadable archive…",
+                               role: .destructive) { confirmClearHistory = true }
                     } label: {
                         Image(systemName: "ellipsis")
                     }

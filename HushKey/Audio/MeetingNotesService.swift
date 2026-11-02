@@ -31,6 +31,8 @@ final class MeetingNotesService {
     private(set) var isFinalizing = false
     private(set) var isGenerating = false
     private(set) var message: String?
+    private(set) var recoveryCopyURL: URL?
+    private(set) var archiveUnreadable = false
     private(set) var activeMeetingStartedAt: Date?
     private(set) var selectedNoteID: UUID?
     private(set) var activeAudioSource: MeetingAudioSource?
@@ -46,7 +48,17 @@ final class MeetingNotesService {
     init(captureGate: AudioCaptureGate, notesURL: URL = MeetingNotesStore.url) {
         self.captureGate = captureGate
         self.notesURL = notesURL
-        self.notes = MeetingNotesStore.load(from: notesURL) ?? []
+        switch MeetingNotesStore.loadState(from: notesURL) {
+        case .missing:
+            self.notes = []
+        case .loaded(let notes):
+            self.notes = notes
+        case .unreadable(let recoveryCopyURL):
+            self.notes = []
+            self.recoveryCopyURL = recoveryCopyURL
+            self.archiveUnreadable = true
+            self.message = Self.archiveRecoveryMessage(copy: recoveryCopyURL)
+        }
     }
 
     var activeDuration: TimeInterval {
@@ -190,6 +202,22 @@ final class MeetingNotesService {
         }
     }
 
+    func removeUnreadableArchive() {
+        guard archiveUnreadable else { return }
+        let copy = recoveryCopyURL
+        do {
+            try MeetingNotesStore.delete(at: notesURL)
+            notes = []
+            selectedNoteID = nil
+            recoveryCopyURL = nil
+            archiveUnreadable = false
+            message = copy.map { "Unreadable meeting notes were removed. Recovery copy: \($0.path)" }
+                ?? "Unreadable meeting notes were removed. No recovery copy could be created."
+        } catch {
+            message = "Unreadable meeting notes could not be removed: \(error.localizedDescription)"
+        }
+    }
+
     func generateSummary(for id: UUID, with transforms: LocalTransformService) async {
         await generate(for: id, with: transforms, isActionItems: false)
     }
@@ -229,5 +257,12 @@ final class MeetingNotesService {
         } catch {
             message = "Meeting note could not be saved: \(error.localizedDescription)"
         }
+    }
+
+    private static func archiveRecoveryMessage(copy: URL?) -> String {
+        if let copy {
+            return "Saved meeting notes could not be read. HushKey kept a recovery copy at \(copy.path). Remove the unreadable archive to continue saving notes."
+        }
+        return "Saved meeting notes could not be read. HushKey left the original file in place but could not make a recovery copy. Remove the unreadable archive to continue saving notes."
     }
 }
