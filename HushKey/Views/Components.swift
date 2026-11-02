@@ -6,33 +6,47 @@ struct PageHeader: View {
     var subtitle: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(eyebrow.uppercased())
-                .font(.caption.weight(.semibold))
-                .tracking(0.6)
-                .foregroundStyle(.tertiary)
+        VStack(alignment: .leading, spacing: Theme.s2) {
+            // Only lab steps carry a visible eyebrow; elsewhere the sidebar already says where you are.
+            if eyebrow.hasPrefix("Step") {
+                SectionLabel(title: eyebrow)
+            }
             Text(title)
-                .font(.system(size: 26, weight: .semibold))
+                .font(.display(30))
+                .tracking(-0.3)
             Text(subtitle)
-                .font(.callout)
-                .foregroundStyle(.secondary)
+                .font(.system(size: 13.5))
+                .foregroundStyle(Theme.ink2)
                 .lineSpacing(2)
-                .frame(maxWidth: 620, alignment: .leading)
+                .frame(maxWidth: 560, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.bottom, 6)
+        .padding(.bottom, Theme.s2)
+    }
+}
+
+extension View {
+    /// The one page layout: a centered column with consistent outer spacing.
+    func pageLayout() -> some View {
+        frame(maxWidth: Theme.pageWidth, alignment: .leading)
+            .padding(.horizontal, Theme.s6)
+            .padding(.top, Theme.s7)
+            .padding(.bottom, Theme.s6)
+            .frame(maxWidth: .infinity, alignment: .top)
     }
 }
 
 /// Gives every GroupBox in the app the same soft card look as the Dictation home.
 struct CardGroupBoxStyle: GroupBoxStyle {
     func makeBody(configuration: Configuration) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Theme.s3) {
             configuration.label
-                .font(.headline)
+                .font(.system(size: 13.5, weight: .semibold))
+                .foregroundStyle(Theme.ink)
+                .labelStyle(.titleOnly)
             configuration.content
         }
-        .card(padding: 8)
+        .card(padding: Theme.s3)
     }
 }
 
@@ -163,10 +177,10 @@ struct HoldToCaptureButton: View {
         .frame(maxWidth: .infinity, minHeight: 120)
         .background(
             RoundedRectangle(cornerRadius: 14)
-                .fill(isCapturing ? Color.red.opacity(0.18) : Color.accentColor.opacity(0.10)))
+                .fill(isCapturing ? Color.red.opacity(0.18) : Theme.ink.opacity(0.10)))
         .overlay(
             RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(isCapturing ? Color.red : Color.accentColor.opacity(0.4), lineWidth: isCapturing ? 2 : 1))
+                .strokeBorder(isCapturing ? Color.red : Theme.ink.opacity(0.4), lineWidth: isCapturing ? 2 : 1))
         .contentShape(Rectangle())
         .opacity(isEnabled ? 1 : 0.4)
         .accessibilityElement(children: .ignore)

@@ -183,6 +183,6 @@ private struct TakeTile: View {
             }
         }
         .padding(6)
-        .background(RoundedRectangle(cornerRadius: 8).strokeBorder(isNew ? Color.accentColor : .clear, lineWidth: 1.5))
+        .background(RoundedRectangle(cornerRadius: 8).strokeBorder(isNew ? Theme.ink : .clear, lineWidth: 1.5))
     }
 }

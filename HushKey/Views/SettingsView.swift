@@ -31,6 +31,7 @@ struct SettingsView: View {
 
                 switch section {
                 case .general:
+                    AppearanceCard()
                     DictationSettingsCard()
                     ShortcutSettingsCard()
                     MicrophoneCard()
@@ -43,9 +44,7 @@ struct SettingsView: View {
                     ResearchReportsCard()
                 }
             }
-            .frame(maxWidth: 920, alignment: .leading)
-            .padding(24)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .pageLayout()
         }
     }
 }
@@ -283,7 +282,7 @@ private struct RecordingCard: View {
                         Label(recorder.isRecording ? "Stop recording" : "Start recording",
                               systemImage: recorder.isRecording ? "stop.fill" : "record.circle")
                     }
-                    .tint(recorder.isRecording ? .red : .accentColor)
+                    .tint(recorder.isRecording ? Theme.listening : Theme.ink)
                     .buttonStyle(.borderedProminent)
 
                     if recorder.isRecording, let startedAt = recorder.startedAt {
@@ -343,6 +342,30 @@ private struct DataManagementCard: View {
         }
         .confirmationDialog("Delete all session logs and local audio files?", isPresented: $confirmDeleteSessions, titleVisibility: .visible) {
             Button("Delete session logs", role: .destructive) { model.deleteSessionLogs() }
+        }
+    }
+}
+
+private struct AppearanceCard: View {
+    @AppStorage(AppearancePreference.storageKey) private var appearance: AppearancePreference = .light
+
+    var body: some View {
+        GroupBox("Appearance") {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Theme").font(.system(size: 13, weight: .medium))
+                    Text("Light uses warm paper; Dark keeps the same layout for night use.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.ink2)
+                }
+                Spacer()
+                Picker("Theme", selection: $appearance) {
+                    ForEach(AppearancePreference.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 220)
+            }
         }
     }
 }

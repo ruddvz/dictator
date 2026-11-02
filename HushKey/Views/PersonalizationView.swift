@@ -139,9 +139,7 @@ struct PersonalizationView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            .frame(maxWidth: 920, alignment: .leading)
-            .padding(24)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .pageLayout()
         }
         .sheet(item: $editor) { request in
             PersonalizationEntryEditor(
@@ -255,9 +253,9 @@ struct PersonalizationView: View {
     private func summaryCard(title: String, count: Int, symbol: String) -> some View {
         GroupBox {
             HStack(spacing: 12) {
-                Image(systemName: symbol).font(.title2).foregroundStyle(Color.accentColor)
+                Image(systemName: symbol).font(.title2).foregroundStyle(Theme.ink)
                     .frame(width: 40, height: 40)
-                    .background(Color.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+                    .background(Theme.ink.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title).font(.caption).foregroundStyle(.secondary)
                     Text("\(count)").font(.title3.weight(.semibold).monospacedDigit())

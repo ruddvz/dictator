@@ -25,13 +25,22 @@ final class AppModel {
             switch self {
             case .dictation: "mic"
             case .transforms: "wand.and.stars"
-            case .files: "waveform.badge.mic"
+            case .files: "doc.text"
             case .setup: "headphones"
             case .train: "square.stack.3d.up"
             case .evaluate: "chart.bar.xaxis"
             case .use: "text.bubble"
-            case .personalization: "text.badge.plus"
-            case .settings: "slider.horizontal.3"
+            case .personalization: "character.book.closed"
+            case .settings: "gearshape"
+            }
+        }
+        /// Short label for the sidebar; `rawValue` stays the full page name.
+        var sidebarTitle: String {
+            switch self {
+            case .files: "Files"
+            case .personalization: "Vocabulary"
+            case .settings: "Settings"
+            default: rawValue
             }
         }
     }

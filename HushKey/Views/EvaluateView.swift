@@ -49,9 +49,7 @@ struct EvaluateView: View {
                         .frame(maxWidth: .infinity, minHeight: 180)
                 }
             }
-            .frame(maxWidth: 920, alignment: .leading)
-            .padding(24)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .pageLayout()
         }
     }
 

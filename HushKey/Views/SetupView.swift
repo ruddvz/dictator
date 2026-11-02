@@ -40,9 +40,7 @@ struct SetupView: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
-            .frame(maxWidth: 920, alignment: .leading)
-            .padding(24)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .pageLayout()
         }
     }
 
@@ -205,7 +203,7 @@ private struct StudyStep: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: state == .done ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(state == .done ? Color.green : state == .current ? Color.accentColor : Color.secondary)
+                .foregroundStyle(state == .done ? Color.green : state == .current ? Theme.ink : Color.secondary)
                 .font(.title3)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {

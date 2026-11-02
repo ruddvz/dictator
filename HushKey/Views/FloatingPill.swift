@@ -90,31 +90,52 @@ struct FloatingPillView: View {
     @Environment(AppModel.self) private var model
 
     @State private var isHovering = false
+    @State private var showsDone = false
 
-    private enum Phase { case idle, hover, listening, finishing }
+    private enum Phase { case idle, hover, listening, finishing, done }
+
+    private var isFinishing: Bool { model.isFinalizingDictation || model.transcriber.isFinalizing }
 
     private var phase: Phase {
-        if model.isFinalizingDictation || model.transcriber.isFinalizing { return .finishing }
+        if isFinishing { return .finishing }
         if model.audio.isRunning { return .listening }
+        if showsDone { return .done }
         return isHovering ? .hover : .idle
+    }
+
+    private var morphPhase: MorphIcon.Phase {
+        switch phase {
+        case .idle, .hover: .idle
+        case .listening: .listening
+        case .finishing: .working
+        case .done: .done
+        }
     }
 
     var body: some View {
         pill
             .padding(6) // room for the shadow inside the transparent panel
             .fixedSize()
-            .animation(.spring(response: 0.28, dampingFraction: 0.82), value: phase)
+            .animation(.spring(response: 0.34, dampingFraction: 0.78), value: phase)
+            .onChange(of: isFinishing) { wasFinishing, finishing in
+                guard wasFinishing, !finishing, !model.transcriber.text.isEmpty else { return }
+                showsDone = true
+                Task {
+                    try? await Task.sleep(for: .seconds(1.4))
+                    showsDone = false
+                }
+            }
     }
 
-    @ViewBuilder
     private var pill: some View {
         Button {
             Task { await model.toggleDictation() }
         } label: {
             content
-                .background(Capsule().fill(.black.opacity(phase == .idle ? 0.55 : 0.88)))
-                .overlay(Capsule().strokeBorder(.white.opacity(0.18), lineWidth: 0.5))
-                .shadow(color: .black.opacity(phase == .idle ? 0 : 0.3), radius: 6, y: 2)
+                .foregroundStyle(.white)
+                .background(Capsule().fill(Color(red: 0.1, green: 0.095, blue: 0.09).opacity(phase == .idle ? 0.6 : 0.94)))
+                .overlay(Capsule().strokeBorder(.white.opacity(phase == .idle ? 0.25 : 0.12), lineWidth: 0.5))
+                .shadow(color: .black.opacity(phase == .idle ? 0 : 0.28), radius: 8, y: 3)
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -126,42 +147,40 @@ struct FloatingPillView: View {
 
     @ViewBuilder
     private var content: some View {
-        switch phase {
-        case .idle:
-            Capsule().fill(.white.opacity(0.55))
-                .frame(width: 28, height: 3)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-        case .hover:
-            HStack(spacing: 8) {
-                Image(systemName: "mic.fill").font(.system(size: 11, weight: .semibold))
-                Text(model.dictationCaptureBehavior == .hold
-                     ? "Click or hold \(model.dictationShortcut.label)"
-                     : "Click or press \(model.dictationShortcut.label)")
+        if phase == .idle {
+            Capsule().fill(.white.opacity(0.6))
+                .frame(width: 26, height: 3)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 5)
+                .transition(.opacity)
+        } else {
+            HStack(spacing: 9) {
+                MorphIcon(phase: morphPhase, level: model.audio.level, lineWidth: 1.8)
+                    .frame(width: 16, height: 16)
+                    .foregroundStyle(phase == .listening ? Theme.listening : phase == .done ? Theme.success : .white)
+                switch phase {
+                case .listening:
+                    LiveWaveform(level: model.audio.level, isActive: true, barCount: 16, tint: .white)
+                        .frame(width: 76, height: 16)
+                    Image(systemName: "stop.fill")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.7))
+                case .finishing:
+                    Text("Transcribing").font(.system(size: 12, weight: .medium))
+                case .done:
+                    Text(model.insertion.isEnabled ? "Ready to insert" : "Done").font(.system(size: 12, weight: .medium))
+                default:
+                    HStack(spacing: 4) {
+                        Text(model.dictationCaptureBehavior == .hold ? "Hold" : "Press")
+                        Text(model.dictationShortcut.label).fontWeight(.semibold)
+                        Text("or click")
+                    }
                     .font(.system(size: 12, weight: .medium))
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-        case .listening:
-            HStack(spacing: 10) {
-                Circle().fill(Theme.listening).frame(width: 8, height: 8)
-                LiveWaveform(level: model.audio.level, isActive: true, barCount: 18, tint: .white)
-                    .frame(width: 92, height: 18)
-                Image(systemName: "stop.fill")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.8))
+                }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-        case .finishing:
-            HStack(spacing: 8) {
-                ProgressView().controlSize(.small).tint(.white)
-                Text("Transcribing").font(.system(size: 12, weight: .medium))
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
+            .transition(.opacity.combined(with: .scale(scale: 0.9)))
         }
     }
 
@@ -170,6 +189,7 @@ struct FloatingPillView: View {
         case .idle, .hover: "Start dictation"
         case .listening: "Listening. Stop dictation"
         case .finishing: "Transcribing"
+        case .done: "Dictation finished"
         }
     }
 }

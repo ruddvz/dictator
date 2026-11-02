@@ -128,6 +128,15 @@ In a fresh session, verify the packaged app in TextEdit and a second supported a
 - App-wide card style for all GroupBoxes and a cleaner page header; Settings split into General / Insertion / Data & privacy / About tabs, with "Enable insertion…" deep-linking to Insertion; 10-week activity heatmap in the Dictation stats card; more legible keycaps.
 - `xcodebuild test`: 28 passed. Dictation, Settings, Transforms, and Snippets & Vocabulary verified by screenshot.
 
+## Completed — 2026-11-01 (Warm editorial redesign and morphing icons)
+
+- Surveyed every view with the dimensional-drawing method (MIT, enesozturk/dimensional-drawing; read, not installed): 18 padding values, 18 stack gaps, 7 radii, 77 caption labels, 3 page widths. Replaced them with one token set documented in [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) using S#/R#/H#/W codes.
+- User chose "warm editorial" and "morphing state icons". Rebuilt the shell: custom sidebar on warm paper (no system split view or accent blue), raised page sheet, hidden title bar, animated page transitions, sidebar icon bounce, setup checklist that jumps to the right place.
+- Dictation home: "Hey <first name>" greeting with amber keycaps, a dismissible next-step banner (insertion → vocabulary → Silent Lab) with an ambient waveform, serif stats with a 12-week heatmap, a composer that appears only while dictating or reviewing, and day-grouped history with sliding hover actions.
+- `MorphIcon`: one 25-point line blending hush → waveform → spinner → check, used in the brand mark, Dictate button, composer, empty state, and pill. Pill adds a "Ready to insert" check moment after transcription.
+- Appearance setting (System / Light / Dark, default Light). All pages share `pageLayout()` and the card `GroupBox` style.
+- `xcodebuild test`: 28 passed. Light and dark home, Transforms, Vocabulary, Settings, Setup, and live listening (pill + composer) verified by screenshot. The pill's done check needs spoken input to appear and was not seen live.
+
 ## Next item — eval harness and pill acceptance
 
 With the user present, grant Microphone/Speech and confirm the pill's listening and transcribing states in another app. Then build a held-out evaluation harness (fixed consented audio clips → transcript → WER and formatting checks, plus UI screenshot checks) in the StarHarness spirit, separate from this UI branch.

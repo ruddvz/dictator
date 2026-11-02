@@ -193,9 +193,7 @@ struct FileTranscriptionView: View {
                     .padding(8)
                 }
             }
-            .frame(maxWidth: 860, alignment: .leading)
-            .padding(28)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .pageLayout()
         }
     }
 

@@ -30,9 +30,7 @@ struct UseView: View {
                 .padding(14)
                 .background(.background, in: RoundedRectangle(cornerRadius: 12))
             }
-            .frame(maxWidth: 920, alignment: .leading)
-            .padding(24)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .pageLayout()
         }
     }
 

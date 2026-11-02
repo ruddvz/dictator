@@ -16,6 +16,7 @@ struct HushKeyApp: App {
                     pill.attach(to: model)
                 }
         }
+        .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentMinSize)
 
         MenuBarExtra("HushKey", image: "HushKeyMenuBar") {

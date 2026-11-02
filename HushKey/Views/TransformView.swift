@@ -48,9 +48,7 @@ struct TransformView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .frame(maxWidth: 920, alignment: .leading)
-            .padding(24)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .pageLayout()
         }
         .alert("Couldn’t create a preview", isPresented: Binding(
             get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
@@ -113,7 +111,7 @@ struct TransformView: View {
                             HStack(alignment: .top, spacing: 12) {
                                 Image(systemName: action.symbol)
                                     .font(.title3)
-                                    .foregroundStyle(selectedAction == action ? Color.accentColor : Color.secondary)
+                                    .foregroundStyle(selectedAction == action ? Theme.ink : Color.secondary)
                                     .frame(width: 26)
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(action.rawValue).font(.headline)
@@ -126,10 +124,10 @@ struct TransformView: View {
                             }
                             .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
                             .padding(12)
-                            .background(selectedAction == action ? Color.accentColor.opacity(0.09) : Color(nsColor: .controlBackgroundColor),
+                            .background(selectedAction == action ? Theme.ink.opacity(0.09) : Color(nsColor: .controlBackgroundColor),
                                         in: RoundedRectangle(cornerRadius: 10))
                             .overlay(RoundedRectangle(cornerRadius: 10)
-                                .stroke(selectedAction == action ? Color.accentColor.opacity(0.6) : Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 1))
+                                .stroke(selectedAction == action ? Theme.ink.opacity(0.6) : Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 1))
                         }
                         .buttonStyle(.plain)
                         .disabled(model.localTransformService.isTransforming)
