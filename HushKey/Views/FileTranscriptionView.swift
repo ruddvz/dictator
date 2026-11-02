@@ -319,6 +319,7 @@ struct FileTranscriptionView: View {
 
     private func startTranscription() {
         guard let selectedURL else { return }
+        guard persistActiveSession() else { return }
         pendingSaveTask?.cancel()
         let sessionID = UUID()
         activeSessionID = sessionID
@@ -350,23 +351,20 @@ struct FileTranscriptionView: View {
         }
     }
 
-    private func persistActiveSession() {
+    @discardableResult
+    private func persistActiveSession(switchingTo targetSessionID: UUID? = nil) -> Bool {
         pendingSaveTask?.cancel()
-        guard let activeSessionID, !currentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        let session = FileTranscriptionSession(
-            id: activeSessionID,
-            sourceName: selectedURL?.lastPathComponent ?? activeSourceName ?? "Audio transcript",
-            engine: engine,
-            languageIdentifier: activeLanguageIdentifier,
-            modelVariant: activeModelVariant,
-            text: currentText,
-            cues: currentCues)
-        model.saveFileTranscriptionSession(session)
+        guard let session = FileTranscriptionSessionSnapshot.make(
+            activeSessionID: activeSessionID, switchingTo: targetSessionID,
+            sourceName: activeSourceName ?? selectedURL?.lastPathComponent ?? "Audio transcript",
+            engine: engine, languageIdentifier: activeLanguageIdentifier,
+            modelVariant: activeModelVariant, text: currentText, cues: currentCues) else { return true }
+        return model.saveFileTranscriptionSession(session)
     }
 
     private func restore(_ session: FileTranscriptionSession) {
-        guard !isBusy else { return }
-        pendingSaveTask?.cancel()
+        guard !isBusy, activeSessionID != session.id else { return }
+        guard persistActiveSession(switchingTo: session.id) else { return }
         engine = session.engine
         selectedURL = nil
         activeSessionID = session.id

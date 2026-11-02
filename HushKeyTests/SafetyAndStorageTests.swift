@@ -617,6 +617,32 @@ final class SafetyAndStorageTests: XCTestCase {
         XCTAssertTrue(FileTranscriptionSessionStore.deleting(id: existing.id, from: updated).isEmpty)
     }
 
+    func testFileTranscriptionSessionSwitchSnapshotsEditsAndSkipsTheCurrentRow() throws {
+        let activeID = UUID()
+        let targetID = UUID()
+        let cues = [SubtitleCue(start: 0.5, duration: 1, text: "Edited text")]
+
+        let outgoing = try XCTUnwrap(FileTranscriptionSessionSnapshot.make(
+            activeSessionID: activeID, switchingTo: targetID,
+            sourceName: "active.m4a", engine: .apple, languageIdentifier: "en-US",
+            modelVariant: nil, text: "Edited text", cues: cues))
+
+        XCTAssertEqual(outgoing.id, activeID)
+        XCTAssertEqual(outgoing.sourceName, "active.m4a")
+        XCTAssertEqual(outgoing.text, "Edited text")
+        XCTAssertEqual(outgoing.cues, cues)
+        XCTAssertNil(FileTranscriptionSessionSnapshot.make(
+            activeSessionID: activeID, switchingTo: activeID,
+            sourceName: "active.m4a", engine: .apple, languageIdentifier: "en-US",
+            modelVariant: nil, text: "Edited text", cues: cues))
+
+        let emptyEdit = try XCTUnwrap(FileTranscriptionSessionSnapshot.make(
+            activeSessionID: activeID, switchingTo: targetID,
+            sourceName: "active.m4a", engine: .apple, languageIdentifier: "en-US",
+            modelVariant: nil, text: "", cues: []))
+        XCTAssertEqual(emptyEdit.text, "")
+    }
+
     @MainActor
     func testClearingFileHistoryDoesNotRepersistAnInFlightTranscription() throws {
         let directory = FileManager.default.temporaryDirectory

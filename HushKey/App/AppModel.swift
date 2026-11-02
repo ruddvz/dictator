@@ -291,15 +291,18 @@ final class AppModel {
         rebuildClassifier()
     }
 
-    func saveFileTranscriptionSession(_ session: FileTranscriptionSession) {
-        guard !fileTranscriptionSessionsDiscardedByClear.contains(session.id) else { return }
+    @discardableResult
+    func saveFileTranscriptionSession(_ session: FileTranscriptionSession) -> Bool {
+        guard !fileTranscriptionSessionsDiscardedByClear.contains(session.id) else { return true }
         let updated = FileTranscriptionSessionStore.upserting(session, into: fileTranscriptionSessions)
         do {
             try FileTranscriptionSessionStore.save(updated, to: fileTranscriptionHistoryURL)
             fileTranscriptionSessions = updated
             if fileTranscriptionHistoryRecoveryCopyURL == nil { fileTranscriptionHistoryMessage = nil }
+            return true
         } catch {
             fileTranscriptionHistoryMessage = "Couldn’t save this transcript locally: \(error.localizedDescription)"
+            return false
         }
     }
 

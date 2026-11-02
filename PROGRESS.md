@@ -1,5 +1,14 @@
 # HushKey progress
 
+## Completed — persist file transcript edits before switching (2026-11-02)
+
+- Fixed the 500 ms autosave race: restoring another file transcript or starting transcription of a newly selected file now saves the active transcript first. Clicking the already active history row is a no-op, so it cannot reload stale text over an edit.
+- Empty transcript edits are saved, and the active session's original source name takes precedence over a newly selected file name. If saving fails, HushKey stays on the current session instead of switching away.
+- Added regression coverage for edited outgoing snapshots, same-row no-op snapshots, and intentional empty text.
+- `xcodebuild ... test`: 114 passed, 2 skipped, 0 failed. The existing CoreSimulator version warning remains; the macOS test run passed.
+- Rebuilt `dist/HushKey.app`, passed strict signature verification, and reopened the packaged app. No capture or permission prompts were started.
+- Next fresh-session step: complete consented live acceptance for microphone/Speech, Meeting Notes cancellation, dictation shortcuts, selected-text editing/insertion, and file exports; record any failures here.
+
 ## Completed — preserve selected-text formatting (2026-11-02)
 
 - Fixed selected-text rewriting so it sends only the text body to the local model, then restores the selection's original leading indentation/whitespace and trailing spaces or line breaks exactly.

@@ -31,6 +31,18 @@ struct FileTranscriptionSession: Codable, Identifiable, Equatable {
     }
 }
 
+enum FileTranscriptionSessionSnapshot {
+    static func make(activeSessionID: UUID?, switchingTo targetSessionID: UUID? = nil,
+                     sourceName: String, engine: FileTranscriptionEngine,
+                     languageIdentifier: String, modelVariant: String?,
+                     text: String, cues: [SubtitleCue]) -> FileTranscriptionSession? {
+        guard let activeSessionID, activeSessionID != targetSessionID else { return nil }
+        return FileTranscriptionSession(id: activeSessionID, sourceName: sourceName,
+                                        engine: engine, languageIdentifier: languageIdentifier,
+                                        modelVariant: modelVariant, text: text, cues: cues)
+    }
+}
+
 enum FileTranscriptionSessionStore {
     private static let fileManager = FileManager.default
 
