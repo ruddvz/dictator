@@ -1,6 +1,6 @@
 # HushKey design system
 
-_Warm editorial. Written 2026-11-01. Source of truth: `HushKey/Views/Theme.swift`._
+_Fog & sage (replaced Warm editorial, which read too close to Wispr Flow). Updated 2026-11-01. Source of truth: `HushKey/Views/Theme.swift`._
 
 The codes follow the dimensional-drawing convention (S spacing, R radius, H/I sizes, W width) so a spec sheet of any component can reference them directly. Values are points.
 
@@ -48,21 +48,24 @@ Each color has a light and dark value (`Theme.dynamic`). Light is the default; S
 
 | Token | Light | Dark | Use |
 | --- | --- | --- | --- |
-| `paper` | #F4F2EE | #191816 | window, sidebar |
-| `sheet` | #FDFCFA | #21201E | raised page, outlined cards |
-| `well` | #F6F4EF | #2A2825 | inset cards on the sheet |
-| `selection` | #EAE6DF | #2F2D2A | selected sidebar row |
-| `hover` | #F0EDE7 | #292724 | hover fills |
-| `hairline` | #E6E1D8 | #35322E | borders, dividers |
-| `ink` / `ink2` / `ink3` | #1A1918 / #6B665E / #9C968C | #F3F1EC / #A8A298 / #77726A | primary / secondary / tertiary text |
-| `keycap` | #F7D58E | #5A4520 | shortcut keys |
-| `listening` | red | red | live microphone only |
+| `paper` | #EEF0EE | #121614 | window, sidebar |
+| `sheet` | #FAFBFA | #1A1F1D | raised page, outlined cards |
+| `well` | #F2F4F2 | #222826 | inset cards on the sheet |
+| `selection` | #E0E7E2 | #26302B | selected sidebar row |
+| `hover` | #E7ECE8 | #1E2522 | hover fills |
+| `hairline` | #DCE1DD | #2C3430 | borders, dividers |
+| `ink` / `ink2` / `ink3` | #1E2321 / #66706B / #949D98 | #E9EEEB / #9BA6A0 / #6C7671 | primary / secondary / tertiary text |
+| `signal` | #4F7F6A | #7FB39C | the one accent: primary buttons, live mic, progress |
+| `signalSoft` | #E3ECE7 | #22322B | tinted fills (next-step banner, active capture) |
+| `keycap` / `keycapEdge` | #DDE7E1 / #9DB5A8 | #2A3A33 / #4C6A5C | shortcut keys |
+| `finishing` | #6F8796 | #9AB2C0 | slate: transcribing |
+| `success` / `danger` | #3F7A5C / #B5534A | #8CC4A5 / #E0877E | done / errors and conflicts |
 
-The system accent color is not used. Red means "the microphone is live" and nothing else.
+Pill surface is always dark: #141B17 with sage #9CCBB4 strokes. The system accent color is not used. Sage is the only accent; red appears only for errors.
 
 ## Type
 
-- **Display:** New York (`Font.display`) for page titles (30), the greeting (32), banner titles (24), and stat numbers (28).
+- **Display:** SF Pro Rounded semibold (`Font.display`) for page titles (30), the greeting (32), banner titles (24), and stat numbers (28). The serif was dropped: it was Wispr's signature.
 - **Text:** SF Pro, 13.5 body, 13 controls, 12 metadata, 11 semibold tracked caps for section labels (`SectionLabel`).
 - Captions are for metadata, not instructions. If a control needs a paragraph to explain it, the control is wrong.
 
@@ -75,16 +78,16 @@ The system accent color is not used. Red means "the microphone is live" and noth
 
 - **Page switch:** fade + 8 pt rise on insert, fade on removal.
 - **Morph icon (`MorphIcon`):** one 25-point stroked line that blends between hush → waveform → spinner → check over 0.45 s (ease-out cubic). Used in the brand mark, the Dictate button, the composer header, the empty history state, and the floating pill.
-- **Pill:** idle bar → hover hint → live waveform → "Transcribing" → check with "Ready to insert" for 1.4 s → idle.
+- **Pill:** idle sage bar → hover hint → listening (cancel ×, `VoiceRibbon`, elapsed time, stop) → "Writing it up" → check with "Typed" for 1.4 s → idle. `VoiceRibbon` is three flowing lines that swell with speech above an adaptive noise floor (fast rise, slow fall), so silence stays calm instead of looking like a broken meter.
 - **Sidebar:** icon bounces on selection; rows fade their fill on hover.
 - **History:** rows slide in from the top, delete animates out, hover actions slide in 6 pt.
 
 ## Components
 
-`card(style: .well | .outlined)`, `PrimaryButtonStyle`, `SecondaryButtonStyle`, `IconButtonStyle`, `Keycap` / `KeycapShortcut`, `MorphIcon`, `LiveWaveform`, `StatusChip`, `SectionLabel`, `ActivityHeatmap`, `PageHeader`, `pageLayout()`, `CardGroupBoxStyle` (applied to every `GroupBox`).
+`card(style: .well | .outlined)`, `PrimaryButtonStyle`, `SecondaryButtonStyle`, `IconButtonStyle`, `Keycap` / `KeycapShortcut`, `MorphIcon`, `VoiceRibbon`, `LiveWaveform`, `StatusChip`, `SectionLabel`, `ActivityHeatmap`, `PageHeader`, `pageLayout()`, `CardGroupBoxStyle` (applied to every `GroupBox`).
 
 ## Open items
 
 - Settings rows still carry long explanatory captions from the old layout; convert them to label + one-line description + right-aligned control.
 - Transforms, Files, and the Silent Lab pages use the shared tokens through `GroupBox` and `pageLayout()`, but their inner controls haven't been individually redesigned.
-- `[TBD]` dark-mode banner treatment: the gradient reads well in light mode; in dark mode it sits close to the sheet color.
+- Banner is now `signalSoft`; check its contrast in dark mode by eye.

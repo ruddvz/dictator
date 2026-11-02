@@ -39,9 +39,11 @@ struct DictationView: View {
                     .font(.display(32))
                     .tracking(-0.4)
                 HStack(spacing: Theme.s2) {
-                    Text(model.dictationCaptureBehavior == .hold ? "Hold" : "Press")
+                    Text(holds ? "Hold" : "Press")
                     KeycapShortcut(label: model.dictationShortcut.label, size: 12)
-                    Text(model.dictationCaptureBehavior == .hold ? "in any app and talk. Let go to finish." : "in any app to start and stop.")
+                    Text(model.dictationShortcut.usesFunctionKey
+                         ? "anywhere and talk. Double-tap for hands-free."
+                         : holds ? "anywhere and talk. Let go to finish." : "anywhere to start and stop.")
                 }
                 .font(.system(size: 14))
                 .foregroundStyle(Theme.ink2)
@@ -57,6 +59,10 @@ struct DictationView: View {
         }
     }
 
+    private var holds: Bool {
+        model.dictationShortcut.usesFunctionKey || model.dictationCaptureBehavior == .hold
+    }
+
     private var firstName: String {
         let full = NSFullUserName().trimmingCharacters(in: .whitespaces)
         return full.split(separator: " ").first.map(String.init) ?? NSUserName()
@@ -64,7 +70,7 @@ struct DictationView: View {
 
     private var problem: String? {
         if let error = model.audio.error ?? model.transcriber.error { return error }
-        return model.dictationShortcutStatus.hasPrefix("Could not") ? model.dictationShortcutStatus : nil
+        return model.dictationShortcutNeedsAttention ? model.dictationShortcutStatus : nil
     }
 
     private var recordButton: some View {
@@ -81,7 +87,7 @@ struct DictationView: View {
             }
             .frame(minWidth: 96)
         }
-        .buttonStyle(PrimaryButtonStyle(tint: model.audio.isRunning ? Theme.listening : Theme.ink))
+        .buttonStyle(PrimaryButtonStyle(tint: model.audio.isRunning ? Theme.ink : Theme.signal))
         .disabled(isFinishing)
         .animation(Theme.snappy, value: model.audio.isRunning)
         .help(model.audio.isRunning ? "Stop dictation" : "Start dictation")
@@ -456,10 +462,10 @@ private struct NextStepBanner: View {
                             .tracking(-0.2)
                         Text(step.detail)
                             .font(.system(size: 13))
-                            .foregroundStyle(.white.opacity(0.72))
+                            .foregroundStyle(Theme.ink2)
                             .fixedSize(horizontal: false, vertical: true)
                         Button(step.action) { step.perform(model) }
-                            .buttonStyle(BannerButtonStyle())
+                            .buttonStyle(PrimaryButtonStyle())
                             .padding(.top, Theme.s2)
                     }
                     Spacer(minLength: 0)
@@ -476,38 +482,22 @@ private struct NextStepBanner: View {
                 .labelStyle(.iconOnly)
                 .buttonStyle(.plain)
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.55))
+                .foregroundStyle(Theme.ink3)
                 .frame(width: 28, height: 28)
                 .contentShape(Rectangle())
                 .padding(Theme.s2)
                 .help("Hide this suggestion")
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(Theme.ink)
             .frame(maxWidth: .infinity, minHeight: 168, alignment: .leading)
-            .background(
-                LinearGradient(colors: [Color(red: 0.09, green: 0.085, blue: 0.08), Color(red: 0.17, green: 0.13, blue: 0.09)],
-                               startPoint: .topLeading, endPoint: .bottomTrailing),
-                in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
+            .background(Theme.signalSoft, in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
             .id(step.id)
             .transition(.opacity.combined(with: .scale(scale: 0.98)))
         }
     }
 }
 
-private struct BannerButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(Color(red: 0.1, green: 0.1, blue: 0.09))
-            .padding(.horizontal, Theme.s4)
-            .frame(height: Theme.controlHeight)
-            .background(Color(red: 0.98, green: 0.96, blue: 0.92), in: Capsule())
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(Theme.snappy, value: configuration.isPressed)
-    }
-}
-
-/// Slow ambient waveform drawn in warm amber; decoration for the banner.
+/// Slow ambient waveform drawn in sage; decoration for the banner.
 private struct BannerWave: View {
     var body: some View {
         TimelineView(.animation(minimumInterval: 1 / 30)) { context in
@@ -524,7 +514,7 @@ private struct BannerWave: View {
                     let rect = CGRect(x: CGFloat(index) * (width + gap), y: (size.height - height) / 2,
                                       width: width, height: height)
                     graphics.fill(Path(roundedRect: rect, cornerRadius: width / 2),
-                                  with: .color(Color(red: 0.97, green: 0.74, blue: 0.36).opacity(0.35 + 0.55 * wave)))
+                                  with: .color(Theme.signal.opacity(0.25 + 0.6 * wave)))
                 }
             }
         }

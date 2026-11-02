@@ -177,10 +177,10 @@ struct HoldToCaptureButton: View {
         .frame(maxWidth: .infinity, minHeight: 120)
         .background(
             RoundedRectangle(cornerRadius: 14)
-                .fill(isCapturing ? Color.red.opacity(0.18) : Theme.ink.opacity(0.10)))
+                .fill(isCapturing ? Theme.signalSoft : Theme.ink.opacity(0.06)))
         .overlay(
             RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(isCapturing ? Color.red : Theme.ink.opacity(0.4), lineWidth: isCapturing ? 2 : 1))
+                .strokeBorder(isCapturing ? Theme.signal : Theme.hairline, lineWidth: isCapturing ? 2 : 1))
         .contentShape(Rectangle())
         .opacity(isEnabled ? 1 : 0.4)
         .accessibilityElement(children: .ignore)

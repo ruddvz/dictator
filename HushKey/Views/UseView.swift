@@ -164,7 +164,7 @@ struct UseView: View {
                 }
                 Spacer()
                 Circle()
-                    .fill(capture.isCapturing ? Color.red : Color.secondary.opacity(0.3))
+                    .fill(capture.isCapturing ? Theme.signal : Color.secondary.opacity(0.3))
                     .frame(width: 10, height: 10)
                 Text(capture.isCapturing ? "Capturing" : "Listening")
                     .font(.caption)

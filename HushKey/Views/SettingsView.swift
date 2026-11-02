@@ -139,18 +139,35 @@ private struct DictationSettingsCard: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                Picker("Start or stop dictation", selection: $model.dictationShortcut) {
-                    ForEach(DictationShortcut.allCases) { Text($0.label).tag($0) }
+                Picker("Dictation key", selection: $model.dictationShortcut) {
+                    ForEach(DictationShortcut.allCases) { Text($0.menuTitle).tag($0) }
                 }
                 .frame(maxWidth: 280, alignment: .leading)
-                Picker("Shortcut behavior", selection: $model.dictationCaptureBehavior) {
-                    ForEach(DictationCaptureBehavior.allCases) { Text($0.rawValue).tag($0) }
+                if !model.dictationShortcut.usesFunctionKey {
+                    Picker("Shortcut behavior", selection: $model.dictationCaptureBehavior) {
+                        ForEach(DictationCaptureBehavior.allCases) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(maxWidth: 360)
                 }
-                .pickerStyle(.segmented)
-                .frame(maxWidth: 360)
                 Text(model.dictationShortcutStatus)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(model.dictationShortcutNeedsAttention ? Theme.danger : .secondary)
+                if model.dictationShortcut.usesFunctionKey, model.dictationShortcutNeedsAttention {
+                    HStack(spacing: Theme.s2) {
+                        if AXIsProcessTrusted() {
+                            Button("Open Keyboard Settings") {
+                                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!)
+                            }
+                        } else {
+                            Button("Open Accessibility Settings") {
+                                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+                            }
+                        }
+                        Button("Check again") { model.refreshFunctionKeyStatus() }
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
+                }
 
                 Picker("Voice edit selected text", selection: $model.selectedTextEditShortcut) {
                     ForEach(SelectedTextEditShortcut.allCases) { Text($0.label).tag($0) }

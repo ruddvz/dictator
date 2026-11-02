@@ -103,15 +103,6 @@ struct FloatingPillView: View {
         return isHovering ? .hover : .idle
     }
 
-    private var morphPhase: MorphIcon.Phase {
-        switch phase {
-        case .idle, .hover: .idle
-        case .listening: .listening
-        case .finishing: .working
-        case .done: .done
-        }
-    }
-
     var body: some View {
         pill
             .padding(6) // room for the shadow inside the transparent panel
@@ -127,60 +118,83 @@ struct FloatingPillView: View {
             }
     }
 
+    private static let surface = Color(red: 0.078, green: 0.106, blue: 0.09)   // #141B17 sage-black
+    private static let glow = Color(red: 0.61, green: 0.80, blue: 0.71)        // #9CCBB4 sage on dark
+
     private var pill: some View {
-        Button {
-            Task { await model.toggleDictation() }
-        } label: {
-            content
-                .foregroundStyle(.white)
-                .background(Capsule().fill(Color(red: 0.1, green: 0.095, blue: 0.09).opacity(phase == .idle ? 0.6 : 0.94)))
-                .overlay(Capsule().strokeBorder(.white.opacity(phase == .idle ? 0.25 : 0.12), lineWidth: 0.5))
-                .shadow(color: .black.opacity(phase == .idle ? 0 : 0.28), radius: 8, y: 3)
-                .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .disabled(phase == .finishing)
-        .onHover { isHovering = $0 }
-        .help(phase == .listening ? "Stop dictation" : "Start dictation (\(model.dictationShortcut.label))")
-        .accessibilityLabel(accessibilityLabel)
+        content
+            .foregroundStyle(.white)
+            .background(Capsule().fill(Self.surface.opacity(phase == .idle ? 0.55 : 0.96)))
+            .overlay(Capsule().strokeBorder(phase == .listening ? Self.glow.opacity(0.35) : .white.opacity(phase == .idle ? 0.22 : 0.1),
+                                            lineWidth: phase == .listening ? 1 : 0.5))
+            .shadow(color: phase == .listening ? Self.glow.opacity(0.25) : .black.opacity(phase == .idle ? 0 : 0.28),
+                    radius: phase == .listening ? 12 : 8, y: 3)
+            .contentShape(Capsule())
+            .onHover { isHovering = $0 }
+            .onTapGesture {
+                guard phase != .finishing else { return }
+                Task { await model.toggleDictation() }
+            }
+            .help(phase == .listening ? "Click to finish" : "Start dictation (\(model.dictationShortcut.menuTitle))")
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel(accessibilityLabel)
+            .accessibilityAddTraits(.isButton)
     }
 
     @ViewBuilder
     private var content: some View {
         if phase == .idle {
-            Capsule().fill(.white.opacity(0.6))
-                .frame(width: 26, height: 3)
+            Capsule().fill(Self.glow.opacity(0.7))
+                .frame(width: 24, height: 3)
                 .padding(.horizontal, 11)
                 .padding(.vertical, 5)
                 .transition(.opacity)
         } else {
-            HStack(spacing: 9) {
-                MorphIcon(phase: morphPhase, level: model.audio.level, lineWidth: 1.8)
-                    .frame(width: 16, height: 16)
-                    .foregroundStyle(phase == .listening ? Theme.listening : phase == .done ? Theme.success : .white)
+            HStack(spacing: 10) {
                 switch phase {
                 case .listening:
-                    LiveWaveform(level: model.audio.level, isActive: true, barCount: 16, tint: .white)
-                        .frame(width: 76, height: 16)
-                    Image(systemName: "stop.fill")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.7))
+                    PillIconButton(systemImage: "xmark", help: "Cancel. Nothing is typed") { model.cancelDictation() }
+                    VoiceRibbon(level: model.audio.level, isActive: true, tint: Self.glow)
+                        .frame(width: 92, height: 20)
+                    elapsed
+                    PillIconButton(systemImage: "stop.fill", help: "Finish and type it") {
+                        Task { await model.toggleDictation() }
+                    }
                 case .finishing:
-                    Text("Transcribing").font(.system(size: 12, weight: .medium))
+                    MorphIcon(phase: .working, lineWidth: 1.8)
+                        .frame(width: 16, height: 16)
+                        .foregroundStyle(Self.glow)
+                    Text("Writing it up").font(.system(size: 12, weight: .medium))
                 case .done:
-                    Text(model.insertion.isEnabled ? "Ready to insert" : "Done").font(.system(size: 12, weight: .medium))
+                    MorphIcon(phase: .done, lineWidth: 2)
+                        .frame(width: 16, height: 16)
+                        .foregroundStyle(Self.glow)
+                    Text(model.insertion.isEnabled ? "Typed" : "Copied to HushKey").font(.system(size: 12, weight: .medium))
                 default:
+                    MorphIcon(phase: .idle, lineWidth: 1.8)
+                        .frame(width: 16, height: 16)
+                        .foregroundStyle(Self.glow)
                     HStack(spacing: 4) {
-                        Text(model.dictationCaptureBehavior == .hold ? "Hold" : "Press")
+                        Text(model.dictationShortcut.usesFunctionKey || model.dictationCaptureBehavior == .hold ? "Hold" : "Press")
                         Text(model.dictationShortcut.label).fontWeight(.semibold)
-                        Text("or click")
+                        Text("or click to talk")
                     }
                     .font(.system(size: 12, weight: .medium))
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.horizontal, phase == .listening ? 6 : 12)
+            .padding(.vertical, phase == .listening ? 4 : 8)
             .transition(.opacity.combined(with: .scale(scale: 0.9)))
+        }
+    }
+
+    private var elapsed: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let seconds = Int(context.date.timeIntervalSince(model.dictationStartedAt ?? context.date))
+            Text(String(format: "%d:%02d", seconds / 60, seconds % 60))
+                .font(.system(size: 11, weight: .medium).monospacedDigit())
+                .foregroundStyle(.white.opacity(0.6))
+                .frame(minWidth: 28)
         }
     }
 
@@ -191,5 +205,28 @@ struct FloatingPillView: View {
         case .finishing: "Transcribing"
         case .done: "Dictation finished"
         }
+    }
+}
+
+/// Small round control inside the pill. Its own hit area, so it does not toggle dictation.
+private struct PillIconButton: View {
+    var systemImage: String
+    var help: String
+    var action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(.white.opacity(hovering ? 0.95 : 0.65))
+                .frame(width: 24, height: 24)
+                .background(Circle().fill(.white.opacity(hovering ? 0.16 : 0.08)))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help(help)
+        .accessibilityLabel(help)
     }
 }

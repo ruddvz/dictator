@@ -244,7 +244,7 @@ struct PersonalizationView: View {
                   : "\(validation.validCount) ready · check line\(validation.invalidLines.count == 1 ? "" : "s") \(validation.invalidLines.map(String.init).joined(separator: ", "))",
                   systemImage: validation.invalidLines.isEmpty ? "checkmark.circle" : "exclamationmark.circle")
                 .font(.caption)
-                .foregroundStyle(validation.invalidLines.isEmpty ? Color.secondary : Color.orange)
+                .foregroundStyle(validation.invalidLines.isEmpty ? Color.secondary : Theme.danger)
         }
         .padding(12)
         .background(.quaternary.opacity(0.22), in: RoundedRectangle(cornerRadius: 10))

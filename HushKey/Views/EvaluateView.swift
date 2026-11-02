@@ -208,7 +208,7 @@ private struct EvaluationResultView: View {
                         Text("\(count)")
                             .font(.caption.monospacedDigit())
                             .frame(minWidth: 36, minHeight: 24)
-                            .background((row == col ? Color.green : Color.red)
+                            .background((row == col ? Theme.success : Theme.danger)
                                 .opacity(Double(count) / Double(total) * 0.7))
                     }
                 }

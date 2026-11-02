@@ -272,3 +272,19 @@ Validate named-target insertion, stale-target rejection, global shortcut inserti
 ## Next item — live selected-text acceptance
 
 In a fresh session, use the packaged app to test the selected-text shortcut, local instruction capture, preview invalidation, Apply once, undo, stale-target rejection, unsupported/secure controls, and permission refusal in TextEdit and one other app. Record actual results in `docs/TESTING_PROTOCOL.md`; then proceed with voice dictation and remaining file/meeting acceptance.
+
+## Completed — Fog & sage palette, fn key, voice ribbon pill
+
+- Replaced the warm paper/amber/serif look (too close to Wispr Flow) with **Fog & sage**: cool fog surfaces, charcoal ink, one sage `signal` accent, SF Pro Rounded display type. The next-step banner is now a light sage panel instead of a dark gradient. Stray reds/oranges/greens in Use, Evaluate, Vocabulary and the capture pad now use theme tokens. Tokens are in `docs/DESIGN_SYSTEM.md`.
+- **fn (Globe) key is the default dictation key** (`FunctionKeyMonitor`). Hold fn to talk. Double-tap fn for hands-free; tap again to stop. fn plus any other key (arrows, F-keys, modifiers) never triggers dictation; a hold aborted that way discards the audio. Needs Accessibility access. Settings warns when access is missing or when “Press 🌐 key to” is not Do Nothing, links to the right System Settings pane, and offers Check again. Monitors re-arm when access is granted. The old ⌥⇧D style shortcuts remain as alternatives.
+- New `cancelDictation()`: stops listening without transcribing, saving or inserting.
+- Pill redesign: dark sage capsule with cancel ×, flowing `VoiceRibbon`, elapsed time, stop; "Writing it up" while finishing; "Typed" or "Copied to HushKey" when done. Verified live: listening state and cancel returned to idle.
+- Tests: 53 passed, 0 failed (added `FunctionKeyGestureTests`).
+- Not verified: fn key in another app (the debug build isn't in the Accessibility list yet), the done state with real speech, and dark mode by eye.
+
+## Next items — each in a fresh session
+
+1. Live fn-key acceptance: grant Accessibility to the packaged app, set Globe to Do Nothing, test hold, double-tap hands-free, fn+arrow and insertion in TextEdit plus one other app.
+2. Status capsule recovery from the competitor addendum: error state in the pill, retry the last audio, and a focus-checked "Paste again".
+3. Settings rewrite: one-line label plus right-aligned control; drop the long captions.
+4. Editable app profiles and dictionary/snippet import and export; local model diagnostics.

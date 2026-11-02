@@ -122,6 +122,9 @@ final class AppModel {
         }
     }
     private(set) var dictationShortcutStatus = "Shortcut is not registered yet."
+    var dictationShortcutNeedsAttention: Bool {
+        dictationShortcutStatus.hasPrefix("Could not") || dictationShortcutStatus.hasPrefix("Set ")
+    }
     private(set) var selectedTextEditShortcutStatus = "Shortcut is not registered yet."
     var dictationTerms = UserDefaults.standard.string(forKey: "dictationTerms") ?? "" {
         didSet { UserDefaults.standard.set(dictationTerms, forKey: "dictationTerms") }
@@ -178,7 +181,7 @@ final class AppModel {
     private(set) var usedNearbyTextHints = false
     private(set) var isFinalizingDictation = false
     @ObservationIgnored private(set) var lastSavedDictationText: String?
-    @ObservationIgnored private var dictationStartedAt: Date?
+    @ObservationIgnored private(set) var dictationStartedAt: Date?
     @ObservationIgnored private var lastDictationDuration: TimeInterval?
 
     var dictationStats: DictationStats { DictationStats(entries: dictationHistory) }
@@ -202,6 +205,8 @@ final class AppModel {
 
     @ObservationIgnored private var keyMonitor: Any?
     @ObservationIgnored private let dictationHotKey = GlobalHotKeyRegistration(id: 2)
+    @ObservationIgnored private let functionKey = FunctionKeyMonitor()
+    @ObservationIgnored private var functionKeyInstalledTrusted = false
     @ObservationIgnored private let selectedTextEditHotKey = GlobalHotKeyRegistration(id: 4)
     @ObservationIgnored private var started = false
     @ObservationIgnored private var motionStarted = false
@@ -270,6 +275,10 @@ final class AppModel {
         installDictationShortcut()
         installSelectedTextEditShortcut()
         updateMotionActivity()
+        NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification,
+                                               object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshFunctionKeyStatus() }
+        }
     }
 
     private func ingest(_ sample: MotionSample) {
@@ -935,6 +944,7 @@ final class AppModel {
         if transcriber.isRunning { transcriber.beginFinalization() }
         else { transcriber.stop() }
         audio.stop()
+        functionKey.reset()
         lastDictationDuration = dictationStartedAt.map { Date().timeIntervalSince($0) }
         dictationStartedAt = nil
         Task { @MainActor [weak self] in
@@ -993,6 +1003,15 @@ final class AppModel {
     }
 
     private func installDictationShortcut() {
+        if dictationShortcut.usesFunctionKey {
+            dictationHotKey.unregister()
+            functionKey.onAction = { [weak self] action in self?.handleFunctionKey(action) }
+            functionKey.install()
+            functionKeyInstalledTrusted = AXIsProcessTrusted()
+            refreshFunctionKeyStatus()
+            return
+        }
+        functionKey.uninstall()
         let status: OSStatus
         switch dictationCaptureBehavior {
         case .hold:
@@ -1143,6 +1162,63 @@ final class AppModel {
     private func endShortcutDictation() {
         dictationShortcutHeld = false
         if audio.isRunning { stopDictation() }
+    }
+
+    private func handleFunctionKey(_ action: FunctionKeyGesture.Action) {
+        switch action {
+        case .startHold: beginShortcutDictation()
+        case .endHold: endShortcutDictation()
+        case .abortHold: cancelDictation()
+        case .startHandsFree:
+            guard !audio.isRunning else { return }
+            Task { @MainActor in await startNewDictation() }
+        case .stopHandsFree:
+            if audio.isRunning { stopDictation() }
+        case .none, .scheduleHoldStart, .cancelHoldStart: break
+        }
+    }
+
+    /// The fn key needs Accessibility access to be seen in other apps, and macOS must not use
+    /// it for something else (emoji picker, input source, or Apple dictation).
+    func refreshFunctionKeyStatus() {
+        guard dictationShortcut.usesFunctionKey else { return }
+        let trusted = AXIsProcessTrusted()
+        if trusted, !functionKeyInstalledTrusted {
+            // Monitors added before access was granted stay deaf, so add them again.
+            functionKey.uninstall()
+            functionKey.install()
+            functionKeyInstalledTrusted = true
+        }
+        if !trusted {
+            dictationShortcutStatus = "Could not watch the fn key yet. Allow HushKey in Accessibility settings."
+        } else if let conflict = Self.globeKeyConflict {
+            dictationShortcutStatus = "Set “Press 🌐 key to” to Do Nothing in Keyboard settings. It currently \(conflict)."
+        } else {
+            dictationShortcutStatus = "Hold fn to dictate from any app. Double-tap fn for hands-free; tap again to stop."
+        }
+    }
+
+    /// What macOS does with the Globe key, when that would fight with dictation.
+    static var globeKeyConflict: String? {
+        switch UserDefaults(suiteName: "com.apple.HIToolbox")?.object(forKey: "AppleFnUsageType") as? Int {
+        case 1: "changes the input source"
+        case 2: "shows emoji and symbols"
+        case 3: "starts Apple dictation"
+        default: nil
+        }
+    }
+
+    /// Stops listening and throws the audio away: nothing is transcribed, saved, or inserted.
+    func cancelDictation() {
+        dictationShortcutHeld = false
+        dictationStartGeneration += 1
+        functionKey.reset()
+        guard audio.isRunning else { return }
+        transcriber.stop()
+        audio.stop()
+        transcriber.clear()
+        dictationStartedAt = nil
+        captureGate.release(.dictation)
     }
 
 }
