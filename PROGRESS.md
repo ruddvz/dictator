@@ -12,12 +12,22 @@
   - Takes that are too short, too long, or include a head turn are refused, and such captures are never typed.
   - A "nothing" rest word is recognised but never typed.
 - **Measuring:** `Scripts/silent-eval.sh` re-scores the saved dataset under several variants and writes `docs/eval/silent-report.md`.
-- **Verified here:** 196 tests, 3 skipped, 0 failures (`xcodebuild … test`), and a signed `Scripts/package-app.sh` build.
+- **Verified here:** 198 tests, 3 skipped, 0 failures (after merging the Electron paste fix) (`xcodebuild … test`), and a signed `Scripts/package-app.sh` build.
 - **Not verified live yet:**
   - Control-hold with AirPods in another app.
   - Motion streaming while HushKey is in the background.
   - Typing into TextEdit.
 - **Next:** record a second session of every word, plus 10 "nothing" takes. Silent Use stays locked until a held-out session beats the baseline, and the current data is one session.
+
+## Completed: no false "Check the field first" after pasting into Electron apps (2026-11-02)
+
+- Dictating into the Claude desktop app inserted the text but showed "Check the field first / Paste again". Paste verification required the field's accessibility value to equal the expected string exactly, and treated any other value or a rebuilt focused element as "target changed".
+- `PasteDeliveryVerifier.matches` now also accepts the text as shown: non-breaking spaces count as spaces, zero-width characters are ignored, and leading or trailing whitespace and newlines are trimmed. Missing, partial or duplicated text is still rejected. If the focused element is replaced in the same app with the same role, its value is still checked.
+- An unconfirmed paste now logs why (`paste unconfirmed …`): element identity, lengths, whether the normalised text matches, and whether the text appears once or twice. It never logs text.
+- Tests: 189 passed, 2 skipped (`testCustomWritingStyleUsesOnDeviceModelWhenAvailable` skipped because it hangs), including two new verifier tests. Signed dist packaged.
+- **Seen live:** fn dictation into the Claude app's message box logged "Pasted into Claude and verified in the same text field", with no notice. Not yet checked: Slack and VS Code.
+- Removed stale HushKey copies (the old Codex dist, two Xcode DerivedData folders, `~/Downloads/Hushkey.dmg`; all in the Trash), so Spotlight finds only `dist/HushKey.app`. `~/Documents/ChatGPT/HushKey` (Codex clone) was left; check it for unmoved work before deleting it.
+- Next: the Parakeet engine and Silent Use improvements are running in their own sessions.
 
 ## Completed: home redesign, ambient hero and breath ribbon (2026-11-02)
 
