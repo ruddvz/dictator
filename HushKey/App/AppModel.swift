@@ -180,6 +180,14 @@ final class AppModel {
     private(set) var selectedTextEditApplied = false
     private(set) var usedNearbyTextHints = false
     private(set) var isFinalizingDictation = false
+    /// The pill's error state for the last dictation, with the recoveries it allows.
+    private(set) var dictationNotice: DictationNotice?
+    /// Bumped each time a dictation ends with text, so the pill can flash its done state.
+    private(set) var completedDictationCount = 0
+    /// Whether the running or last dictation has a text field to type into.
+    private(set) var dictationHasTarget = false
+    /// Keeps the finished text on the pill's card, with Copy, when there was nowhere to type it.
+    private(set) var showsFinishedTranscript = false
     @ObservationIgnored private(set) var lastSavedDictationText: String?
     @ObservationIgnored private(set) var dictationStartedAt: Date?
     @ObservationIgnored private var lastDictationDuration: TimeInterval?
@@ -191,6 +199,9 @@ final class AppModel {
     @ObservationIgnored private var capturedInsertionTarget: TextInsertionService.InsertionTarget?
     @ObservationIgnored private var selectedTextEditTarget: TextInsertionService.InsertionTarget?
     @ObservationIgnored private let selectedEditTranscriber = MicTranscriber()
+    @ObservationIgnored private let retainedAudio = RetainedDictationAudio()
+    @ObservationIgnored private var retainedAudioSinkID: UUID?
+    @ObservationIgnored private var lastDictationContextualStrings: [String] = []
 
     // MARK: Decoding
 
@@ -581,7 +592,10 @@ final class AppModel {
             insertion.report("This transcript was already inserted once.")
             return
         }
-        if insertion.insert(text) { didInsertCurrentDictation = true }
+        if insertion.insert(text) {
+            didInsertCurrentDictation = true
+            dictationNotice = nil
+        }
     }
 
     var canInsertIntoCapturedTarget: Bool {
@@ -708,7 +722,10 @@ final class AppModel {
         }
         isInsertingDictation = true
         defer { isInsertingDictation = false }
-        if await insertion.insert(text, into: target) { didInsertCurrentDictation = true }
+        if await insertion.insert(text, into: target) {
+            didInsertCurrentDictation = true
+            dictationNotice = nil
+        }
     }
 
     func undoLastInsertion() {
@@ -844,6 +861,7 @@ final class AppModel {
         lastSavedDictationText = restoredText
         currentDictationHistoryEntryID = nil
         lastDictationDuration = nil
+        dismissDictationNotice()
         screen = .dictation
     }
 
@@ -875,6 +893,7 @@ final class AppModel {
         insertion.clearUndoRecord()
         lastSavedDictationText = nil
         currentDictationHistoryEntryID = nil
+        dismissDictationNotice()
     }
 
     func requestNearbyTextAccess() {
@@ -893,11 +912,15 @@ final class AppModel {
         }
         dictationStartGeneration += 1
         let generation = dictationStartGeneration
+        dictationNotice = nil
+        showsFinishedTranscript = false
+        retainedAudio.reset()
         let target = NSWorkspace.shared.frontmostApplication
         let isHushKey = target?.bundleIdentifier == "com.ruddvz.hushkey"
         activeDictationTarget = isHushKey ? nil : target?.localizedName
         capturedInsertionTarget = isHushKey ? nil : insertion.captureInsertionTarget()
         capturedInsertionTargetName = capturedInsertionTarget?.applicationName
+        dictationHasTarget = insertion.isEnabled && capturedInsertionTarget != nil
         activeDictationMode = DictationMode.resolved(dictationMode,
                                                       bundleIdentifier: isHushKey ? nil : target?.bundleIdentifier)
         let nearbyHints = usesNearbyTextHints ? insertion.nearbyContextHints() : []
@@ -907,8 +930,13 @@ final class AppModel {
         guard generation == dictationStartGeneration, audio.isRunning else {
             audio.stop()
             captureGate.release(.dictation)
+            if generation == dictationStartGeneration {
+                dictationNotice = DictationRecovery.notice(audioError: audio.error ?? "The microphone did not start.",
+                                                           transcriberError: nil, transcript: "", hasRetainedAudio: false)
+            }
             return
         }
+        retainedAudioSinkID = audio.sink.add { [retainedAudio] buffer, _ in retainedAudio.append(buffer) }
         dictationStartedAt = Date()
         lastDictationDuration = nil
         let customWords = DictationVocabulary.terms(from: dictationTerms)
@@ -919,21 +947,26 @@ final class AppModel {
         case .code: modeHints = ["underscore", "camelCase", "snake_case", "open parenthesis", "close parenthesis", "semicolon", "arrow"]
         case .automatic, .natural: modeHints = []
         }
+        lastDictationContextualStrings = DictationContextHints.prioritized(customWords: customWords,
+                                                                           modeHints: modeHints,
+                                                                           nearbyHints: nearbyHints,
+                                                                           learnedWords: dataset.vocabulary)
         let started = await transcriber.start(sink: audio.sink, localeIdentifier: dictationLanguage,
-                                              contextualStrings: DictationContextHints.prioritized(
-                                                customWords: customWords,
-                                                modeHints: modeHints,
-                                                nearbyHints: nearbyHints,
-                                                learnedWords: dataset.vocabulary))
+                                              contextualStrings: lastDictationContextualStrings)
         guard generation == dictationStartGeneration, audio.isRunning else {
             transcriber.stop()
             audio.stop()
+            stopRetainingAudio(keep: false)
             captureGate.release(.dictation)
             return
         }
         if !started {
             audio.stop()
+            stopRetainingAudio(keep: false)
             captureGate.release(.dictation)
+            dictationNotice = DictationRecovery.notice(
+                audioError: nil, transcriberError: transcriber.error ?? "Speech recognition did not start.",
+                transcript: "", hasRetainedAudio: false)
         }
     }
 
@@ -944,22 +977,125 @@ final class AppModel {
         if transcriber.isRunning { transcriber.beginFinalization() }
         else { transcriber.stop() }
         audio.stop()
+        stopRetainingAudio(keep: true)
         functionKey.reset()
         lastDictationDuration = dictationStartedAt.map { Date().timeIntervalSince($0) }
         dictationStartedAt = nil
         Task { @MainActor [weak self] in
             guard let self else { return }
             let rawText = await transcriber.waitForFinalization()
-            rawDictationText = rawText
-            let processed = DictationTranscriptProcessor.process(rawText, mode: activeDictationMode,
-                                                                  snippets: dictationSnippets,
-                                                                  applyCorrections: appliesSpokenCorrections,
-                                                                  cleanupFillers: cleansDictationFillers)
-            transcriber.replaceText(processed)
-            saveCurrentDictation()
+            await finishDictation(rawText: rawText)
+        }
+    }
+
+    /// Shared end of a live dictation and of a retry: process, save, then either type the
+    /// text into the captured field or raise a notice the pill can recover from.
+    private func finishDictation(rawText: String) async {
+        rawDictationText = rawText
+        let processed = DictationTranscriptProcessor.process(rawText, mode: activeDictationMode,
+                                                              snippets: dictationSnippets,
+                                                              applyCorrections: appliesSpokenCorrections,
+                                                              cleanupFillers: cleansDictationFillers)
+        transcriber.replaceText(processed)
+        saveCurrentDictation()
+        if let notice = DictationRecovery.notice(audioError: nil, transcriberError: transcriber.error,
+                                                 transcript: processed, hasRetainedAudio: retainedAudio.isUsable) {
+            dictationNotice = notice
+        } else {
+            retainedAudio.reset()
+            if dictationHasTarget {
+                typeFinishedDictation(processed.trimmingCharacters(in: .whitespacesAndNewlines))
+            } else {
+                showsFinishedTranscript = true
+            }
+            completedDictationCount += 1
+        }
+        isFinalizingDictation = false
+        captureGate.release(.dictation)
+    }
+
+    /// Types a finished dictation into the field it was started from, only if that field
+    /// still has focus.
+    private func typeFinishedDictation(_ text: String) {
+        guard insertion.isEnabled, !didInsertCurrentDictation, let target = capturedInsertionTarget else { return }
+        if insertion.insert(text, ifStillFocused: target) {
+            didInsertCurrentDictation = true
+        } else {
+            dictationNotice = DictationRecovery.insertionFailed(insertion.status, canPasteAgain: true)
+        }
+    }
+
+    /// Runs recognition again over the failed dictation's audio, which was kept in memory.
+    func retryDictation() async {
+        guard dictationNotice?.canRetry == true, !audio.isRunning, !isFinalizingDictation,
+              !transcriber.isRunning, !transcriber.isFinalizing else { return }
+        let recorded = retainedAudio.snapshot()
+        guard !recorded.isEmpty else {
+            dismissDictationNotice()
+            return
+        }
+        guard captureGate.claim(.dictation) else {
+            insertion.report("Meeting capture is active. Stop it before retrying dictation.")
+            return
+        }
+        dictationNotice = nil
+        isFinalizingDictation = true
+        let started = await transcriber.transcribe(recorded: recorded, localeIdentifier: dictationLanguage,
+                                                   contextualStrings: lastDictationContextualStrings)
+        guard started else {
             isFinalizingDictation = false
             captureGate.release(.dictation)
+            dictationNotice = DictationRecovery.notice(
+                audioError: nil, transcriberError: transcriber.error ?? "Speech recognition did not start.",
+                transcript: "", hasRetainedAudio: retainedAudio.isUsable)
+            return
         }
+        let rawText = await transcriber.waitForFinalization()
+        await finishDictation(rawText: rawText)
+    }
+
+    /// Types the last dictation again, only into the original app and field and only while
+    /// they have focus. Otherwise it says where to click instead of guessing.
+    func pasteLastDictationAgain() {
+        let text = transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let focus = capturedInsertionTarget.map { insertion.focusState(of: $0) } ?? (appIsFrontmost: false, fieldIsFocused: false)
+        let decision = PasteAgainGate.decision(
+            text: text, hasTarget: capturedInsertionTarget != nil,
+            isBusy: audio.isRunning || isFinalizingDictation || transcriber.isRunning || transcriber.isFinalizing,
+            alreadyInserted: didInsertCurrentDictation, insertionEnabled: insertion.isEnabled,
+            targetIsFrontmost: focus.appIsFrontmost, targetFieldIsFocused: focus.fieldIsFocused)
+        switch decision {
+        case .allowed:
+            guard let target = capturedInsertionTarget else { return }
+            if insertion.insert(text, ifStillFocused: target) {
+                didInsertCurrentDictation = true
+                dictationNotice = nil
+                completedDictationCount += 1
+            } else {
+                dictationNotice = DictationRecovery.insertionFailed(insertion.status, canPasteAgain: true)
+            }
+        case .focusLost:
+            dictationNotice = DictationRecovery.focusLost(appName: capturedInsertionTarget?.applicationName ?? "the original app")
+        case .unavailable(let reason):
+            dictationNotice = DictationRecovery.insertionFailed(reason, canPasteAgain: false)
+        }
+    }
+
+    func dismissFinishedTranscript() {
+        showsFinishedTranscript = false
+    }
+
+    /// Hides the pill's notice and forgets any audio kept for a retry.
+    func dismissDictationNotice() {
+        dictationNotice = nil
+        showsFinishedTranscript = false
+        if !isFinalizingDictation { retainedAudio.reset() }
+    }
+
+    private func stopRetainingAudio(keep: Bool) {
+        if let retainedAudioSinkID { audio.sink.remove(retainedAudioSinkID) }
+        retainedAudioSinkID = nil
+        if !keep { retainedAudio.reset() }
     }
 
     private func saveCurrentDictation() {
@@ -1208,7 +1344,7 @@ final class AppModel {
         }
     }
 
-    /// Stops listening and throws the audio away: nothing is transcribed, saved, or inserted.
+    /// Stops listening and throws the audio away: nothing is transcribed, saved, inserted, or kept.
     func cancelDictation() {
         dictationShortcutHeld = false
         dictationStartGeneration += 1
@@ -1216,6 +1352,7 @@ final class AppModel {
         guard audio.isRunning else { return }
         transcriber.stop()
         audio.stop()
+        stopRetainingAudio(keep: false)
         transcriber.clear()
         dictationStartedAt = nil
         captureGate.release(.dictation)

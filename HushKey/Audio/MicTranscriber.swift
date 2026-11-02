@@ -24,7 +24,48 @@ final class MicTranscriber {
     func start(sink: AudioSink, localeIdentifier: String = "en-US", contextualStrings: [String] = []) async -> Bool {
         guard !isRunning, !isFinalizing else { return false }
         error = nil
+        guard await prepareRecognizer(localeIdentifier: localeIdentifier) else { return false }
 
+        self.sink = sink
+        sinkID = sink.add { [box] buffer, _ in box.append(buffer) }
+        isRunning = true
+        self.contextualStrings = Array(contextualStrings.prefix(DictationContextHints.maximumCount))
+        startTask()
+        return true
+    }
+
+    /// Runs recognition again over audio that was already recorded, for a failed dictation.
+    /// Finishes like a live session: call `waitForFinalization()` for the text.
+    func transcribe(recorded buffers: [AVAudioPCMBuffer], localeIdentifier: String = "en-US",
+                    contextualStrings: [String] = []) async -> Bool {
+        guard !isRunning, !isFinalizing, !buffers.isEmpty else { return false }
+        error = nil
+        guard await prepareRecognizer(localeIdentifier: localeIdentifier), let recognizer,
+              !isRunning, !isFinalizing else { return false }
+        clear()
+        generation += 1
+        isFinalizing = true
+
+        let request = SFSpeechAudioBufferRecognitionRequest()
+        request.shouldReportPartialResults = false
+        request.addsPunctuation = true
+        request.requiresOnDeviceRecognition = true
+        request.contextualStrings = Array(contextualStrings.prefix(DictationContextHints.maximumCount))
+        for buffer in buffers { request.append(buffer) }
+        request.endAudio()
+        isOnDevice = true
+        task?.cancel()
+        task = recognizer.recognitionTask(with: request, resultHandler: Self.resultHandler(owner: self, generation: generation))
+
+        let seconds = buffers.reduce(0.0) { $0 + Double($1.frameLength) / max($1.format.sampleRate, 1) }
+        finalizationTimeoutTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(10 + seconds))
+            self?.completeFinalization()
+        }
+        return true
+    }
+
+    private func prepareRecognizer(localeIdentifier: String) async -> Bool {
         let status = await withCheckedContinuation { continuation in
             SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0) }
         }
@@ -38,12 +79,6 @@ final class MicTranscriber {
             error = "On-device speech recognition is unavailable for \(localeIdentifier) on this Mac. No audio was sent for remote recognition."
             return false
         }
-
-        self.sink = sink
-        sinkID = sink.add { [box] buffer, _ in box.append(buffer) }
-        isRunning = true
-        self.contextualStrings = Array(contextualStrings.prefix(DictationContextHints.maximumCount))
-        startTask()
         return true
     }
 

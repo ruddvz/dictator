@@ -265,6 +265,42 @@ final class TextInsertionService {
                                 originalValue: currentValue, selectedRange: currentRange)
     }
 
+    /// Where a captured target stands right now. Never activates or focuses anything.
+    func focusState(of target: InsertionTarget) -> (appIsFrontmost: Bool, fieldIsFocused: Bool) {
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == target.processIdentifier else {
+            return (false, false)
+        }
+        guard let focused = focusedElement() else { return (true, false) }
+        return (true, CFEqual(target.element, focused))
+    }
+
+    /// Types at the current cursor of a captured field, but only while that exact field still
+    /// has keyboard focus. Unlike `insert(_:into:)` it never switches apps, so text cannot land
+    /// somewhere the user has since moved away from.
+    @discardableResult
+    func insert(_ text: String, ifStillFocused target: InsertionTarget) -> Bool {
+        guard isEnabled, AXIsProcessTrusted() else {
+            isEnabled = false
+            status = "Accessibility access is unavailable. Text was not inserted."
+            return false
+        }
+        guard !text.isEmpty,
+              let app = NSRunningApplication(processIdentifier: target.processIdentifier),
+              !app.isTerminated,
+              app.bundleIdentifier == target.bundleIdentifier else {
+            status = "The original app is no longer available. Nothing was inserted."
+            return false
+        }
+        let state = focusState(of: target)
+        guard state.appIsFrontmost, state.fieldIsFocused, let focused = focusedElement() else {
+            status = "\(target.applicationName) or its text field is no longer focused. Nothing was inserted."
+            return false
+        }
+        return performInsertion(text, app: app, element: focused,
+                                originalValue: stringAttribute(kAXValueAttribute, of: focused),
+                                selectedRange: selectedTextRange(of: focused))
+    }
+
     @discardableResult
     func undoLastInsertion() -> Bool {
         guard let record = undoRecord else {

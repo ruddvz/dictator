@@ -78,7 +78,7 @@ Pill surface is always dark: #141B17 with sage #9CCBB4 strokes. The system accen
 
 - **Page switch:** fade + 8 pt rise on insert, fade on removal.
 - **Morph icon (`MorphIcon`):** one 25-point stroked line that blends between hush → waveform → spinner → check over 0.45 s (ease-out cubic). Used in the brand mark, the Dictate button, the composer header, the empty history state, and the floating pill.
-- **Pill:** idle sage bar → hover hint → listening (cancel ×, `VoiceRibbon`, elapsed time, stop) → "Writing it up" → check with "Typed" for 1.4 s → idle. `VoiceRibbon` is three flowing lines that swell with speech above an adaptive noise floor (fast rise, slow fall), so silence stays calm instead of looking like a broken meter.
+- **Pill:** idle sage bar → hover hint → listening (cancel ×, `VoiceRibbon`, elapsed time, stop) → "Writing it up" → check with "Typed" (or "Ready in HushKey") for 1.4 s → idle. Errors replace the done state: `Theme.danger` icon, short message and dismiss ×, plus Retry and/or Paste again as titled `PillIconButton` capsules. The error stays until it is dismissed or acted on. **Transcript card:** a 340 pt dark card (#141B17, radius `r1`) sits 8 pt above the pill with a sage glyph, an optional grey hint, ×, and the last three lines of text at 17 pt white; the finished no-target card adds a sage `PrimaryButtonStyle` Copy. `VoiceRibbon` is three flowing lines that swell with speech above an adaptive noise floor (fast rise, slow fall), so silence stays calm instead of looking like a broken meter.
 - **Sidebar:** icon bounces on selection; rows fade their fill on hover.
 - **History:** rows slide in from the top, delete animates out, hover actions slide in 6 pt.
 

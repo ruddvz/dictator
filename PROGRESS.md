@@ -282,9 +282,20 @@ In a fresh session, use the packaged app to test the selected-text shortcut, loc
 - Tests: 53 passed, 0 failed (added `FunctionKeyGestureTests`).
 - Not verified: fn key in another app (the debug build isn't in the Accessibility list yet), the done state with real speech, and dark mode by eye.
 
+## Completed — pill recovery and transcript card: error state, retry, Paste again, Copy
+
+- **Error phase** in the pill (`DictationNotice`, `HushKey/Recording/DictationRecovery.swift`): mic didn't start, couldn't transcribe, didn't catch that (empty result), couldn't type it, and "Click back into <App>". Short message, icon, stroke and dismiss × in `Theme.danger`; the full reason is in the tooltip and VoiceOver label. A stray click on the pill body does not start recording while an error shows. The pill panel is forced to dark appearance so tokens resolve to their dark values.
+- **Retry**: the last dictation's microphone audio is copied into memory (`RetainedDictationAudio`, never written to disk, max 5 min; longer recordings are not kept). `MicTranscriber.transcribe(recorded:)` runs on-device recognition over it again with the same contextual hints. The audio is dropped once a transcript succeeds, and on dismiss, cancel, clear, restore or the next dictation.
+- **Auto-type on finish (behaviour change)**: when insertion is on and a supported text field was focused at start, the finished text is typed into it, but only if that exact field still has focus (`TextInsertionService.insert(_:ifStillFocused:)` never switches apps). The done state now says "Typed" only when text was actually typed, otherwise "Ready in HushKey". Failure raises the error phase.
+- **Transcript card** (`TranscriptCard`): a dark rounded card above the pill (#141B17, sage glyph) shows the last ~3 lines of live text while talking. With a target it appears once text arrives and collapses back to the pill after typing. With no target (insertion off or no supported field focused) it shows "No text box selected. Talk, then copy." from the start, and after finishing it stays up with the final text, a sage `PrimaryButtonStyle` Copy (NSPasteboard, only on click) and ×. Esc closes it through key monitors that run only while the card is up. × during listening hides the live text for that dictation.
+- **Paste again** (`PasteAgainGate`): re-types the last dictation only while the original app and the same field have focus; otherwise the pill says "Click back into <App>" and keeps the button. Refuses while busy, without text, target or insertion, or when the dictation was already typed once.
+- Tests: 65 passed, 0 failed (added `DictationRecoveryTests`: notice rules, paste-again gate, buffer copy and the 5-minute cap, card states and transcript tail).
+- The pill now also starts and stops dictation from an accessibility press (VoiceOver); before, only a real mouse tap worked.
+- Verified live (debug build, Finder frontmost, no text field): idle pill; the live card with hint, × and live text; after stop the card stayed up with the final text and Copy, and Copy put the text on the clipboard ("Copied" shown, `pbpaste` matched); the pill showed "Ready in HushKey"; the panel stayed anchored at the bottom while growing to 157 pt with nothing clipped.
+- Not verified live: Esc closing the card, the error states (speech was always recognized), Retry, Paste again, and auto-type into a second app. Auto-type in browsers and Electron fields depends on their Accessibility support.
+
 ## Next items — each in a fresh session
 
-1. Live fn-key acceptance: grant Accessibility to the packaged app, set Globe to Do Nothing, test hold, double-tap hands-free, fn+arrow and insertion in TextEdit plus one other app.
-2. Status capsule recovery from the competitor addendum: error state in the pill, retry the last audio, and a focus-checked "Paste again".
-3. Settings rewrite: one-line label plus right-aligned control; drop the long captions.
-4. Editable app profiles and dictionary/snippet import and export; local model diagnostics.
+1. Live fn-key acceptance: grant Accessibility to the packaged app, set Globe to Do Nothing, test hold, double-tap hands-free, fn+arrow and insertion in TextEdit plus one other app. Include the pill recovery paths: deny the mic, dictate silence → Retry, move focus before finishing → Paste again.
+2. Settings rewrite: one-line label plus right-aligned control; drop the long captions.
+3. Editable app profiles and dictionary/snippet import and export; local model diagnostics.
