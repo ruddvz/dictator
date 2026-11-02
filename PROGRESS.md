@@ -366,3 +366,9 @@ Record the 14 clip references as consented audio in `Fixtures/eval/<split>/audio
 ## Next item — live file-transcription acceptance
 
 Test Apple Speech and downloaded WhisperKit transcription, editing, TXT/SRT/WebVTT export, and clearing history while a job runs. Confirm the running result remains exportable, does not return to Recent transcripts, and a later job saves normally. Then continue the microphone, insertion, and meeting acceptance checks.
+
+## Completed — one working copy
+
+- Codex had been working in a separate clone (`~/Documents/Codex/2026-11-01/…/outputs/HushKey`) on the retired `feature/hushkey-macos-prototype` branch. Its uncommitted fix for file history repopulating after a clear is now merged here as 6405ce5. 74 tests ran: 73 passed, 1 skipped, 0 failed.
+- Added `AGENTS.md`: `~/Projects/HushKey` on `feature/flow-style-ui` is the only working copy for every agent. The old Codex clone got an untracked `AGENTS.md` telling Codex to stop working there.
+- Checked `amirrsyed/hushkey`: an unrelated MIT webcam lip-reading project with the same name. Notes are in `docs/CRITIQUE_AND_ROADMAP.md`.

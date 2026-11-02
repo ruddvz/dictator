@@ -149,3 +149,11 @@ Each item ships with a check in the held-out evaluation harness:
 - [TypeWhisper repository](https://github.com/TypeWhisper/typewhisper-mac) and [release notes](https://newreleases.io/project/github/TypeWhisper/typewhisper-mac/release/v1.3.0); [Digital Trends hands-on](https://www.digitaltrends.com/computing/i-found-a-better-way-to-dictate-on-my-mac-and-it-doesnt-need-the-cloud/); [AlternativeTo listing](https://alternativeto.net/software/typewhisper/about).
 - MuteIt, jaw-motion IMU silent speech: [ACM IMWUT 2022, doi:10.1145/3550281](https://doi.org/10.1145/3550281).
 - Apple silent-speech patent and reports (not shipping hardware): [MobileIDWorld](https://mobileidworld.com/new-apple-patent-explores-silent-voice-recognition-for-future-airpods-111301/), [Macworld](https://www.macworld.com/article/675759/patent-control-your-airpods-with-a-wink-or-smile.html).
+
+## Related project: amirrsyed/hushkey (checked 2026-11-01)
+
+- An independent MIT project by Amir Syed, created 2026-10-31, with the **same name**. It does silent dictation by **webcam lip reading**: a native Mac app plus a local Python model server. The model is a frozen Auto-AVSR conformer with LoRA adapters, a lip/jaw/throat "kinematic" branch, and in-app "Train on my mouth" personalisation. It reports 19.1% WER on voiced LRS3 and says outright that silent webcam use is worse.
+- Why it matters to us: it covers the channel AirPods can't sense (lips), and its roadmap lists AirPods head/jaw motion as a future input, which is what our Silent Lab does. The two approaches complement each other.
+- Ideas worth taking (MIT, attribute in `NOTICE.md` if code is adapted): a HUD with a live partial transcript (we now have the transcript card), Esc to cancel, clipboard restore after paste, energy-gate segmentation with pre-roll/hang-over, and paired-bootstrap eval comparisons for our eval harness.
+- Risk: the shared name could confuse people on GitHub and in search. Decide whether to keep "HushKey" before any public release.
+- A Codex session cloned it to `~/Documents/ChatGPT/HushKey` and left uncommitted edits there. They belong to that repo, not ours, and were not merged.
