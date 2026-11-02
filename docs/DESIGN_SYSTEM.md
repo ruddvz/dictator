@@ -35,8 +35,10 @@ Nested corners: a card inside the sheet sits at least S4 from the sheet edge, so
 
 | Code | Token | Value | Use |
 | --- | --- | --- | --- |
-| W | `Theme.pageWidth` | 800 | page column, centered |
+| W | `Theme.pageWidth` | 800 | page column, left edge shared with home (see `pageLayout`) |
 | WH | `Theme.homeWidth` | 1040 | Dictation home, Train, Meeting notes (main column + 248 side card) |
+
+`pageLayout` centres a 1040 frame and anchors each page's column to its left edge, so a page title sits at the same x on every screen. Narrower pages end earlier on the right instead of shifting left and right.
 | WS | `Theme.sidebarWidth` | 216 | fixed sidebar |
 | H1 | `Theme.sidebarRow` | 36 | sidebar and settings-nav rows, 4 pt apart |
 | H2 | `Theme.controlHeight` | 36 | buttons, menus, search fields |

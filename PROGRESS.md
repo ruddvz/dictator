@@ -1,5 +1,32 @@
 # HushKey progress
 
+## Completed — dictation start-up, permissions and app-wide polish (2026-11-02)
+
+- **Behaviour:**
+  - The mic opens in parallel with Speech preparation, and its audio is buffered until recognition is ready, so the first words survive a slow start. The pill shows the meter as soon as the mic is open.
+  - Releasing fn or pressing ✓ during the start now finishes instead of cancelling.
+  - A pending macOS permission prompt shows "Answer the macOS prompt".
+  - Missing mic or Speech permission gives a specific notice with Open Settings.
+  - Found while doing this: "Preparing locally" stalls of 5–30 s were a pending Speech Recognition prompt. Every `Scripts/package-app.sh` build is ad-hoc signed, so macOS asks again for each new build. No signing identity is installed here (`security find-identity` shows 0). An Apple Development certificate from Xcode would stop the repeats.
+- **Visual:**
+  - Every page now shares the home page's left edge; titles moved 115 pt between Home/Insights and the other pages.
+  - Home: the hero is the same height as the stats card (title at the top, action at the bottom). Stats now come from the Insights ledger, and the card opens Insights. The fn warning has Open Settings. The button says Stop once the mic is open.
+  - The Silent lab folds away in the sidebar.
+  - Files has one Choose file button and the language sheet.
+  - Meeting notes shows one empty state.
+- Tests: `RequestBoxTests` (4) and a permission-notice test. `xcodebuild ... test`: 180 passed, 2 skipped.
+- **Seen live (packaged app):**
+  - the pill's "Answer the macOS prompt" during a real pending prompt
+  - home with the new hero, stats, fn warning and the folded lab
+  - Style and Files titles on the home edge
+  - Files with one button
+  - Meeting notes with one empty state
+- **Not seen live:**
+  - a full dictation through the new buffered start (every new build needs the permission prompts answered, and I didn't answer them)
+  - the permission notice itself (it needs a denied permission)
+  - the stats card's hover
+- Next: run a real dictation with fn on this build and check the first word is kept. Then a guided tour, and a pixel pass on the pill's live-text card and the Transforms editor.
+
 ## Completed — recover cancelled dictations, Insights and Languages (2026-11-02)
 
 - **Recover:** cancelling with × or Esc (after at least 1 s of listening) keeps the audio in memory until HushKey quits. History shows "You cancelled a m:ss dictation in App" with **Recover** and Discard. Recover transcribes it with the settings of that run and saves it to History without typing it anywhere.

@@ -56,6 +56,13 @@ _2026-11-02. Sources: the user's screenshots of HushKey (idle, recording) and Wi
 - **Meeting notes button** in the hover capsule, with its own hint.
 - Private Core Audio aggregate devices are hidden from microphone lists.
 
+**Third pass (2026-11-02): start-up and permissions**
+
+- The microphone opens while Speech prepares, and its audio is buffered (`RequestBox`) and handed to the first recognition request, so words said during "Preparing" aren't lost. The pill shows the live meter as soon as the mic is open.
+- Releasing fn, or pressing ✓, during that start finishes once recognition is ready instead of cancelling.
+- While macOS shows a permission prompt, the hint says "Answer the macOS prompt" instead of "Preparing locally" (this is what the long "Preparing" stalls were).
+- A missing microphone or Speech Recognition permission is its own notice ("Allow the microphone" / "Allow speech recognition") with Open Settings to that Privacy pane.
+
 **Still open**
 
 - A long-session warning. HushKey has no recording limit; Retry stops being available after 5 minutes because longer audio is not kept, which the pill doesn't say.
