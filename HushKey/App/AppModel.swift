@@ -673,13 +673,8 @@ final class AppModel {
             dictationTerms = DictationVocabulary.encode(resolved.vocabulary)
             dictationSnippets = resolved.snippets
             dictationCorrectionRules = resolved.correctionRules
+            dictationAppProfiles = resolved.appProfiles
             let validStyleIDs = Set(resolved.writingStyles.map(\.id))
-            dictationAppProfiles = dictationAppProfiles.map { profile in
-                guard let styleID = profile.writingStylePresetID, !validStyleIDs.contains(styleID) else { return profile }
-                var updated = profile
-                updated.writingStylePresetID = nil
-                return updated
-            }
             if let activeStyleID = activeDictationWritingStylePresetID, !validStyleIDs.contains(activeStyleID) {
                 activeDictationWritingStylePresetID = nil
             }
@@ -711,7 +706,8 @@ final class AppModel {
             vocabulary: DictationVocabulary.terms(from: dictationTerms),
             snippets: dictationSnippets,
             correctionRules: dictationCorrectionRules,
-            writingStyles: writingStylePresets)
+            writingStyles: writingStylePresets,
+            appProfiles: dictationAppProfiles)
     }
 
     func saveWritingStylePresets(_ presets: [WritingStylePreset]) throws {
@@ -1218,14 +1214,19 @@ final class AppModel {
                                  cleansFillers: Bool? = nil, writingStylePresetID: UUID? = nil) -> Bool {
         let name = appName.trimmingCharacters(in: .whitespacesAndNewlines)
         let identifier = bundleIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedIdentifier = DictationAppProfile.normalizedBundleIdentifier(identifier)
+        let profileAlreadyExists = dictationAppProfiles.contains {
+            DictationAppProfile.normalizedBundleIdentifier($0.bundleIdentifier) == normalizedIdentifier
+        }
         guard !name.isEmpty, name.count <= 80,
               DictationAppProfile.isValidBundleIdentifier(identifier),
-              mode != .automatic, vocabulary.utf8.count <= 4_000,
+              mode != .automatic, vocabulary.utf8.count <= DictationAppProfile.maximumCustomizationBytes,
+              (profileAlreadyExists || dictationAppProfiles.count < HushKeyPersonalDataBackup.maximumAppProfiles),
               languageIdentifier.map({ language in
                   DictationLanguage.onDevice.contains { $0.identifier == language }
               }) ?? true,
-              snippets.map({ $0.utf8.count <= 4_000 && DictationSnippetExpander.validation(for: $0).invalidLines.isEmpty }) ?? true,
-              correctionRules.map({ $0.utf8.count <= 4_000 && DictationCorrectionRules.validation(for: $0).invalidLines.isEmpty }) ?? true,
+              snippets.map({ $0.utf8.count <= DictationAppProfile.maximumCustomizationBytes && DictationSnippetExpander.validation(for: $0).invalidLines.isEmpty }) ?? true,
+              correctionRules.map({ $0.utf8.count <= DictationAppProfile.maximumCustomizationBytes && DictationCorrectionRules.validation(for: $0).invalidLines.isEmpty }) ?? true,
               writingStylePresetID.map({ id in writingStylePresets.contains { $0.id == id } }) ?? true else { return false }
         let profile = DictationAppProfile(appName: name, bundleIdentifier: identifier,
                                           mode: mode, vocabulary: vocabulary,

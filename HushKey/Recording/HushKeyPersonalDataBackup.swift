@@ -7,11 +7,12 @@ enum PersonalDataImportStrategy: Equatable {
 
 struct HushKeyPersonalDataBackup: Codable, Equatable {
     static let formatIdentifier = "com.ruddvz.hushkey.personal-data"
-    static let currentVersion = 2
+    static let currentVersion = 3
     static let maximumFileBytes = 10 * 1_024 * 1_024
     static let maximumHistoryEntries = 50
     static let maximumVocabularyTerms = 500
     static let maximumDefinitionLines = 500
+    static let maximumAppProfiles = 100
 
     var format: String
     var version: Int
@@ -21,9 +22,11 @@ struct HushKeyPersonalDataBackup: Codable, Equatable {
     var snippets: String
     var correctionRules: String
     var writingStyles: [WritingStylePreset]
+    var appProfiles: [DictationAppProfile]
 
     init(exportedAt: Date = Date(), dictationHistory: [DictationHistoryEntry], vocabulary: [String],
-         snippets: String, correctionRules: String, writingStyles: [WritingStylePreset] = []) {
+         snippets: String, correctionRules: String, writingStyles: [WritingStylePreset] = [],
+         appProfiles: [DictationAppProfile] = []) {
         self.format = Self.formatIdentifier
         self.version = Self.currentVersion
         self.exportedAt = exportedAt
@@ -32,10 +35,11 @@ struct HushKeyPersonalDataBackup: Codable, Equatable {
         self.snippets = snippets
         self.correctionRules = correctionRules
         self.writingStyles = writingStyles
+        self.appProfiles = appProfiles
     }
 
     private enum CodingKeys: String, CodingKey {
-        case format, version, exportedAt, dictationHistory, vocabulary, snippets, correctionRules, writingStyles
+        case format, version, exportedAt, dictationHistory, vocabulary, snippets, correctionRules, writingStyles, appProfiles
     }
 
     init(from decoder: Decoder) throws {
@@ -48,6 +52,7 @@ struct HushKeyPersonalDataBackup: Codable, Equatable {
         snippets = try container.decode(String.self, forKey: .snippets)
         correctionRules = try container.decode(String.self, forKey: .correctionRules)
         writingStyles = try container.decodeIfPresent([WritingStylePreset].self, forKey: .writingStyles) ?? []
+        appProfiles = version >= 3 ? try container.decode([DictationAppProfile].self, forKey: .appProfiles) : []
     }
 
     static func decode(_ data: Data) throws -> HushKeyPersonalDataBackup {
@@ -68,7 +73,7 @@ struct HushKeyPersonalDataBackup: Codable, Equatable {
 
     func validate() throws {
         guard format == Self.formatIdentifier else { throw BackupError.wrongFormat }
-        guard version == 1 || version == Self.currentVersion else { throw BackupError.unsupportedVersion(version) }
+        guard (1...Self.currentVersion).contains(version) else { throw BackupError.unsupportedVersion(version) }
         guard exportedAt.timeIntervalSince1970.isFinite else { throw BackupError.invalidExportDate }
         guard dictationHistory.count <= Self.maximumHistoryEntries else { throw BackupError.tooManyHistoryEntries }
         guard Set(dictationHistory.map(\.id)).count == dictationHistory.count else { throw BackupError.duplicateHistoryEntry }
@@ -108,15 +113,30 @@ struct HushKeyPersonalDataBackup: Codable, Equatable {
                 throw BackupError.invalidWritingStyles
             }
         }
+
+        if version >= 3 {
+            guard appProfiles.count <= Self.maximumAppProfiles else { throw BackupError.tooManyAppProfiles }
+            let validStyleIDs = Set(writingStyles.map(\.id))
+            var seenBundleIdentifiers = Set<String>()
+            for profile in appProfiles {
+                let key = DictationAppProfile.normalizedBundleIdentifier(profile.bundleIdentifier)
+                guard DictationAppProfile.isValidForBackup(profile, writingStyleIDs: validStyleIDs),
+                      seenBundleIdentifiers.insert(key).inserted else {
+                    throw BackupError.invalidAppProfiles
+                }
+            }
+        }
     }
 
     func resolved(against current: HushKeyPersonalDataBackup,
                   using strategy: PersonalDataImportStrategy) -> HushKeyPersonalDataBackup {
         if strategy == .replace {
-            guard version == 1 else { return self }
+            let resolvedStyles = version == 1 ? current.writingStyles : writingStyles
+            let resolvedProfiles = version < 3 ? current.appProfiles : appProfiles
             return HushKeyPersonalDataBackup(
                 exportedAt: Date(), dictationHistory: dictationHistory, vocabulary: vocabulary,
-                snippets: snippets, correctionRules: correctionRules, writingStyles: current.writingStyles)
+                snippets: snippets, correctionRules: correctionRules, writingStyles: resolvedStyles,
+                appProfiles: Self.clearingMissingStyleReferences(in: resolvedProfiles, validStyleIDs: Set(resolvedStyles.map(\.id))))
         }
         var historyByID: [UUID: DictationHistoryEntry] = [:]
         for entry in current.dictationHistory { historyByID[entry.id] = entry }
@@ -125,6 +145,9 @@ struct HushKeyPersonalDataBackup: Codable, Equatable {
         }
         let mergedHistory = historyByID.values.sorted { $0.createdAt > $1.createdAt }
             .prefix(Self.maximumHistoryEntries)
+        let mergedStyles = Self.mergingStyles(current.writingStyles, with: writingStyles)
+        let mergedProfiles = Self.mergingProfiles(current.appProfiles, with: appProfiles,
+                                                   importedStyles: writingStyles, mergedStyles: mergedStyles)
         return HushKeyPersonalDataBackup(
             exportedAt: Date(),
             dictationHistory: Array(mergedHistory),
@@ -132,13 +155,15 @@ struct HushKeyPersonalDataBackup: Codable, Equatable {
                                                    vocabulary.joined(separator: "\n")),
             snippets: Self.mergingDefinitions(current.snippets, with: snippets),
             correctionRules: Self.mergingDefinitions(current.correctionRules, with: correctionRules),
-            writingStyles: Self.mergingStyles(current.writingStyles, with: writingStyles))
+            writingStyles: mergedStyles,
+            appProfiles: Self.clearingMissingStyleReferences(in: mergedProfiles, validStyleIDs: Set(mergedStyles.map(\.id))))
     }
 
     var summary: String {
         let snippetCount = DictationSnippetExpander.validation(for: snippets).validCount
         let correctionCount = DictationCorrectionRules.validation(for: correctionRules).validCount
-        return "\(dictationHistory.count) dictations, \(vocabulary.count) vocabulary terms, \(snippetCount) snippets, \(correctionCount) correction rules and \(writingStyles.count) writing styles."
+        let profileLabel = appProfiles.count == 1 ? "1 app profile" : "\(appProfiles.count) app profiles"
+        return "\(dictationHistory.count) dictations, \(vocabulary.count) vocabulary terms, \(snippetCount) snippets, \(correctionCount) correction rules, \(writingStyles.count) writing styles and \(profileLabel)."
     }
 
     private static func validateDefinitions(_ definitions: String, kind: DefinitionKind) throws {
@@ -194,6 +219,42 @@ struct HushKeyPersonalDataBackup: Codable, Equatable {
         return merged
     }
 
+    private static func mergingProfiles(_ existing: [DictationAppProfile], with incoming: [DictationAppProfile],
+                                        importedStyles: [WritingStylePreset],
+                                        mergedStyles: [WritingStylePreset]) -> [DictationAppProfile] {
+        var merged = existing
+        var bundleIdentifiers = Set(existing.map { DictationAppProfile.normalizedBundleIdentifier($0.bundleIdentifier) })
+        let importedStyleByID = Dictionary(uniqueKeysWithValues: importedStyles.map { ($0.id, $0) })
+        for profile in incoming {
+            let key = DictationAppProfile.normalizedBundleIdentifier(profile.bundleIdentifier)
+            guard bundleIdentifiers.insert(key).inserted else { continue }
+            var imported = profile
+            if let styleID = profile.writingStylePresetID,
+               let sourceStyle = importedStyleByID[styleID] {
+                let name = normalizedStyleName(sourceStyle.name)
+                imported.writingStylePresetID = mergedStyles.first(where: { $0.id == styleID })?.id
+                    ?? mergedStyles.first(where: { normalizedStyleName($0.name) == name })?.id
+            }
+            merged.append(imported)
+        }
+        return merged
+    }
+
+    private static func clearingMissingStyleReferences(in profiles: [DictationAppProfile],
+                                                       validStyleIDs: Set<UUID>) -> [DictationAppProfile] {
+        profiles.map { profile in
+            guard let styleID = profile.writingStylePresetID, !validStyleIDs.contains(styleID) else { return profile }
+            var updated = profile
+            updated.writingStylePresetID = nil
+            return updated
+        }
+    }
+
+    private static func normalizedStyleName(_ name: String) -> String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+    }
+
     enum DefinitionKind: Equatable {
         case snippet
         case correction
@@ -213,6 +274,8 @@ struct HushKeyPersonalDataBackup: Codable, Equatable {
         case tooManyDefinitions
         case tooManyWritingStyles
         case invalidWritingStyles
+        case tooManyAppProfiles
+        case invalidAppProfiles
         case invalidDefinitions(DefinitionKind, [Int])
         case definitionEntryTooLong(DefinitionKind)
 
@@ -231,6 +294,8 @@ struct HushKeyPersonalDataBackup: Codable, Equatable {
             case .tooManyDefinitions: return "The backup contains too many snippet or correction rules."
             case .tooManyWritingStyles: return "The backup contains more writing styles than HushKey can store."
             case .invalidWritingStyles: return "The backup contains an invalid or duplicate writing style."
+            case .tooManyAppProfiles: return "The backup contains more app profiles than HushKey can store."
+            case .invalidAppProfiles: return "The backup contains an invalid or duplicate app profile."
             case .invalidDefinitions(let kind, let lines):
                 let name = kind == .snippet ? "snippet" : "correction"
                 return "The backup has invalid \(name) rules on line\(lines.count == 1 ? "" : "s") \(lines.map(String.init).joined(separator: ", "))."

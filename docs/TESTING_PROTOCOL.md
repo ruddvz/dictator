@@ -98,10 +98,10 @@ Run this separately from the AirPods motion study:
 
 ## Personal data backup acceptance
 
-1. Save a dictation with a processed/raw difference, then add vocabulary, one snippet, one correction rule, and a custom writing style. Export **Settings → Data & privacy → Your files → Personal data backup** and confirm the version-2 JSON contains these items but no audio.
-2. Import the file into a second HushKey data folder or a clean test account. Choose Merge and confirm it adds missing entries while keeping local entries with matching IDs/cues. Confirm history remains capped at 50.
-3. Import again and choose Replace. Confirm the confirmation lists the data counts and that replacement changes dictation history, vocabulary, snippets, corrections, and writing styles.
-4. Import a version-1 backup without `writingStyles`; confirm it is accepted and Replace preserves the existing local styles. Try a non-HushKey JSON file, an unsupported version, malformed rules, and a file over 10 MiB. Confirm each is rejected before local data changes.
+1. Save a dictation with a processed/raw difference, then add vocabulary, a snippet, a correction rule, a custom writing style, and an Automatic app profile with at least one override. Export **Settings → Data & privacy → Your files → Personal data backup** and confirm the version-3 JSON contains these items, the profile refers to its style, and no audio or app text is included.
+2. Import the file into a second HushKey data folder or a clean test account. Choose Merge and confirm it adds missing entries while keeping local entries with matching IDs/cues and local profiles with matching bundle identifiers. Confirm an imported profile that names a style conflict points to the retained local style. Confirm history remains capped at 50.
+3. Import again and choose Replace. Confirm the confirmation lists the data counts and that replacement changes dictation history, vocabulary, snippets, corrections, writing styles, and app profiles.
+4. Import version-1 and version-2 backups; confirm both are accepted and Replace preserves local app profiles. Version 1 preserves local styles; version 2 replaces them. Try a non-HushKey JSON file, an unsupported version, malformed rules/profile fields, and a file over 10 MiB. Confirm each is rejected before local data changes.
 5. In a disposable test account, corrupt the local dictation-history JSON and relaunch. Confirm HushKey shows a recovery copy path, blocks export of incomplete history, and can replace the archive only after a valid backup is selected and confirmed. Verify the recovery copy still contains the original bytes.
 
 ## Build and test

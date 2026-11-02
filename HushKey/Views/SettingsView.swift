@@ -310,9 +310,9 @@ private struct DataSettings: View {
         } message: {
             if let backup = model.pendingPersonalDataBackup {
                 if model.dictationHistoryArchiveUnreadable {
-                    Text("The backup contains \(backup.summary) Replace affects only dictations, vocabulary, snippets, corrections and writing styles; file transcripts, meeting notes, Silent Lab templates and session logs stay on this Mac. Your unreadable dictation archive will be replaced, with a recovery copy preserved where possible. Merge keeps local conflicts and adds missing backup entries. Audio is not included.")
+                    Text("The backup contains \(backup.summary) Replace affects dictations, vocabulary, snippets, corrections, writing styles and app profiles; file transcripts, meeting notes, Silent Lab templates and session logs stay on this Mac. Your unreadable dictation archive will be replaced, with a recovery copy preserved where possible. Merge keeps local conflicts and adds missing backup entries. Audio is not included.")
                 } else {
-                    Text("The backup contains \(backup.summary) Replace affects only dictations, vocabulary, snippets, corrections and writing styles; file transcripts, meeting notes, Silent Lab templates and session logs stay on this Mac. Merge keeps your current entries and adds missing backup entries. Audio is not included.")
+                    Text("The backup contains \(backup.summary) Replace affects dictations, vocabulary, snippets, corrections, writing styles and app profiles; file transcripts, meeting notes, Silent Lab templates and session logs stay on this Mac. Merge keeps your current entries and adds missing backup entries. Audio is not included.")
                 }
             } else {
                 Text("The selected backup is no longer available.")
@@ -460,6 +460,12 @@ private struct DictationAppProfilesEditor: View {
     ]
 
     var body: some View {
+        Text("App profiles · \(model.dictationAppProfiles.count) of \(HushKeyPersonalDataBackup.maximumAppProfiles)")
+            .font(.hkCallout.weight(.semibold))
+            .foregroundStyle(Theme.ink)
+        Text("Automatic mode preferences stay local and can travel in a personal data backup.")
+            .font(.hkCaption)
+            .foregroundStyle(Theme.ink2)
         ForEach(model.dictationAppProfiles) { profile in
             SettingsRow(title: profile.appName, detail: "\(profile.mode.rawValue) · \(profile.bundleIdentifier)") {
                 HStack(spacing: 2) {
@@ -563,7 +569,8 @@ private struct DictationAppProfilesEditor: View {
                 Button(editingIdentifier == nil ? "Add profile" : "Save profile") { save() }
                     .buttonStyle(PrimaryButtonStyle())
                     .disabled(appName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-                              appName.count > 80 || vocabulary.utf8.count > 4_000 ||
+                              appName.count > 80 || vocabulary.utf8.count > DictationAppProfile.maximumCustomizationBytes ||
+                              (editingIdentifier == nil && model.dictationAppProfiles.count >= HushKeyPersonalDataBackup.maximumAppProfiles) ||
                               !DictationAppProfile.isValidBundleIdentifier(bundleIdentifier))
                 if editingIdentifier != nil {
                     Button("Cancel") { resetForm() }
@@ -611,7 +618,7 @@ private struct DictationAppProfilesEditor: View {
                                             correctionRules: usesAppCorrections ? correctionRules : nil,
                                             cleansFillers: cleanupOverride.value,
                                             writingStylePresetID: writingStylePresetID) else {
-            status = "Check the app details, choose an available on-device language, and fix any invalid snippet or correction lines."
+            status = "Check the app details, choose an available on-device language, fix invalid rules, and keep no more than 100 profiles."
             return
         }
         if let editingIdentifier,

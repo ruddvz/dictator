@@ -4,19 +4,27 @@ import XCTest
 final class PersonalDataBackupTests: XCTestCase {
     func testBackupRoundTripsAndKeepsVersionedFormat() throws {
         let history = [DictationHistoryEntry(text: "Keep this private.", rawText: "Um, keep this private.", duration: 2.5)]
+        let style = WritingStylePreset(name: "Friendly", instructions: "Keep it warm.")
+        let profile = DictationAppProfile(appName: "Slack", bundleIdentifier: "com.example.slack",
+                                          mode: .message, vocabulary: "HushKey, project Redwood",
+                                          languageIdentifier: "fr-CA", snippets: "signoff => Merci",
+                                          correctionRules: "hush key => HushKey", cleansFillers: true,
+                                          writingStylePresetID: style.id)
         let backup = HushKeyPersonalDataBackup(
             exportedAt: Date(timeIntervalSince1970: 1_800_000_000),
             dictationHistory: history,
             vocabulary: ["HushKey", "Maya"],
             snippets: "email => maya@example.com",
             correctionRules: "hush key => HushKey",
-            writingStyles: [WritingStylePreset(name: "Friendly", instructions: "Keep it warm.")])
+            writingStyles: [style], appProfiles: [profile])
 
         let decoded = try HushKeyPersonalDataBackup.decode(backup.encoded())
 
         XCTAssertEqual(decoded, backup)
         XCTAssertEqual(decoded.format, HushKeyPersonalDataBackup.formatIdentifier)
         XCTAssertEqual(decoded.version, HushKeyPersonalDataBackup.currentVersion)
+        XCTAssertEqual(decoded.appProfiles, [profile])
+        XCTAssertTrue(decoded.summary.contains("1 app profile"))
     }
 
     func testBackupRejectsWrongVersionMalformedRulesDuplicatesAndOversizedFiles() throws {
@@ -46,6 +54,34 @@ final class PersonalDataBackupTests: XCTestCase {
         ]
         XCTAssertThrowsError(try duplicateStyles.encoded())
 
+        var invalidProfiles = valid
+        invalidProfiles.appProfiles = [
+            DictationAppProfile(appName: "Slack", bundleIdentifier: "com.example.slack",
+                                mode: .automatic, vocabulary: "HushKey")
+        ]
+        XCTAssertThrowsError(try invalidProfiles.encoded())
+        invalidProfiles.appProfiles = [
+            DictationAppProfile(appName: "Slack", bundleIdentifier: "invalid",
+                                mode: .message, vocabulary: "HushKey")
+        ]
+        XCTAssertThrowsError(try invalidProfiles.encoded())
+        invalidProfiles.appProfiles = [
+            DictationAppProfile(appName: "Slack", bundleIdentifier: "com.example.slack",
+                                mode: .message, vocabulary: "HushKey", snippets: "broken")
+        ]
+        XCTAssertThrowsError(try invalidProfiles.encoded())
+        invalidProfiles.appProfiles = [
+            DictationAppProfile(appName: "Slack", bundleIdentifier: "com.example.slack",
+                                mode: .message, vocabulary: "HushKey", writingStylePresetID: UUID())
+        ]
+        XCTAssertThrowsError(try invalidProfiles.encoded())
+
+        invalidProfiles.appProfiles = (0..<HushKeyPersonalDataBackup.maximumAppProfiles + 1).map { index in
+            DictationAppProfile(appName: "App \(index)", bundleIdentifier: "com.example.app\(index)",
+                                mode: .natural, vocabulary: "")
+        }
+        XCTAssertThrowsError(try invalidProfiles.encoded())
+
         duplicateStyles.writingStyles = [
             WritingStylePreset(name: "Warm", instructions: "Keep it warm."),
             WritingStylePreset(name: "wárm", instructions: "Keep it brief.")
@@ -65,22 +101,53 @@ final class PersonalDataBackupTests: XCTestCase {
         XCTAssertTrue(backup.writingStyles.isEmpty)
 
         let localStyle = WritingStylePreset(name: "Local", instructions: "Keep my style.")
+        let localProfile = DictationAppProfile(appName: "Local app", bundleIdentifier: "com.example.local",
+                                               mode: .natural, vocabulary: "Local", writingStylePresetID: localStyle.id)
         let current = HushKeyPersonalDataBackup(
             dictationHistory: [], vocabulary: [], snippets: "", correctionRules: "",
-            writingStyles: [localStyle])
+            writingStyles: [localStyle], appProfiles: [localProfile])
         let replaced = backup.resolved(against: current, using: .replace)
         XCTAssertEqual(replaced.writingStyles, [localStyle])
+        XCTAssertEqual(replaced.appProfiles, [localProfile])
+    }
+
+    func testVersionTwoReplaceRestoresStylesAndPreservesLocalProfiles() throws {
+        let localStyle = WritingStylePreset(name: "Local", instructions: "Keep my local style.")
+        let importedStyle = WritingStylePreset(name: "Imported", instructions: "Use the imported style.")
+        let localProfile = DictationAppProfile(appName: "Editor", bundleIdentifier: "com.example.editor",
+                                               mode: .code, vocabulary: "Local term")
+        var versionTwo = HushKeyPersonalDataBackup(dictationHistory: [], vocabulary: [], snippets: "",
+                                                   correctionRules: "", writingStyles: [importedStyle])
+        versionTwo.version = 2
+        let decoded = try HushKeyPersonalDataBackup.decode(versionTwo.encodedForTest())
+        let current = HushKeyPersonalDataBackup(dictationHistory: [], vocabulary: [], snippets: "",
+                                                correctionRules: "", writingStyles: [localStyle],
+                                                appProfiles: [localProfile])
+
+        let replaced = decoded.resolved(against: current, using: .replace)
+
+        XCTAssertEqual(replaced.writingStyles, [importedStyle])
+        XCTAssertEqual(replaced.appProfiles, [localProfile])
     }
 
     func testMergeAddsMissingDataAndKeepsLocalConflicts() throws {
         let sharedID = UUID()
         let sharedStyleID = UUID()
+        let conflictingImportedStyle = WritingStylePreset(name: "Warm", instructions: "Imported warm style.")
+        let localProfile = DictationAppProfile(appName: "Chat", bundleIdentifier: "com.example.chat",
+                                               mode: .message, vocabulary: "Local", writingStylePresetID: sharedStyleID)
+        let importedConflict = DictationAppProfile(appName: "Different label", bundleIdentifier: "COM.EXAMPLE.CHAT",
+                                                   mode: .code, vocabulary: "Incoming")
+        let importedEditor = DictationAppProfile(appName: "Editor", bundleIdentifier: "com.example.editor",
+                                                 mode: .code, vocabulary: "HushKey",
+                                                 writingStylePresetID: conflictingImportedStyle.id)
         let local = HushKeyPersonalDataBackup(
             dictationHistory: [DictationHistoryEntry(id: sharedID, text: "Edited locally.")],
             vocabulary: ["HushKey", "local term"],
             snippets: "signature => Local sign-off",
             correctionRules: "hush key => Local spelling",
-            writingStyles: [WritingStylePreset(id: sharedStyleID, name: "Warm", instructions: "Local style.")])
+            writingStyles: [WritingStylePreset(id: sharedStyleID, name: "Warm", instructions: "Local style.")],
+            appProfiles: [localProfile])
         let incoming = HushKeyPersonalDataBackup(
             dictationHistory: [
                 DictationHistoryEntry(id: sharedID, text: "Older backup version."),
@@ -90,9 +157,9 @@ final class PersonalDataBackupTests: XCTestCase {
             snippets: "signature => Imported sign-off\nemail => maya@example.com",
             correctionRules: "hush key => HushKey\ncolour => color",
             writingStyles: [
-                WritingStylePreset(id: sharedStyleID, name: "Warm", instructions: "Old backup style."),
+                conflictingImportedStyle,
                 WritingStylePreset(name: "Technical", instructions: "Keep the technical detail.")
-            ])
+            ], appProfiles: [importedConflict, importedEditor])
 
         let merged = incoming.resolved(against: local, using: .merge)
         try merged.validate()
@@ -105,6 +172,10 @@ final class PersonalDataBackupTests: XCTestCase {
         XCTAssertTrue(merged.correctionRules.contains("hush key => Local spelling"))
         XCTAssertTrue(merged.correctionRules.contains("colour => color"))
         XCTAssertEqual(merged.writingStyles, [local.writingStyles[0], incoming.writingStyles[1]])
+        XCTAssertEqual(merged.appProfiles.count, 2)
+        XCTAssertEqual(merged.appProfiles.first(where: { $0.bundleIdentifier.lowercased() == "com.example.chat" }), localProfile)
+        XCTAssertEqual(merged.appProfiles.first(where: { $0.bundleIdentifier == "com.example.editor" })?.writingStylePresetID,
+                       sharedStyleID)
 
         let replaced = incoming.resolved(against: local, using: .replace)
         XCTAssertEqual(replaced.dictationHistory, incoming.dictationHistory)
@@ -112,6 +183,7 @@ final class PersonalDataBackupTests: XCTestCase {
         XCTAssertEqual(replaced.snippets, incoming.snippets)
         XCTAssertEqual(replaced.correctionRules, incoming.correctionRules)
         XCTAssertEqual(replaced.writingStyles, incoming.writingStyles)
+        XCTAssertEqual(replaced.appProfiles, incoming.appProfiles)
     }
 
     func testMergeRejectsWritingStyleOverflowInsteadOfDroppingBackupStyles() throws {
@@ -133,6 +205,56 @@ final class PersonalDataBackupTests: XCTestCase {
         XCTAssertThrowsError(try merged.validate()) { error in
             XCTAssertTrue(error.localizedDescription.contains("more writing styles"))
         }
+    }
+
+    @MainActor
+    func testReplaceBackupPersistsAppProfilesAndTheirStylesAcrossRelaunch() throws {
+        let suffix = UUID().uuidString
+        let directory = FileManager.default.temporaryDirectory
+        let dictationURL = directory.appending(path: "hushkey-backup-profiles-\(suffix).json")
+        let filesURL = directory.appending(path: "hushkey-backup-profiles-files-\(suffix).json")
+        let defaults = UserDefaults.standard
+        let priorProfileData = defaults.object(forKey: "dictationAppProfiles")
+        let priorStyleData = defaults.object(forKey: WritingStylePresetStore.preferenceKey)
+        let priorSaveHistory = defaults.object(forKey: "saveDictationHistory")
+        defer {
+            try? FileManager.default.removeItem(at: dictationURL)
+            try? FileManager.default.removeItem(at: filesURL)
+            if let priorProfileData { defaults.set(priorProfileData, forKey: "dictationAppProfiles") }
+            else { defaults.removeObject(forKey: "dictationAppProfiles") }
+            if let priorStyleData { defaults.set(priorStyleData, forKey: WritingStylePresetStore.preferenceKey) }
+            else { defaults.removeObject(forKey: WritingStylePresetStore.preferenceKey) }
+            if let priorSaveHistory { defaults.set(priorSaveHistory, forKey: "saveDictationHistory") }
+            else { defaults.removeObject(forKey: "saveDictationHistory") }
+        }
+
+        let localStyle = WritingStylePreset(name: "Local", instructions: "Keep it local.")
+        let localProfile = DictationAppProfile(appName: "Local app", bundleIdentifier: "com.example.local",
+                                               mode: .natural, vocabulary: "Local")
+        defaults.set(try JSONEncoder().encode([localProfile]), forKey: "dictationAppProfiles")
+        defaults.set(try JSONEncoder().encode([localStyle]), forKey: WritingStylePresetStore.preferenceKey)
+        defaults.set(false, forKey: "saveDictationHistory")
+
+        let importedStyle = WritingStylePreset(name: "Technical", instructions: "Keep the detail.")
+        let importedProfile = DictationAppProfile(appName: "Editor", bundleIdentifier: "com.example.editor",
+                                                  mode: .code, vocabulary: "HushKey",
+                                                  writingStylePresetID: importedStyle.id)
+        let backup = HushKeyPersonalDataBackup(dictationHistory: [], vocabulary: [], snippets: "",
+                                               correctionRules: "", writingStyles: [importedStyle],
+                                               appProfiles: [importedProfile])
+        let model = AppModel(dictationHistoryURL: dictationURL, fileTranscriptionHistoryURL: filesURL)
+        XCTAssertTrue(model.stagePersonalDataBackup(try backup.encoded()))
+
+        model.applyPersonalDataBackup(using: .replace)
+
+        XCTAssertEqual(model.dictationAppProfiles, [importedProfile])
+        XCTAssertEqual(model.writingStylePresets, [importedStyle])
+        let persistedProfiles = try JSONDecoder().decode([DictationAppProfile].self,
+                                                         from: try XCTUnwrap(defaults.data(forKey: "dictationAppProfiles")))
+        XCTAssertEqual(persistedProfiles, [importedProfile])
+        let relaunchedModel = AppModel(dictationHistoryURL: dictationURL, fileTranscriptionHistoryURL: filesURL)
+        XCTAssertEqual(relaunchedModel.dictationAppProfiles, [importedProfile])
+        XCTAssertEqual(relaunchedModel.writingStylePresets, [importedStyle])
     }
 
     @MainActor

@@ -48,6 +48,8 @@ enum DictationMode: String, CaseIterable, Identifiable, Codable {
 }
 
 struct DictationAppProfile: Codable, Identifiable, Equatable {
+    static let maximumCustomizationBytes = 4_000
+
     var appName: String
     var bundleIdentifier: String
     var mode: DictationMode
@@ -67,6 +69,27 @@ struct DictationAppProfile: Codable, Identifiable, Equatable {
     static func isValidBundleIdentifier(_ value: String) -> Bool {
         guard value.utf8.count <= 255,
               let expression = try? NSRegularExpression(pattern: #"^[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$"#) else { return false }
+        let range = NSRange(value.startIndex..., in: value)
+        return expression.firstMatch(in: value, range: range)?.range == range
+    }
+
+    static func isValidForBackup(_ profile: DictationAppProfile, writingStyleIDs: Set<UUID>) -> Bool {
+        let name = profile.appName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, name.count <= 80, !name.contains(where: \.isNewline),
+              isValidBundleIdentifier(profile.bundleIdentifier), profile.mode != .automatic,
+              profile.vocabulary.utf8.count <= maximumCustomizationBytes,
+              profile.languageIdentifier.map(isValidLanguageIdentifier) ?? true,
+              profile.snippets.map({ $0.utf8.count <= maximumCustomizationBytes &&
+                  DictationSnippetExpander.validation(for: $0).invalidLines.isEmpty }) ?? true,
+              profile.correctionRules.map({ $0.utf8.count <= maximumCustomizationBytes &&
+                  DictationCorrectionRules.validation(for: $0).invalidLines.isEmpty }) ?? true,
+              profile.writingStylePresetID.map(writingStyleIDs.contains) ?? true else { return false }
+        return true
+    }
+
+    private static func isValidLanguageIdentifier(_ value: String) -> Bool {
+        guard value.utf8.count <= 64,
+              let expression = try? NSRegularExpression(pattern: #"^[A-Za-z]{2,8}(?:[-_][A-Za-z0-9]{1,8})*$"#) else { return false }
         let range = NSRange(value.startIndex..., in: value)
         return expression.firstMatch(in: value, range: range)?.range == range
     }

@@ -1,5 +1,13 @@
 # HushKey progress
 
+## Completed — portable Automatic app profiles (2026-11-02)
+
+- Personal data backup format v3 now exports and imports Automatic app profiles, including every optional override. Existing version-1 and version-2 backups remain readable; Replace preserves app profiles that older formats did not contain.
+- Merge keeps local profiles with matching bundle identifiers, adds other imported profiles, and remaps imported writing-style references to the retained local style when names conflict. Invalid profile data, dangling style references, duplicates, and more than 100 profiles are rejected before data changes.
+- Added coverage for v3 round-trip and validation, v1/v2 migration, merge conflict behavior, style-reference remapping, and AppModel replacement persistence across relaunch. Updated backup guide, acceptance protocol, README, product plan, and competitor research notes.
+- `xcodebuild ... test`: 139 passed, 2 skipped, 0 failed. Release packaging succeeded and strict code-signature verification passed. Opened the updated `/Users/rudra/Projects/HushKey/dist/HushKey.app`.
+- Next fresh-session step: complete the remaining live acceptance workflows for permission-gated dictation/insertion, local model use, and meeting capture; do not claim those hardware/permission paths from unit tests.
+
 ## Completed — app-specific Automatic dictation profiles (2026-11-02)
 
 - Automatic profiles can now override on-device language, snippets, deterministic corrections, filler cleanup and a saved Transform style in addition to writing mode and vocabulary. Explicit dictation modes keep global preferences.
@@ -7,7 +15,7 @@
 - Transform styles remain preview-first: a matching profile selects its style for the new transcript, while user-selected styles remain under user control.
 - Added resolver tests for Automatic-only behavior, global fallbacks, legacy profile decoding, round-trip persistence and input validation.
 - `xcodebuild ... test`: 137 passed, 2 skipped, 0 failed. Release packaging succeeded; strict code-signature verification passed. Opened the updated `dist/HushKey.app`.
-- Next fresh-session engineering item: include app profiles in personal-data backup and test migration. Live insertion acceptance still awaits user-enabled Accessibility.
+- Live insertion acceptance still awaits user-enabled Accessibility.
 
 ## Completed — preserve open dictation during backup replacement (2026-11-02)
 
