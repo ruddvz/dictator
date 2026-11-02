@@ -154,8 +154,14 @@ struct MeetingNotesView: View {
             if service.isCapturing {
                 Button("Stop and save", systemImage: "stop.fill") { service.stop() }
                     .buttonStyle(PrimaryButtonStyle(tint: Theme.ink))
-            } else if service.isFinalizing || service.isStarting {
+            } else if service.isFinalizing {
                 ProgressView().controlSize(.small)
+            } else if service.isStarting {
+                HStack(spacing: Theme.s2) {
+                    ProgressView().controlSize(.small)
+                    Button("Cancel", systemImage: "xmark") { service.cancelStarting() }
+                        .buttonStyle(SecondaryButtonStyle())
+                }
             } else {
                 MenuPicker(selection: $meeting.audioSource,
                            options: MeetingAudioSource.allCases.map { ($0, $0.rawValue) },

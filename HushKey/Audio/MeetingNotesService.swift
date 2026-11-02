@@ -87,12 +87,7 @@ final class MeetingNotesService {
         let sink = source == .microphone ? audio.sink : systemAudio.sink
         let speechReady = await transcriber.start(sink: sink, localeIdentifier: localeIdentifier,
                                                  contextualStrings: Array(contextualStrings.prefix(DictationContextHints.maximumCount)))
-        guard startGeneration == generation else {
-            transcriber.stop()
-            captureGate.release(.meeting)
-            isStarting = false
-            return
-        }
+        guard startGeneration == generation else { return }
         guard speechReady else {
             message = transcriber.error ?? "On-device speech recognition is unavailable."
             captureGate.release(.meeting)
@@ -108,7 +103,8 @@ final class MeetingNotesService {
                                     microphoneDeviceID: source == .both ? audio.selectedDeviceID : nil)
         }
         let sourceStarted = source.captureRoute == .microphone ? audio.isRunning : systemAudio.isRunning
-        guard startGeneration == generation, sourceStarted else {
+        guard startGeneration == generation else { return }
+        guard sourceStarted else {
             transcriber.stop()
             switch source.captureRoute {
             case .microphone:
@@ -127,7 +123,22 @@ final class MeetingNotesService {
         isStarting = false
     }
 
+    func cancelStarting() {
+        guard isStarting else { return }
+        generation += 1
+        isStarting = false
+        transcriber.stop()
+        audio.stop()
+        systemAudio.stop()
+        captureGate.release(.meeting)
+        message = "Meeting setup cancelled."
+    }
+
     func stop() {
+        if isStarting {
+            cancelStarting()
+            return
+        }
         guard isCapturing else { return }
         generation += 1
         isCapturing = false

@@ -1,5 +1,14 @@
 # HushKey progress
 
+## Completed — cancel Meeting Notes startup (2026-11-01)
+
+- Meeting Notes now offers **Cancel** while preparing local recognition or audio capture. Cancellation stops pending Speech and microphone work, invalidates late system-audio microphone permission responses, and releases the shared capture gate so another audio flow can proceed.
+- Added a deterministic test for a system-audio startup cancelled while its injected microphone authorization is pending; a late grant no longer starts capture or overwrites the cancellation state.
+- Added a manual permission-startup cancellation check to `docs/TESTING_PROTOCOL.md`.
+- `xcodebuild ... test`: 110 passed, 2 skipped, 0 failed. The test run reported the existing outdated CoreSimulator warning; macOS tests passed.
+- Rebuilt and reopened `dist/HushKey.app`; strict code-signature verification passed. The packaged app is idle. Startup cancellation was not exercised live because that would require starting capture and resolving macOS permissions.
+- Next fresh-session step: complete consented live acceptance for microphone/Speech, Meeting Notes source cancellation, dictation shortcuts, insertion and file exports; continue fixing any failures found.
+
 ## Completed — keep personalization replacements literal (2026-11-01)
 
 - Fixed snippets and correction rules so every cue is matched against the original dictated text in one pass; inserted replacement text is protected from other rules and from later formatting.

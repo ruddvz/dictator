@@ -272,6 +272,28 @@ final class SafetyAndStorageTests: XCTestCase {
         XCTAssertTrue(gate.claim(.meeting))
     }
 
+    @MainActor
+    func testSystemAudioStartupCancellationIgnoresLateMicrophonePermission() async {
+        var permissionContinuation: CheckedContinuation<Bool, Never>?
+        let service = SystemAudioService(requestMicrophoneAccess: {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+                permissionContinuation = continuation
+            }
+        })
+        let startTask = Task {
+            await service.start(includeMicrophone: true, microphoneDeviceID: 0)
+        }
+        while permissionContinuation == nil { await Task.yield() }
+
+        service.stop()
+        permissionContinuation?.resume(returning: true)
+        permissionContinuation = nil
+        await startTask.value
+
+        XCTAssertFalse(service.isRunning)
+        XCTAssertNil(service.error)
+    }
+
     func testMeetingNotesRoundTripLocallyAndDeleteIsIdempotent() throws {
         let url = FileManager.default.temporaryDirectory
             .appending(path: "hushkey-meetings-\(UUID().uuidString).json")

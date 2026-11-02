@@ -14,9 +14,19 @@ final class SystemAudioService {
     @ObservationIgnored private var tapID: AudioObjectID?
     @ObservationIgnored private var aggregateID: AudioObjectID?
     @ObservationIgnored private var engine: AVAudioEngine?
+    @ObservationIgnored private var startGeneration = 0
+    @ObservationIgnored private let requestMicrophoneAccess: () async -> Bool
+
+    init(requestMicrophoneAccess: @escaping () async -> Bool = {
+        await AVCaptureDevice.requestAccess(for: .audio)
+    }) {
+        self.requestMicrophoneAccess = requestMicrophoneAccess
+    }
 
     func start(includeMicrophone: Bool = false, microphoneDeviceID: AudioDeviceID? = nil) async {
         guard !isRunning else { return }
+        startGeneration += 1
+        let generation = startGeneration
         error = nil
 
         guard #available(macOS 14.2, *) else {
@@ -26,7 +36,9 @@ final class SystemAudioService {
 
         var microphoneUID: String?
         if includeMicrophone {
-            guard await AVCaptureDevice.requestAccess(for: .audio) else {
+            let microphoneAuthorized = await requestMicrophoneAccess()
+            guard generation == startGeneration else { return }
+            guard microphoneAuthorized else {
                 error = "Microphone access denied. Enable it in System Settings › Privacy & Security, or choose System audio only."
                 return
             }
@@ -141,6 +153,7 @@ final class SystemAudioService {
     }
 
     func stop() {
+        startGeneration += 1
         guard isRunning || tapID != nil || aggregateID != nil else { return }
         tearDown()
         isRunning = false
