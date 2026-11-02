@@ -42,32 +42,33 @@ struct MeetingNotesView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            PageHeader(
-                eyebrow: "LOCAL MEETING WORKSPACE",
-                title: "Meeting notes",
-                subtitle: "Capture a meeting transcript on this Mac, then create a reviewable summary and action list with Apple’s on-device model.")
+        VStack(alignment: .leading, spacing: Theme.s5) {
+            PageHeader(eyebrow: "", title: "Meeting notes",
+                       subtitle: "Transcribe a meeting on this Mac, then draft a summary and action items.")
 
             captureControls
 
             if let message = service.message {
                 Label(message, systemImage: "exclamationmark.circle")
                     .font(.hkCallout)
-                    .foregroundStyle(Theme.ink2)
+                    .foregroundStyle(Theme.finishing)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            HSplitView {
+            HStack(alignment: .top, spacing: Theme.s5) {
                 notesList
-                    .frame(minWidth: 220, idealWidth: 270, maxWidth: 340, maxHeight: .infinity)
+                    .frame(width: 280)
+                    .frame(maxHeight: .infinity, alignment: .top)
                 detail
-                    .frame(minWidth: 440, maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
             .frame(minHeight: 390, maxHeight: .infinity)
-
-            privacyNote
         }
-        .padding(24)
+        .frame(maxWidth: Theme.homeWidth)
+        .padding(.horizontal, Theme.s7 - 8)
+        .padding(.top, Theme.s7)
+        .padding(.bottom, Theme.s5)
+        .frame(maxWidth: .infinity, alignment: .top)
         .fileExporter(isPresented: $isExporting, document: exportDocument,
                       contentType: .plainText, defaultFilename: exportFilename) { result in
             if case .failure(let error) = result {
@@ -98,92 +99,92 @@ struct MeetingNotesView: View {
 
     private var captureControls: some View {
         @Bindable var meeting = service
-        return GroupBox {
-            HStack(spacing: 14) {
+        return HStack(spacing: Theme.s4) {
+            Image(systemName: service.isCapturing ? "waveform" : "person.2.wave.2")
+                .font(.system(size: 22, weight: .medium))
+                .foregroundStyle(service.isCapturing ? Theme.listening : Theme.signal)
+                .symbolEffect(.variableColor.iterative, isActive: service.isCapturing)
+                .frame(width: 52, height: 52)
+                .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
+            VStack(alignment: .leading, spacing: 4) {
                 if service.isCapturing {
-                    Label(captureStatusTitle,
-                          systemImage: "waveform.circle.fill")
-                        .foregroundStyle(Theme.danger)
-                    ProgressView(value: Double(service.activeAudioLevel))
-                        .frame(maxWidth: 120)
-                        .accessibilityLabel("Meeting audio input level")
-                    Text(durationLabel(service.activeDuration))
-                        .font(.hkCaption.monospacedDigit())
-                        .foregroundStyle(Theme.ink2)
-                    Spacer()
-                    Button("Stop and save", systemImage: "stop.fill") { service.stop() }
-                        .buttonStyle(PrimaryButtonStyle())
-                } else if service.isFinalizing {
-                    ProgressView()
-                    Text("Finishing the on-device transcript…")
-                        .foregroundStyle(Theme.ink2)
-                    Spacer()
-                    Button("Finishing…") {}.disabled(true)
-                } else if service.isStarting {
-                    ProgressView()
-                    Text("Preparing local speech recognition…")
-                        .foregroundStyle(Theme.ink2)
-                    Spacer()
-                    Button("Starting…") {}.disabled(true)
-                } else {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Picker("Meeting audio source", selection: $meeting.audioSource) {
-                            ForEach(MeetingAudioSource.allCases) { source in
-                                Text(source.rawValue).tag(source)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        .frame(maxWidth: 360)
-
-                        Text(audioSourceDescription)
-                            .font(.hkCaption)
+                    Text(captureStatusTitle).font(.hkTitle3)
+                    HStack(spacing: Theme.s3) {
+                        LevelMeter(value: Double(service.activeAudioLevel))
+                            .frame(width: 120)
+                            .accessibilityLabel("Meeting audio input level")
+                        Text(durationLabel(service.activeDuration))
+                            .font(.hkCallout.monospacedDigit())
                             .foregroundStyle(Theme.ink2)
                     }
-                    Spacer()
-                    Button("Start meeting", systemImage: service.audioSource == .microphone ? "record.circle" : "waveform",
-                           action: startMeeting)
-                    .buttonStyle(PrimaryButtonStyle())
-                    .disabled(model.captureGate.owner != nil)
+                } else if service.isFinalizing || service.isStarting {
+                    Text(service.isFinalizing ? "Saving the transcript" : "Getting ready").font(.hkTitle3)
+                    Text(service.isFinalizing ? "Finishing on this Mac…" : "Preparing local speech recognition…")
+                        .font(.hkCallout)
+                        .foregroundStyle(Theme.ink2)
+                } else {
+                    Text("Start a meeting").font(.hkTitle3)
+                    Text(audioSourceDescription)
+                        .font(.hkCallout)
+                        .foregroundStyle(Theme.ink2)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .padding(6)
-        } label: {
-            Label("Capture", systemImage: "mic.badge.plus")
+            Spacer(minLength: Theme.s4)
+            if service.isCapturing {
+                Button("Stop and save", systemImage: "stop.fill") { service.stop() }
+                    .buttonStyle(PrimaryButtonStyle(tint: Theme.ink))
+            } else if service.isFinalizing || service.isStarting {
+                ProgressView().controlSize(.small)
+            } else {
+                MenuPicker(selection: $meeting.audioSource,
+                           options: MeetingAudioSource.allCases.map { ($0, $0.rawValue) },
+                           width: 170)
+                Button("Start", systemImage: "record.circle", action: startMeeting)
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(model.captureGate.owner != nil)
+            }
         }
+        .padding(Theme.s5)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.signalSoft, in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
+        .animation(Theme.snappy, value: service.isCapturing)
     }
 
     private var notesList: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            TextField("Search meeting notes", text: $searchText)
-                .textFieldStyle(.roundedBorder)
-                .accessibilityLabel("Search meeting notes")
-
-            List(selection: Binding(get: { service.selectedNoteID }, set: { service.select($0) })) {
-                if filteredNotes.isEmpty {
-                    ContentUnavailableView(searchText.isEmpty ? "No meeting notes yet" : "No matches",
-                                           systemImage: "text.badge.plus",
-                                           description: Text(searchText.isEmpty
-                                               ? "Start a meeting capture to save a local transcript."
-                                               : "Try a different title or transcript phrase."))
-                }
-                ForEach(filteredNotes) { note in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(note.title).font(.hkHeadline).lineLimit(1)
-                        Text(note.transcript.isEmpty ? "No transcript" : note.transcript)
-                            .font(.hkCaption)
-                            .foregroundStyle(Theme.ink2)
-                            .lineLimit(2)
-                        Text(note.createdAt.formatted(date: .abbreviated, time: .shortened))
-                            .font(.hkMeta)
-                            .foregroundStyle(Theme.ink3)
-                    }
-                    .padding(.vertical, 4)
-                    .tag(note.id)
-                }
+        VStack(alignment: .leading, spacing: Theme.s3) {
+            HStack(spacing: Theme.s2) {
+                Image(systemName: "magnifyingglass").foregroundStyle(Theme.ink3)
+                TextField("Search notes", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .accessibilityLabel("Search meeting notes")
             }
-            .listStyle(.sidebar)
+            .font(.hkCallout)
+            .padding(.horizontal, Theme.s3)
+            .frame(height: Theme.controlHeight)
+            .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
+                .strokeBorder(Theme.hairline, lineWidth: 1))
+
+            if filteredNotes.isEmpty {
+                EmptyState(systemImage: searchText.isEmpty ? "text.badge.plus" : "magnifyingglass",
+                           title: searchText.isEmpty ? "No notes yet" : "No matches",
+                           message: searchText.isEmpty ? "Your meetings land here." : "Try another word.")
+                    .card(padding: 0, style: .outlined)
+            } else {
+                ScrollView {
+                    VStack(spacing: 2) {
+                        ForEach(filteredNotes) { note in
+                            MeetingNoteRow(note: note, isSelected: service.selectedNoteID == note.id) {
+                                service.select(note.id)
+                            }
+                        }
+                    }
+                }
+                .scrollIndicators(.never)
+            }
         }
-        .padding(.trailing, 8)
     }
 
     @ViewBuilder
@@ -203,114 +204,124 @@ struct MeetingNotesView: View {
     }
 
     private var liveTranscript: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label(service.isFinalizing ? "Saving meeting transcript" : "Live transcript",
-                  systemImage: service.isFinalizing ? "ellipsis.circle" : "waveform")
-                .font(.hkHeadline)
-            TextEditor(text: .constant(service.transcriber.text))
-                .font(.hkBody)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(6)
-                .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: Theme.r3, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
-                .disabled(true)
-            Text("Live text is temporary until you stop the capture. No microphone audio is written to disk.")
+        VStack(alignment: .leading, spacing: Theme.s3) {
+            Text(service.isFinalizing ? "Saving transcript" : "Live transcript").font(.hkTitle3)
+            ScrollView {
+                Text(service.transcriber.text.isEmpty ? "Listening…" : service.transcriber.text)
+                    .font(.hkBody)
+                    .lineSpacing(3)
+                    .foregroundStyle(service.transcriber.text.isEmpty ? Theme.ink3 : Theme.ink)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .textSelection(.enabled)
+                    .padding(Theme.s4)
+            }
+            .frame(maxHeight: .infinity)
+            .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
+            Text("Audio is never written to disk.")
                 .font(.hkCaption)
-                .foregroundStyle(Theme.ink2)
+                .foregroundStyle(Theme.ink3)
         }
-        .padding(10)
     }
 
     private func noteEditor(_ note: MeetingNote) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                TextField("Meeting title", text: binding(for: note, keyPath: \.title))
-                    .font(.hkTitle3.weight(.semibold))
-                    .textFieldStyle(.plain)
-                Spacer(minLength: 4)
-                Menu {
-                    Button("Export transcript…", systemImage: "doc.text") {
-                        beginExport(note.transcript, title: note.title)
+        ScrollView {
+            VStack(alignment: .leading, spacing: Theme.s5) {
+                HStack(alignment: .firstTextBaseline, spacing: Theme.s2) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Meeting title", text: binding(for: note, keyPath: \.title))
+                            .font(.hkTitle2)
+                            .textFieldStyle(.plain)
+                        Text("\(note.createdAt.formatted(date: .abbreviated, time: .shortened)) · \(durationLabel(note.duration)) · On this Mac")
+                            .font(.hkCallout)
+                            .foregroundStyle(Theme.ink2)
                     }
-                    Button("Export all notes…", systemImage: "doc.richtext") {
-                        beginExport(exportText(for: note), title: note.title)
-                    }
-                    Divider()
-                    Button("Delete meeting note…", systemImage: "trash", role: .destructive) {
-                        pendingDeleteID = note.id
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .font(.hkTitle3)
-                }
-                .menuStyle(.borderlessButton)
-                .help("More meeting note actions")
-            }
-            Text("\(note.createdAt.formatted(date: .complete, time: .shortened)) · \(durationLabel(note.duration)) · Stored on this Mac")
-                .font(.hkCaption)
-                .foregroundStyle(Theme.ink2)
-
-            if service.isGenerating {
-                ProgressView("Creating a local draft…")
-                    .font(.hkCaption)
-                    .padding(.vertical, 2)
-            }
-
-            GroupBox {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Label("Summary", systemImage: "text.alignleft")
-                            .font(.hkHeadline)
-                        Spacer()
-                        Button("Create summary", systemImage: "sparkles") {
-                            Task { await service.generateSummary(for: note.id, with: model.localTransformService) }
+                    Spacer(minLength: 4)
+                    Menu {
+                        Button("Export transcript…", systemImage: "doc.text") {
+                            beginExport(note.transcript, title: note.title)
                         }
-                        .disabled(!canGenerate || model.localTransformService.isTransforming)
+                        Button("Export all notes…", systemImage: "doc.richtext") {
+                            beginExport(exportText(for: note), title: note.title)
+                        }
+                        Divider()
+                        Button("Delete meeting note…", systemImage: "trash", role: .destructive) {
+                            pendingDeleteID = note.id
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
                     }
-                    TextEditor(text: binding(for: note, keyPath: \.summary))
-                        .frame(minHeight: 86)
-                        .disabled(service.isGenerating)
-                    Text(model.localTransformService.availabilityMessage)
+                    .menuStyle(.button)
+                    .buttonStyle(IconButtonStyle())
+                    .menuIndicator(.hidden)
+                    .fixedSize()
+                    .help("More meeting note actions")
+                }
+
+                if !model.localTransformService.modelIsAvailable {
+                    Label(model.localTransformService.availabilityMessage, systemImage: "info.circle")
                         .font(.hkCaption)
                         .foregroundStyle(Theme.ink2)
                 }
-                .padding(6)
-            }
 
-            GroupBox {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Label("Action items", systemImage: "checklist")
-                            .font(.hkHeadline)
-                        Spacer()
-                        Button("Extract action items", systemImage: "list.bullet.clipboard") {
-                            Task { await service.generateActionItems(for: note.id, with: model.localTransformService) }
-                        }
-                        .disabled(!canGenerate || model.localTransformService.isTransforming)
+                noteSection("Summary", text: binding(for: note, keyPath: \.summary), minHeight: 90,
+                            empty: "A few lines on what was decided.") {
+                    Button("Draft", systemImage: "sparkles") {
+                        Task { await service.generateSummary(for: note.id, with: model.localTransformService) }
                     }
-                    TextEditor(text: binding(for: note, keyPath: \.actionItems))
-                        .frame(minHeight: 66)
-                        .disabled(service.isGenerating)
+                    .buttonStyle(SecondaryButtonStyle())
+                    .disabled(!canGenerate || model.localTransformService.isTransforming)
                 }
-                .padding(6)
-            }
-
-            GroupBox {
-                VStack(alignment: .leading, spacing: 8) {
-                    Label("Transcript", systemImage: "waveform")
-                        .font(.hkHeadline)
-                    TextEditor(text: binding(for: note, keyPath: \.transcript))
-                        .font(.hkBody)
-                        .frame(minHeight: 160)
-                        .disabled(service.isGenerating)
-                    Text("\(note.transcript.count.formatted()) characters · Edit to correct recognition before generating notes.")
-                        .font(.hkCaption)
-                        .foregroundStyle(Theme.ink2)
+                noteSection("Action items", text: binding(for: note, keyPath: \.actionItems), minHeight: 70,
+                            empty: "Who does what, next.") {
+                    Button("Extract", systemImage: "checklist") {
+                        Task { await service.generateActionItems(for: note.id, with: model.localTransformService) }
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
+                    .disabled(!canGenerate || model.localTransformService.isTransforming)
                 }
-                .padding(6)
+                noteSection("Transcript", text: binding(for: note, keyPath: \.transcript), minHeight: 180,
+                            empty: "") {
+                    Text("\(note.transcript.count.formatted()) characters")
+                        .font(.hkMeta.monospacedDigit())
+                        .foregroundStyle(Theme.ink3)
+                }
+                if service.isGenerating {
+                    ProgressView("Drafting on this Mac…").font(.hkCaption).controlSize(.small)
+                }
             }
         }
-        .padding(10)
+        .scrollIndicators(.automatic)
+    }
+
+    private func noteSection<Trailing: View>(_ title: String, text: Binding<String>, minHeight: CGFloat, empty: String,
+                                             @ViewBuilder trailing: () -> Trailing) -> some View {
+        VStack(alignment: .leading, spacing: Theme.s2) {
+            HStack {
+                Text(title).font(.hkTitle3)
+                Spacer()
+                trailing()
+            }
+            ZStack(alignment: .topLeading) {
+                if text.wrappedValue.isEmpty && !empty.isEmpty {
+                    Text(empty)
+                        .font(.hkBody)
+                        .foregroundStyle(Theme.ink3)
+                        .padding(.horizontal, Theme.s3 + 5)
+                        .padding(.vertical, Theme.s3)
+                        .allowsHitTesting(false)
+                }
+                TextEditor(text: text)
+                    .font(.hkBody)
+                    .lineSpacing(3)
+                    .scrollContentBackground(.hidden)
+                    .frame(minHeight: minHeight)
+                    .padding(Theme.s3)
+                    .disabled(service.isGenerating)
+            }
+            .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
+        }
     }
 
     private var canGenerate: Bool {
@@ -330,16 +341,16 @@ struct MeetingNotesView: View {
     private var audioSourceDescription: String {
         switch service.audioSource {
         case .microphone:
-            "Captures your selected microphone. Remote voices routed to headphones may be missed."
+            "Your microphone. Voices in your headphones may be missed."
         case .systemAudio:
-            "Captures audio playing from apps on this Mac. Your microphone is not included."
+            "Sound from apps on this Mac, without your microphone."
         case .both:
-            "Captures your selected microphone and Mac audio together. Requires both permissions."
+            "Your microphone and Mac audio together."
         }
     }
 
     private var privacyNote: some View {
-        Label("Start capture explicitly. Both sides combines your microphone with sound playing from apps. macOS may ask separately for microphone and System Audio Recording access. Speech recognition and notes stay on this Mac; audio is not saved and speakers are not identified.",
+        Label("Transcribed on this Mac. Audio is never saved.",
               systemImage: "lock.shield")
             .font(.hkCaption)
             .foregroundStyle(Theme.ink2)
@@ -388,5 +399,38 @@ struct MeetingNotesView: View {
     private func durationLabel(_ seconds: TimeInterval) -> String {
         let minutes = max(0, Int(seconds) / 60)
         return "\(minutes / 60)h \(minutes % 60)m"
+    }
+}
+
+/// One note in the list: title, first line, and date, with a selection fill like the sidebar.
+private struct MeetingNoteRow: View {
+    var note: MeetingNote
+    var isSelected: Bool
+    var action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(note.title).font(.hkRowTitle).lineLimit(1)
+                Text(note.transcript.isEmpty ? "No transcript" : note.transcript)
+                    .font(.hkCaption)
+                    .foregroundStyle(Theme.ink2)
+                    .lineLimit(1)
+                Text(note.createdAt.formatted(date: .abbreviated, time: .shortened))
+                    .font(.hkMeta)
+                    .foregroundStyle(Theme.ink3)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Theme.s3)
+            .padding(.vertical, Theme.s2 + 2)
+            .background(isSelected ? Theme.selection : hovering ? Theme.hover : .clear,
+                        in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.12), value: hovering)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 }

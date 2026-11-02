@@ -36,172 +36,75 @@ struct FileTranscriptionView: View {
     var body: some View {
         @Bindable var whisper = model.whisperFileTranscriber
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                PageHeader(
-                    eyebrow: "LOCAL AUDIO",
-                    title: "Transcribe a file",
-                    subtitle: "Choose an audio file to create a transcript and timestamped subtitles on this Mac.")
+            VStack(alignment: .leading, spacing: Theme.s6) {
+                PageHeader(eyebrow: "", title: "Files",
+                           subtitle: "Turn a recording into text and subtitles, on this Mac.") {
+                    Button("Choose file…", systemImage: "folder") { chooseFile() }
+                        .buttonStyle(SecondaryButtonStyle())
+                        .disabled(isBusy)
+                }
 
-                GroupBox {
-                    VStack(alignment: .leading, spacing: 14) {
-                        Picker("Local engine", selection: $engine) {
-                            ForEach(FileTranscriptionEngine.allCases) { Text($0.rawValue).tag($0) }
-                        }
-                        .pickerStyle(.segmented)
-                        .frame(maxWidth: 380)
-                        .disabled(isBusy || !currentText.isEmpty)
+                sourceCard
 
-                        if !currentText.isEmpty {
-                            Label("This transcript is saved in Recent file transcripts. Choose an audio file to start a separate job or switch engines.",
-                                  systemImage: "checkmark.circle")
-                                .font(.hkCaption)
-                                .foregroundStyle(Theme.ink2)
-                        }
-
-                        Label(engine == .apple
-                              ? "Apple Speech runs on this Mac when the selected language supports on-device recognition. No speech model download is needed."
-                              : "WhisperKit uses a model you choose and download. The model download needs internet; transcription itself runs locally after setup.",
-                              systemImage: "lock.shield")
-                            .font(.hkCallout)
-                            .foregroundStyle(Theme.ink2)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                        if engine == .whisperKit {
-                            HStack(spacing: 12) {
-                                Picker("WhisperKit model", selection: $whisper.selectedVariant) {
-                                    ForEach(WhisperModelVariant.allCases) { variant in
-                                        Text(variant.title).tag(variant)
-                                    }
-                                }
-                                .frame(maxWidth: 360)
+                SettingsGroup(title: "Engine") {
+                    SettingsRow(title: "Speech engine",
+                                detail: engine == .apple ? "Apple Speech. Nothing to download."
+                                    : "WhisperKit. Downloads a model once, then runs offline.") {
+                        MenuPicker(selection: $engine,
+                                   options: FileTranscriptionEngine.allCases.map { ($0, $0.rawValue) })
+                            .disabled(isBusy || !currentText.isEmpty)
+                    }
+                    SettingsRow(title: "Language", detail: nil) {
+                        if engine == .apple {
+                            MenuPicker(selection: Binding(get: { model.dictationLanguage },
+                                                          set: { model.dictationLanguage = $0 }),
+                                       options: DictationLanguage.onDevice.map { ($0.identifier, $0.name) })
                                 .disabled(isBusy)
+                        } else {
+                            MenuPicker(selection: $whisper.selectedLanguage,
+                                       options: WhisperKitLanguage.options.map { ($0.identifier, $0.name) })
+                                .disabled(isBusy)
+                        }
+                    }
+                    if engine == .whisperKit {
+                        SettingsRow(title: "Model",
+                                    detail: whisper.selectedModelIsDownloaded ? "On this Mac." : "Not downloaded yet.") {
+                            HStack(spacing: Theme.s2) {
                                 if whisper.selectedModelIsDownloaded {
-                                    Label("On this Mac", systemImage: "checkmark.circle.fill")
-                                        .foregroundStyle(Theme.ink2)
-                                    Button("Remove model", role: .destructive) { whisper.removeSelectedModel() }
+                                    Button("Remove") { whisper.removeSelectedModel() }
+                                        .buttonStyle(DestructiveButtonStyle())
                                         .disabled(isBusy)
-                                } else {
-                                    Button("Download model", systemImage: "arrow.down.circle") {
-                                        whisper.downloadSelectedModel()
-                                    }
-                                    .buttonStyle(PrimaryButtonStyle())
-                                    .disabled(isBusy)
+                                } else if !whisper.isDownloading {
+                                    Button("Download") { whisper.downloadSelectedModel() }
+                                        .buttonStyle(PrimaryButtonStyle())
+                                        .disabled(isBusy)
                                 }
+                                MenuPicker(selection: $whisper.selectedVariant,
+                                           options: WhisperModelVariant.allCases.map { ($0, $0.title) })
+                                    .disabled(isBusy)
                             }
-                            if whisper.isDownloading {
-                                HStack(spacing: 12) {
+                        }
+                        if whisper.isDownloading {
+                            GroupRow {
+                                HStack(spacing: Theme.s3) {
                                     ProgressView(value: whisper.downloadProgress)
+                                        .tint(Theme.signal)
                                         .accessibilityLabel("Downloading local speech model")
                                     Text(whisper.downloadProgressDescription)
                                         .font(.hkCaption.monospacedDigit())
                                         .foregroundStyle(Theme.ink2)
-                                    Button("Cancel", role: .cancel) { whisper.cancelDownload() }
+                                    Button("Cancel") { whisper.cancelDownload() }
+                                        .buttonStyle(SecondaryButtonStyle())
                                         .disabled(whisper.status == "Cancelling model download…")
                                 }
-                                Text("Model files stay in HushKey’s local Application Support folder. You can remove them here.")
-                                    .font(.hkCaption)
-                                    .foregroundStyle(Theme.ink2)
                             }
-                        }
-
-                        HStack(spacing: 12) {
-                            Button("Choose audio file…", systemImage: "folder") { chooseFile() }
-                                .disabled(isBusy)
-                            if let sourceName = selectedURL?.lastPathComponent ?? activeSourceName {
-                                Label(sourceName, systemImage: "waveform")
-                                    .lineLimit(1)
-                                    .textSelection(.enabled)
-                            }
-                            Spacer()
-                        }
-
-                        HStack(spacing: 12) {
-                            Button(action: startTranscription) {
-                                Label(isBusy ? "Working…" : "Transcribe locally",
-                                      systemImage: isBusy ? "hourglass" : "waveform")
-                                    .frame(minWidth: 150)
-                            }
-                            .buttonStyle(PrimaryButtonStyle())
-                            .disabled(selectedURL == nil || isBusy ||
-                                      (engine == .whisperKit && !whisper.selectedModelIsDownloaded))
-
-                            if engine == .apple && transcription.isTranscribing {
-                                Button("Cancel", role: .cancel) { transcription.cancel() }
-                            } else if engine == .whisperKit && whisper.isTranscribing {
-                                Button("Cancel", role: .cancel) { whisper.cancelTranscription() }
-                                    .disabled(whisper.status == "Cancelling transcription…")
-                            }
-                            Spacer()
-                            if engine == .apple {
-                                Picker("Language", selection: Binding(get: { model.dictationLanguage },
-                                                                      set: { model.dictationLanguage = $0 })) {
-                                    ForEach(DictationLanguage.onDevice) { language in
-                                        Text(language.name).tag(language.identifier)
-                                    }
-                                }
-                                .frame(maxWidth: 260)
-                                .disabled(isBusy)
-                            } else {
-                                Picker("Language", selection: $whisper.selectedLanguage) {
-                                    ForEach(WhisperKitLanguage.options) { language in
-                                        Text(language.name).tag(language.identifier)
-                                    }
-                                }
-                                .frame(maxWidth: 260)
-                                .disabled(isBusy)
-                            }
-                        }
-
-                        if let error = currentError {
-                            Label(error, systemImage: "exclamationmark.triangle.fill")
-                                .foregroundStyle(Theme.finishing)
-                                .fixedSize(horizontal: false, vertical: true)
-                        } else if let status = currentStatus {
-                            Label(status, systemImage: isBusy ? "gearshape.2" : "checkmark.circle")
-                                .foregroundStyle(Theme.ink2)
                         }
                     }
-                    .padding(10)
                 }
+
+                if !currentText.isEmpty { transcriptCard }
 
                 recentSessionsCard
-
-                GroupBox("Transcript") {
-                    VStack(alignment: .leading, spacing: 12) {
-                        if currentText.isEmpty {
-                            ContentUnavailableView("No transcript yet", systemImage: "text.alignleft",
-                                                   description: Text("Choose an audio file to begin."))
-                                .frame(minHeight: 160)
-                        } else {
-                            TextEditor(text: transcriptBinding)
-                                .font(.hkBody)
-                                .frame(minHeight: 220)
-                                .disabled(isBusy)
-                                .padding(4)
-                                .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: Theme.r3, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
-
-                            HStack(spacing: 10) {
-                                Button("Save text…", systemImage: "doc.text") { save(content: currentText, fileExtension: "txt", type: .plainText) }
-                                Button("Export SRT…", systemImage: "captions.bubble") { save(content: SubtitleFormatter.srt(currentCues), fileExtension: "srt", type: UTType(filenameExtension: "srt") ?? .plainText) }
-                                    .disabled(currentCues.isEmpty)
-                                Button("Export WebVTT…", systemImage: "captions.bubble") { save(content: SubtitleFormatter.vtt(currentCues), fileExtension: "vtt", type: UTType(filenameExtension: "vtt") ?? .plainText) }
-                                    .disabled(currentCues.isEmpty)
-                                Spacer()
-                                Text("\(currentCues.count) timed segments")
-                                    .font(.hkCaption)
-                                    .foregroundStyle(Theme.ink2)
-                            }
-                            Text("Transcript edits save automatically to Recent file transcripts and appear in TXT export. Subtitle exports keep the original timed recognition segments.")
-                                .font(.hkCaption)
-                                .foregroundStyle(Theme.ink2)
-                        }
-                        if let exportMessage {
-                            Text(exportMessage).font(.hkCaption).foregroundStyle(Theme.ink2)
-                        }
-                    }
-                    .padding(8)
-                }
             }
             .pageLayout()
         }
@@ -232,66 +135,173 @@ struct FileTranscriptionView: View {
         Binding(get: { currentText }, set: { engine == .apple ? transcription.replaceText($0) : whisper.replaceText($0) })
     }
 
-    private var recentSessionsCard: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 10) {
-                    TextField("Search file transcripts", text: $historySearch)
-                        .textFieldStyle(.roundedBorder)
-                    if !historySessions.isEmpty {
-                        Button("Delete all…", role: .destructive) { confirmClearHistory = true }
-                            .buttonStyle(SecondaryButtonStyle())
+    /// The file and its one action, like Wispr's hero cards: big, calm, obvious.
+    private var sourceCard: some View {
+        @Bindable var whisper = model.whisperFileTranscriber
+        let sourceName = selectedURL?.lastPathComponent ?? activeSourceName
+        return HStack(spacing: Theme.s4) {
+            Image(systemName: sourceName == nil ? "waveform.badge.plus" : "waveform")
+                .font(.system(size: 22, weight: .medium))
+                .foregroundStyle(Theme.signal)
+                .frame(width: 52, height: 52)
+                .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(sourceName ?? "Choose an audio or video file")
+                    .font(.hkTitle3)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Group {
+                    if let error = currentError {
+                        Label(error, systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(Theme.danger)
+                    } else if let status = currentStatus {
+                        Text(status).foregroundStyle(Theme.ink2)
+                    } else {
+                        Text("M4A, MP3, WAV, MOV and more. The audio itself is never kept.")
+                            .foregroundStyle(Theme.ink2)
                     }
                 }
+                .font(.hkCallout)
+                .lineLimit(2)
+            }
+            Spacer(minLength: Theme.s4)
+            if engine == .apple && transcription.isTranscribing {
+                Button("Cancel") { transcription.cancel() }
+                    .buttonStyle(SecondaryButtonStyle())
+            } else if engine == .whisperKit && whisper.isTranscribing {
+                Button("Cancel") { whisper.cancelTranscription() }
+                    .buttonStyle(SecondaryButtonStyle())
+                    .disabled(whisper.status == "Cancelling transcription…")
+            }
+            if selectedURL == nil && !isBusy {
+                Button("Choose file…") { chooseFile() }
+                    .buttonStyle(PrimaryButtonStyle())
+            } else {
+                Button(action: startTranscription) {
+                    Label(isBusy ? "Working…" : "Transcribe", systemImage: isBusy ? "hourglass" : "waveform")
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                .disabled(selectedURL == nil || isBusy ||
+                          (engine == .whisperKit && !whisper.selectedModelIsDownloaded))
+            }
+        }
+        .padding(Theme.s5)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.signalSoft, in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
+    }
 
-                if filteredSessions.isEmpty {
-                    ContentUnavailableView(
-                        historySearch.isEmpty ? "No saved file transcripts" : "No matching transcripts",
-                        systemImage: historySearch.isEmpty ? "waveform" : "magnifyingglass",
-                        description: Text(historySearch.isEmpty
-                                          ? "Finished and edited file transcripts are saved on this Mac so you can return to them."
-                                          : "Search by file name or words in the transcript."))
-                        .frame(minHeight: 100)
-                } else {
+    private var transcriptCard: some View {
+        VStack(alignment: .leading, spacing: Theme.s3) {
+            HStack {
+                Text("Transcript").font(.hkTitle3)
+                Spacer()
+                Text("\(currentCues.count) timed segments")
+                    .font(.hkMeta.monospacedDigit())
+                    .foregroundStyle(Theme.ink3)
+            }
+            VStack(alignment: .leading, spacing: 0) {
+                TextEditor(text: transcriptBinding)
+                    .font(.hkBody)
+                    .lineSpacing(3)
+                    .scrollContentBackground(.hidden)
+                    .frame(minHeight: 220)
+                    .disabled(isBusy)
+                    .padding(Theme.s3)
+                RowDivider()
+                HStack(spacing: Theme.s2) {
+                    Text(exportMessage ?? "Edits save automatically. Subtitles keep the original timing.")
+                        .font(.hkCaption)
+                        .foregroundStyle(Theme.ink3)
+                        .lineLimit(1)
+                    Spacer()
+                    Button("SRT") { save(content: SubtitleFormatter.srt(currentCues), fileExtension: "srt", type: UTType(filenameExtension: "srt") ?? .plainText) }
+                        .buttonStyle(SecondaryButtonStyle())
+                        .disabled(currentCues.isEmpty)
+                        .help("Export SRT subtitles")
+                    Button("WebVTT") { save(content: SubtitleFormatter.vtt(currentCues), fileExtension: "vtt", type: UTType(filenameExtension: "vtt") ?? .plainText) }
+                        .buttonStyle(SecondaryButtonStyle())
+                        .disabled(currentCues.isEmpty)
+                        .help("Export WebVTT subtitles")
+                    Button("Save text…", systemImage: "square.and.arrow.down") { save(content: currentText, fileExtension: "txt", type: .plainText) }
+                        .buttonStyle(PrimaryButtonStyle())
+                }
+                .padding(.horizontal, Theme.s4)
+                .padding(.vertical, Theme.s3)
+            }
+            .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
+                .strokeBorder(Theme.hairline, lineWidth: 1))
+        }
+    }
+
+    private var recentSessionsCard: some View {
+        VStack(alignment: .leading, spacing: Theme.s3) {
+            HStack(spacing: Theme.s2) {
+                Text("Recent").font(.hkTitle3)
+                Spacer()
+                if !historySessions.isEmpty {
+                    HStack(spacing: Theme.s2) {
+                        Image(systemName: "magnifyingglass").foregroundStyle(Theme.ink3)
+                        TextField("Search", text: $historySearch)
+                            .textFieldStyle(.plain)
+                            .frame(width: 160)
+                    }
+                    .font(.hkCallout)
+                    .padding(.horizontal, Theme.s3)
+                    .frame(height: Theme.controlHeight - 4)
+                    .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
+                        .strokeBorder(Theme.hairline, lineWidth: 1))
+                    Menu {
+                        Button("Delete all…", role: .destructive) { confirmClearHistory = true }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                    }
+                    .menuStyle(.button)
+                    .buttonStyle(IconButtonStyle())
+                    .menuIndicator(.hidden)
+                    .fixedSize()
+                    .help("More")
+                }
+            }
+            if let message = model.fileTranscriptionHistoryMessage {
+                Label(message, systemImage: "exclamationmark.triangle")
+                    .font(.hkCaption).foregroundStyle(Theme.finishing)
+            }
+            if filteredSessions.isEmpty {
+                EmptyState(systemImage: historySearch.isEmpty ? "clock" : "magnifyingglass",
+                           title: historySearch.isEmpty ? "No file transcripts yet" : "No matches",
+                           message: historySearch.isEmpty ? "Finished transcripts stay here, on this Mac."
+                               : "Search by file name or words in the transcript.")
+                    .card(padding: 0, style: .outlined)
+            } else {
+                ListGroup {
                     ForEach(filteredSessions) { session in
-                        HStack(spacing: 10) {
+                        ListRow {
                             Button { restore(session) } label: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    HStack(spacing: 8) {
-                                        Text(session.sourceName).font(.hkHeadline).lineLimit(1)
-                                        Text(session.engine.rawValue).font(.hkCaption).foregroundStyle(Theme.ink2)
+                                HStack(alignment: .firstTextBaseline, spacing: Theme.s4) {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(session.sourceName).font(.hkRowTitle).lineLimit(1)
+                                        Text(session.text).font(.hkCallout).foregroundStyle(Theme.ink2).lineLimit(1)
                                     }
-                                    Text(session.text).font(.hkCallout).foregroundStyle(Theme.ink2).lineLimit(2)
+                                    Spacer(minLength: Theme.s2)
                                     Text(session.createdAt.formatted(date: .abbreviated, time: .shortened))
-                                        .font(.hkMeta).foregroundStyle(Theme.ink3)
+                                        .font(.system(size: 14).monospacedDigit())
+                                        .foregroundStyle(Theme.ink3)
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
-                            .help("Restore this file transcript")
-
-                            Button("Delete \(session.sourceName)", systemImage: "trash", role: .destructive) {
-                                delete(session)
-                            }
-                            .labelStyle(.iconOnly)
-                            .buttonStyle(.borderless)
+                            .help("Open this transcript")
+                        } actions: {
+                            Button("Delete \(session.sourceName)", systemImage: "trash") { delete(session) }
+                                .buttonStyle(IconButtonStyle())
+                                .help("Delete")
                         }
-                        .padding(.vertical, 7)
-                        Divider()
                     }
                 }
-
-                Text("Transcript text and timed cues stay on this Mac. HushKey does not copy or retain the source audio.")
-                    .font(.hkCaption).foregroundStyle(Theme.ink2)
-                if let message = model.fileTranscriptionHistoryMessage {
-                    Label(message, systemImage: "exclamationmark.triangle")
-                        .font(.hkCaption).foregroundStyle(Theme.finishing)
-                }
             }
-            .padding(8)
-        } label: {
-            Label("Recent file transcripts · \(historySessions.count)", systemImage: "clock.arrow.circlepath")
         }
     }
 
