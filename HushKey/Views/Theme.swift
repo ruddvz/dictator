@@ -34,12 +34,21 @@ struct Keycap: View {
             .font(.system(size: size, weight: .semibold, design: .rounded))
             .frame(minWidth: size * 1.9, minHeight: size * 1.9)
             .padding(.horizontal, glyph.count > 1 ? 6 : 0)
-            .background(
-                RoundedRectangle(cornerRadius: size * 0.45, style: .continuous)
-                    .fill(.background)
-                    .shadow(color: .black.opacity(0.18), radius: 0, x: 0, y: 1.5))
+            .foregroundStyle(.primary.opacity(0.85))
+            .background {
+                // Darker base offset below the face reads as a physical key edge.
+                ZStack {
+                    RoundedRectangle(cornerRadius: size * 0.45, style: .continuous)
+                        .fill(Color.primary.opacity(0.22))
+                        .offset(y: 1.5)
+                    RoundedRectangle(cornerRadius: size * 0.45, style: .continuous)
+                        .fill(Color(nsColor: .controlBackgroundColor))
+                    RoundedRectangle(cornerRadius: size * 0.45, style: .continuous)
+                        .fill(Color.primary.opacity(0.12))
+                }
+            }
             .overlay(RoundedRectangle(cornerRadius: size * 0.45, style: .continuous)
-                .strokeBorder(.separator, lineWidth: 0.5))
+                .strokeBorder(Color.primary.opacity(0.16), lineWidth: 1))
     }
 }
 
@@ -67,6 +76,8 @@ struct LiveWaveform: View {
     var tint: Color = .primary
 
     @State private var history: [CGFloat] = []
+    /// Adaptive room-noise floor on the 0…1 dB-mapped level, so bars move with speech, not hiss.
+    @State private var noiseFloor: Float?
 
     var body: some View {
         GeometryReader { geo in
@@ -76,7 +87,7 @@ struct LiveWaveform: View {
                 ForEach(0..<barCount, id: \.self) { index in
                     let value = index < history.count ? history[index] : 0
                     Capsule()
-                        .fill(tint.opacity(isActive ? 0.9 : 0.35))
+                        .fill(tint.opacity(isActive ? 0.35 + 0.65 * value : 0.35))
                         .frame(width: barWidth, height: max(barWidth, geo.size.height * value))
                 }
             }
@@ -84,16 +95,25 @@ struct LiveWaveform: View {
         }
         .animation(.easeOut(duration: 0.09), value: history)
         .onChange(of: level) { _, newValue in push(newValue) }
-        .onChange(of: isActive) { _, active in if !active { history = [] } }
+        .onChange(of: isActive) { _, active in
+            if !active {
+                history = []
+                noiseFloor = nil
+            }
+        }
         .accessibilityHidden(true)
     }
 
     private func push(_ newValue: Float) {
         guard isActive else { return }
-        // Shape the level so normal speech fills the bar without clipping.
-        let shaped = CGFloat(min(1, pow(Double(max(newValue, 0)), 0.6) * 1.4))
+        // The level maps -60…0 dBFS to 0…1. Measure speech above a slowly rising noise floor
+        // so a quiet room stays flat and normal speech spans roughly half to full height.
+        let floor = min(newValue, (noiseFloor ?? newValue) + 0.003)
+        noiseFloor = floor
+        let aboveFloor = max(0, newValue - floor - 0.04) / 0.45
+        let shaped = CGFloat(min(1, aboveFloor))
         var next = history
-        next.append(max(0.08, shaped))
+        next.append(max(0.1, shaped))
         if next.count > barCount { next.removeFirst(next.count - barCount) }
         history = next
     }
@@ -112,5 +132,47 @@ struct StatusChip: View {
             .padding(.horizontal, 9)
             .padding(.vertical, 4)
             .background(tint.opacity(0.12), in: Capsule())
+    }
+}
+
+/// GitHub-style grid of the last few weeks; darker cells mean more dictations that day.
+struct ActivityHeatmap: View {
+    var entries: [DictationHistoryEntry]
+    var weeks = 10
+    var now = Date()
+
+    var body: some View {
+        let calendar = Calendar.current
+        let counts = Dictionary(grouping: entries) { calendar.startOfDay(for: $0.createdAt) }.mapValues(\.count)
+        let today = calendar.startOfDay(for: now)
+        // Columns are weeks ending with the current one; rows are weekdays from the locale's first day.
+        let weekdayOffset = (calendar.component(.weekday, from: today) - calendar.firstWeekday + 7) % 7
+        let lastColumnStart = calendar.date(byAdding: .day, value: -weekdayOffset, to: today) ?? today
+        let maxCount = max(1, counts.values.max() ?? 1)
+
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Activity")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            HStack(spacing: 3) {
+                ForEach(0..<weeks, id: \.self) { column in
+                    VStack(spacing: 3) {
+                        ForEach(0..<7, id: \.self) { row in
+                            let start = calendar.date(byAdding: .day, value: (column - weeks + 1) * 7, to: lastColumnStart) ?? today
+                            let day = calendar.date(byAdding: .day, value: row, to: start) ?? today
+                            let count = counts[day] ?? 0
+                            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                .fill(day > today ? Color.clear
+                                      : count == 0 ? Color.primary.opacity(0.07)
+                                      : Color.accentColor.opacity(0.3 + 0.7 * Double(count) / Double(maxCount)))
+                                .frame(width: 11, height: 11)
+                                .help(day > today ? "" : "\(day.formatted(date: .abbreviated, time: .omitted)): \(count) dictation\(count == 1 ? "" : "s")")
+                        }
+                    }
+                }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Dictation activity for the last \(weeks) weeks")
     }
 }

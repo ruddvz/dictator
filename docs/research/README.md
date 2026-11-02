@@ -4,6 +4,7 @@
 
 1. [Wispr Flow vs TypeWhisper — supplied research report (PDF)](Wispr_Flow_vs_TypeWhisper_Research_Report_2026-11-01.pdf) — the original 10-page report supplied for this HushKey task. The PDF is preserved as received.
 2. [HushKey competitor landscape and product opportunities](../COMPETITOR_RESEARCH.md) — HushKey's feature comparison, product gaps, license boundary, and staged implementation recommendations.
+3. [Critique and improvement roadmap](../CRITIQUE_AND_ROADMAP.md) — critiques of Wispr Flow, TypeWhisper, and HushKey; what AirPods motion can and cannot sense; the layered quiet-input plan (gestures, speaking confirmation, whisper boost, silent commands); and measurable checks.
 
 ## How the findings map to HushKey
 

@@ -4,6 +4,15 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
+    @AppStorage("settingsSection") private var section: Section = .general
+
+    enum Section: String, CaseIterable, Identifiable {
+        case general = "General"
+        case insertion = "Insertion"
+        case data = "Data & privacy"
+        case about = "About"
+        var id: String { rawValue }
+    }
 
     var body: some View {
         ScrollView {
@@ -11,15 +20,28 @@ struct SettingsView: View {
                 PageHeader(
                     eyebrow: "Manage",
                     title: "Settings & data",
-                    subtitle: "Set up local dictation, safe text insertion, and the separate silent-mouthing experiment.")
+                    subtitle: "Dictation, shortcuts, safe text insertion, and what stays on this Mac.")
 
-                DictationSettingsCard()
-                ShortcutSettingsCard()
-                TextInsertionSettingsCard()
-                MicrophoneCard()
-                RecordingCard()
-                ResearchReportsCard()
-                DataManagementCard()
+                Picker("Section", selection: $section) {
+                    ForEach(Section.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(maxWidth: 460)
+
+                switch section {
+                case .general:
+                    DictationSettingsCard()
+                    ShortcutSettingsCard()
+                    MicrophoneCard()
+                case .insertion:
+                    TextInsertionSettingsCard()
+                case .data:
+                    RecordingCard()
+                    DataManagementCard()
+                case .about:
+                    ResearchReportsCard()
+                }
             }
             .frame(maxWidth: 920, alignment: .leading)
             .padding(24)

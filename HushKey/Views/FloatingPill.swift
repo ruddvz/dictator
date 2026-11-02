@@ -40,10 +40,18 @@ final class FloatingPillController {
         panel.hasShadow = false
         panel.hidesOnDeactivate = false
         panel.isMovable = false
-        let root = FloatingPillView { [weak self] size in self?.resize(to: size) }
-            .environment(model)
-        panel.contentView = FirstMouseHostingView(rootView: root)
+        let root = FloatingPillView().environment(model)
+        let hosting = FirstMouseHostingView(rootView: root)
+        // Report size changes but let the controller own the frame, so the pill grows upward
+        // from the bottom edge instead of downward from its top.
+        hosting.sizingOptions = [.intrinsicContentSize]
+        hosting.onIntrinsicSizeChange = { [weak self, weak hosting] in
+            guard let hosting else { return }
+            self?.resize(to: hosting.fittingSize)
+        }
+        panel.contentView = hosting
         self.panel = panel
+        resize(to: hosting.fittingSize)
         place()
         panel.orderFrontRegardless()
     }
@@ -68,12 +76,18 @@ final class FloatingPillController {
 }
 
 private final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
+    var onIntrinsicSizeChange: (() -> Void)?
+
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func invalidateIntrinsicContentSize() {
+        super.invalidateIntrinsicContentSize()
+        DispatchQueue.main.async { [weak self] in self?.onIntrinsicSizeChange?() }
+    }
 }
 
 struct FloatingPillView: View {
     @Environment(AppModel.self) private var model
-    var onSizeChange: (CGSize) -> Void
 
     @State private var isHovering = false
 
@@ -89,10 +103,6 @@ struct FloatingPillView: View {
         pill
             .padding(6) // room for the shadow inside the transparent panel
             .fixedSize()
-            .background(GeometryReader { geo in
-                Color.clear.preference(key: PillSizeKey.self, value: geo.size)
-            })
-            .onPreferenceChange(PillSizeKey.self) { onSizeChange($0) }
             .animation(.spring(response: 0.28, dampingFraction: 0.82), value: phase)
     }
 
@@ -162,9 +172,4 @@ struct FloatingPillView: View {
         case .finishing: "Transcribing"
         }
     }
-}
-
-private struct PillSizeKey: PreferenceKey {
-    static let defaultValue: CGSize = .zero
-    static func reduce(value: inout CGSize, nextValue: () -> CGSize) { value = nextValue() }
 }

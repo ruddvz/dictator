@@ -47,6 +47,7 @@ struct ContentView: View {
             case .settings: SettingsView()
             }
         }
+        .groupBoxStyle(CardGroupBoxStyle())
         .toolbar {
             if Self.labScreens.contains(model.screen) {
                 ToolbarItem(placement: .status) {

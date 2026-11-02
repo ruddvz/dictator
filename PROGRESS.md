@@ -117,6 +117,17 @@ In a fresh session, verify the packaged app in TextEdit and a second supported a
 - New shared components in `HushKey/Views/Theme.swift` (card, keycap, waveform, status chip).
 - `xcodebuild test`: 28 tests passed (new stats test). Debug app launched; Dictation home and idle pill verified by screenshot. Listening/transcribing pill states and the waveform were not exercised live (would need the microphone prompt).
 
+## Completed — 2026-11-01 (Critique and multimodal roadmap)
+
+- Added [docs/CRITIQUE_AND_ROADMAP.md](docs/CRITIQUE_AND_ROADMAP.md): critiques of Wispr Flow, TypeWhisper, and HushKey, with improvement tables; a sensor reality check (AirPods expose head motion only, jaw motion is indirect, lips are not sensed); a layered quiet-input plan led by head-gesture commands; a prioritized roadmap; and per-feature evaluation checks. Documentation only; no code changed.
+
+## Completed — 2026-11-01 (Live pill check and app-wide restyle)
+
+- Live microphone check found two defects, now fixed: the waveform pinned every bar at full height (it now measures speech above an adaptive noise floor), and the pill grew downward off-screen (its panel now reads the hosting view's intrinsic size and stays anchored 10 pt above the bottom). Verified listening state by screenshot.
+- Reviewed every Wispr Flow page (Dictionary, Snippets, Style, Transforms, Scratchpad, Insights, Settings) in full screen; no settings changed.
+- App-wide card style for all GroupBoxes and a cleaner page header; Settings split into General / Insertion / Data & privacy / About tabs, with "Enable insertion…" deep-linking to Insertion; 10-week activity heatmap in the Dictation stats card; more legible keycaps.
+- `xcodebuild test`: 28 passed. Dictation, Settings, Transforms, and Snippets & Vocabulary verified by screenshot.
+
 ## Next item — eval harness and pill acceptance
 
 With the user present, grant Microphone/Speech and confirm the pill's listening and transcribing states in another app. Then build a held-out evaluation harness (fixed consented audio clips → transcript → WER and formatting checks, plus UI screenshot checks) in the StarHarness spirit, separate from this UI branch.

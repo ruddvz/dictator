@@ -6,19 +6,33 @@ struct PageHeader: View {
     var subtitle: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Text(eyebrow)
-                .font(.callout.weight(.medium))
-                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 6) {
+            Text(eyebrow.uppercased())
+                .font(.caption.weight(.semibold))
+                .tracking(0.6)
+                .foregroundStyle(.tertiary)
             Text(title)
-                .font(.title.weight(.semibold))
+                .font(.system(size: 26, weight: .semibold))
             Text(subtitle)
-                .font(.body)
+                .font(.callout)
                 .foregroundStyle(.secondary)
                 .lineSpacing(2)
+                .frame(maxWidth: 620, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.bottom, 4)
+        .padding(.bottom, 6)
+    }
+}
+
+/// Gives every GroupBox in the app the same soft card look as the Dictation home.
+struct CardGroupBoxStyle: GroupBoxStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            configuration.label
+                .font(.headline)
+            configuration.content
+        }
+        .card(padding: 8)
     }
 }
 

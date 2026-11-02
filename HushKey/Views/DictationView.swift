@@ -110,7 +110,10 @@ struct DictationView: View {
                 }
                 Spacer()
                 if !model.insertion.isEnabled {
-                    Button("Enable insertion…") { model.screen = .settings }
+                    Button("Enable insertion…") {
+                        UserDefaults.standard.set(SettingsView.Section.insertion.rawValue, forKey: "settingsSection")
+                        model.screen = .settings
+                    }
                         .buttonStyle(.link)
                         .font(.callout)
                 }
@@ -229,6 +232,8 @@ struct DictationView: View {
             statRow(value: stats.wordsPerMinute.map { "\($0)" } ?? "—", label: "wpm")
             statRow(value: "\(stats.dayStreak)", label: "day streak")
             statRow(value: "\(stats.dictations)", label: stats.dictations == 1 ? "dictation" : "dictations")
+            Divider()
+            ActivityHeatmap(entries: model.dictationHistory)
         }
         .card(padding: 18)
         .accessibilityElement(children: .combine)
