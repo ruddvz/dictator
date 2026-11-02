@@ -1,11 +1,36 @@
 # HushKey progress
 
+## Completed: home redesign, ambient hero and breath ribbon (2026-11-02)
+
+- **Home (Dictation) screen**, brought closer to Wispr Flow's home:
+  - The greeting is one line: "Hey Rudra, hold [fn] and just talk", with one `ink2` hint under it.
+  - A large dark hero (`HeroCard`) sits beside the stats card. Its title ends in a sage accent ("Teach HushKey *your words*"), and its button is light on dark.
+  - When every next step is dismissed, the hero falls back to "Whisper it. HushKey still hears you." with Try a whisper.
+  - The history header is now the first day label ("TODAY") with search and the menu, as in Wispr. The separate "History" title is gone.
+- **Ambient motion (`AmbientField`, `HushKey/Views/Ambient.swift`):** drifting sage and fog glows, plus seven faint ribbons that gather softly toward the voice ribbon.
+  - It is built from Core Animation layers. Every shape is a precomputed keyframe loop that the render server plays, so the app does no per-frame work.
+  - A first version used a SwiftUI `Canvas` redrawn at 20 fps. That re-laid out the whole window every frame: about 20–25 % CPU (sampled). The layer version measured 0–0.8 % with the hero on screen (one 7.6 % reading).
+  - It pauses while the window is hidden, minimised or covered (`onWindowVisibilityChange`). Reduce Motion shows a still frame.
+  - New tokens: `heroBase`, `heroInk`, `heroInk2`, `heroGlow` and `heroMist`, documented in `docs/DESIGN_SYSTEM.md`.
+- **Waveform (`BreathRibbon`):** replaces the bar meters (`PillMeter`, `LiveWaveform` and `VoiceRibbon` are removed).
+  - It is one tapered ribbon: a thin line breathing every 5 s at rest, swelling with speech^0.45, so a whisper doubles it. A bead travels along it while waiting or transcribing.
+  - Used in the recording pill (58 × 18), the hero (live only while dictating; at rest the ambient layer draws it), and as `MorphIcon`'s listening lens. The hush line opens into the lens.
+- Tests: `BreathRibbonTests` (5, replacing `PillMeterTests`) and `AmbientFieldTests` (2: keyframe paths keep the same element count, and the loops end where they start).
+- `xcodebuild ... test`: 187 passed, 2 skipped, with `-skip-testing:HushKeyTests/SafetyAndStorageTests/testCustomWritingStyleUsesOnDeviceModelWhenAvailable`. That existing test hung for 10+ minutes waiting on Apple's on-device model, so it needs a timeout. It is unrelated to this change.
+- **Seen in the packaged app** (dist, signed "HushKey Local Signing"): the home screen in light and dark mode, and the hero animating (glows moved between captures).
+- **Not seen live:** the pill's ribbon and the hero's live ribbon during a real dictation, with a whisper versus normal speech; Reduce Motion; the pause when covered (inferred from 0 % CPU while covered).
+- **Next:** check the ribbon live with a whisper. Possibly add a subtle ambient layer behind other pages; only the hero has one now.
+
 ## Completed — local builds keep Accessibility (2026-11-02)
 
 - Ad-hoc builds have no certificate, so macOS dropped HushKey's Accessibility grant on every rebuild. fn then did nothing and the pill said "Typing into apps is off". Microphone and Speech survived, which hid the cause.
 - `Scripts/make-signing-identity.sh` creates a self-signed "HushKey Local Signing" identity in the login keychain (done on this Mac). `Scripts/package-app.sh` signs with it when present; the designated requirement is now `identifier "com.ruddvz.hushkey" and certificate leaf = H"e4ff…520d"`, stable across builds. Without the identity it falls back to ad-hoc and warns.
 - Tests 184 passed, 2 skipped; `codesign --verify --deep --strict` passes. The user must allow the new build in Accessibility once. Not yet verified that the grant survives the next rebuild.
 - Other sessions also launch their own HushKey builds (Xcode Release from a scratch folder); only one copy should run, and only `dist/HushKey.app` carries the stable signature.
+- Live check (17:30): differently signed copies (an ad-hoc scratch Release build, worktree Debug hosts, and the old ad-hoc dist) kept replacing each other's grants. tccd logged "Failed to match existing code requirement" for Microphone, Speech and Accessibility, so the user got endless mic prompts. Fixed by `tccutil reset All com.ruddvz.hushkey` (then Speech again), quitting the other copies, and granting the signed dist once.
+- Verified live: the Microphone grant survived two signed rebuilds. fn dictation into TextEdit logged `enabled=true trusted=true … inserted=true` ("Inserted and verified in the focused field"), and the text appeared. Insertion and fn still need checking in an Electron app (Slack/VS Code).
+- The Globe key is still set to start Apple Dictation (`AppleFnUsageType = 3`); set "Press 🌐 key to" to Do Nothing.
+- Unit tests start an ad-hoc Debug test host with the same bundle ID. Don't click Allow on permission prompts during a test run, or the grant moves away from dist.
 
 ## Completed — verify text insertion before reporting success (2026-11-02)
 

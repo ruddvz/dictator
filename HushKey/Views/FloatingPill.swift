@@ -371,9 +371,10 @@ struct FloatingPillView: View {
                 }
                 .transition(.opacity.combined(with: .scale(scale: 0.6)))
             }
-            PillMeter(level: model.audio.level,
-                      mode: phase == .listening ? .live : phase == .preparing ? .waiting : .working)
-                .frame(height: 16)
+            BreathRibbon(level: model.audio.level,
+                         mode: phase == .listening ? .live : phase == .preparing ? .waiting : .working,
+                         tint: Theme.ink)
+                .frame(width: 58, height: 18)
                 .padding(.horizontal, showsControls ? 2 : 6)
             if phase == .listening { elapsed }
             if showsControls {

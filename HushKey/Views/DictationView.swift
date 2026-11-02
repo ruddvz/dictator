@@ -11,7 +11,7 @@ struct DictationView: View {
             VStack(alignment: .leading, spacing: Theme.s5) {
                 header
                 HStack(alignment: .top, spacing: Theme.s4) {
-                    NextStepBanner()
+                    HeroCard()
                     statsCard.frame(width: 248)
                 }
                 .fixedSize(horizontal: false, vertical: true)
@@ -47,18 +47,20 @@ struct DictationView: View {
     private var header: some View {
         HStack(alignment: .center, spacing: Theme.s4) {
             VStack(alignment: .leading, spacing: Theme.s2) {
-                Text("Hey \(firstName)")
-                    .font(.hkTitle1)
-                    .tracking(-0.3)
-                HStack(spacing: Theme.s2) {
-                    Text(holds ? "Hold" : "Press")
-                    KeycapShortcut(label: model.dictationShortcut.label, size: 13)
-                    Text(model.dictationShortcut.usesFunctionKey
-                         ? "anywhere and talk. Double-tap for hands-free."
-                         : holds ? "anywhere and talk. Let go to finish." : "anywhere to start and stop.")
+                HStack(alignment: .center, spacing: Theme.s2) {
+                    Text("Hey \(firstName), \(holds ? "hold" : "press")")
+                    KeycapShortcut(label: model.dictationShortcut.label, size: 17)
+                    Text(holds ? "and just talk" : "to dictate")
                 }
-                .font(.hkCallout)
-                .foregroundStyle(Theme.ink2)
+                .font(.hkTitle1)
+                .tracking(-0.3)
+                .accessibilityElement(children: .combine)
+                Text(model.dictationShortcut.usesFunctionKey
+                     ? "Works in any app. Double-tap for hands-free. A whisper is enough."
+                     : holds ? "Works in any app. Let go to finish. A whisper is enough."
+                     : "Works in any app. Press again to finish. A whisper is enough.")
+                    .font(.hkCallout)
+                    .foregroundStyle(Theme.ink2)
                 if let problem {
                     HStack(spacing: Theme.s2) {
                         Label(problem, systemImage: "exclamationmark.triangle.fill")
@@ -172,12 +174,6 @@ struct DictationView: View {
                         .buttonStyle(IconButtonStyle())
                         .help("Clear the current transcript")
                 }
-            }
-
-            if model.audio.isRunning {
-                LiveWaveform(level: model.audio.level, isActive: true, barCount: 56, tint: Theme.listening)
-                    .frame(height: 28)
-                    .transition(.opacity)
             }
 
             transcriptEditor
@@ -310,7 +306,7 @@ struct DictationView: View {
     private var historySection: some View {
         VStack(alignment: .leading, spacing: Theme.s3) {
             HStack(spacing: Theme.s2) {
-                Text("History").font(.hkTitle3)
+                SectionLabel(title: groupedHistory.first.map { dayTitle($0.day) } ?? "History")
                 Spacer()
                 if !model.dictationHistory.isEmpty {
                     if searching || !historySearch.isEmpty {
@@ -361,8 +357,10 @@ struct DictationView: View {
             } else {
                 ForEach(groupedHistory, id: \.day) { group in
                     VStack(alignment: .leading, spacing: Theme.s2) {
-                        SectionLabel(title: dayTitle(group.day))
-                            .padding(.top, Theme.s2)
+                        if group.day != groupedHistory.first?.day {
+                            SectionLabel(title: dayTitle(group.day))
+                                .padding(.top, Theme.s4)
+                        }
                         VStack(spacing: 0) {
                             ForEach(Array(group.entries.enumerated()), id: \.element.id) { index, entry in
                                 if index > 0 {
@@ -478,68 +476,86 @@ struct DictationView: View {
     }
 }
 
-/// Dark editorial banner that points at the single most useful next step for this user.
-private struct NextStepBanner: View {
+/// The home hero: a deep panel with a slow ambient field, the next useful step on the left,
+/// and HushKey's breath ribbon on the right, which listens along whenever a dictation runs.
+private struct HeroCard: View {
     @Environment(AppModel.self) private var model
     @AppStorage("dismissedNextSteps") private var dismissedRaw = ""
+    @State private var windowVisible = true
 
     private struct Step {
         var id: String
         var title: String
+        /// Last words of the title, set in sage.
+        var accent: String
         var detail: String
         var action: String
+        var dismissable = true
         var perform: (AppModel) -> Void
     }
 
-    private var step: Step? {
+    private var step: Step {
         let dismissed = Set(dismissedRaw.split(separator: ",").map(String.init))
         let candidates: [Step] = [
             model.insertion.isEnabled ? nil : Step(
-                id: "insertion", title: "Type straight into any app",
+                id: "insertion", title: "Type straight into", accent: "any app",
                 detail: "Turn on insertion and finished dictations land where your cursor is.",
                 action: "Turn on insertion") { model in
                     UserDefaults.standard.set(SettingsView.Section.insertion.rawValue, forKey: "settingsSection")
                     model.screen = .settings
                 },
             !model.dictationToneSettings.tones.isEmpty ? nil : Step(
-                id: "style", title: "Make it sound like you",
+                id: "style", title: "Make HushKey sound like", accent: "you",
                 detail: "Casual in Messages, formal in Mail. Pick a style for each kind of app.",
                 action: "Choose styles") { $0.screen = .style },
             !model.dictationTerms.isEmpty || !model.dictationSnippets.isEmpty ? nil : Step(
-                id: "vocabulary", title: "Teach HushKey your words",
+                id: "vocabulary", title: "Teach HushKey", accent: "your words",
                 detail: "Add names and jargon once. Recognition and spelling follow everywhere.",
                 action: "Add words") { $0.screen = .personalization },
-            Step(id: "silent", title: "Go quiet with AirPods",
+            Step(id: "silent", title: "Go quiet with", accent: "AirPods",
                  detail: "Train a few words or head gestures in the Silent Lab and keep your hands free.",
                  action: "Open Silent Lab") { $0.screen = .setup },
         ].compactMap { $0 }
-        return candidates.first { !dismissed.contains($0.id) }
+        return candidates.first { !dismissed.contains($0.id) } ?? Step(
+            id: "whisper", title: "Whisper it.", accent: "HushKey still hears you.",
+            detail: "Quiet speech is transcribed on this Mac, and nothing leaves it.",
+            action: "Try a whisper", dismissable: false) { model in
+                Task { await model.toggleDictation() }
+            }
+    }
+
+    private var ribbonMode: BreathRibbon.Mode {
+        if model.audio.isRunning { return .live }
+        if model.isStartingDictation { return .waiting }
+        if model.isFinalizingDictation || model.transcriber.isFinalizing { return .working }
+        return .rest
     }
 
     var body: some View {
-        if let step {
-            ZStack(alignment: .topTrailing) {
-                HStack(alignment: .bottom, spacing: Theme.s4) {
-                    // Title at the top, action at the bottom, whatever height the stats card sets.
-                    VStack(alignment: .leading, spacing: Theme.s2) {
-                        Text(step.title)
-                            .font(.display(28))
-                            .tracking(-0.3)
-                        Text(step.detail)
-                            .font(.hkCallout)
-                            .foregroundStyle(Theme.ink2)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Spacer(minLength: Theme.s4)
-                        Button(step.action) { step.perform(model) }
-                            .buttonStyle(PrimaryButtonStyle())
-                    }
-                    .frame(maxHeight: .infinity, alignment: .topLeading)
-                    Spacer(minLength: 0)
-                    BannerWave()
-                        .frame(width: 150, height: 80)
-                }
-                .padding(Theme.s6 - 4)
+        let step = step
+        ZStack(alignment: .topTrailing) {
+            // Title at the top, action at the bottom, whatever height the stats card sets.
+            VStack(alignment: .leading, spacing: Theme.s2) {
+                (Text(step.title + " ") + Text(step.accent).foregroundStyle(Theme.heroGlow))
+                    .font(.display(30))
+                    .tracking(-0.4)
+                    .foregroundStyle(Theme.heroInk)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(step.detail)
+                    .font(.hkCallout)
+                    .foregroundStyle(Theme.heroInk2)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: Theme.s4)
+                Button(step.action) { step.perform(model) }
+                    .buttonStyle(PrimaryButtonStyle(tint: Theme.heroInk, foreground: Theme.heroBase))
+            }
+            .frame(maxWidth: 420, maxHeight: .infinity, alignment: .topLeading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(Theme.s6 - 4)
+            .id(step.id)
+            .transition(.opacity)
 
+            if step.dismissable {
                 Button("Dismiss", systemImage: "xmark") {
                     withAnimation(Theme.gentle) {
                         dismissedRaw = (dismissedRaw.isEmpty ? "" : dismissedRaw + ",") + step.id
@@ -548,44 +564,48 @@ private struct NextStepBanner: View {
                 .labelStyle(.iconOnly)
                 .buttonStyle(.plain)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Theme.ink3)
+                .foregroundStyle(Theme.heroInk2)
                 .frame(width: 28, height: 28)
                 .contentShape(Rectangle())
                 .padding(Theme.s2)
                 .help("Hide this suggestion")
             }
-            .foregroundStyle(Theme.ink)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-            .frame(minHeight: 180)
-            .background(Theme.signalSoft, in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
-            .id(step.id)
-            .transition(.opacity.combined(with: .scale(scale: 0.98)))
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(minHeight: 200)
+        .background {
+            IsolatedHost { HeroBackdrop(level: model.audio.level, mode: ribbonMode, visible: windowVisible) }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.r1, style: .continuous)
+            .strokeBorder(Theme.heroInk.opacity(0.08), lineWidth: 1))
+        .onWindowVisibilityChange { windowVisible = $0 }
+        .animation(Theme.gentle, value: step.id)
     }
 }
 
-/// Slow ambient waveform drawn in sage; decoration for the banner.
-private struct BannerWave: View {
+/// The hero's moving layer: the ambient field, and the voice ribbon while a dictation runs.
+private struct HeroBackdrop: View {
+    var level: Float
+    var mode: BreathRibbon.Mode
+    var visible: Bool
+
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30)) { context in
-            let time = context.date.timeIntervalSinceReferenceDate
-            Canvas { graphics, size in
-                let bars = 22
-                let gap: CGFloat = 3
-                let width = (size.width - gap * CGFloat(bars - 1)) / CGFloat(bars)
-                for index in 0..<bars {
-                    let t = Double(index) / Double(bars - 1)
-                    let envelope = sin(.pi * t)
-                    let wave = 0.5 + 0.5 * sin(t * 9 + time * 1.4) * cos(t * 3.1 - time * 0.7)
-                    let height = max(width, size.height * envelope * (0.25 + 0.75 * wave))
-                    let rect = CGRect(x: CGFloat(index) * (width + gap), y: (size.height - height) / 2,
-                                      width: width, height: height)
-                    graphics.fill(Path(roundedRect: rect, cornerRadius: width / 2),
-                                  with: .color(Theme.signal.opacity(0.25 + 0.6 * wave)))
+        GeometryReader { geo in
+            let focus = UnitPoint(x: 0.78, y: 0.5)
+            let ribbon = AmbientField.ribbonRect(in: geo.size, focus: focus)
+            ZStack {
+                // At rest the field draws the ribbon itself; a live one runs at 60 fps only while dictating.
+                AmbientField(focus: focus, paused: !visible,
+                             restingRibbon: mode == .rest ? Theme.heroGlow : nil)
+                if mode != .rest {
+                    BreathRibbon(level: level, mode: mode, tint: Theme.heroGlow, paused: !visible)
+                        .frame(width: ribbon.width, height: ribbon.height)
+                        .position(x: ribbon.midX, y: ribbon.midY)
+                        .transition(.opacity)
                 }
             }
         }
-        .accessibilityHidden(true)
     }
 }
 
