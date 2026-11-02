@@ -221,6 +221,6 @@ In a fresh session, follow the non-AirPods voice acceptance checks in docs/TESTI
 - `xcodebuild -quiet -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build -destination 'platform=macOS,arch=arm64' test`: 45 passed, 0 failed, 0 skipped on the MacBook Pro. Live insertion into TextEdit/another app is still pending with the user.
 - The first test build exposed a main-actor isolation error in the new pure comparison helper; it was corrected and the final suite passed. Xcode reports an outdated CoreSimulator framework, but macOS tests completed.
 
-## Next item — package and publish, then live insertion acceptance
+## Next item — live insertion acceptance
 
-Refresh and verify `dist/HushKey.app`, commit/push the guarded-insertion fix to PR #1, then validate named-target insertion, stale-target rejection, global shortcut insertion, and undo in TextEdit and a second app. Microphone, file-model, and meeting capture acceptance remain open.
+Validate named-target insertion, stale-target rejection, global shortcut insertion, and undo in TextEdit and a second app. Microphone, file-model, and meeting capture acceptance remain open.
