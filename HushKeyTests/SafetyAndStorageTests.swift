@@ -99,11 +99,18 @@ final class SafetyAndStorageTests: XCTestCase {
     }
 
     @MainActor
-    func testInsertionTargetWhitelistRejectsSecureAndNonTextControls() {
+    func testInsertionAndPasteFallbackWhitelistRejectsSecureAndNonTextControls() {
         XCTAssertTrue(TextInsertionService.isSupportedTextTarget(role: "AXTextField", subrole: ""))
         XCTAssertTrue(TextInsertionService.isSupportedTextTarget(role: "AXTextArea", subrole: ""))
         XCTAssertFalse(TextInsertionService.isSupportedTextTarget(role: "AXTextField", subrole: "AXSecureTextField"))
         XCTAssertFalse(TextInsertionService.isSupportedTextTarget(role: "AXButton", subrole: ""))
+
+        XCTAssertTrue(TextInsertionService.isSupportedPasteTarget(role: "AXTextField", subrole: ""))
+        XCTAssertTrue(TextInsertionService.isSupportedPasteTarget(role: "AXTextArea", subrole: ""))
+        XCTAssertTrue(TextInsertionService.isSupportedPasteTarget(role: "AXComboBox", subrole: ""))
+        XCTAssertFalse(TextInsertionService.isSupportedPasteTarget(role: "AXTextField", subrole: "AXSecureTextField"))
+        XCTAssertFalse(TextInsertionService.isSupportedPasteTarget(role: "AXButton", subrole: ""))
+        XCTAssertFalse(TextInsertionService.isSupportedPasteTarget(role: "AXGroup", subrole: ""))
     }
 
     func testCapturedInsertionTargetRequiresTheSameFieldTextAndSelection() {

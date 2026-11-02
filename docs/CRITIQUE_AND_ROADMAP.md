@@ -74,7 +74,7 @@ Every "better" claim below should become a measurable check in the evaluation ha
 
 - **The core loop isn't accepted on real apps yet.** Microphone, whisper capture, global shortcut, insertion, and undo still need the manual pass in TextEdit plus a second app. Nothing else matters until this works every time.
 - **No streaming insertion.** Text appears only after stop plus finalization; Wispr feels faster because the release-to-text gap is short. Measure and minimize that gap.
-- **Insertion uses Accessibility only.** That's safer than clipboard paste, but some apps (Electron, terminals, web editors) reject AX value writes. We need a per-app fallback policy that the user can see.
+- **Paste fallback is global, not per-app.** When enabled, HushKey temporarily borrows the clipboard only for a supported text-field role and restores it if no newer clipboard change needs protection. Some apps still reject both Accessibility typing and paste; per-app fallback controls and live acceptance remain open work.
 - **Polishing is a separate screen.** Transforms should be reachable from the pill and history rows, not only from a sidebar page.
 - **The Silent Lab reads as a science project.** Its evidence gates are right, but the user doesn't see a reason to use it day to day yet. The multimodal lane below fixes that by shipping the reliable pieces first.
 - **No benchmark.** We can't yet say HushKey is more accurate than anything. The eval harness is the fix.

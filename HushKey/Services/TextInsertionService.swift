@@ -312,7 +312,9 @@ final class TextInsertionService {
               let focused = focusedElement() else { return false }
         var pid: pid_t = 0
         guard AXUIElementGetPid(focused, &pid) == .success, pid == app.processIdentifier else { return false }
-        return stringAttribute(kAXSubroleAttribute, of: focused) != (kAXSecureTextFieldSubrole as String)
+        let role = stringAttribute(kAXRoleAttribute, of: focused) ?? ""
+        let subrole = stringAttribute(kAXSubroleAttribute, of: focused) ?? ""
+        return Self.isSupportedPasteTarget(role: role, subrole: subrole)
     }
 
     /// Pastes into the focused field of `app` for apps that refuse direct Accessibility typing
@@ -389,6 +391,10 @@ final class TextInsertionService {
     static func isSupportedTextTarget(role: String, subrole: String) -> Bool {
         guard subrole != (kAXSecureTextFieldSubrole as String) else { return false }
         return [kAXTextFieldRole as String, kAXTextAreaRole as String, kAXComboBoxRole as String].contains(role)
+    }
+
+    static func isSupportedPasteTarget(role: String, subrole: String) -> Bool {
+        isSupportedTextTarget(role: role, subrole: subrole)
     }
 
     nonisolated static func selectionContextMatches(originalValue: String, originalRange: CFRange,

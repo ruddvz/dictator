@@ -514,3 +514,12 @@ Same as above, plus: start a dictation with no field focused, click into TextEdi
 - README, the personal-backup guide, and acceptance steps now document writing-style export/import, version-1 compatibility, Replace behavior, Merge conflict rules, and the 12-style capacity limit.
 - Checked the documented behaviors against the current validator, importer, and existing passing regression tests. Documentation-only change; no build or test rerun.
 - Next: complete live dictation, selected-text insertion, meeting, and file-transcription acceptance in a user-approved device session.
+
+## Completed — restrict paste fallback to supported text controls (2026-11-02)
+
+- Paste fallback previously accepted any focused control except a secure field, which could make an unsupported non-text control look insertable. It now uses the same explicit text-field role whitelist as direct insertion and still excludes secure/password fields.
+- Added regression coverage for text fields, text areas, combo boxes, buttons, groups, and secure fields; updated the live acceptance protocol to cover fallback behavior.
+- Updated Settings and README copy to disclose that fallback briefly uses the clipboard and restores it only if no newer clipboard change needs protection.
+- `xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build CODE_SIGNING_ALLOWED=NO test`: 121 passed, 2 skipped, 0 failed.
+- Release packaging succeeded and `codesign --verify --deep --strict dist/HushKey.app` passed; the updated packaged app is open.
+- Next: perform live insertion and fallback acceptance in a user-approved session; paste fallback remains unverified against third-party applications.
