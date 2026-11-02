@@ -508,3 +508,9 @@ Same as above, plus: start a dictation with no field focused, click into TextEdi
 - Merge keeps local styles on ID/name conflicts and reports capacity overflow rather than silently discarding imported styles. Imported styles appear immediately in the transform screen.
 - `xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build test`: 121 passed, 2 skipped, 0 failed. Release package built and strict signature verification passed; only `~/Projects/HushKey/dist/HushKey.app` was opened.
 - Live microphone, Speech, Accessibility insertion, meeting capture, and export acceptance still need a user-approved device session. Start that as the next item in a fresh session.
+
+## Completed — align backup documentation with format v2 (2026-11-02)
+
+- README, the personal-backup guide, and acceptance steps now document writing-style export/import, version-1 compatibility, Replace behavior, Merge conflict rules, and the 12-style capacity limit.
+- Checked the documented behaviors against the current validator, importer, and existing passing regression tests. Documentation-only change; no build or test rerun.
+- Next: complete live dictation, selected-text insertion, meeting, and file-transcription acceptance in a user-approved device session.

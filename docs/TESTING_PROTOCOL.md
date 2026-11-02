@@ -96,10 +96,10 @@ Run this separately from the AirPods motion study:
 
 ## Personal data backup acceptance
 
-1. Save a dictation with a processed/raw difference, then add vocabulary, one snippet, and one correction rule. Export **Settings → Data & privacy → Your files → Personal data backup** and confirm the JSON contains these text items but no audio.
+1. Save a dictation with a processed/raw difference, then add vocabulary, one snippet, one correction rule, and a custom writing style. Export **Settings → Data & privacy → Your files → Personal data backup** and confirm the version-2 JSON contains these items but no audio.
 2. Import the file into a second HushKey data folder or a clean test account. Choose Merge and confirm it adds missing entries while keeping local entries with matching IDs/cues. Confirm history remains capped at 50.
-3. Import again and choose Replace. Confirm the confirmation lists the data counts and that replacement changes only dictation history, vocabulary, snippets, and corrections.
-4. Try a non-HushKey JSON file, an unsupported version, malformed rules, and a file over 10 MiB. Confirm each is rejected before local data changes.
+3. Import again and choose Replace. Confirm the confirmation lists the data counts and that replacement changes dictation history, vocabulary, snippets, corrections, and writing styles.
+4. Import a version-1 backup without `writingStyles`; confirm it is accepted and Replace preserves the existing local styles. Try a non-HushKey JSON file, an unsupported version, malformed rules, and a file over 10 MiB. Confirm each is rejected before local data changes.
 5. In a disposable test account, corrupt the local dictation-history JSON and relaunch. Confirm HushKey shows a recovery copy path, blocks export of incomplete history, and can replace the archive only after a valid backup is selected and confirmed. Verify the recovery copy still contains the original bytes.
 
 ## Build and test
