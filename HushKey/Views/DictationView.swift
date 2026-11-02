@@ -301,7 +301,9 @@ struct DictationView: View {
                     .buttonStyle(IconButtonStyle())
                     .menuIndicator(.hidden)
                     .fixedSize()
-                    .help("History options")
+                    .disabled(!model.canClearDictationHistory)
+                    .help(model.canClearDictationHistory
+                          ? "History options" : "Stop dictation before clearing history")
                 }
             }
             .animation(Theme.snappy, value: searching)

@@ -216,6 +216,13 @@ final class AppModel {
     @ObservationIgnored private var lastDictationDuration: TimeInterval?
 
     var dictationStats: DictationStats { DictationStats(entries: dictationHistory) }
+    var canClearDictationHistory: Bool {
+        DictationHistoryClearGate.canClear(isStarting: isStartingDictation || audio.isStarting,
+                                           isRecording: audio.isRunning,
+                                           isFinalizing: isFinalizingDictation,
+                                           transcriptionRunning: transcriber.isRunning,
+                                           transcriptionFinalizing: transcriber.isFinalizing)
+    }
     @ObservationIgnored private let dictationHistoryURL: URL
     @ObservationIgnored private let fileTranscriptionHistoryURL: URL
     @ObservationIgnored private var fileTranscriptionSessionsDiscardedByClear = Set<UUID>()
@@ -1043,6 +1050,10 @@ final class AppModel {
     }
 
     func clearDictationHistory() {
+        guard canClearDictationHistory else {
+            dictationHistoryMessage = "Stop dictation before clearing history so the active transcript can finish safely."
+            return
+        }
         let recoveryCopyURL = dictationHistoryRecoveryCopyURL
         do {
             try DictationHistoryStore.delete(at: dictationHistoryURL)

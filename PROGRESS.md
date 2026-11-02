@@ -540,3 +540,12 @@ Same as above, plus: start a dictation with no field focused, click into TextEdi
 - `xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build CODE_SIGNING_ALLOWED=NO test`: 126 passed, 2 skipped, 0 failed.
 - Release package built, strict signature verification passed, and the updated app is open.
 - Next: live file-transcription and meeting-capture acceptance in a user-approved session.
+
+
+## Completed — prevent clearing history during active dictation (2026-11-02)
+
+- History clearing is blocked while dictation is starting, recording, transcribing, or finalizing. The History options menu is disabled during that window, and the model guard also rejects a stale confirmation if capture starts after the dialog opens.
+- Added unit coverage for each busy state and a live acceptance step to confirm a finished dictation cannot repopulate history after deletion.
+- `xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build CODE_SIGNING_ALLOWED=NO test`: 127 passed, 2 skipped, 0 failed. Release packaging succeeded and strict signature verification passed; the updated app is open.
+- GitHub Actions did not start this commit's hosted job: GitHub reported that account payments failed or the spending limit must be increased. The local build and test run passed.
+- Next: live file-transcription, meeting-capture, and history-clear acceptance in a user-approved session.

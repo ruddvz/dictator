@@ -57,6 +57,7 @@ Run this separately from the AirPods motion study:
 6. Leave nearby text hints off first. If the user enables them, grant Accessibility access separately, confirm a supported non-secure text field is required, then verify HushKey only reports extracted terms and saves no surrounding text.
 7. In TextEdit and one other supported app, start dictation with the target field focused using the global shortcut, finish, then use the Dictation screen's named-target Insert button. Confirm HushKey returns to that app and inserts once only if the same field and selection remain unchanged. Change the target or field contents before pressing the button and confirm it fails closed. Also insert with the global `⌥⇧I` shortcut, confirm the clipboard did not change, then press `⌥⇧U` immediately while the same field is unchanged. Confirm undo removes the insert; changed focus or content must fail closed. If direct typing is declined, verify paste fallback is offered only for a supported text field and never for a button, other non-text control, or secure/password field.
 8. Reload the local history entry, restore raw recognition, clear the current draft, and clear history. Confirm microphone audio is never stored by ordinary dictation.
+9. During a new live dictation, confirm the History options menu is disabled. Stop and let finalization finish, then delete history; confirm the archive stays empty after reopening HushKey.
 
 ## Selected-text voice-edit acceptance
 

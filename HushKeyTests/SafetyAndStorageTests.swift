@@ -807,6 +807,27 @@ final class SafetyAndStorageTests: XCTestCase {
                                                            enabled: true))
     }
 
+    func testDictationHistoryCannotBeClearedDuringCaptureOrFinalization() {
+        func canClear(starting: Bool = false,
+                      recording: Bool = false,
+                      finalizing: Bool = false,
+                      transcribing: Bool = false,
+                      transcriptionFinalizing: Bool = false) -> Bool {
+            DictationHistoryClearGate.canClear(isStarting: starting,
+                                               isRecording: recording,
+                                               isFinalizing: finalizing,
+                                               transcriptionRunning: transcribing,
+                                               transcriptionFinalizing: transcriptionFinalizing)
+        }
+
+        XCTAssertTrue(canClear())
+        XCTAssertFalse(canClear(starting: true))
+        XCTAssertFalse(canClear(recording: true))
+        XCTAssertFalse(canClear(finalizing: true))
+        XCTAssertFalse(canClear(transcribing: true))
+        XCTAssertFalse(canClear(transcriptionFinalizing: true))
+    }
+
     @MainActor
     func testManualTranscriptEditsAreDebouncedIntoLocalHistory() async throws {
         let url = FileManager.default.temporaryDirectory

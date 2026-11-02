@@ -116,6 +116,16 @@ enum DictationHistoryStore {
     }
 }
 
+enum DictationHistoryClearGate {
+    nonisolated static func canClear(isStarting: Bool,
+                                     isRecording: Bool,
+                                     isFinalizing: Bool,
+                                     transcriptionRunning: Bool,
+                                     transcriptionFinalizing: Bool) -> Bool {
+        !isStarting && !isRecording && !isFinalizing && !transcriptionRunning && !transcriptionFinalizing
+    }
+}
+
 enum DictationHistorySaveGate {
     static func shouldSave(text: String, lastSavedText: String?, enabled: Bool) -> Bool {
         let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines)
