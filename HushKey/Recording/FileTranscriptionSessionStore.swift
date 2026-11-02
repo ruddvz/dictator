@@ -43,6 +43,15 @@ enum FileTranscriptionSessionSnapshot {
     }
 }
 
+enum FileTranscriptionSourceSwitchGate {
+    @discardableResult
+    static func run(saveCurrentSession: () -> Bool, switchSource: () -> Void) -> Bool {
+        guard saveCurrentSession() else { return false }
+        switchSource()
+        return true
+    }
+}
+
 enum FileTranscriptionSessionStore {
     private static let fileManager = FileManager.default
 

@@ -399,14 +399,17 @@ struct FileTranscriptionView: View {
         panel.canChooseDirectories = false
         panel.prompt = "Choose Audio"
         if panel.runModal() == .OK, let url = panel.url {
-            persistActiveSession()
-            pendingSaveTask?.cancel()
-            selectedURL = url
-            activeSessionID = nil
-            activeSourceName = nil
-            exportMessage = nil
-            transcription.clear()
-            whisper.clear()
+            FileTranscriptionSourceSwitchGate.run(
+                saveCurrentSession: { persistActiveSession() },
+                switchSource: {
+                    pendingSaveTask?.cancel()
+                    selectedURL = url
+                    activeSessionID = nil
+                    activeSourceName = nil
+                    exportMessage = nil
+                    transcription.clear()
+                    whisper.clear()
+                })
         }
     }
 

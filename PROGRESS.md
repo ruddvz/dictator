@@ -523,3 +523,11 @@ Same as above, plus: start a dictation with no field focused, click into TextEdi
 - `xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build CODE_SIGNING_ALLOWED=NO test`: 121 passed, 2 skipped, 0 failed.
 - Release packaging succeeded and `codesign --verify --deep --strict dist/HushKey.app` passed; the updated packaged app is open.
 - Next: perform live insertion and fallback acceptance in a user-approved session; paste fallback remains unverified against third-party applications.
+
+## Completed — keep file transcript edits when a source switch cannot save (2026-11-02)
+
+- Choosing another audio file now waits for the active file transcript to save successfully before clearing its text, session ID, or selected source. A failed save leaves the current edit open for recovery.
+- Added regression coverage for both failed-save and successful-save transitions, and added the failure case to the manual file-transcription acceptance protocol.
+- `xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build CODE_SIGNING_ALLOWED=NO test`: 123 passed, 2 skipped, 0 failed.
+- Release package built, strict signature verification passed, and the updated app is open.
+- Next: live file-transcription acceptance in a user-approved session.

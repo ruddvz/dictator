@@ -695,6 +695,49 @@ final class SafetyAndStorageTests: XCTestCase {
         XCTAssertEqual(emptyEdit.text, "")
     }
 
+    func testChoosingAnotherFileKeepsCurrentSessionWhenSavingFails() {
+        let sessionID = UUID()
+        var state: (selectedSource: String, sessionID: UUID?, transcript: String) =
+            ("current.m4a", sessionID, "Unsaved edit")
+        let original = state
+        var attemptedSourceSwitch = false
+
+        let switched = FileTranscriptionSourceSwitchGate.run(
+            saveCurrentSession: { false },
+            switchSource: {
+                attemptedSourceSwitch = true
+                state = ("next.m4a", nil, "")
+            })
+
+        XCTAssertFalse(switched)
+        XCTAssertFalse(attemptedSourceSwitch)
+        XCTAssertEqual(state.selectedSource, original.selectedSource)
+        XCTAssertEqual(state.sessionID, original.sessionID)
+        XCTAssertEqual(state.transcript, original.transcript)
+    }
+
+    func testChoosingAnotherFileSwitchesOnlyAfterCurrentSessionSaves() {
+        let sessionID = UUID()
+        var state: (selectedSource: String, sessionID: UUID?, transcript: String) =
+            ("current.m4a", sessionID, "Saved edit")
+        var saveWasAttempted = false
+
+        let switched = FileTranscriptionSourceSwitchGate.run(
+            saveCurrentSession: {
+                saveWasAttempted = true
+                return true
+            },
+            switchSource: {
+                state = ("next.m4a", nil, "")
+            })
+
+        XCTAssertTrue(switched)
+        XCTAssertTrue(saveWasAttempted)
+        XCTAssertEqual(state.selectedSource, "next.m4a")
+        XCTAssertNil(state.sessionID)
+        XCTAssertEqual(state.transcript, "")
+    }
+
     @MainActor
     func testClearingFileHistoryDoesNotRepersistAnInFlightTranscription() throws {
         let directory = FileManager.default.temporaryDirectory
