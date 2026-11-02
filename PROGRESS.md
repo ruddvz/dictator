@@ -1,5 +1,11 @@
 # HushKey progress
 
+## Live insertion acceptance — awaiting Accessibility permission (2026-11-02)
+
+- Opened the current packaged app at `~/Projects/HushKey/dist/HushKey.app`. Its setup screen says to allow HushKey in Accessibility settings; text insertion is off. I did not change macOS privacy permissions.
+- Opened a blank TextEdit window for the acceptance check and closed it without saving or changing any user document. No live insertion was sent.
+- Next: after the user enables HushKey under **System Settings → Privacy & Security → Accessibility** and turns on **Type where your cursor is**, verify one direct insertion and clipboard restoration in TextEdit, then test paste fallback in another supported app. Microphone and Speech permissions remain separate and were not requested.
+
 ## Completed — verify clipboard paste delivery before reporting success (2026-11-02)
 
 - Paste fallback now snapshots the readable text field before dictation, revalidates the same app, field, contents, and selection before sending Cmd-V, and waits up to two seconds for the exact expected field contents before reporting success.
