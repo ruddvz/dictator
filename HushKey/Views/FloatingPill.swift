@@ -203,8 +203,9 @@ struct FloatingPillView: View {
 
     private var phase: Phase {
         if isFinishing { return .finishing }
-        if model.isStartingDictation { return .preparing }
+        // The microphone buffers while recognition gets ready, so show the live meter at once.
         if model.audio.isRunning { return .listening }
+        if model.isStartingDictation { return .preparing }
         if model.dictationNotice != nil { return .error }
         if showsDone { return .done }
         return isHovering ? .hover : .idle
@@ -383,7 +384,11 @@ struct FloatingPillView: View {
         }
         switch phase {
         case .hover: return .init(title: "Dictate", shortcut: model.dictationShortcut.label)
-        case .preparing: return .init(title: model.audio.isStarting ? "Waiting for microphone" : "Preparing locally", shortcut: nil)
+        case .preparing:
+            if model.audio.isAwaitingPermission || model.transcriber.isAwaitingPermission {
+                return .init(title: "Answer the macOS prompt", shortcut: nil)
+            }
+            return .init(title: model.audio.isStarting ? "Waiting for microphone" : "Preparing locally", shortcut: nil)
         default: return nil
         }
     }
@@ -522,6 +527,13 @@ struct FloatingPillView: View {
             .accessibilityLabel("Choose the microphone")
             PillIconButton(systemImage: "slider.horizontal.3", help: "Open Sound settings to check the input") {
                 model.openSoundInputSettings()
+            }
+        }
+        if let privacy = notice.missingPermission {
+            PillIconButton(systemImage: "lock.open", title: "Open Settings",
+                           help: "Open Privacy & Security settings", prominent: true) {
+                model.openPrivacySettings(privacy)
+                model.dismissDictationNotice()
             }
         }
         if notice.canPasteAgain {

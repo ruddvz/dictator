@@ -47,6 +47,8 @@ final class AudioSink: @unchecked Sendable {
 final class AudioService {
     private(set) var isRunning = false
     private(set) var isStarting = false
+    /// macOS is showing its microphone permission prompt.
+    private(set) var isAwaitingPermission = false
     private(set) var level: Float = 0
     /// Loudest level since the last start, so an empty result can tell a silent mic from silence.
     @ObservationIgnored private(set) var peakLevel: Float = 0
@@ -85,9 +87,11 @@ final class AudioService {
 
         let requestID = UUID()
         permissionRequestID = requestID
+        isAwaitingPermission = AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined
         let request = Task { await LocalPermissionAccess.microphone() }
         permissionTask = request
         let permission = await request.value
+        isAwaitingPermission = false
         guard generation == startGeneration, permissionRequestID == requestID else { return }
         permissionRequestID = nil
         permissionTask = nil
@@ -154,6 +158,7 @@ final class AudioService {
         permissionRequestID = nil
         permissionTask?.cancel()
         permissionTask = nil
+        isAwaitingPermission = false
         isStarting = false
         if let engine {
             engine.inputNode.removeTap(onBus: 0)

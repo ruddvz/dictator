@@ -197,4 +197,17 @@ final class DictationRecoveryTests: XCTestCase {
         for i in 0..<Int(frames) { buffer.floatChannelData![0][i] = value }
         return buffer
     }
+
+    func testPermissionNoticesNameTheSwitchAndOpenItsPane() {
+        let mic = DictationRecovery.permissionNeeded(.microphone)
+        XCTAssertEqual(mic.missingPermission, .microphone)
+        XCTAssertFalse(mic.canRetry)
+        XCTAssertTrue(mic.detail.contains("Microphone"))
+        XCTAssertEqual(mic.missingPermission?.settingsURL?.absoluteString,
+                       "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")
+        let speech = DictationRecovery.permissionNeeded(.speechRecognition)
+        XCTAssertEqual(speech.message, "Allow speech recognition")
+        XCTAssertTrue(speech.missingPermission?.settingsURL?.absoluteString.hasSuffix("Privacy_SpeechRecognition") == true)
+        XCTAssertNil(DictationRecovery.cancelled().missingPermission)
+    }
 }

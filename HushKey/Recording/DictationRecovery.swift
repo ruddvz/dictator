@@ -18,6 +18,21 @@ struct DictationNotice: Equatable {
         case insertion
         /// "Paste again" was refused because the original app or field is not focused.
         case focusLost
+        /// macOS hasn't granted the microphone or Speech Recognition, so nothing can start.
+        case permission(Privacy)
+    }
+
+    /// The Privacy & Security pane that holds the missing permission.
+    enum Privacy: Equatable {
+        case microphone
+        case speechRecognition
+
+        var settingsURL: URL? {
+            switch self {
+            case .microphone: URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")
+            case .speechRecognition: URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_SpeechRecognition")
+            }
+        }
     }
 
     let kind: Kind
@@ -32,6 +47,10 @@ struct DictationNotice: Equatable {
     var offersMicrophoneHelp: Bool { kind == .microphone || kind == .silentMicrophone }
     /// Not a failure: shown in neutral ink instead of the danger colour.
     var isNeutral: Bool { kind == .cancelled }
+    /// The settings pane to open when macOS is blocking dictation.
+    var missingPermission: Privacy? {
+        if case .permission(let privacy) = kind { privacy } else { nil }
+    }
 }
 
 enum DictationRecovery {
@@ -69,6 +88,20 @@ enum DictationRecovery {
 
     /// Recordings shorter than this are accidental taps, so cancelling them offers no Undo.
     static let minimumUndoSeconds: Double = 1
+
+    /// Dictation couldn't start because macOS hasn't granted access. Says which switch to turn on.
+    static func permissionNeeded(_ privacy: DictationNotice.Privacy) -> DictationNotice {
+        switch privacy {
+        case .microphone:
+            DictationNotice(kind: .permission(.microphone), message: "Allow the microphone",
+                            detail: "Turn on HushKey under Privacy & Security › Microphone, then dictate again.",
+                            canRetry: false, canPasteAgain: false)
+        case .speechRecognition:
+            DictationNotice(kind: .permission(.speechRecognition), message: "Allow speech recognition",
+                            detail: "Turn on HushKey under Privacy & Security › Speech Recognition, then dictate again. Recognition stays on this Mac.",
+                            canRetry: false, canPasteAgain: false)
+        }
+    }
 
     static func cancelled() -> DictationNotice {
         DictationNotice(kind: .cancelled, message: "Cancelled",

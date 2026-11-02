@@ -10,6 +10,8 @@ final class MicTranscriber {
     private(set) var text = ""
     private(set) var isOnDevice = false
     private(set) var error: String?
+    /// macOS is showing its Speech Recognition permission prompt.
+    private(set) var isAwaitingPermission = false
 
     @ObservationIgnored private var recognizer: SFSpeechRecognizer?
     @ObservationIgnored private var preparedLocaleIdentifier: String?
@@ -36,12 +38,22 @@ final class MicTranscriber {
         error = nil
         guard await prepareRecognizer(localeIdentifier: localeIdentifier) else { return false }
 
-        self.sink = sink
-        sinkID = sink.add { [box] buffer, _ in box.append(buffer) }
+        if sinkID == nil {
+            self.sink = sink
+            sinkID = sink.add { [box] buffer, _ in box.append(buffer) }
+        }
         isRunning = true
         self.contextualStrings = Array(contextualStrings.prefix(DictationContextHints.maximumCount))
         startTask()
         return true
+    }
+
+    /// Starts keeping microphone audio before recognition is ready; `start` sends it first.
+    func beginBuffering(sink: AudioSink) {
+        guard !isRunning, !isFinalizing, sinkID == nil else { return }
+        box.bufferUntilRequest()
+        self.sink = sink
+        sinkID = sink.add { [box] buffer, _ in box.append(buffer) }
     }
 
     /// Runs recognition again over audio that was already recorded, for a failed dictation.
@@ -86,9 +98,11 @@ final class MicTranscriber {
 
         let requestID = UUID()
         authorizationRequestID = requestID
+        isAwaitingPermission = SFSpeechRecognizer.authorizationStatus() == .notDetermined
         let request = Task { await LocalPermissionAccess.speechRecognition() }
         authorizationTask = request
         let outcome = await request.value
+        isAwaitingPermission = false
         guard authorizationRequestID == requestID else { return false }
         authorizationRequestID = nil
         authorizationTask = nil
@@ -120,6 +134,7 @@ final class MicTranscriber {
 
     func cancelPendingAuthorization() {
         authorizationRequestID = nil
+        isAwaitingPermission = false
         authorizationTask?.cancel()
         authorizationTask = nil
     }
@@ -277,18 +292,42 @@ final class MicTranscriber {
 }
 
 /// The current recognition request, appended to from the audio thread.
-private final class RequestBox: @unchecked Sendable {
+final class RequestBox: @unchecked Sendable {
+    /// About 20 s of audio at typical tap sizes; a start never takes that long.
+    static let maximumPendingBuffers = 2_000
+
     private let lock = NSLock()
     private var request: SFSpeechAudioBufferRecognitionRequest?
+    private var pending: [AVAudioPCMBuffer] = []
+    private var isBuffering = false
 
     func set(_ request: SFSpeechAudioBufferRecognitionRequest?) {
         lock.withLock {
             self.request?.endAudio()
             self.request = request
+            if let request { pending.forEach(request.append) }
+            pending.removeAll()
+            isBuffering = false
+        }
+    }
+
+    /// Keeps appended audio until the first request arrives.
+    func bufferUntilRequest() {
+        lock.withLock {
+            pending.removeAll()
+            isBuffering = request == nil
         }
     }
 
     func append(_ buffer: AVAudioPCMBuffer) {
-        lock.withLock { request?.append(buffer) }
+        lock.withLock {
+            if let request {
+                request.append(buffer)
+            } else if isBuffering, pending.count < Self.maximumPendingBuffers {
+                pending.append(buffer)
+            }
+        }
     }
+
+    var pendingCount: Int { lock.withLock { pending.count } }
 }

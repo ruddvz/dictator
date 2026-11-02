@@ -1,5 +1,6 @@
 import AppKit
 import AVFoundation
+import Speech
 import Observation
 import UniformTypeIdentifiers
 
@@ -212,6 +213,8 @@ final class AppModel {
     var selectedTextEditLiveInstruction: String { selectedEditTranscriber.text }
     private(set) var isStartingSelectedTextEdit = false
     private(set) var isStartingDictation = false
+    /// Finish was pressed while the microphone was open but recognition was still starting.
+    @ObservationIgnored private var stopsWhenStarted = false
     private(set) var isSelectedTextEditCapturing = false
     private(set) var isFinalizingSelectedTextEdit = false
     private(set) var isGeneratingSelectedTextEdit = false
@@ -1200,7 +1203,7 @@ final class AppModel {
 
     func toggleDictation() async {
         if isStartingDictation {
-            cancelDictation()
+            stopWhileStarting()
         } else if isStartingSelectedTextEdit {
             selectedTextEditShortcutHeld = false
             selectedTextEditStatus = "Voice edit start cancelled. Your selected text is unchanged."
@@ -1349,6 +1352,7 @@ final class AppModel {
             return
         }
         isStartingDictation = true
+        stopsWhenStarted = false
         defer { isStartingDictation = false }
         dictationStartGeneration += 1
         let generation = dictationStartGeneration
@@ -1388,30 +1392,35 @@ final class AppModel {
         let nearbyHints = usesNearbyTextHints ? insertion.nearbyContextHints() : []
         usedNearbyTextHints = !nearbyHints.isEmpty
 
-        let speechReady = await transcriber.prepare(localeIdentifier: activeDictationLanguageIdentifier)
-        guard generation == dictationStartGeneration else {
-            captureGate.release(.dictation)
-            return
-        }
-        guard speechReady else {
-            captureGate.release(.dictation)
-            dictationNotice = DictationRecovery.notice(
-                audioError: nil, transcriberError: transcriber.error ?? "Local speech recognition is unavailable.",
-                transcript: "", hasRetainedAudio: false)
-            return
-        }
-
+        // Open the microphone while Speech gets ready, and buffer what it hears, so words
+        // spoken during the start aren't lost.
+        async let speechPreparation = transcriber.prepare(localeIdentifier: activeDictationLanguageIdentifier)
         await audio.start()
-        guard generation == dictationStartGeneration, audio.isRunning else {
+        if audio.isRunning, generation == dictationStartGeneration {
+            transcriber.beginBuffering(sink: audio.sink)
+            retainedAudioSinkID = audio.sink.add { [retainedAudio] buffer, _ in retainedAudio.append(buffer) }
+        }
+        let speechReady = await speechPreparation
+        guard generation == dictationStartGeneration, speechReady, audio.isRunning else {
+            transcriber.stop()
             audio.stop()
+            stopRetainingAudio(keep: false)
             captureGate.release(.dictation)
-            if generation == dictationStartGeneration {
-                dictationNotice = DictationRecovery.notice(audioError: audio.error ?? "The microphone did not start.",
-                                                           transcriberError: nil, transcript: "", hasRetainedAudio: false)
+            guard generation == dictationStartGeneration else { return }
+            if !speechReady {
+                dictationNotice = SFSpeechRecognizer.authorizationStatus() != .authorized
+                    ? DictationRecovery.permissionNeeded(.speechRecognition)
+                    : DictationRecovery.notice(
+                        audioError: nil, transcriberError: transcriber.error ?? "Local speech recognition is unavailable.",
+                        transcript: "", hasRetainedAudio: false)
+            } else {
+                dictationNotice = AVCaptureDevice.authorizationStatus(for: .audio) != .authorized
+                    ? DictationRecovery.permissionNeeded(.microphone)
+                    : DictationRecovery.notice(audioError: audio.error ?? "The microphone did not start.",
+                                               transcriberError: nil, transcript: "", hasRetainedAudio: false)
             }
             return
         }
-        retainedAudioSinkID = audio.sink.add { [retainedAudio] buffer, _ in retainedAudio.append(buffer) }
         lastDictationMicrophoneName = audio.activeDeviceName
         playDictationSound("Tink")
         dictationStartedAt = Date()
@@ -1444,6 +1453,9 @@ final class AppModel {
             dictationNotice = DictationRecovery.notice(
                 audioError: nil, transcriberError: transcriber.error ?? "Speech recognition did not start.",
                 transcript: "", hasRetainedAudio: false)
+        } else if stopsWhenStarted {
+            stopsWhenStarted = false
+            stopDictation()
         }
     }
 
@@ -1855,8 +1867,15 @@ final class AppModel {
 
     private func endShortcutDictation() {
         dictationShortcutHeld = false
-        if audio.isRunning { stopDictation() }
-        else if isStartingDictation { cancelDictation() }
+        if isStartingDictation { stopWhileStarting() }
+        else if audio.isRunning { stopDictation() }
+    }
+
+    /// Finish pressed before recognition was ready. If the microphone is already open the person
+    /// may have spoken, so finish as soon as the start completes; otherwise nothing was heard.
+    private func stopWhileStarting() {
+        if audio.isRunning { stopsWhenStarted = true }
+        else { cancelDictation() }
     }
 
     private func handleFunctionKey(_ action: FunctionKeyGesture.Action) {
@@ -1868,8 +1887,8 @@ final class AppModel {
             guard !audio.isRunning else { return }
             Task { @MainActor in await startNewDictation() }
         case .stopHandsFree:
-            if audio.isRunning { stopDictation() }
-            else if isStartingDictation { cancelDictation() }
+            if isStartingDictation { stopWhileStarting() }
+            else if audio.isRunning { stopDictation() }
         case .none, .scheduleHoldStart, .cancelHoldStart: break
         }
     }
@@ -1908,6 +1927,7 @@ final class AppModel {
     /// and Esc), a recording of a second or more stays in memory for a few seconds so the pill's
     /// Undo can transcribe it anyway; otherwise, or once that passes, the audio is dropped.
     func cancelDictation(offersUndo: Bool = false) {
+        stopsWhenStarted = false
         let wasStarting = isStartingDictation
         let wasListening = audio.isRunning
         dictationShortcutHeld = false
@@ -2045,6 +2065,12 @@ final class AppModel {
             }
         }
         return settings
+    }
+
+    /// Opens the Privacy & Security pane for a permission dictation needs.
+    func openPrivacySettings(_ privacy: DictationNotice.Privacy) {
+        guard let url = privacy.settingsURL else { return }
+        NSWorkspace.shared.open(url)
     }
 
     /// Opens the input tab of Sound settings, for a muted or missing microphone.
