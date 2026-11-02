@@ -17,6 +17,11 @@ final class TextInsertionService {
         let selectedRange: CFRange
     }
 
+    struct SelectedTextTarget {
+        let insertionTarget: InsertionTarget
+        let selectedText: String
+    }
+
     private(set) var isEnabled = false
     private(set) var status = "Text insertion is off."
     private(set) var contextAccessStatus = "Nearby text hints are off."
@@ -121,6 +126,16 @@ final class TextInsertionService {
                                element: focused,
                                fieldValue: fieldValue,
                                selectedRange: selectedRange)
+    }
+
+    /// Captures only a non-empty selection in an explicitly supported text field.
+    /// The selection and its containing field stay in memory and are revalidated before Apply.
+    func captureSelectedTextTarget() -> SelectedTextTarget? {
+        guard let target = captureInsertionTarget(),
+              let selectedText = Self.selectedText(in: target.fieldValue, range: target.selectedRange),
+              !selectedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              selectedText.count <= 12_000 else { return nil }
+        return SelectedTextTarget(insertionTarget: target, selectedText: selectedText)
     }
 
     func enable() {
@@ -301,6 +316,16 @@ final class TextInsertionService {
             originalRange.length == currentRange.length
     }
 
+    nonisolated static func selectedText(in fieldValue: String, range: CFRange,
+                                         maximumCharacters: Int = 12_000) -> String? {
+        let field = fieldValue as NSString
+        guard range.location >= 0, range.length > 0,
+              range.location <= field.length,
+              range.length <= field.length - range.location,
+              range.length <= maximumCharacters else { return nil }
+        return field.substring(with: NSRange(location: range.location, length: range.length))
+    }
+
     private func registerShortcut() {
         let result = hotKey.register(keyCode: shortcut.keyCode, modifiers: shortcut.carbonModifiers) { [weak self] in
             self?.onInsertShortcut?()
@@ -315,7 +340,7 @@ final class TextInsertionService {
         var focusedValue: CFTypeRef?
         guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedValue) == .success,
               let focusedValue, CFGetTypeID(focusedValue) == AXUIElementGetTypeID() else { return nil }
-        return focusedValue as! AXUIElement
+        return (focusedValue as! AXUIElement)
     }
 
     private func performInsertion(_ text: String, app: NSRunningApplication, element: AXUIElement,

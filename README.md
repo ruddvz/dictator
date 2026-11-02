@@ -9,6 +9,7 @@ HushKey is a native macOS dictation app with a separate experimental lab for sil
 - Speech recognition uses Apple's on-device Speech framework and exposes languages supported for on-device recognition on this Mac. HushKey does not send audio to a remote service.
 - Dictation includes Natural, Message, Email, Code, and Automatic modes; explicit spoken corrections with raw-transcript restore; local vocabulary/snippets; and a one-step guarded insertion undo. Automatic mode maps common Mac app identifiers when started with the global shortcut.
 - **Transforms** offers review-first local polish, concise, professional, bullets, and action-item drafts using Apple's on-device Foundation Model when available (macOS 26+); conservative filler removal works without a model on macOS 14+. Create up to 12 local writing styles for tone, format, or translation. Every generated draft stays reviewable and can be undone; HushKey has no cloud fallback.
+- **Voice edit selected text** lets you select text in another app, hold `⌥⇧E` (configurable), and speak an edit instruction. HushKey reads the selection only after that shortcut, creates an on-device preview, and rechecks the original app, field, text, and selection before Apply. The instruction and selection are not added to dictation history. This flow requires Accessibility insertion and Apple's on-device Foundation Model (macOS 26+).
 - Optional local filler cleanup removes only standalone “um”, “uh”, and “erm”; it is off by default. Snippet settings report malformed lines instead of silently ignoring them.
 - **Transcribe files** accepts one audio file at a time and exports editable text, SRT, or WebVTT captions. Choose Apple Speech for zero-download on-device recognition where supported, or explicitly download a WhisperKit model for offline inference after setup. Model downloads require internet; audio files are not uploaded.
 - **Meeting notes** provides explicit microphone, system-audio, or combined capture, a searchable local transcript archive, editable transcripts, and TXT export. Choose **Both sides** to combine your selected microphone with Mac app audio; macOS may request separate microphone and System Audio Recording permissions. System audio requires macOS 14.2+. Meeting audio is streamed to on-device Speech and is not saved; the transcript is stored when capture stops. Summary and action-item drafts use Apple's on-device Foundation Model (macOS 26+), with no cloud fallback. HushKey does not identify speakers.
@@ -67,9 +68,11 @@ Open **Meeting notes**, choose **Microphone**, **System audio**, or **Both sides
 
 ## Safe text insertion
 
-Text insertion is off by default. Enable it in **Settings & Data**, approve HushKey under **System Settings → Privacy & Security → Accessibility**, then press **Insert into current app** or the displayed configurable global shortcut (`⌥⇧I` by default) while the intended text field remains focused in another app.
+Text insertion is off by default. Enable it in **Settings & Data**, approve HushKey under **System Settings → Privacy & Security → Accessibility**, then use the configurable global shortcut (`⌥⇧I` by default) in a supported text field. For the Dictation screen's named-target Insert button, start dictation with its global shortcut while that field is focused.
 
 HushKey uses Accessibility to inspect the frontmost app and focused control, allows only supported text fields, rejects secure/password controls, rechecks the process and focus immediately before insertion, and writes through the selected-text attribute once. It does not use or modify the clipboard. Unsupported controls fail closed. Undo is available only while the same field stays focused and its contents remain unchanged.
+
+For a voice edit, select text in another app and hold the dedicated selected-text shortcut (`⌥⇧E` by default). Say an instruction, release, then review the preview in **Transforms**. Apply is explicit and fails closed if the original app, field contents, or selection changed. Spoken edit instructions are not saved in dictation history.
 
 ## Local data and privacy
 
@@ -91,7 +94,7 @@ HushKey is the requested working name for this private prototype. A separate pub
 
 Headphone motion is processed and low-rate (often about 25 Hz). Jaw movement and head motion can dominate the signal, and reseating the headphones can change the measurements. A result on a small trained vocabulary does not establish arbitrary phrase recognition. Voice, whisper, and silent-mouthing results must be evaluated separately and across sessions before drawing conclusions.
 
-HushKey includes optional local text transforms, but they are not a claim of full Wispr Flow or TypeWhisper parity. A generated draft can change meaning and must be reviewed. HushKey still does not include voice editing of selected text, meeting recording/notes, or workflow/plugin automation. Apple Speech, WhisperKit, and Apple Foundation Model availability depends on the chosen local engine, supported OS, and device readiness. These are separate features from the silent-motion experiment and are not implied by its results.
+HushKey includes local text transforms and a preview-first selected-text voice-edit workflow, but they are not a claim of full Wispr Flow or TypeWhisper parity. A generated draft can change meaning and must be reviewed. HushKey does not include workflow/plugin automation. Live acceptance of selected-text editing, microphone capture, file models, and meeting sources remains important; Apple Speech, WhisperKit, and Apple Foundation Model availability depends on the chosen local engine, supported OS, and device readiness. These are separate features from the silent-motion experiment and are not implied by its results.
 
 ## Research reports
 

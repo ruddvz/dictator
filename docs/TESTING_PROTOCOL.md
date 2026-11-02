@@ -57,6 +57,13 @@ Run this separately from the AirPods motion study:
 6. In TextEdit and one other supported app, start dictation with the target field focused using the global shortcut, finish, then use the Dictation screen's named-target Insert button. Confirm HushKey returns to that app and inserts once only if the same field and selection remain unchanged. Change the target or field contents before pressing the button and confirm it fails closed. Also insert with the global `⌥⇧I` shortcut, confirm the clipboard did not change, then press `⌥⇧U` immediately while the same field is unchanged. Confirm undo removes the insert; changed focus or content must fail closed.
 7. Reload the local history entry, restore raw recognition, clear the current draft, and clear history. Confirm microphone audio is never stored by ordinary dictation.
 
+## Selected-text voice-edit acceptance
+
+1. Enable text insertion and Accessibility. In TextEdit, select a short non-secure phrase and hold the configured voice-edit shortcut (`⌥⇧E` by default); speak one clear instruction and release. Confirm the live capture stops and the instruction appears in **Transforms**, not dictation history.
+2. Confirm only the selected phrase is shown as source. Preview the edit and verify the source stays unchanged. Edit the recognized instruction and confirm the old preview is invalidated. Confirm HushKey uses Apple's on-device model only and gives a clear unavailable message without a remote fallback.
+3. Apply once. Confirm only the original selection is replaced, then use `⌥⇧U` in the same unchanged field to undo. Confirm changed focus, field contents, selection, process, or a secure/password field prevents replacement.
+4. Try the shortcut without a selection, in an unsupported control, after denying Accessibility, and while meeting capture is active. Confirm no text is read or replaced, no competing audio engine starts, and the UI explains what to do next. Confirm the spoken instruction and selected text are not written to history or audio files.
+
 ## Local writing style acceptance
 
 1. With Apple's on-device language model available, create a named writing style such as a warm concise tone or a translation instruction. Confirm blank/overlong names and instructions are rejected, duplicate names are blocked, and no more than 12 styles can be saved.
