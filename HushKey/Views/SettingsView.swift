@@ -250,7 +250,6 @@ private struct DataSettings: View {
 
     var body: some View {
         @Bindable var model = model
-        @Bindable var recorder = model.recorder
 
         PrivacyPromise()
 
@@ -269,13 +268,14 @@ private struct DataSettings: View {
                         .buttonStyle(DestructiveButtonStyle())
                 }
             }
-            SettingsRow(title: "Session logs", detail: "Motion CSV and optional audio, in Documents.") {
+            SettingsRow(title: "Session logs",
+                        detail: "Motion logs are in Documents. Enable microphone audio in Silent Lab → Setup.") {
                 HStack(spacing: Theme.s2) {
                     Button("Export…") { model.exportSessions() }
                         .buttonStyle(SecondaryButtonStyle())
                     Button("Delete…") { confirmDeleteSessions = true }
                         .buttonStyle(DestructiveButtonStyle())
-                        .disabled(recorder.isRecording)
+                        .disabled(model.recorder.isRecording)
                 }
             }
             SettingsRow(title: "Personal data backup",
@@ -313,45 +313,6 @@ private struct DataSettings: View {
             }
         }
 
-        SettingsGroup(title: "Research recording",
-                      footer: recorder.error ?? "Saves synchronized motion and optional audio. While it runs, \(model.captureShortcut.label) marks an utterance.") {
-            SettingsRow(title: "Condition", detail: "Label for the next session.") {
-                MenuPicker(selection: $recorder.condition,
-                           options: SessionRecorder.Condition.allCases.map { ($0, $0.rawValue) })
-            }
-            .disabled(recorder.isRecording)
-            SettingsRow(title: "Phrase label", detail: nil) {
-                TextField("Optional", text: $recorder.prompt)
-                    .textFieldStyle(.plain)
-                    .font(.hkBody)
-                    .padding(.horizontal, Theme.s3)
-                    .frame(width: Theme.menuWidth, height: Theme.controlHeight)
-                    .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
-                        .strokeBorder(Theme.hairline, lineWidth: 1))
-            }
-            SettingsRow(title: recorder.isRecording ? "Recording" : "Session", detail: recordingDetail) {
-                HStack(spacing: Theme.s2) {
-                    if !recorder.isRecording, let url = recorder.lastSessionURL {
-                        Button("Show last") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
-                            .buttonStyle(SecondaryButtonStyle())
-                    }
-                    Button {
-                        recorder.isRecording ? recorder.stop() : recorder.start(audio: model.audio)
-                    } label: {
-                        Label(recorder.isRecording ? "Stop" : "Start",
-                              systemImage: recorder.isRecording ? "stop.fill" : "record.circle")
-                    }
-                    .buttonStyle(PrimaryButtonStyle(tint: recorder.isRecording ? Theme.danger : Theme.signal))
-                }
-            }
-        }
-    }
-
-    private var recordingDetail: String {
-        let recorder = model.recorder
-        guard recorder.isRecording else { return "Not recording." }
-        return "\(recorder.motionCount) samples · \(recorder.eventCount) marks"
     }
 }
 

@@ -486,3 +486,11 @@ Same as above, plus: start a dictation with no field focused, click into TextEdi
 - Added regression tests for both cases. `xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build test`: 118 passed, 2 skipped, 0 failed.
 - Packaged Release app at `~/Projects/HushKey/dist/HushKey.app`; strict code-signature verification passed, and the latest app bundle is open.
 - Live microphone, Speech, Accessibility insertion, meeting capture, and export acceptance still need a user-approved device session. Start that as the next item in a fresh session.
+
+## Completed — put research capture where it belongs (2026-11-02)
+
+- Moved the research-session controls out of Settings → Data & privacy and into Silent Lab → Setup, beside live motion diagnostics. Data & privacy now only manages stored files and backup.
+- Microphone audio is an explicit, saved opt-in that starts off. Session recording attaches audio only when the option is enabled and HushKey’s microphone is already running; the session metadata records the choice. Start is disabled until motion is streaming, and Stop remains available during a capture.
+- Verified the packaged app’s accessibility state: Data & privacy no longer contains recording controls; Silent Lab Setup shows the audio option off and Start disabled while headphones are unavailable. No permissions were accepted and no recording was made.
+- `xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build test`: 119 passed, 2 skipped, 0 failed. Release packaging and strict signature verification passed; only `/Users/rudra/Projects/HushKey/dist/HushKey.app` remains open.
+- Next: user-approved live microphone, insertion, meeting, and export acceptance in a fresh session.

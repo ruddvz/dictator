@@ -41,6 +41,8 @@ struct SetupView: View {
                                    channels: SignalPlot.attitude, span: span, minScale: 0.1)
                     }
                 }
+
+                ResearchRecordingSection()
             }
             .pageLayout()
         }

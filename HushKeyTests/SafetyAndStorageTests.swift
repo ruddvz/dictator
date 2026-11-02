@@ -632,6 +632,16 @@ final class SafetyAndStorageTests: XCTestCase {
     }
 
     @MainActor
+    func testResearchCaptureRequiresAudioOptInAndAnActiveMicrophone() {
+        XCTAssertFalse(SessionRecorder.shouldCaptureAudio(includeMicrophoneAudio: false,
+                                                           microphoneIsRunning: true))
+        XCTAssertFalse(SessionRecorder.shouldCaptureAudio(includeMicrophoneAudio: true,
+                                                           microphoneIsRunning: false))
+        XCTAssertTrue(SessionRecorder.shouldCaptureAudio(includeMicrophoneAudio: true,
+                                                          microphoneIsRunning: true))
+    }
+
+    @MainActor
     func testFileTranscriptionDeleteFailureKeepsSessionAndReportsFailure() throws {
         let directory = FileManager.default.temporaryDirectory
             .appending(path: "hushkey-file-delete-\(UUID().uuidString)", directoryHint: .isDirectory)

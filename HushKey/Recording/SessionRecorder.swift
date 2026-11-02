@@ -2,12 +2,12 @@ import AVFoundation
 import AppKit
 import Observation
 
-/// Records synchronized motion CSV + microphone audio + labelled segment events for offline
+/// Records synchronized motion CSV + optionally enabled microphone audio + labelled segment events for offline
 /// analysis (normal speech vs. whisper vs. silent mouthing).
 ///
 /// Output: ~/Documents/HushKey/Sessions/<timestamp>-<condition>/
 ///   motion.csv  — every headphone-motion sample, t relative to session start
-///   audio.caf   — microphone audio (if the mic is running)
+///   audio.caf   — microphone audio only after explicit opt-in and while the mic is running
 ///   events.csv  — captured segments with their label / prediction
 ///   meta.json   — condition, prompt, clock offsets
 @MainActor @Observable
@@ -47,10 +47,12 @@ final class SessionRecorder {
     @ObservationIgnored private var sinkID: UUID?
     @ObservationIgnored private weak var sink: AudioSink?
     @ObservationIgnored private var audioDeviceName: String?
+    @ObservationIgnored private var microphoneAudioRequested = false
 
-    func start(audio: AudioService) {
+    func start(audio: AudioService, includeMicrophoneAudio: Bool = false) {
         guard !isRecording else { return }
         error = nil
+        microphoneAudioRequested = includeMicrophoneAudio
         let stamp = Date().formatted(.iso8601.year().month().day().time(includingFractionalSeconds: false))
             .replacingOccurrences(of: ":", with: "")
         let dir = Self.root.appending(path: "\(stamp)-\(condition.slug)", directoryHint: .isDirectory)
@@ -69,7 +71,8 @@ final class SessionRecorder {
         motionCount = 0
         eventCount = 0
 
-        if audio.isRunning {
+        if Self.shouldCaptureAudio(includeMicrophoneAudio: includeMicrophoneAudio,
+                                   microphoneIsRunning: audio.isRunning) {
             let writer = AudioFileWriter(url: dir.appending(path: "audio.caf"))
             audioWriter = writer
             sink = audio.sink
@@ -100,6 +103,7 @@ final class SessionRecorder {
             "motionSamples": motionCount,
             "events": eventCount,
             "audioDevice": audioDeviceName ?? NSNull(),
+            "microphoneAudioRequested": microphoneAudioRequested,
             "audioSampleRate": audioInfo?.sampleRate ?? NSNull(),
             "audioStartOffsetSeconds": audioInfo?.firstHostSeconds.map { $0 - startUptime } ?? NSNull(),
             "note": "Motion t and audioStartOffsetSeconds are relative to startUptime (seconds since boot).",
@@ -109,6 +113,10 @@ final class SessionRecorder {
         }
         lastSessionURL = directory
         self.directory = nil
+    }
+
+    static func shouldCaptureAudio(includeMicrophoneAudio: Bool, microphoneIsRunning: Bool) -> Bool {
+        includeMicrophoneAudio && microphoneIsRunning
     }
 
     func deleteAllSessions() throws {
