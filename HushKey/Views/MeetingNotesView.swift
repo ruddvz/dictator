@@ -194,11 +194,10 @@ struct MeetingNotesView: View {
         } else if let note = selectedNote {
             noteEditor(note)
         } else {
-            ContentUnavailableView(searchText.isEmpty ? "Your notes stay here" : "No meeting note selected",
-                                   systemImage: searchText.isEmpty ? "waveform.and.text" : "text.magnifyingglass",
-                                   description: Text(searchText.isEmpty
-                                       ? "Start a meeting capture. HushKey transcribes on this Mac and does not keep microphone audio."
-                                       : "Select a matching note or clear the search."))
+            EmptyState(systemImage: searchText.isEmpty ? "waveform.and.text" : "text.magnifyingglass",
+                       title: searchText.isEmpty ? "Your notes stay here" : "Pick a note",
+                       message: searchText.isEmpty ? "Start a meeting. The transcript, summary and action items appear here."
+                           : "Select a matching note, or clear the search.")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }

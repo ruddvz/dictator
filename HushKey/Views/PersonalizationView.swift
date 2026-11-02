@@ -1,8 +1,8 @@
 import SwiftUI
 
 private enum PersonalizationSection: String, CaseIterable, Identifiable {
-    case snippets = "Snippets"
     case vocabulary = "Vocabulary"
+    case snippets = "Snippets"
     case corrections = "Corrections"
 
     var id: String { rawValue }
@@ -31,7 +31,8 @@ private struct PersonalizationEditorRequest: Identifiable {
 
 struct PersonalizationView: View {
     @Environment(AppModel.self) private var model
-    @State private var section: PersonalizationSection = .snippets
+    @State private var section: PersonalizationSection = .vocabulary
+    @State private var searching = false
     @State private var query = ""
     @State private var editor: PersonalizationEditorRequest?
     @State private var notice: String?
@@ -90,83 +91,38 @@ struct PersonalizationView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                PageHeader(
-                    eyebrow: "PERSONALIZE",
-                    title: "Your words, your shortcuts",
-                    subtitle: "Teach HushKey your vocabulary, phrase shortcuts, and preferred spellings. These settings stay on this Mac.")
-
-                HStack(spacing: 12) {
-                    summaryCard(title: "Snippets", count: snippets.count, symbol: "text.quote")
-                    summaryCard(title: "Vocabulary", count: vocabulary.count, symbol: "character.book.closed")
-                    summaryCard(title: "Corrections", count: corrections.count, symbol: "arrow.left.arrow.right")
-                }
-
-                GroupBox {
-                    HStack(spacing: 14) {
-                        Picker("Personalization type", selection: $section) {
-                            ForEach(PersonalizationSection.allCases) { item in
-                                Label(item.rawValue, systemImage: item.symbol).tag(item)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        .frame(maxWidth: 340)
-
-                        HStack(spacing: 8) {
-                            Image(systemName: "magnifyingglass").foregroundStyle(Theme.ink2)
-                            TextField("Search \(section.rawValue.lowercased())", text: $query)
-                                .textFieldStyle(.plain)
-                                .accessibilityLabel("Search \(section.rawValue.lowercased())")
-                            if !query.isEmpty {
-                                Button("Clear search", systemImage: "xmark.circle.fill") { query = "" }
-                                    .labelStyle(.iconOnly)
-                                    .buttonStyle(.plain)
-                                    .foregroundStyle(Theme.ink2)
-                            }
-                        }
-                        .padding(.horizontal, 11)
-                        .padding(.vertical, 8)
-                        .background(.background, in: RoundedRectangle(cornerRadius: 9))
-                        .overlay(RoundedRectangle(cornerRadius: 9).stroke(.quaternary, lineWidth: 1))
-
-                        Button("Add", systemImage: "plus") {
-                            editor = PersonalizationEditorRequest(section: section, snippet: nil, term: nil)
-                        }
-                        .buttonStyle(PrimaryButtonStyle())
+            VStack(alignment: .leading, spacing: Theme.s5) {
+                PageHeader(eyebrow: "", title: "Vocabulary", subtitle: "") {
+                    Button("Add new", systemImage: "plus") {
+                        editor = PersonalizationEditorRequest(section: section, snippet: nil, term: nil)
                     }
-                    .padding(8)
+                    .buttonStyle(PrimaryButtonStyle())
                 }
 
-                GroupBox {
-                    VStack(alignment: .leading, spacing: 0) {
-                        if section == .snippets {
-                            snippetList
-                        } else if section == .vocabulary {
-                            vocabularyList
-                        } else {
-                            correctionList
-                        }
+                HStack(alignment: .bottom, spacing: Theme.s3) {
+                    UnderlineTabs(selection: $section, options: PersonalizationSection.allCases.map {
+                        ($0, "\($0.rawValue) \(count(for: $0))")
+                    })
+                    .onChange(of: section) { _, _ in query = "" }
+                }
+                .overlay(alignment: .topTrailing) { searchControl }
+
+                hero
+
+                Group {
+                    switch section {
+                    case .snippets: snippetList
+                    case .vocabulary: vocabularyList
+                    case .corrections: correctionList
                     }
-                    .padding(8)
-                } label: {
-                    Label(section.rawValue, systemImage: section.symbol)
                 }
+                .animation(Theme.gentle, value: section)
 
-                if section == .snippets {
-                    advancedSnippetEditor
-                } else if section == .vocabulary {
-                    Label("Your saved terms are prioritized ahead of optional mode, nearby-text, and Silent Lab hints. Up to 100 hints go to on-device Speech per capture; recognition can still misspell unfamiliar names.",
-                          systemImage: "info.circle")
-                        .font(.hkCaption)
-                        .foregroundStyle(Theme.ink2)
-                } else {
-                    advancedCorrectionEditor
+                switch section {
+                case .snippets: advancedSnippetEditor
+                case .corrections: advancedCorrectionEditor
+                case .vocabulary: EmptyView()
                 }
-
-                Label("HushKey uses personalization entries locally. It does not upload your words, corrections, or snippets.",
-                      systemImage: "lock.shield")
-                    .font(.hkCaption)
-                    .foregroundStyle(Theme.ink2)
             }
             .pageLayout()
         }
@@ -187,37 +143,105 @@ struct PersonalizationView: View {
         }
     }
 
+    private func count(for section: PersonalizationSection) -> Int {
+        switch section {
+        case .snippets: snippets.count
+        case .vocabulary: vocabulary.count
+        case .corrections: corrections.count
+        }
+    }
+
+    private var searchControl: some View {
+        HStack(spacing: Theme.s2) {
+            if searching || !query.isEmpty {
+                TextField("Search \(section.rawValue.lowercased())", text: $query)
+                    .textFieldStyle(.plain)
+                    .font(.hkCallout)
+                    .frame(width: 180)
+                    .accessibilityLabel("Search \(section.rawValue.lowercased())")
+                    .onExitCommand { query = ""; searching = false }
+                    .transition(.opacity.combined(with: .move(edge: .trailing)))
+            }
+            Button(searching ? "Close search" : "Search", systemImage: searching ? "xmark" : "magnifyingglass") {
+                withAnimation(Theme.snappy) {
+                    if searching { query = "" }
+                    searching.toggle()
+                }
+            }
+            .buttonStyle(IconButtonStyle())
+            .help(searching ? "Close search" : "Search")
+        }
+    }
+
+    /// One-time explanation in Wispr's banner position, with live examples from your own list.
+    private var hero: some View {
+        let examples: [String] = switch section {
+        case .vocabulary: Array(vocabulary.prefix(5))
+        case .snippets: snippets.prefix(3).map(\.cue)
+        case .corrections: corrections.prefix(3).map { "\($0.cue) → \($0.expansion)" }
+        }
+        let title = switch section {
+        case .vocabulary: "HushKey spells the way you do."
+        case .snippets: "Say a cue, get the whole thing."
+        case .corrections: "Fix a mishearing once."
+        }
+        let detail = switch section {
+        case .vocabulary: "Names, product terms and jargon are passed to on-device recognition, so they come out right."
+        case .snippets: "Your email, a sign-off or a long prompt, dropped in when you say its cue."
+        case .corrections: "When HushKey keeps hearing a phrase wrong, replace it with the one you meant."
+        }
+        return VStack(alignment: .leading, spacing: Theme.s3) {
+            Text(title)
+                .font(.display(26))
+                .tracking(-0.3)
+            Text(detail)
+                .font(.hkCallout)
+                .foregroundStyle(Theme.ink2)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: Theme.s2) {
+                Button("Add \(section == .vocabulary ? "word" : section == .snippets ? "snippet" : "correction")") {
+                    editor = PersonalizationEditorRequest(section: section, snippet: nil, term: nil)
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                ForEach(examples, id: \.self) { example in
+                    Text(example)
+                        .font(.hkControl)
+                        .lineLimit(1)
+                        .padding(.horizontal, Theme.s3)
+                        .frame(height: Theme.controlHeight)
+                        .background(Theme.sheet.opacity(0.7),
+                                    in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
+                }
+            }
+            .padding(.top, Theme.s1)
+        }
+        .padding(Theme.s6 - 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.signalSoft, in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
+        .lineLimit(1)
+    }
+
     @ViewBuilder
     private var snippetList: some View {
         if filteredSnippets.isEmpty {
-            ContentUnavailableView(
-                query.isEmpty ? "No snippets yet" : "No matching snippets",
-                systemImage: query.isEmpty ? "text.quote" : "magnifyingglass",
-                description: Text(query.isEmpty ? "Add a short spoken cue and the phrase HushKey should expand it to." : "Try another cue or part of the expanded phrase."))
-                .frame(minHeight: 150)
+            listEmpty(query.isEmpty ? "No snippets yet" : "No matching snippets",
+                      query.isEmpty ? "Add a short cue and the text it should become." : "Try another cue or phrase.")
         } else {
-            ForEach(filteredSnippets) { entry in
-                HStack(alignment: .center, spacing: 14) {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(entry.cue).font(.hkHeadline)
-                        Text(entry.expansion).font(.hkBody).foregroundStyle(Theme.ink2).lineLimit(2)
+            ListGroup {
+                ForEach(filteredSnippets) { entry in
+                    ListRow {
+                        HStack(spacing: Theme.s2) {
+                            Text(entry.cue).font(.hkBody.weight(.medium))
+                            Image(systemName: "arrow.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.ink3)
+                            Text(entry.expansion).font(.hkBody).foregroundStyle(Theme.ink2).lineLimit(1)
+                        }
+                    } actions: {
+                        rowAction("Edit \(entry.cue)", "pencil") {
+                            editor = PersonalizationEditorRequest(section: .snippets, snippet: entry, term: nil)
+                        }
+                        rowAction("Delete \(entry.cue)", "trash") { removeSnippet(entry.cue) }
                     }
-                    Spacer(minLength: 12)
-                    Button("Edit \(entry.cue)", systemImage: "pencil") {
-                        editor = PersonalizationEditorRequest(section: .snippets, snippet: entry, term: nil)
-                    }
-                    .labelStyle(.iconOnly)
-                    .buttonStyle(.borderless)
-                    .help("Edit snippet")
-                    Button("Delete \(entry.cue)", systemImage: "trash", role: .destructive) {
-                        removeSnippet(entry.cue)
-                    }
-                    .labelStyle(.iconOnly)
-                    .buttonStyle(.borderless)
-                    .help("Delete snippet")
                 }
-                .padding(.vertical, 10)
-                Divider()
             }
         }
     }
@@ -225,32 +249,20 @@ struct PersonalizationView: View {
     @ViewBuilder
     private var vocabularyList: some View {
         if filteredVocabulary.isEmpty {
-            ContentUnavailableView(
-                query.isEmpty ? "No personal words yet" : "No matching words",
-                systemImage: query.isEmpty ? "character.book.closed" : "magnifyingglass",
-                description: Text(query.isEmpty ? "Add names, product terms, or specialist vocabulary to help recognition." : "Try another search."))
-                .frame(minHeight: 150)
+            listEmpty(query.isEmpty ? "No words yet" : "No matching words",
+                      query.isEmpty ? "Add names, product terms or jargon." : "Try another search.")
         } else {
-            ForEach(filteredVocabulary, id: \.self) { term in
-                HStack(spacing: 12) {
-                    Image(systemName: "character.book.closed").foregroundStyle(Theme.ink2)
-                    Text(term).font(.hkBody)
-                    Spacer()
-                    Button("Edit \(term)", systemImage: "pencil") {
-                        editor = PersonalizationEditorRequest(section: .vocabulary, snippet: nil, term: term)
+            ListGroup {
+                ForEach(filteredVocabulary, id: \.self) { term in
+                    ListRow {
+                        Text(term).font(.hkBody)
+                    } actions: {
+                        rowAction("Edit \(term)", "pencil") {
+                            editor = PersonalizationEditorRequest(section: .vocabulary, snippet: nil, term: term)
+                        }
+                        rowAction("Delete \(term)", "trash") { removeTerm(term) }
                     }
-                    .labelStyle(.iconOnly)
-                    .buttonStyle(.borderless)
-                    .help("Edit word")
-                    Button("Delete \(term)", systemImage: "trash", role: .destructive) {
-                        removeTerm(term)
-                    }
-                    .labelStyle(.iconOnly)
-                    .buttonStyle(.borderless)
-                    .help("Delete word")
                 }
-                .padding(.vertical, 9)
-                Divider()
             }
         }
     }
@@ -258,46 +270,42 @@ struct PersonalizationView: View {
     @ViewBuilder
     private var correctionList: some View {
         if filteredCorrections.isEmpty {
-            ContentUnavailableView(
-                query.isEmpty ? "No correction rules yet" : "No matching corrections",
-                systemImage: query.isEmpty ? "arrow.left.arrow.right" : "magnifyingglass",
-                description: Text(query.isEmpty
-                                  ? "Add a recognized phrase and the exact phrase HushKey should use instead."
-                                  : "Try another recognized phrase or replacement."))
-                .frame(minHeight: 150)
+            listEmpty(query.isEmpty ? "No corrections yet" : "No matching corrections",
+                      query.isEmpty ? "Add what HushKey hears and what you meant." : "Try another phrase.")
         } else {
-            ForEach(filteredCorrections) { rule in
-                HStack(alignment: .center, spacing: 14) {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(rule.cue).font(.hkHeadline)
-                        Label(rule.expansion, systemImage: "arrow.right")
-                            .font(.hkBody)
-                            .foregroundStyle(Theme.ink2)
-                            .lineLimit(2)
+            ListGroup {
+                ForEach(filteredCorrections) { rule in
+                    ListRow {
+                        HStack(spacing: Theme.s2) {
+                            Text(rule.cue).font(.hkBody).foregroundStyle(Theme.ink2).strikethrough(color: Theme.ink3)
+                            Image(systemName: "arrow.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.ink3)
+                            Text(rule.expansion).font(.hkBody.weight(.medium)).lineLimit(1)
+                        }
+                    } actions: {
+                        rowAction("Edit correction for \(rule.cue)", "pencil") {
+                            editor = PersonalizationEditorRequest(section: .corrections, snippet: rule, term: nil)
+                        }
+                        rowAction("Delete correction for \(rule.cue)", "trash") { removeCorrection(rule.cue) }
                     }
-                    Spacer(minLength: 12)
-                    Button("Edit correction for \(rule.cue)", systemImage: "pencil") {
-                        editor = PersonalizationEditorRequest(section: .corrections, snippet: rule, term: nil)
-                    }
-                    .labelStyle(.iconOnly)
-                    .buttonStyle(.borderless)
-                    .help("Edit correction")
-                    Button("Delete correction for \(rule.cue)", systemImage: "trash", role: .destructive) {
-                        removeCorrection(rule.cue)
-                    }
-                    .labelStyle(.iconOnly)
-                    .buttonStyle(.borderless)
-                    .help("Delete correction")
                 }
-                .padding(.vertical, 10)
-                Divider()
             }
         }
     }
 
+    private func listEmpty(_ title: String, _ message: String) -> some View {
+        EmptyState(systemImage: query.isEmpty ? section.symbol : "magnifyingglass", title: title, message: message)
+            .card(padding: 0, style: .outlined)
+    }
+
+    private func rowAction(_ title: String, _ symbol: String, perform: @escaping () -> Void) -> some View {
+        Button(title, systemImage: symbol, action: perform)
+            .buttonStyle(IconButtonStyle())
+            .help(title)
+    }
+
     private var advancedSnippetEditor: some View {
         @Bindable var model = model
-        return DisclosureGroup("Advanced snippet list") {
+        return DisclosureGroup("Edit as text") {
             TextEditor(text: $model.dictationSnippets)
                 .font(.hkBody.monospaced())
                 .frame(minHeight: 90)
@@ -316,13 +324,15 @@ struct PersonalizationView: View {
                 .font(.hkCaption)
                 .foregroundStyle(validation.invalidLines.isEmpty ? Theme.ink2 : Theme.danger)
         }
-        .padding(12)
-        .background(.quaternary.opacity(0.22), in: RoundedRectangle(cornerRadius: 10))
+        .font(.hkCallout)
+        .tint(Theme.ink2)
+        .padding(Theme.s4)
+        .background(Theme.well, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
     }
 
     private var advancedCorrectionEditor: some View {
         @Bindable var model = model
-        return DisclosureGroup("Advanced correction list") {
+        return DisclosureGroup("Edit as text") {
             TextEditor(text: $model.dictationCorrectionRules)
                 .font(.hkBody.monospaced())
                 .frame(minHeight: 90)
@@ -339,27 +349,12 @@ struct PersonalizationView: View {
                   : "\(validation.validCount) ready · check line\(validation.invalidLines.count == 1 ? "" : "s") \(validation.invalidLines.map(String.init).joined(separator: ", "))",
                   systemImage: validation.invalidLines.isEmpty ? "checkmark.circle" : "exclamationmark.circle")
                 .font(.hkCaption)
-                .foregroundStyle(validation.invalidLines.isEmpty ? Theme.ink2 : Color.orange)
+                .foregroundStyle(validation.invalidLines.isEmpty ? Theme.ink2 : Theme.finishing)
         }
-        .padding(12)
-        .background(.quaternary.opacity(0.22), in: RoundedRectangle(cornerRadius: 10))
-    }
-
-    private func summaryCard(title: String, count: Int, symbol: String) -> some View {
-        GroupBox {
-            HStack(spacing: 12) {
-                Image(systemName: symbol).font(.hkTitle2).foregroundStyle(Theme.ink)
-                    .frame(width: 40, height: 40)
-                    .background(Theme.ink.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title).font(.hkCaption).foregroundStyle(Theme.ink2)
-                    Text("\(count)").font(.hkTitle3.weight(.semibold).monospacedDigit())
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(6)
-        }
-        .frame(maxWidth: .infinity)
+        .font(.hkCallout)
+        .tint(Theme.ink2)
+        .padding(Theme.s4)
+        .background(Theme.well, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
     }
 
     private func save(primary: String, secondary: String?, request: PersonalizationEditorRequest) -> String? {
