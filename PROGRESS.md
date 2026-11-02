@@ -400,6 +400,15 @@ Give the build Accessibility access and set Globe to Do Nothing. Then, with the 
 
 Same as above, plus: start a dictation with no field focused, click into TextEdit while talking, and confirm it types there; with typing off, confirm the card shows Copy and the "Type for me next time" link.
 
+## Completed — validated personal data backup (2026-11-01)
+
+- Added versioned JSON export/import for recent dictations (including raw recognition), vocabulary, snippets, and correction rules. No audio is included.
+- Imports reject unknown versions, oversized files, malformed/duplicate terms or rules, duplicate history IDs, and invalid entries before applying changes. Users choose Merge or Replace; Merge preserves local conflicts and adds missing records.
+- An approved import can restore an unreadable dictation archive after preserving a recovery copy where possible. The import is staged and does not change local data until confirmation.
+- Added a Settings → Data & privacy flow, a format/privacy guide, and manual acceptance steps.
+- `xcodebuild ... test`: 102 tests ran, 100 passed, 2 skipped, 0 failed.
+- Manual file-panel import/export and live voice/insertion acceptance remain to be verified on the packaged app.
+
 ## Completed — protect unreadable local history archives (2026-11-01)
 
 - Dictation, file-transcript, and meeting-note stores now distinguish missing files from unreadable archives. On decode/read failure, HushKey preserves a recovery copy when possible and refuses to overwrite the unreadable original.

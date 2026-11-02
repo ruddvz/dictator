@@ -89,6 +89,12 @@ enum DictationHistoryStore {
         try LocalJSONArchive.save(entries, protectingExistingAs: [DictationHistoryEntry].self, to: url)
     }
 
+    static func replaceAfterExplicitImport(_ entries: [DictationHistoryEntry], to url: URL) throws {
+        try LocalJSONArchive.replaceAfterExplicitRecovery(entries,
+                                                          preservingExistingAs: [DictationHistoryEntry].self,
+                                                          to: url)
+    }
+
     static func upsertingAndSaving(_ entry: DictationHistoryEntry,
                                    to url: URL,
                                    existing entries: [DictationHistoryEntry],

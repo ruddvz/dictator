@@ -93,6 +93,14 @@ Run this separately from the AirPods motion study:
 7. On macOS 14.2 or later, choose Both sides. Confirm the microphone prompt appears only after Start meeting, speak into the selected microphone while playing a separate consented voice from an app, and verify both are represented in one transcript. Stop and confirm the audio engine/tap ends and the capture gate is released. Confirm a denied microphone or System Audio Recording permission stops capture, releases the gate, and leaves System audio-only capture available. Repeat with audio routed to headphones and speakers. HushKey does not provide speaker labels.
 8. With Accessibility insertion enabled, press the global insert shortcut from Meeting Notes, Files, Settings, and Snippets/Vocabulary; it must not insert an old Silent Lab prediction. Press it from Silent Use with an accepted prediction; confirm it inserts that prediction once. Confirm insertion is blocked during meeting capture.
 
+## Personal data backup acceptance
+
+1. Save a dictation with a processed/raw difference, then add vocabulary, one snippet, and one correction rule. Export **Settings → Data & privacy → Your files → Personal data backup** and confirm the JSON contains these text items but no audio.
+2. Import the file into a second HushKey data folder or a clean test account. Choose Merge and confirm it adds missing entries while keeping local entries with matching IDs/cues. Confirm history remains capped at 50.
+3. Import again and choose Replace. Confirm the confirmation lists the data counts and that replacement changes only dictation history, vocabulary, snippets, and corrections.
+4. Try a non-HushKey JSON file, an unsupported version, malformed rules, and a file over 10 MiB. Confirm each is rejected before local data changes.
+5. In a disposable test account, corrupt the local dictation-history JSON and relaunch. Confirm HushKey shows a recovery copy path, blocks export of incomplete history, and can replace the archive only after a valid backup is selected and confirmed. Verify the recovery copy still contains the original bytes.
+
 ## Build and test
 
 Run `xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build test`. Unit tests use synthetic signals and verify classifier behavior, capture segmentation, permission/connection state transitions, dataset persistence, and secure-target insertion guards. They do not emulate AirPods or prove real-world feasibility.

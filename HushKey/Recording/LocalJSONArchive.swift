@@ -53,6 +53,20 @@ enum LocalJSONArchive {
         try data.write(to: url, options: .atomic)
     }
 
+    /// Used only after a user explicitly approves importing over an unreadable archive.
+    /// The original bytes are copied first when possible, then replaced atomically.
+    static func replaceAfterExplicitRecovery<Value: Codable, Existing: Decodable>(
+        _ value: Value,
+        preservingExistingAs existingType: Existing.Type,
+        to url: URL
+    ) throws {
+        if fileManager.fileExists(atPath: url.path) {
+            _ = load(existingType, from: url)
+        }
+        let data = try JSONEncoder().encode(value)
+        try data.write(to: url, options: .atomic)
+    }
+
     private static func preserveCopy(of url: URL, matching originalData: Data? = nil) -> URL? {
         let directory = url.deletingLastPathComponent()
         let stem = url.deletingPathExtension().lastPathComponent

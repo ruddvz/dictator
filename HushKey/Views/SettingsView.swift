@@ -246,6 +246,7 @@ private struct DataSettings: View {
     @Environment(AppModel.self) private var model
     @State private var confirmDeleteTemplates = false
     @State private var confirmDeleteSessions = false
+    @State private var confirmPersonalBackupImport = false
 
     var body: some View {
         @Bindable var model = model
@@ -277,12 +278,39 @@ private struct DataSettings: View {
                         .disabled(recorder.isRecording)
                 }
             }
+            SettingsRow(title: "Personal data backup",
+                        detail: "Recent dictations, vocabulary, snippets and corrections. No audio.") {
+                HStack(spacing: Theme.s2) {
+                    Button("Export…") { model.exportPersonalDataBackup() }
+                        .buttonStyle(SecondaryButtonStyle())
+                    Button("Import…") {
+                        confirmPersonalBackupImport = model.selectPersonalDataBackup()
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                }
+            }
         }
         .confirmationDialog("Delete all training templates from this Mac?", isPresented: $confirmDeleteTemplates, titleVisibility: .visible) {
             Button("Delete templates", role: .destructive) { model.clearTrainingData() }
         }
         .confirmationDialog("Delete all session logs and local audio files?", isPresented: $confirmDeleteSessions, titleVisibility: .visible) {
             Button("Delete session logs", role: .destructive) { model.deleteSessionLogs() }
+        }
+        .confirmationDialog("Import personal HushKey backup?", isPresented: $confirmPersonalBackupImport,
+                            titleVisibility: .visible) {
+            Button("Merge backup") { model.applyPersonalDataBackup(using: .merge) }
+            Button("Replace local data", role: .destructive) { model.applyPersonalDataBackup(using: .replace) }
+            Button("Cancel", role: .cancel) { model.cancelPersonalDataImport() }
+        } message: {
+            if let backup = model.pendingPersonalDataBackup {
+                if model.dictationHistoryArchiveUnreadable {
+                    Text("The backup contains \(backup.summary) Your unreadable dictation archive will be replaced; HushKey preserved its recovery copy where possible. Merge keeps local settings conflicts and adds matching records that are missing. Replace uses only the backup. Audio is not included.")
+                } else {
+                    Text("The backup contains \(backup.summary) Merge keeps your current entries and adds missing ones. Replace uses only the backup. Audio is not included.")
+                }
+            } else {
+                Text("The selected backup is no longer available.")
+            }
         }
 
         SettingsGroup(title: "Research recording",

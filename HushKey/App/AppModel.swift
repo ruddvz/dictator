@@ -98,6 +98,7 @@ final class AppModel {
     private(set) var fileTranscriptionHistoryMessage: String?
     private(set) var fileTranscriptionHistoryRecoveryCopyURL: URL?
     private(set) var fileTranscriptionHistoryArchiveUnreadable = false
+    private(set) var pendingPersonalDataBackup: HushKeyPersonalDataBackup?
 
     var captureShortcut: CaptureShortcut = CaptureShortcut(
         rawValue: UserDefaults.standard.string(forKey: CaptureShortcut.preferenceKey) ?? "") ?? .default {
@@ -504,6 +505,128 @@ final class AppModel {
         } catch {
             dataMessage = "Dataset export failed: \(error.localizedDescription)"
         }
+    }
+
+    func exportPersonalDataBackup() {
+        guard !dictationHistoryArchiveUnreadable else {
+            dataMessage = "Dictation history is unreadable. Import a known-good backup or remove the damaged archive before exporting a complete personal backup."
+            return
+        }
+        do {
+            let backup = currentPersonalDataBackup()
+            let data = try backup.encoded()
+            let panel = NSSavePanel()
+            panel.allowedContentTypes = [.json]
+            panel.nameFieldStringValue = "HushKey-Personal-Data.json"
+            panel.prompt = "Export Backup"
+            guard panel.runModal() == .OK, let url = panel.url else { return }
+            try data.write(to: url, options: .atomic)
+            dataMessage = "Personal backup exported to \(url.lastPathComponent). It contains dictation text and personalization, but no audio."
+        } catch {
+            dataMessage = "Personal backup export failed: \(error.localizedDescription)"
+        }
+    }
+
+    @discardableResult
+    func selectPersonalDataBackup() -> Bool {
+        guard captureGate.owner == nil, !audio.isRunning, !isFinalizingDictation, !transcriber.isFinalizing,
+              !isStartingSelectedTextEdit, !isSelectedTextEditCapturing, !isFinalizingSelectedTextEdit,
+              !isGeneratingSelectedTextEdit, !isApplyingSelectedTextEdit else {
+            dataMessage = "Finish the current capture before importing a backup."
+            return false
+        }
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.prompt = "Check Backup"
+        guard panel.runModal() == .OK, let url = panel.url else { return false }
+        let hasSecurityScope = url.startAccessingSecurityScopedResource()
+        defer { if hasSecurityScope { url.stopAccessingSecurityScopedResource() } }
+        do {
+            if let fileSize = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+               fileSize > HushKeyPersonalDataBackup.maximumFileBytes {
+                throw HushKeyPersonalDataBackup.BackupError.fileTooLarge
+            }
+            let data = try Data(contentsOf: url, options: .mappedIfSafe)
+            return stagePersonalDataBackup(data)
+        } catch {
+            pendingPersonalDataBackup = nil
+            dataMessage = "Personal backup import failed: \(error.localizedDescription)"
+            return false
+        }
+    }
+
+    @discardableResult
+    func stagePersonalDataBackup(_ data: Data) -> Bool {
+        do {
+            pendingPersonalDataBackup = try HushKeyPersonalDataBackup.decode(data)
+            dataMessage = "Backup checked. \(pendingPersonalDataBackup?.summary ?? "") Choose Merge or Replace to continue."
+            return true
+        } catch {
+            pendingPersonalDataBackup = nil
+            dataMessage = "Personal backup import failed: \(error.localizedDescription)"
+            return false
+        }
+    }
+
+    func cancelPersonalDataImport() {
+        pendingPersonalDataBackup = nil
+    }
+
+    func applyPersonalDataBackup(using strategy: PersonalDataImportStrategy) {
+        guard let pendingPersonalDataBackup else { return }
+        guard captureGate.owner == nil, !audio.isRunning, !isFinalizingDictation,
+              !transcriber.isFinalizing, !isStartingSelectedTextEdit, !isSelectedTextEditCapturing,
+              !isFinalizingSelectedTextEdit, !isGeneratingSelectedTextEdit, !isApplyingSelectedTextEdit else {
+            dataMessage = "Finish the current capture before importing a backup."
+            return
+        }
+
+        if strategy == .merge, !dictationHistoryArchiveUnreadable, savesDictationHistory {
+            let currentText = transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if DictationHistorySaveGate.shouldSave(text: currentText, lastSavedText: lastSavedDictationText,
+                                                  enabled: true) {
+                cancelPendingDictationHistorySave()
+                saveCurrentDictation()
+                guard lastSavedDictationText == currentText else {
+                    dataMessage = "The current dictation could not be saved first. Resolve its history save message, then import again."
+                    return
+                }
+            }
+        }
+
+        let current = currentPersonalDataBackup()
+        let resolved = pendingPersonalDataBackup.resolved(against: current, using: strategy)
+        do {
+            try resolved.validate()
+            if dictationHistoryArchiveUnreadable {
+                try DictationHistoryStore.replaceAfterExplicitImport(resolved.dictationHistory, to: dictationHistoryURL)
+            } else {
+                try DictationHistoryStore.save(resolved.dictationHistory, to: dictationHistoryURL)
+            }
+            dictationHistory = resolved.dictationHistory
+            dictationHistoryRecoveryCopyURL = nil
+            dictationHistoryArchiveUnreadable = false
+            dictationHistoryMessage = nil
+            dictationTerms = DictationVocabulary.encode(resolved.vocabulary)
+            dictationSnippets = resolved.snippets
+            dictationCorrectionRules = resolved.correctionRules
+            currentDictationHistoryEntryID = nil
+            lastSavedDictationText = transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            self.pendingPersonalDataBackup = nil
+            dataMessage = "Personal backup \(strategy == .merge ? "merged" : "restored"): \(resolved.summary) Audio is not included."
+        } catch {
+            dataMessage = "Personal backup could not be applied: \(error.localizedDescription)"
+        }
+    }
+
+    private func currentPersonalDataBackup() -> HushKeyPersonalDataBackup {
+        HushKeyPersonalDataBackup(
+            dictationHistory: dictationHistory,
+            vocabulary: DictationVocabulary.terms(from: dictationTerms),
+            snippets: dictationSnippets,
+            correctionRules: dictationCorrectionRules)
     }
 
     func exportSessions() {
