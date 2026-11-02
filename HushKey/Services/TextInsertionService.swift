@@ -3,6 +3,7 @@ import ApplicationServices
 import Carbon.HIToolbox
 import CryptoKit
 import Observation
+import os
 
 enum DirectInsertionVerification: Equatable {
     case verified
@@ -603,6 +604,30 @@ final class TextInsertionService {
               !exposedProcesses.contains(pid) else { return }
         exposedProcesses.insert(pid)
         AXUIElementSetAttributeValue(AXUIElementCreateApplication(pid), "AXManualAccessibility" as CFString, kCFBooleanTrue)
+    }
+
+    @ObservationIgnored private let log = Logger(subsystem: "com.ruddvz.hushkey", category: "insertion")
+
+    /// Records what HushKey sees in the focused app, so a field it cannot type into can be
+    /// diagnosed with `log show --predicate 'subsystem == "com.ruddvz.hushkey"'`. Never logs text.
+    func logFocus(_ moment: String) {
+        let app = NSWorkspace.shared.frontmostApplication
+        var line = "\(moment): enabled=\(isEnabled) trusted=\(AXIsProcessTrusted()) app=\(app?.bundleIdentifier ?? "none")"
+        if let focused = focusedElement() {
+            var settable = DarwinBoolean(false)
+            let settableResult = AXUIElementIsAttributeSettable(focused, kAXSelectedTextAttribute as CFString, &settable)
+            line += " role=\(stringAttribute(kAXRoleAttribute, of: focused) ?? "nil")"
+            line += " subrole=\(stringAttribute(kAXSubroleAttribute, of: focused) ?? "nil")"
+            line += " hasValue=\(stringAttribute(kAXValueAttribute, of: focused) != nil)"
+            line += " hasRange=\(selectedTextRange(of: focused) != nil)"
+            line += " selectedTextSettable=\(settableResult.rawValue):\(settable.boolValue)"
+        } else {
+            var value: CFTypeRef?
+            let result = AXUIElementCopyAttributeValue(AXUIElementCreateSystemWide(),
+                                                       kAXFocusedUIElementAttribute as CFString, &value)
+            line += " focused=none(\(result.rawValue))"
+        }
+        log.notice("\(line, privacy: .public) status=\(self.status, privacy: .public)")
     }
 
     private func focusedElement() -> AXUIElement? {

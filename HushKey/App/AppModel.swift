@@ -1436,6 +1436,7 @@ final class AppModel {
         capturedInsertionTargetName = capturedInsertionTarget?.applicationName
         dictationTargetApp = isHushKey ? nil : target
         dictationHasTarget = insertion.isEnabled && (capturedInsertionTarget != nil || capturedPasteTarget != nil)
+        insertion.logFocus("start insertTarget=\(capturedInsertionTarget != nil) pasteTarget=\(capturedPasteTarget != nil)")
         let targetBundleIdentifier = isHushKey ? nil : target?.bundleIdentifier
         let profileSettings = DictationAppProfile.resolve(
             requestedMode: dictationMode,
@@ -1570,6 +1571,7 @@ final class AppModel {
             retainedAudio.reset()
             let finished = processed.trimmingCharacters(in: .whitespacesAndNewlines)
             recordUsage(raw: rawText, final: finished)
+            insertion.logFocus("finish hasTarget=\(dictationHasTarget)")
             if dictationHasTarget {
                 await typeFinishedDictation(finished)
             } else if finishesWithoutTyping {
@@ -1577,6 +1579,7 @@ final class AppModel {
             } else if !(await typeIntoFieldFocusedNow(finished)) {
                 showsFinishedTranscript = true
             }
+            insertion.logFocus("after inserted=\(didInsertCurrentDictation) card=\(showsFinishedTranscript) notice=\(dictationNotice != nil)")
             completedDictationCount += 1
         }
         finishesWithoutTyping = false
