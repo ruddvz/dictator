@@ -306,10 +306,11 @@ enum DictationModeFormatter {
 enum DictationTranscriptProcessor {
     static func process(_ raw: String, mode: DictationMode, snippets: String,
                         applyCorrections: Bool = true, cleanupFillers: Bool = false,
-                        correctionRules: String = "") -> String {
+                        correctionRules: String = "", tone: DictationTone = .formal) -> String {
         let source = applyCorrections ? DictationBacktrack.apply(to: raw) : raw
         let corrected = DictationSnippetExpander.expandSegments(source, definitions: correctionRules)
-        let formatted = corrected.flatMap { segment -> [DictationTextSegment] in
+        let lastFreeSegment = corrected.lastIndex { !$0.isProtected }
+        let formatted = corrected.enumerated().flatMap { index, segment -> [DictationTextSegment] in
             guard !segment.isProtected else { return [segment] }
             let leading = segment.text.prefix(while: \.isWhitespace)
             let remainder = segment.text.dropFirst(leading.count)
@@ -317,7 +318,12 @@ enum DictationTranscriptProcessor {
             var text = String(remainder.dropLast(trailing.count))
             if cleanupFillers { text = DictationLocalCleanup.removeFillers(from: text) }
             if mode == .code { text = DictationCodeFormatter.format(text) }
-            else { text = DictationModeFormatter.format(text, mode: mode) }
+            else {
+                text = DictationModeFormatter.format(text, mode: mode)
+                // Tone only drops the closing full stop at the very end of the dictation.
+                if tone == .casual { text = index == lastFreeSegment ? tone.apply(to: text) : text }
+                else { text = tone.apply(to: text) }
+            }
             let leadingWhitespace = text.hasPrefix("\n") ? "" : String(leading)
             let trailingWhitespace = text.hasSuffix("\n") ? "" : String(trailing)
             let preservedWhitespace = leadingWhitespace + text + trailingWhitespace

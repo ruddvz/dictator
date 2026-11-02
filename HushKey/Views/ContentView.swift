@@ -7,7 +7,7 @@ struct ContentView: View {
     @AppStorage(AppearancePreference.storageKey) private var appearance: AppearancePreference = .light
 
     static let labScreens: [AppModel.Screen] = [.setup, .train, .evaluate, .use]
-    private static let mainScreens: [AppModel.Screen] = [.dictation, .transforms, .files, .meetings, .personalization]
+    private static let mainScreens: [AppModel.Screen] = [.dictation, .style, .transforms, .files, .meetings, .personalization]
 
     var body: some View {
         HStack(spacing: 0) {
@@ -97,6 +97,7 @@ struct ContentView: View {
                 case .evaluate: EvaluateView()
                 case .use: UseView()
                 case .personalization: PersonalizationView()
+                case .style: StyleView()
                 case .settings: SettingsView()
                 }
             }

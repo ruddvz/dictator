@@ -465,6 +465,10 @@ private struct NextStepBanner: View {
                     UserDefaults.standard.set(SettingsView.Section.insertion.rawValue, forKey: "settingsSection")
                     model.screen = .settings
                 },
+            !model.dictationToneSettings.tones.isEmpty ? nil : Step(
+                id: "style", title: "Make it sound like you",
+                detail: "Casual in Messages, formal in Mail. Pick a style for each kind of app.",
+                action: "Choose styles") { $0.screen = .style },
             !model.dictationTerms.isEmpty || !model.dictationSnippets.isEmpty ? nil : Step(
                 id: "vocabulary", title: "Teach HushKey your words",
                 detail: "Add names and jargon once. Recognition and spelling follow everywhere.",

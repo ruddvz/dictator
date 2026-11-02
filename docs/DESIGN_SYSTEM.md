@@ -128,6 +128,7 @@ Matched to Wispr's measured sizes; SF Pro / SF Pro Rounded instead of Wispr's sa
 - **Surfaces:** `card(style: .well | .outlined)`, `SettingsGroup`, `GroupRow`, `ListGroup`, `RowDivider`.
 - **Rows:** `SettingsRow` (label, one-line detail, right-aligned control), `ListRow` (hover fill and actions).
 - **Controls:** `PrimaryButtonStyle(tint:foreground:)`, `SecondaryButtonStyle(minWidth:)`, `DestructiveButtonStyle`, `IconButtonStyle`, `MenuPicker`, `RowToggle`, `UnderlineTabs`, `Keycap` / `KeycapShortcut`.
+- **Style page:** `StyleView`: `UnderlineTabs` for the four contexts, plain app chips, and three `ToneCard`s (`well`, or `signalSoft` with a 1.5 pt `signal` border when selected) whose previews run through `DictationTone.apply`.
 - **Page:** `PageHeader` (title, optional subtitle, trailing actions), `pageLayout(maxWidth:)`, `EmptyState`.
 - **Silent Lab:** `LabProgress` (Connect → Train → Evaluate → Silent Use strip on every lab page), `LabHero`, `HeroMetric`.
 - **Motion:** `MorphIcon`, `PillMeter`, `VoiceRibbon`, `LiveWaveform`, `StatusChip`, `SectionLabel`, `ActivityHeatmap`.

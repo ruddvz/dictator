@@ -20,6 +20,7 @@ final class AppModel {
         case evaluate = "Evaluate"
         case use = "Silent Use"
         case personalization = "Snippets & Vocabulary"
+        case style = "Style"
         case settings = "Settings & Data"
         var id: String { rawValue }
         var symbol: String {
@@ -33,6 +34,7 @@ final class AppModel {
             case .evaluate: "chart.bar.xaxis"
             case .use: "text.bubble"
             case .personalization: "character.book.closed"
+            case .style: "textformat"
             case .settings: "gearshape"
             }
         }
@@ -170,6 +172,13 @@ final class AppModel {
     var showsFloatingPill = UserDefaults.standard.object(forKey: "showFloatingPill") as? Bool ?? true {
         didSet { UserDefaults.standard.set(showsFloatingPill, forKey: "showFloatingPill") }
     }
+    /// Tone per context (Personal messages, Work messages, Email, Other); see the Style page.
+    var dictationToneSettings = AppModel.loadToneSettings() {
+        didSet {
+            let stored = Dictionary(uniqueKeysWithValues: dictationToneSettings.tones.map { ($0.key.rawValue, $0.value.rawValue) })
+            UserDefaults.standard.set(stored, forKey: "dictationTones")
+        }
+    }
     /// A soft system sound when dictation starts listening and when it stops. Off by default.
     var playsDictationSounds = UserDefaults.standard.bool(forKey: "playDictationSounds") {
         didSet { UserDefaults.standard.set(playsDictationSounds, forKey: "playDictationSounds") }
@@ -221,6 +230,8 @@ final class AppModel {
     @ObservationIgnored private(set) var lastSavedDictationText: String?
     @ObservationIgnored private(set) var dictationStartedAt: Date?
     @ObservationIgnored private var lastDictationDuration: TimeInterval?
+    /// The tone picked from the Style page when this dictation started.
+    @ObservationIgnored private var activeDictationTone: DictationTone = .formal
     /// The input the last dictation used, for "We couldn't hear you".
     @ObservationIgnored private var lastDictationMicrophoneName: String?
     @ObservationIgnored private var cancelNoticeToken = 0
@@ -437,7 +448,7 @@ final class AppModel {
                               label: prediction.best?.label ?? "", confidence: prediction.confidence)
         case .settings:
             recorder.logEvent(segment, kind: "segment", label: recorder.prompt, confidence: nil)
-        case .dictation, .transforms, .files, .meetings, .setup, .evaluate, .personalization:
+        case .dictation, .transforms, .files, .meetings, .setup, .evaluate, .personalization, .style:
             if recorder.isRecording {
                 recorder.logEvent(segment, kind: "segment", label: recorder.prompt, confidence: nil)
             }
@@ -478,6 +489,7 @@ final class AppModel {
         case .files: return false
         case .meetings: return false
         case .personalization: return false
+        case .style: return false
         case .settings: return false
         case .setup, .evaluate: return false
         }
@@ -1345,6 +1357,7 @@ final class AppModel {
             globalCorrectionRules: dictationCorrectionRules,
             globalCleansFillers: cleansDictationFillers)
         activeDictationMode = profileSettings.mode
+        activeDictationTone = dictationToneSettings.tone(forBundle: targetBundleIdentifier, mode: profileSettings.mode)
         activeDictationLanguageIdentifier = profileSettings.languageIdentifier
         activeDictationSnippets = profileSettings.snippets
         activeDictationCorrectionRules = profileSettings.correctionRules
@@ -1440,7 +1453,8 @@ final class AppModel {
                                                               snippets: activeDictationSnippets,
                                                               applyCorrections: appliesSpokenCorrections,
                                                               cleanupFillers: activeDictationCleansFillers,
-                                                              correctionRules: activeDictationCorrectionRules)
+                                                              correctionRules: activeDictationCorrectionRules,
+                                                              tone: activeDictationTone)
         transcriber.replaceText(processed)
         if !processed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             activeDictationProfileName = captureDictationProfileName
@@ -1900,6 +1914,17 @@ final class AppModel {
             guard let self, token == cancelNoticeToken, dictationNotice?.kind == .cancelled else { return }
             dismissDictationNotice()
         }
+    }
+
+    private static func loadToneSettings() -> DictationToneSettings {
+        let stored = UserDefaults.standard.dictionary(forKey: "dictationTones") as? [String: String] ?? [:]
+        var settings = DictationToneSettings()
+        for (context, tone) in stored {
+            if let context = DictationContext(rawValue: context), let tone = DictationTone(rawValue: tone) {
+                settings.tones[context] = tone
+            }
+        }
+        return settings
     }
 
     /// Opens the input tab of Sound settings, for a muted or missing microphone.

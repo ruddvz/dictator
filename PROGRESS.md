@@ -1,5 +1,16 @@
 # HushKey progress
 
+## Completed — app-wide Wispr comparison and Style page (2026-11-02)
+
+- Wrote `docs/APP_UX_ANALYSIS.md`. HushKey already matches Wispr Flow on breadth. The biggest visible gap was **Style**: Wispr sets a tone (Formal / Casual / Very casual) for each kind of app, with previews; HushKey had only modes.
+- New **Style** page in the sidebar. Its tabs are Personal messages, Work messages, Email and Other, matched by the target app's bundle identifier (`DictationContext`). Three tone cards each show a live preview. `DictationTone` runs on this Mac after mode formatting and before snippets: Casual drops the final full stop; Very casual lower-cases sentence starts (keeping "I" and acronyms) and drops sentence full stops (keeping decimals, ellipses, ? and !). Code mode is never restyled. The default is Formal everywhere, so existing output is unchanged.
+- The home next-step hero now suggests "Make it sound like you", which opens Style, until a tone is chosen.
+- Added `DictationToneTests` (7). `xcodebuild ... test`: 163 passed, 2 skipped, 0 failed.
+- **Seen live (packaged app):** the Style page and selecting Very casual, which updated the card and the check (then set back to Formal); the pill reopened at its dragged position after relaunch.
+- **Not seen live:** a real dictation into Messages/Slack/Mail with a non-formal tone, and the new Style hero (it hides once a tone has been stored, which my test did).
+- Wispr Flow's window was on another Space; I read its home screen and accessibility tree but didn't click through its other pages. The comparison also uses the 2026-11-01 measurements.
+- Next: recover cancelled dictations from history (in memory, this session only) and a 2-minute guided tour from the setup checklist.
+
 ## Completed — pill recovery, Undo, mic menu and placement (2026-11-02)
 
 - "We couldn't hear you" when the recording's peak level stayed under −54 dBFS (`AudioService.peakLevel`, `DictationRecovery.silenceLevel`). It and "Mic didn't start" offer a Mic picker and Sound settings.
