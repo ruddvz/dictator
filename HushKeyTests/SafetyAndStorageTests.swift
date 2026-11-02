@@ -336,6 +336,65 @@ final class SafetyAndStorageTests: XCTestCase {
     }
 
     @MainActor
+    func testMeetingDraftCheckpointRecoversAfterServiceRecreation() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "hushkey-meeting-draft-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let notesURL = directory.appending(path: "meeting-notes.json")
+        let draftURL = directory.appending(path: "meeting-notes-active-draft.json")
+        let service = MeetingNotesService(captureGate: AudioCaptureGate(), notesURL: notesURL,
+                                          draftURL: draftURL)
+        let draft = MeetingNotesDraft(startedAt: Date(timeIntervalSince1970: 1_800_000_000),
+                                      duration: 92, audioSource: .both,
+                                      transcript: "Mira will send the final copy by Friday.")
+
+        XCTAssertTrue(service.checkpointDraft(draft))
+        let relaunchedService = MeetingNotesService(captureGate: AudioCaptureGate(), notesURL: notesURL,
+                                                    draftURL: draftURL)
+        XCTAssertEqual(relaunchedService.recoveredDraft, draft)
+        XCTAssertTrue(relaunchedService.hasPendingDraftRecovery)
+
+        relaunchedService.recoverInterruptedMeetingDraft()
+
+        let recoveredNote = try XCTUnwrap(MeetingNotesStore.load(from: notesURL)?.first)
+        XCTAssertEqual(recoveredNote.id, draft.id)
+        XCTAssertEqual(recoveredNote.transcript, draft.transcript)
+        XCTAssertEqual(recoveredNote.duration, draft.duration)
+        XCTAssertNil(relaunchedService.recoveredDraft)
+        if case .missing = MeetingNotesDraftStore.loadState(from: draftURL) {} else {
+            XCTFail("Recovered checkpoint should be removed after saving the note")
+        }
+    }
+
+    @MainActor
+    func testMeetingDraftStaysAvailableWhenRecoveryCannotSaveNotes() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "hushkey-meeting-draft-failure-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let blockingFile = directory.appending(path: "not-a-directory")
+        try Data("blocked".utf8).write(to: blockingFile)
+        let notesURL = blockingFile.appending(path: "meeting-notes.json")
+        let draftURL = directory.appending(path: "meeting-notes-active-draft.json")
+        let draft = MeetingNotesDraft(startedAt: Date(), duration: 12, audioSource: .microphone,
+                                      transcript: "The recovered transcript remains here.")
+        try MeetingNotesDraftStore.save(draft, to: draftURL)
+        let service = MeetingNotesService(captureGate: AudioCaptureGate(), notesURL: notesURL,
+                                          draftURL: draftURL)
+
+        service.recoverInterruptedMeetingDraft()
+
+        XCTAssertEqual(service.recoveredDraft, draft)
+        XCTAssertEqual(service.message?.contains("could not be saved"), true)
+        if case .loaded(let savedDraft) = MeetingNotesDraftStore.loadState(from: draftURL) {
+            XCTAssertEqual(savedDraft, draft)
+        } else {
+            XCTFail("The unsaved recovery checkpoint should remain available")
+        }
+    }
+
+    @MainActor
     func testMeetingServiceCanRemoveUnreadableArchiveAfterPreservingRecoveryCopy() throws {
         let url = FileManager.default.temporaryDirectory
             .appending(path: "hushkey-meetings-reset-\(UUID().uuidString).json")

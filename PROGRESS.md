@@ -549,3 +549,13 @@ Same as above, plus: start a dictation with no field focused, click into TextEdi
 - `xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build CODE_SIGNING_ALLOWED=NO test`: 127 passed, 2 skipped, 0 failed. Release packaging succeeded and strict signature verification passed; the updated app is open.
 - GitHub Actions did not start this commit's hosted job: GitHub reported that account payments failed or the spending limit must be increased. The local build and test run passed.
 - Next: live file-transcription, meeting-capture, and history-clear acceptance in a user-approved session.
+
+
+## Completed — recover interrupted meeting transcripts (2026-11-02)
+
+- Meeting capture now checkpoints recognized text locally at least every two seconds while updates arrive; audio remains transient. Stop promotes the final checkpoint into the meeting archive and removes the temporary file only after the note is saved.
+- On relaunch, HushKey offers the partial transcript with source and duration so the user can save it as a note or explicitly discard it. If saving the note fails, the checkpoint remains available.
+- Added regression coverage for checkpoint/relaunch/recovery and preserving the draft when promotion fails. Updated privacy copy, product plan, and manual force-quit acceptance steps.
+- `xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build CODE_SIGNING_ALLOWED=NO test`: 129 passed, 2 skipped, 0 failed. Release packaging succeeded; strict signature verification passed and the updated app is open.
+- Live force-quit recovery and microphone/system-audio capture still need a user-approved session. GitHub Actions hosted jobs remain unable to start due the account payment/spending-limit restriction.
+- Next: live meeting crash-recovery and file-transcription acceptance in a user-approved session.

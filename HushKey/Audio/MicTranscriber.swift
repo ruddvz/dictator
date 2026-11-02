@@ -23,6 +23,7 @@ final class MicTranscriber {
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var finalizationContinuation: CheckedContinuation<String, Never>?
     @ObservationIgnored private var finalizationTimeoutTask: Task<Void, Never>?
+    @ObservationIgnored var onTextChange: ((String) -> Void)?
 
     func prepare(localeIdentifier: String = "en-US") async -> Bool {
         guard !isRunning, !isFinalizing else { return false }
@@ -166,13 +167,13 @@ final class MicTranscriber {
 
     func clear() {
         stitcher = TranscriptStitcher()
-        text = ""
+        setText("")
     }
 
     func replaceText(_ value: String) {
         guard !isRunning else { return }
         stitcher = TranscriptStitcher(text: value)
-        text = value
+        setText(value)
     }
 
     private func startTask() {
@@ -197,13 +198,13 @@ final class MicTranscriber {
         guard generation == self.generation, isRunning || isFinalizing else { return }
         if let partial = result.text {
             stitcher.update(partial: partial, start: result.start, end: result.end)
-            text = stitcher.text
+            setText(stitcher.text)
             error = nil
         }
         guard result.isFinal || result.failure != nil else { return }
         // The task is over, by a final result, silence, or an error. Keep every word heard so far.
         stitcher.commit()
-        text = stitcher.text
+        setText(stitcher.text)
         if let failure = result.failure, !result.isBenignEnd {
             error = "Speech recognition issue: \(failure)"
         }
@@ -216,6 +217,12 @@ final class MicTranscriber {
             try? await Task.sleep(for: .milliseconds(result.failure != nil && !result.isBenignEnd ? 500 : 50))
             self?.startTask()
         }
+    }
+
+    private func setText(_ value: String) {
+        guard text != value else { return }
+        text = value
+        onTextChange?(value)
     }
 
     private func completeFinalization() {

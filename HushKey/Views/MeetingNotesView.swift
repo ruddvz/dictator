@@ -21,6 +21,8 @@ struct MeetingNotesView: View {
     @State private var searchText = ""
     @State private var pendingDeleteID: UUID?
     @State private var confirmRemoveUnreadableArchive = false
+    @State private var confirmDiscardRecoveredDraft = false
+    @State private var confirmRemoveUnreadableDraft = false
     @State private var exportDocument: MeetingNoteDocument?
     @State private var exportFilename = "HushKey Meeting Notes"
     @State private var isExporting = false
@@ -49,6 +51,10 @@ struct MeetingNotesView: View {
 
             captureControls
 
+            if let draft = service.recoveredDraft {
+                interruptedDraftCard(draft)
+            }
+
             if let message = service.message {
                 VStack(alignment: .leading, spacing: Theme.s2) {
                     Label(message, systemImage: "exclamationmark.circle")
@@ -57,6 +63,10 @@ struct MeetingNotesView: View {
                         .fixedSize(horizontal: false, vertical: true)
                     if service.archiveUnreadable {
                         Button("Remove unreadable archive…") { confirmRemoveUnreadableArchive = true }
+                            .buttonStyle(SecondaryButtonStyle())
+                    }
+                    if service.draftArchiveUnreadable {
+                        Button("Remove unreadable meeting draft…") { confirmRemoveUnreadableDraft = true }
                             .buttonStyle(SecondaryButtonStyle())
                     }
                 }
@@ -104,6 +114,26 @@ struct MeetingNotesView: View {
                 Text("HushKey kept a recovery copy at \(recoveryCopyURL.path). Removing this unreadable file lets new meeting notes save normally.")
             } else {
                 Text("HushKey could not make a recovery copy. The original file remains in place until you remove it.")
+            }
+        }
+        .confirmationDialog("Discard this interrupted meeting transcript?",
+                            isPresented: $confirmDiscardRecoveredDraft,
+                            titleVisibility: .visible) {
+            Button("Discard transcript", role: .destructive) { service.discardInterruptedMeetingDraft() }
+            Button("Keep transcript", role: .cancel) { confirmDiscardRecoveredDraft = false }
+        } message: {
+            Text("This removes the locally recovered transcript from this Mac. Meeting audio was not saved.")
+        }
+        .confirmationDialog("Remove unreadable meeting draft?",
+                            isPresented: $confirmRemoveUnreadableDraft,
+                            titleVisibility: .visible) {
+            Button("Remove draft", role: .destructive) { service.removeUnreadableDraftArchive() }
+            Button("Cancel", role: .cancel) { confirmRemoveUnreadableDraft = false }
+        } message: {
+            if let recoveryCopyURL = service.draftRecoveryCopyURL {
+                Text("HushKey kept a recovery copy at \(recoveryCopyURL.path). Removing this unreadable draft lets a new meeting start.")
+            } else {
+                Text("HushKey could not make a recovery copy. The original draft file remains until you remove it.")
             }
         }
         .onAppear {
@@ -168,13 +198,45 @@ struct MeetingNotesView: View {
                            width: 170)
                 Button("Start", systemImage: "record.circle", action: startMeeting)
                     .buttonStyle(PrimaryButtonStyle())
-                    .disabled(model.captureGate.owner != nil)
+                    .disabled(model.captureGate.owner != nil || service.hasPendingDraftRecovery)
+                    .help(service.hasPendingDraftRecovery
+                          ? "Recover or discard the interrupted transcript before starting"
+                          : "Start local meeting capture")
             }
         }
         .padding(Theme.s5)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.signalSoft, in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
         .animation(Theme.snappy, value: service.isCapturing)
+    }
+
+    private func interruptedDraftCard(_ draft: MeetingNotesDraft) -> some View {
+        VStack(alignment: .leading, spacing: Theme.s3) {
+            Label("Recovered unfinished meeting", systemImage: "arrow.uturn.backward.circle")
+                .font(.hkTitle3)
+            Text("Partial transcript from \(draft.audioSource.rawValue.lowercased()) · started \(draft.startedAt.formatted(date: .abbreviated, time: .shortened)) · \(durationLabel(draft.duration)). Audio was not saved.")
+                .font(.hkCallout)
+                .foregroundStyle(Theme.ink2)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(draft.transcript)
+                .font(.hkBody)
+                .lineLimit(5)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(Theme.s3)
+                .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
+            HStack {
+                Spacer()
+                Button("Discard…", systemImage: "trash") { confirmDiscardRecoveredDraft = true }
+                    .buttonStyle(SecondaryButtonStyle())
+                Button("Save recovered transcript", systemImage: "square.and.arrow.down") {
+                    service.recoverInterruptedMeetingDraft()
+                }
+                .buttonStyle(PrimaryButtonStyle())
+            }
+        }
+        .padding(Theme.s5)
+        .background(Theme.signalSoft, in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
     }
 
     private var notesList: some View {
@@ -374,7 +436,7 @@ struct MeetingNotesView: View {
     }
 
     private var privacyNote: some View {
-        Label("Transcribed on this Mac. Audio is never saved.",
+        Label("Transcribed on this Mac. Partial text is checkpointed for recovery; audio is never saved.",
               systemImage: "lock.shield")
             .font(.hkCaption)
             .foregroundStyle(Theme.ink2)
