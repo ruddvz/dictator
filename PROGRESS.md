@@ -164,6 +164,13 @@ In a fresh session, with the user present, verify microphone and Speech prompts,
 - Rebuilt `dist/HushKey.app` in Release configuration; `codesign --verify --deep --strict` passed.
 - Computer Use could not bind to the packaged app path (`-10005`), so the running window was not visually refreshed or verified. No microphone, audio, or user permission was used.
 
+## Completed — stable dictation history edits
+
+- Updated the active transcript's history entry in place after repeated manual edits, local transforms, or raw restore. Each edit keeps the entry ID and creation time stable instead of filling history with duplicates.
+- Editing a restored history item creates a new current entry, leaving the restored original available in Recent dictations.
+- History deletion resets its active-entry state only after the file is successfully removed. Added regression coverage for repeated edits, record identity, creation-time preservation, and write failures.
+- `xcodebuild test`: 40 passed, 0 failed, 0 skipped. Rebuilt `dist/HushKey.app`; strict code-signature verification passed.
+
 ## Next item — manual runtime acceptance
 
 With the user present, verify the packaged app's transcript editing, delayed history save, raw restore, transform preview invalidation, and undo/insertion reset. Then test recent file transcripts, search, restore, and deletion with consented audio, plus the documented voice and meeting capture flows. Recheck the running app path when Computer Use can bind to it; builds and unit tests do not prove live microphone, Accessibility insertion, AirPods, or system-audio behavior.

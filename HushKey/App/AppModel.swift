@@ -146,6 +146,7 @@ final class AppModel {
     @ObservationIgnored private(set) var lastSavedDictationText: String?
     @ObservationIgnored private let dictationHistoryURL: URL
     @ObservationIgnored private var dictationHistorySaveTask: Task<Void, Never>?
+    @ObservationIgnored private var currentDictationHistoryEntryID: UUID?
 
     // MARK: Decoding
 
@@ -571,6 +572,7 @@ final class AppModel {
         didInsertCurrentDictation = false
         insertion.clearUndoRecord()
         lastSavedDictationText = nil
+        currentDictationHistoryEntryID = nil
         await startDictation()
     }
 
@@ -587,6 +589,8 @@ final class AppModel {
             try DictationHistoryStore.delete(at: dictationHistoryURL)
             cancelPendingDictationHistorySave()
             dictationHistory.removeAll()
+            currentDictationHistoryEntryID = nil
+            lastSavedDictationText = nil
             dictationHistoryMessage = "Saved transcript history was deleted from this Mac."
         } catch {
             dictationHistoryMessage = "Could not delete transcript history: \(error.localizedDescription)"
@@ -596,7 +600,6 @@ final class AppModel {
             transcriber.clear()
             rawDictationText = ""
             clearLocalTransformUndo()
-            lastSavedDictationText = nil
             didInsertCurrentDictation = false
             insertion.clearUndoRecord()
         }
@@ -612,6 +615,7 @@ final class AppModel {
         didInsertCurrentDictation = false
         insertion.clearUndoRecord()
         lastSavedDictationText = restoredText
+        currentDictationHistoryEntryID = nil
         screen = .dictation
     }
 
@@ -640,6 +644,7 @@ final class AppModel {
         didInsertCurrentDictation = false
         insertion.clearUndoRecord()
         lastSavedDictationText = nil
+        currentDictationHistoryEntryID = nil
     }
 
     func requestNearbyTextAccess() {
@@ -721,10 +726,13 @@ final class AppModel {
         guard DictationHistorySaveGate.shouldSave(text: text, lastSavedText: lastSavedDictationText,
                                                   enabled: savesDictationHistory) else { return }
         let raw = rawDictationText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let entry = DictationHistoryEntry(text: text, rawText: raw.isEmpty || raw == text ? nil : raw)
+        let entry = DictationHistoryEntry(id: currentDictationHistoryEntryID ?? UUID(),
+                                          text: text,
+                                          rawText: raw.isEmpty || raw == text ? nil : raw)
         do {
-            dictationHistory = try DictationHistoryStore.appendingAndSaving(
+            dictationHistory = try DictationHistoryStore.upsertingAndSaving(
                 entry, to: dictationHistoryURL, existing: dictationHistory)
+            currentDictationHistoryEntryID = entry.id
             lastSavedDictationText = text
             dictationHistoryMessage = nil
         } catch {

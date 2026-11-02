@@ -152,7 +152,7 @@ final class SafetyAndStorageTests: XCTestCase {
         let existing = [DictationHistoryEntry(text: "Previously saved.")]
         let pending = DictationHistoryEntry(text: "New transcript.")
 
-        XCTAssertThrowsError(try DictationHistoryStore.appendingAndSaving(
+        XCTAssertThrowsError(try DictationHistoryStore.upsertingAndSaving(
             pending, to: destination, existing: existing))
         XCTAssertEqual(existing.map(\.text), ["Previously saved."])
         XCTAssertNil(DictationHistoryStore.load(from: destination))
@@ -386,9 +386,19 @@ final class SafetyAndStorageTests: XCTestCase {
         XCTAssertEqual(model.transcriber.text, "Human-edited words.")
         try await Task.sleep(for: .milliseconds(700))
 
+        let firstEdit = try XCTUnwrap(model.dictationHistory.first)
         XCTAssertEqual(model.dictationHistory.first?.text, "Human-edited words.")
         XCTAssertEqual(model.dictationHistory.first?.rawText, "Um, processed words.")
         XCTAssertEqual(DictationHistoryStore.load(from: url)?.first?.text, "Human-edited words.")
+
+        model.editCurrentDictation("Human-edited words again.")
+        try await Task.sleep(for: .milliseconds(700))
+
+        XCTAssertEqual(model.dictationHistory.count, 2)
+        XCTAssertEqual(model.dictationHistory.first?.id, firstEdit.id)
+        XCTAssertEqual(model.dictationHistory.first?.createdAt, firstEdit.createdAt)
+        XCTAssertEqual(model.dictationHistory.first?.text, "Human-edited words again.")
+        XCTAssertEqual(DictationHistoryStore.load(from: url)?.count, 2)
     }
 
     func testPersonalVocabularySplitsAndDeduplicatesLocalHints() {

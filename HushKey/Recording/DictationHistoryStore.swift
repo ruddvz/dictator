@@ -44,11 +44,17 @@ enum DictationHistoryStore {
         try JSONEncoder().encode(entries).write(to: url, options: .atomic)
     }
 
-    static func appendingAndSaving(_ entry: DictationHistoryEntry,
+    static func upsertingAndSaving(_ entry: DictationHistoryEntry,
                                    to url: URL,
                                    existing entries: [DictationHistoryEntry],
                                    limit: Int = 50) throws -> [DictationHistoryEntry] {
-        let updated = Array(([entry] + entries).prefix(max(0, limit)))
+        var savedEntry = entry
+        var remaining = entries
+        if let existingIndex = remaining.firstIndex(where: { $0.id == entry.id }) {
+            savedEntry.createdAt = remaining[existingIndex].createdAt
+            remaining.remove(at: existingIndex)
+        }
+        let updated = Array(([savedEntry] + remaining).prefix(max(0, limit)))
         try save(updated, to: url)
         return updated
     }
