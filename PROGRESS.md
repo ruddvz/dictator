@@ -25,6 +25,34 @@
 - **Verified live by the user:** fn dictation with Parakeet selected in the packaged worktree build. The Apple Speech fallback path has not been forced live.
 - Other agents' `quit app "HushKey"` calls (before their test or package runs) closed the packaged app twice during this work. Only one HushKey can run, so coordinate before a live check.
 - **Next:** record a few consented clips of the user's own voice into `Fixtures/eval/*/audio/` for a real WER. Consider FluidAudio's CTC vocabulary boosting (an extra ~130 MB model) if name accuracy still lags.
+## Completed: Silent Use audit, Control-hold capture and better decoding (2026-11-02)
+
+- **Research:** [docs/SILENT_SPEECH_RESEARCH.md](docs/SILENT_SPEECH_RESEARCH.md) compares SubVox with Spiro-12/silent-speech, mutix, Loq, speechless, MuteIt, JawSense, Unvoiced and QuietSync, with licences and reported accuracy. SubVox publishes no accuracy figures and has no upstream changes since `591d028`.
+- **Fixed:** Silent Use re-locked after every launch and every new take, because the evidence was held only in memory. It now re-checks itself in the background (`AppModel.silentEvidence`).
+- **Fixed:** trained words could not be typed into another app without switching windows and pressing the insert shortcut. Now:
+  - Holding **Control** alone captures a silent word on Train and on an unlocked Silent Use, in any app. It uses the same hold logic as fn for dictation (`FunctionKeyMonitor(key: .control)`), and ⌃-shortcuts cancel the capture.
+  - Accepted words are typed into the front app (toggle **Type into the front app**, on by default).
+- **Improved decoding:**
+  - 3-sample smoothing: leave-one-out accuracy on this Mac's 37 real takes went from 38 % to 43 % (chance 30 %), and p from 0.026 to 0.002. On clean takes it went from 33 % to 48 %.
+  - Takes that are too short, too long, or include a head turn are refused, and such captures are never typed.
+  - A "nothing" rest word is recognised but never typed.
+- **Measuring:** `Scripts/silent-eval.sh` re-scores the saved dataset under several variants and writes `docs/eval/silent-report.md`.
+- **Verified here:** 198 tests, 3 skipped, 0 failures (after merging the Electron paste fix) (`xcodebuild … test`), and a signed `Scripts/package-app.sh` build.
+- **Not verified live yet:**
+  - Control-hold with AirPods in another app.
+  - Motion streaming while HushKey is in the background.
+  - Typing into TextEdit.
+- **Next:** record a second session of every word, plus 10 "nothing" takes. Silent Use stays locked until a held-out session beats the baseline, and the current data is one session.
+
+## Completed: no false "Check the field first" after pasting into Electron apps (2026-11-02)
+
+- Dictating into the Claude desktop app inserted the text but showed "Check the field first / Paste again". Paste verification required the field's accessibility value to equal the expected string exactly, and treated any other value or a rebuilt focused element as "target changed".
+- `PasteDeliveryVerifier.matches` now also accepts the text as shown: non-breaking spaces count as spaces, zero-width characters are ignored, and leading or trailing whitespace and newlines are trimmed. Missing, partial or duplicated text is still rejected. If the focused element is replaced in the same app with the same role, its value is still checked.
+- An unconfirmed paste now logs why (`paste unconfirmed …`): element identity, lengths, whether the normalised text matches, and whether the text appears once or twice. It never logs text.
+- Tests: 189 passed, 2 skipped (`testCustomWritingStyleUsesOnDeviceModelWhenAvailable` skipped because it hangs), including two new verifier tests. Signed dist packaged.
+- **Seen live:** fn dictation into the Claude app's message box logged "Pasted into Claude and verified in the same text field", with no notice. Not yet checked: Slack and VS Code.
+- Removed stale HushKey copies (the old Codex dist, two Xcode DerivedData folders, `~/Downloads/Hushkey.dmg`; all in the Trash), so Spotlight finds only `dist/HushKey.app`. `~/Documents/ChatGPT/HushKey` (Codex clone) was left; check it for unmoved work before deleting it.
+- Next: the Parakeet engine and Silent Use improvements are running in their own sessions.
 
 ## Completed: home redesign, ambient hero and breath ribbon (2026-11-02)
 

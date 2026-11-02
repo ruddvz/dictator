@@ -91,11 +91,16 @@ struct TrainView: View {
             }
             HoldToCaptureButton(
                 title: "Capture “\(word)”",
-                shortcut: model.captureShortcut.label,
+                shortcut: "Control",
                 isCapturing: model.capture.isCapturing,
                 isEnabled: model.selectedWord != nil && model.motion.status == .streaming,
                 onBegin: model.capture.begin,
                 onEnd: model.capture.end)
+            if let issue = model.lastTakeIssue {
+                Label(issue.message + " It wasn’t saved.", systemImage: "exclamationmark.triangle")
+                    .font(.hkCaption)
+                    .foregroundStyle(Theme.finishing)
+            }
             HStack(spacing: Theme.s2) {
                 if model.motion.status != .streaming {
                     Label(model.motion.status.label, systemImage: "headphones")
@@ -121,8 +126,10 @@ struct TrainView: View {
             "Say it out loud while you hold capture."
         case .whisper:
             "Whisper it while you hold capture."
+        case .silent where model.selectedWord == TemplateClassifier.restLabel:
+            "Hold capture with your mouth closed and still. HushKey learns to ignore this, never types it."
         case .silent:
-            "Mouth it without a sound while you hold capture."
+            "Mouth it without a sound while you hold capture, or hold Control. Add a word “\(TemplateClassifier.restLabel)” so stray movement is ignored."
         }
     }
 

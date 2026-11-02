@@ -89,16 +89,47 @@ struct FunctionKeyGesture {
     }
 }
 
-/// Watches the fn key system-wide. Global key monitoring needs Accessibility access,
-/// which HushKey already asks for to insert text.
+/// Watches a lone modifier key system-wide: fn for dictation, Control for Silent Use.
+/// Global key monitoring needs Accessibility access, which HushKey already asks for to insert text.
 @MainActor
 final class FunctionKeyMonitor {
+    enum Key {
+        case function
+        case control
+
+        var keyCodes: Set<UInt16> {
+            switch self {
+            case .function: [UInt16(kVK_Function)]
+            case .control: [UInt16(kVK_Control), UInt16(kVK_RightControl)]
+            }
+        }
+
+        var flag: NSEvent.ModifierFlags {
+            switch self {
+            case .function: .function
+            case .control: .control
+            }
+        }
+
+        /// Modifiers that turn a press into a shortcut. fn is excluded for fn itself because macOS
+        /// sets it on arrow and F-key events too.
+        var otherModifiers: NSEvent.ModifierFlags {
+            switch self {
+            case .function: [.command, .option, .control, .shift]
+            case .control: [.command, .option, .shift, .function]
+            }
+        }
+    }
+
+    let key: Key
     var onAction: ((FunctionKeyGesture.Action) -> Void)?
     private(set) var gesture = FunctionKeyGesture()
     private var monitors: [Any] = []
     private var holdTimer: DispatchWorkItem?
 
     var isInstalled: Bool { !monitors.isEmpty }
+
+    init(key: Key = .function) { self.key = key }
 
     func install() {
         guard monitors.isEmpty else { return }
@@ -135,11 +166,11 @@ final class FunctionKeyMonitor {
         let now = event.timestamp
         let action: FunctionKeyGesture.Action
         switch event.type {
-        case .flagsChanged where event.keyCode == UInt16(kVK_Function):
-            let others = event.modifierFlags.intersection([.command, .option, .control, .shift])
-            if event.modifierFlags.contains(.function), others.isEmpty {
+        case .flagsChanged where key.keyCodes.contains(event.keyCode):
+            let others = event.modifierFlags.intersection(key.otherModifiers)
+            if event.modifierFlags.contains(key.flag), others.isEmpty {
                 action = gesture.fnDown(at: now)
-            } else if !event.modifierFlags.contains(.function) {
+            } else if !event.modifierFlags.contains(key.flag) {
                 action = gesture.fnUp(at: now)
             } else {
                 action = gesture.otherKeyDown()
