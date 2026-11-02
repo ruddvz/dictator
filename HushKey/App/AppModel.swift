@@ -126,6 +126,16 @@ final class AppModel {
     var dictationMode = DictationMode(rawValue: UserDefaults.standard.string(forKey: "dictationMode") ?? "") ?? .automatic {
         didSet { UserDefaults.standard.set(dictationMode.rawValue, forKey: "dictationMode") }
     }
+    var dictationAppProfiles: [DictationAppProfile] = {
+        guard let data = UserDefaults.standard.data(forKey: "dictationAppProfiles"),
+              let profiles = try? JSONDecoder().decode([DictationAppProfile].self, from: data) else { return [] }
+        return profiles
+    }() {
+        didSet {
+            guard let data = try? JSONEncoder().encode(dictationAppProfiles) else { return }
+            UserDefaults.standard.set(data, forKey: "dictationAppProfiles")
+        }
+    }
     var usesNearbyTextHints = UserDefaults.standard.object(forKey: "useNearbyTextHints") as? Bool ?? false {
         didSet { UserDefaults.standard.set(usesNearbyTextHints, forKey: "useNearbyTextHints") }
     }
@@ -148,6 +158,7 @@ final class AppModel {
         return !didInsertCurrentDictation && !audio.isRunning && !isFinalizingDictation && transcriber.text == output
     }
     private(set) var activeDictationMode: DictationMode = .natural
+    private(set) var activeDictationProfileName: String?
     private(set) var activeDictationTarget: String?
     private(set) var capturedInsertionTargetName: String?
     private(set) var isInsertingDictation = false
@@ -837,6 +848,25 @@ final class AppModel {
         _ = insertion.requestAccessibilityAccessForContext()
     }
 
+    @discardableResult
+    func saveDictationAppProfile(appName: String, bundleIdentifier: String, mode: DictationMode,
+                                 vocabulary: String) -> Bool {
+        let name = appName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let identifier = bundleIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, name.count <= 80,
+              DictationAppProfile.isValidBundleIdentifier(identifier),
+              mode != .automatic, vocabulary.utf8.count <= 4_000 else { return false }
+        let profile = DictationAppProfile(appName: name, bundleIdentifier: identifier,
+                                          mode: mode, vocabulary: vocabulary)
+        dictationAppProfiles = DictationAppProfile.upserting(profile, into: dictationAppProfiles)
+        return true
+    }
+
+    func deleteDictationAppProfile(bundleIdentifier: String) {
+        let identifier = DictationAppProfile.normalizedBundleIdentifier(bundleIdentifier)
+        dictationAppProfiles.removeAll { DictationAppProfile.normalizedBundleIdentifier($0.bundleIdentifier) == identifier }
+    }
+
     private func startDictation() async {
         guard !isFinalizingDictation, !transcriber.isFinalizing else { return }
         guard !meetingNotes.isStarting, !meetingNotes.isCapturing, !meetingNotes.isFinalizing else {
@@ -854,8 +884,12 @@ final class AppModel {
         activeDictationTarget = isHushKey ? nil : target?.localizedName
         capturedInsertionTarget = isHushKey ? nil : insertion.captureInsertionTarget()
         capturedInsertionTargetName = capturedInsertionTarget?.applicationName
-        activeDictationMode = DictationMode.resolved(dictationMode,
-                                                      bundleIdentifier: isHushKey ? nil : target?.bundleIdentifier)
+        let targetBundleIdentifier = isHushKey ? nil : target?.bundleIdentifier
+        let activeProfile = DictationAppProfile.profile(for: targetBundleIdentifier, in: dictationAppProfiles)
+        activeDictationProfileName = activeProfile?.appName
+        activeDictationMode = DictationAppProfile.resolvedMode(requested: dictationMode,
+                                                                bundleIdentifier: targetBundleIdentifier,
+                                                                profiles: dictationAppProfiles)
         let nearbyHints = usesNearbyTextHints ? insertion.nearbyContextHints() : []
         usedNearbyTextHints = !nearbyHints.isEmpty
 
@@ -865,7 +899,8 @@ final class AppModel {
             captureGate.release(.dictation)
             return
         }
-        let customWords = DictationVocabulary.terms(from: dictationTerms)
+        let customWords = DictationVocabulary.terms(from: dictationTerms) +
+            DictationAppProfile.vocabulary(for: targetBundleIdentifier, in: dictationAppProfiles)
         let modeHints: [String]
         switch activeDictationMode {
         case .message: modeHints = ["DM", "FYI", "ASAP", "RSVP", "TL;DR"]

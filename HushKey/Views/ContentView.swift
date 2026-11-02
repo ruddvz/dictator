@@ -7,25 +7,19 @@ struct ContentView: View {
         NavigationSplitView {
             List(selection: screenSelection) {
                 Section("WRITE") {
-                    Label(AppModel.Screen.dictation.rawValue, systemImage: AppModel.Screen.dictation.symbol)
-                        .tag(AppModel.Screen.dictation)
-                    Label(AppModel.Screen.transforms.rawValue, systemImage: AppModel.Screen.transforms.symbol)
-                        .tag(AppModel.Screen.transforms)
-                    Label(AppModel.Screen.files.rawValue, systemImage: AppModel.Screen.files.symbol)
-                        .tag(AppModel.Screen.files)
-                    Label(AppModel.Screen.meetings.rawValue, systemImage: AppModel.Screen.meetings.symbol)
-                        .tag(AppModel.Screen.meetings)
+                    sidebarItem(.dictation)
+                    sidebarItem(.transforms)
+                    sidebarItem(.files)
+                    sidebarItem(.meetings)
                 }
                 Section("SILENT LAB") {
                     ForEach([AppModel.Screen.setup, .train, .evaluate, .use]) { screen in
-                        Label(screen.rawValue, systemImage: screen.symbol).tag(screen)
+                        sidebarItem(screen)
                     }
                 }
                 Section("MANAGE") {
-                    Label(AppModel.Screen.personalization.rawValue, systemImage: AppModel.Screen.personalization.symbol)
-                        .tag(AppModel.Screen.personalization)
-                    Label(AppModel.Screen.settings.rawValue, systemImage: AppModel.Screen.settings.symbol)
-                        .tag(AppModel.Screen.settings)
+                    sidebarItem(.personalization)
+                    sidebarItem(.settings)
                 }
             }
             .listStyle(.sidebar)
@@ -50,6 +44,14 @@ struct ContentView: View {
             }
         }
         .navigationTitle(model.screen.rawValue)
+    }
+
+    private func sidebarItem(_ screen: AppModel.Screen) -> some View {
+        Label(screen.rawValue, systemImage: screen.symbol)
+            .tag(screen)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(screen.rawValue)
+            .accessibilityIdentifier("sidebar.\(screen.id)")
     }
 
     private var screenSelection: Binding<AppModel.Screen?> {

@@ -53,7 +53,8 @@ struct DictationView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if !model.rawDictationText.isEmpty {
-                    Label("Last capture: \(model.activeDictationMode.rawValue) · \(model.activeDictationTarget ?? "HushKey window") · \(contextHintSummary)",
+                    let profileSummary = model.activeDictationProfileName.map { " · profile \($0)" } ?? ""
+                    Label("Last capture: \(model.activeDictationMode.rawValue) · \(model.activeDictationTarget ?? "HushKey window")\(profileSummary) · \(contextHintSummary)",
                           systemImage: "sparkle.magnifyingglass")
                         .font(.caption)
                         .foregroundStyle(.secondary)

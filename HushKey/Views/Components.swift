@@ -12,6 +12,8 @@ struct PageHeader: View {
                 .foregroundStyle(.secondary)
             Text(title)
                 .font(.title.weight(.semibold))
+                .accessibilityLabel(title)
+                .accessibilityIdentifier("page.header")
             Text(subtitle)
                 .font(.body)
                 .foregroundStyle(.secondary)

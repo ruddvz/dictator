@@ -52,4 +52,5 @@ schemes:
         HushKey: all
         HushKeyTests: [test]
     test:
-      targets: [HushKeyTests]
+      targets:
+        - HushKeyTests

@@ -59,6 +59,7 @@ Make ordinary voice and whispered dictation usable locally on a Mac, while keepi
 - **Completed:** make Voice/Whisper dictation the launch screen; keep Setup, Train, Evaluate, and Silent Use in a separate Silent Lab.
 - **Completed:** add global start/stop dictation, live local transcription, transcript editing, copy, safe phrase insertion, recent local history, and personal vocabulary hints.
 - **Completed:** add five local writing modes, common app mapping, explicit spoken correction with raw restore, optional transient nearby terms, and a focus-checked insertion undo shortcut.
+- **Completed:** add local per-app profiles for Automatic dictation. Each profile chooses Natural/Message/Email/Code formatting and adds app-specific speech vocabulary; profiles match only the frontmost app's bundle identifier and never read its text.
 - **Completed:** add conservative optional filler cleanup, snippet-line validation, Apple on-device audio-file transcription, and downloadable WhisperKit model selection with local storage and TXT/SRT/WebVTT export.
 - **Completed:** add a searchable Snippets & Vocabulary workspace, searchable transcript history, and processed/raw restore actions; package only this app without deleting unrelated Xcode outputs.
 - **Completed:** add review-first text transforms using Apple's on-device Foundation Model when available, deterministic filler removal on older macOS versions, explicit apply, stale-preview protection, and undo; test the offline cleanup and undo paths.
