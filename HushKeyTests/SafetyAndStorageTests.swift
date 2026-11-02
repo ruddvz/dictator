@@ -299,6 +299,20 @@ final class SafetyAndStorageTests: XCTestCase {
         XCTAssertEqual(result, "Send my Hello team, my name is Rudra, please.")
     }
 
+    func testLocalCorrectionRulesFixWholePhrasesBeforeFormatting() {
+        XCTAssertEqual(DictationCorrectionRules.apply(
+            to: "I said hush key, not Hush Keybird. Gray.",
+            rules: "Hush Key => HushKey\nGray => grey"),
+            "I said HushKey, not Hush Keybird. grey.")
+        XCTAssertEqual(DictationTranscriptProcessor.process(
+            "Hush Key new line team", mode: .message, snippets: "",
+            applyCorrections: false, correctionRules: "Hush Key => HushKey"), "HushKey\nteam")
+        let validation = DictationCorrectionRules.validation(
+            for: "Hush Key => HushKey\nbad line\nhush key => another")
+        XCTAssertEqual(validation.validCount, 1)
+        XCTAssertEqual(validation.invalidLines, [2, 3])
+    }
+
     func testSpokenCorrectionsReplaceThePreviousPhraseAndKeepRawInputSeparate() {
         XCTAssertEqual(DictationBacktrack.apply(to: "Send it to Alice, actually Bob."), "Send it to Bob.")
         XCTAssertEqual(DictationBacktrack.apply(to: "Use the old route, scratch that, new route."), "Use the new route.")

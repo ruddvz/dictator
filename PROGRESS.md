@@ -251,3 +251,15 @@ In a fresh session, use the packaged app to test the selected-text shortcut, loc
 ## Next item — live end-to-end acceptance
 
 With the user present, validate the latest packaged app in TextEdit and a second app: voice and whisper capture, profile selection, selected-text edit preview/apply/undo, guarded insertion/recovery, file transcription, and meeting sources. Record outcomes in `docs/TESTING_PROTOCOL.md`; do not treat unit tests as proof that device permissions or live capture passed.
+
+## Completed — local transcription correction rules
+
+- Added a Corrections section to **Snippets & Vocabulary** with add/edit/delete, search, an advanced list editor, malformed-line validation, and local preference storage.
+- Rules replace case-insensitive whole words or phrases before filler cleanup, writing-mode formatting, and snippet expansion. They do not change the raw recognition; the existing Restore original recognition action still returns it.
+- Added regression coverage for punctuation, whole-phrase boundaries, formatting order, malformed/duplicate rules, and the independent explicit spoken-correction setting. Updated README, acceptance protocol, product plan, and competitor roadmap.
+- `xcodebuild ... test`: **49 passed, 0 failed, 0 skipped** on the MacBook Pro. The CoreSimulator version warning remains unrelated to macOS test execution.
+- Rebuilt `dist/HushKey.app`; strict signature verification passed. Computer Use confirms the packaged app opens to Dictation with the microphone off and the latest bundle as the only running HushKey instance.
+
+## Next item — live correction and voice acceptance
+
+Navigate to Snippets & Vocabulary and validate rule creation/deletion, then dictate a real phrase to confirm correction application and raw restore. Continue the outstanding microphone, insertion, file, and meeting acceptance checks. Do not claim these paths passed until verified in the live app.

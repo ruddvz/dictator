@@ -236,13 +236,26 @@ enum DictationModeFormatter {
 
 enum DictationTranscriptProcessor {
     static func process(_ raw: String, mode: DictationMode, snippets: String,
-                        applyCorrections: Bool = true, cleanupFillers: Bool = false) -> String {
+                        applyCorrections: Bool = true, cleanupFillers: Bool = false,
+                        correctionRules: String = "") -> String {
         var result = applyCorrections ? DictationBacktrack.apply(to: raw) : raw
+        result = DictationCorrectionRules.apply(to: result, rules: correctionRules)
         if cleanupFillers { result = DictationLocalCleanup.removeFillers(from: result) }
         if mode == .code { result = DictationCodeFormatter.format(result) }
         else { result = DictationModeFormatter.format(result, mode: mode) }
         return DictationSnippetExpander.expand(result, definitions: snippets)
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+enum DictationCorrectionRules {
+    static func validation(for rules: String) -> (validCount: Int, invalidLines: [Int]) {
+        DictationSnippetExpander.validation(for: rules)
+    }
+
+    /// Corrects complete words or phrases with local rules before formatting and snippet expansion.
+    static func apply(to text: String, rules: String) -> String {
+        DictationSnippetExpander.expand(text, definitions: rules)
     }
 }
 
