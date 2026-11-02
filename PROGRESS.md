@@ -233,6 +233,7 @@ Validate named-target insertion, stale-target rejection, global shortcut inserti
 - Added UTF-16 selection boundary and prompt-separation unit coverage. Latest test run: `47 passed, 0 failed, 0 skipped` on the MacBook Pro.
 - `bash scripts/package-app.sh` succeeded. `dist/HushKey.app` passed `codesign --verify --deep --strict`; its display name is `HushKey` and bundle identifier is `com.ruddvz.hushkey`.
 - Live capture/insertion in TextEdit and a second app is still unverified. Computer Use's native UI pipe failed, so the updated Transforms flow was not visually inspected and a running app process may need a relaunch to load the new package.
+- A screenshot of the packaged app's idle Dictation screen exposed a duplicated “Writing mode” label. The duplicate was removed and the app was rebuilt; the suite still passes 47/47. Navigation to Transforms then hit the same native UI pipe failure, so that screen remains visually unchecked.
 - Updated README, testing protocol, product plan, and competitor roadmap to mark the implementation and keep live acceptance as the next step.
 
 ## Next item — live selected-text acceptance

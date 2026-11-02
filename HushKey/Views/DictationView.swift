@@ -34,7 +34,7 @@ struct DictationView: View {
                 HStack(spacing: 12) {
                     Label("Writing mode", systemImage: model.dictationMode.symbol)
                         .font(.callout.weight(.medium))
-                    Picker("Writing mode", selection: Binding(
+                    Picker("", selection: Binding(
                         get: { model.dictationMode },
                         set: { model.dictationMode = $0 })) {
                         ForEach(DictationMode.allCases) { mode in
@@ -42,6 +42,7 @@ struct DictationView: View {
                         }
                     }
                     .pickerStyle(.menu)
+                    .accessibilityLabel("Writing mode")
                     .disabled(model.audio.isRunning || model.isFinalizingDictation || model.transcriber.isFinalizing ||
                               model.isSelectedTextEditCapturing || model.isFinalizingSelectedTextEdit)
                     Spacer()
