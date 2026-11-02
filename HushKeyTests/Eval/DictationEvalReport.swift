@@ -8,15 +8,15 @@ struct EvalReport: Codable {
 }
 
 enum EvalReportWriter {
-    static func write(_ report: EvalReport, to directory: URL) throws {
+    static func write(_ report: EvalReport, baseline: EvalReport? = nil, to directory: URL) throws {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         try encoder.encode(report).write(to: directory.appending(path: "report.json"))
-        try Data(markdown(report).utf8).write(to: directory.appending(path: "report.md"))
+        try Data(markdown(report, baseline: baseline).utf8).write(to: directory.appending(path: "report.md"))
     }
 
-    static func markdown(_ report: EvalReport) -> String {
+    static func markdown(_ report: EvalReport, baseline: EvalReport? = nil) -> String {
         var lines = [
             "# HushKey dictation eval",
             "",
@@ -101,7 +101,51 @@ enum EvalReportWriter {
             }
             lines.append("")
         }
+        lines += comparisons(report, baseline: baseline)
         return lines.joined(separator: "\n") + "\n"
+    }
+
+    /// Paired-bootstrap WER comparisons: each engine against the first, and each engine against
+    /// its own result in the previous report.
+    static func comparisons(_ report: EvalReport, baseline: EvalReport?) -> [String] {
+        let ran = report.engines.filter { $0.skippedReason == nil }
+        var rows: [(String, EvalSplit, PairedComparison)] = []
+        if let reference = ran.first {
+            for engine in ran.dropFirst() {
+                for split in EvalSplit.allCases {
+                    if let result = PairedBootstrap.compare(baseline: reference, candidate: engine, split: split) {
+                        rows.append(("\(engine.engine) vs \(reference.engine)", split, result))
+                    }
+                }
+            }
+        }
+        for engine in ran {
+            guard let before = baseline?.engines.first(where: { $0.engine == engine.engine && $0.skippedReason == nil })
+            else { continue }
+            for split in EvalSplit.allCases {
+                if let result = PairedBootstrap.compare(baseline: before, candidate: engine, split: split) {
+                    rows.append(("\(engine.engine): this run vs previous report", split, result))
+                }
+            }
+        }
+        guard !rows.isEmpty else { return [] }
+        var lines = ["## Comparisons (paired bootstrap, 2000 resamples)", "",
+                     "Clips are paired by id. Δ is candidate WER minus baseline WER; negative is better. "
+                     + "A gain counts only when the whole 95% interval is below zero.", "",
+                     "| Comparison | Split | Clips | Baseline WER | Candidate WER | Δ | 95% interval | p | Verdict |",
+                     "|---|---|---|---|---|---|---|---|---|"]
+        for (name, split, result) in rows {
+            lines.append("| \(name) | \(split.rawValue) | \(result.clips) | \(percent(result.baselineWER)) | "
+                + "\(percent(result.candidateWER)) | \(signedPoints(result.delta)) | "
+                + "\(signedPoints(result.low95)) to \(signedPoints(result.high95)) | "
+                + "\(String(format: "%.3f", result.pValue)) | \(result.verdict) |")
+        }
+        lines.append("")
+        return lines
+    }
+
+    private static func signedPoints(_ value: Double) -> String {
+        String(format: "%+.1f pts", value * 100)
     }
 
     private static func fraction(_ passed: Int, _ total: Int) -> String {

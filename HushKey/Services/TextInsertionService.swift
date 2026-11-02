@@ -23,6 +23,10 @@ final class TextInsertionService {
     }
 
     private(set) var isEnabled = false
+    /// Paste through the clipboard in apps that refuse direct typing; the clipboard is restored.
+    var allowsPasteFallback = UserDefaults.standard.object(forKey: "allowsPasteFallback") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(allowsPasteFallback, forKey: "allowsPasteFallback") }
+    }
     private(set) var status = "Text insertion is off."
     private(set) var contextAccessStatus = "Nearby text hints are off."
     var shortcut: InsertionShortcut = InsertionShortcut(
@@ -299,6 +303,48 @@ final class TextInsertionService {
         return performInsertion(text, app: app, element: focused,
                                 originalValue: stringAttribute(kAXValueAttribute, of: focused),
                                 selectedRange: selectedTextRange(of: focused))
+    }
+
+    /// Whether `app` is in front with a non-password field focused, so a paste would land in it.
+    func canPaste(into app: NSRunningApplication) -> Bool {
+        guard isEnabled, allowsPasteFallback, AXIsProcessTrusted(), !app.isTerminated,
+              NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier,
+              let focused = focusedElement() else { return false }
+        var pid: pid_t = 0
+        guard AXUIElementGetPid(focused, &pid) == .success, pid == app.processIdentifier else { return false }
+        return stringAttribute(kAXSubroleAttribute, of: focused) != (kAXSecureTextFieldSubrole as String)
+    }
+
+    /// Pastes into the focused field of `app` for apps that refuse direct Accessibility typing
+    /// (many browsers and Electron apps). Borrows the clipboard and puts the user's contents back
+    /// unless something else copied in the meantime.
+    func paste(_ text: String, into app: NSRunningApplication) async -> Bool {
+        let name = app.localizedName ?? "The app"
+        guard !text.isEmpty, canPaste(into: app) else {
+            status = "\(name) or a text field in it is no longer focused. Nothing was pasted."
+            return false
+        }
+        let pasteboard = NSPasteboard.general
+        let saved = ClipboardSnapshot(pasteboard)
+        let ours = ClipboardSnapshot.placeTransient(text, on: pasteboard)
+        Self.postCommandV()
+        // Give the app time to read the pasteboard before it is restored.
+        try? await Task.sleep(for: .milliseconds(450))
+        let restored = saved.restore(to: pasteboard, ifChangeCountIs: ours)
+        undoRecord = nil
+        status = restored
+            ? "Pasted into \(name). Your clipboard was put back."
+            : "Pasted into \(name). The clipboard changed meanwhile, so it was left as is."
+        return true
+    }
+
+    private static func postCommandV() {
+        let source = CGEventSource(stateID: .combinedSessionState)
+        for isDown in [true, false] {
+            let event = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: isDown)
+            event?.flags = .maskCommand
+            event?.post(tap: .cghidEventTap)
+        }
     }
 
     @discardableResult

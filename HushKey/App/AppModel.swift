@@ -200,6 +200,8 @@ final class AppModel {
     private(set) var completedDictationCount = 0
     /// Whether the running or last dictation has a text field to type into.
     private(set) var dictationHasTarget = false
+    /// The app dictation started in, used to paste when its field refuses direct typing.
+    @ObservationIgnored private var dictationTargetApp: NSRunningApplication?
     /// Keeps the finished text on the pill's card, with Copy, when there was nowhere to type it.
     private(set) var showsFinishedTranscript = false
     @ObservationIgnored private(set) var lastSavedDictationText: String?
@@ -974,7 +976,9 @@ final class AppModel {
         activeDictationTarget = isHushKey ? nil : target?.localizedName
         capturedInsertionTarget = isHushKey ? nil : insertion.captureInsertionTarget()
         capturedInsertionTargetName = capturedInsertionTarget?.applicationName
-        dictationHasTarget = insertion.isEnabled && capturedInsertionTarget != nil
+        dictationTargetApp = isHushKey ? nil : target
+        dictationHasTarget = insertion.isEnabled && (capturedInsertionTarget != nil
+            || dictationTargetApp.map(insertion.canPaste(into:)) == true)
         let targetBundleIdentifier = isHushKey ? nil : target?.bundleIdentifier
         let activeProfile = DictationAppProfile.profile(for: targetBundleIdentifier, in: dictationAppProfiles)
         activeDictationProfileName = activeProfile?.appName
@@ -1064,7 +1068,7 @@ final class AppModel {
         } else {
             retainedAudio.reset()
             if dictationHasTarget {
-                typeFinishedDictation(processed.trimmingCharacters(in: .whitespacesAndNewlines))
+                await typeFinishedDictation(processed.trimmingCharacters(in: .whitespacesAndNewlines))
             } else {
                 showsFinishedTranscript = true
             }
@@ -1076,12 +1080,25 @@ final class AppModel {
 
     /// Types a finished dictation into the field it was started from, only if that field
     /// still has focus.
-    private func typeFinishedDictation(_ text: String) {
-        guard insertion.isEnabled, !didInsertCurrentDictation, let target = capturedInsertionTarget else { return }
-        if insertion.insert(text, ifStillFocused: target) {
+    private func typeFinishedDictation(_ text: String) async {
+        guard insertion.isEnabled, !didInsertCurrentDictation else { return }
+        if let target = capturedInsertionTarget {
+            if insertion.insert(text, ifStillFocused: target) {
+                didInsertCurrentDictation = true
+                return
+            }
+            // The same field is still focused but refused direct typing: paste instead.
+            // If focus moved, never paste somewhere else; offer Paste again.
+            if insertion.focusState(of: target).fieldIsFocused, let app = dictationTargetApp,
+               await insertion.paste(text, into: app) {
+                didInsertCurrentDictation = true
+                return
+            }
+            dictationNotice = DictationRecovery.insertionFailed(insertion.status, canPasteAgain: true)
+        } else if let app = dictationTargetApp, await insertion.paste(text, into: app) {
             didInsertCurrentDictation = true
         } else {
-            dictationNotice = DictationRecovery.insertionFailed(insertion.status, canPasteAgain: true)
+            showsFinishedTranscript = true
         }
     }
 

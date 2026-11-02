@@ -369,6 +369,8 @@ private struct TextInsertionSettingsCard: View {
                     .frame(width: 170)
                     .disabled(!insertion.isEnabled)
                 }
+                Toggle("Paste in apps that block direct typing, then restore the clipboard", isOn: $insertion.allowsPasteFallback)
+                    .disabled(!insertion.isEnabled)
                 Label(insertion.status, systemImage: insertion.isEnabled ? "checkmark.shield" : "lock.shield")
                     .font(.caption)
                     .foregroundStyle(.secondary)

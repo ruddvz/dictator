@@ -22,22 +22,28 @@ final class FloatingPillController {
         withObservationTracking {
             _ = model.showsFloatingPill
             _ = model.showsFinishedTranscript
+            _ = model.audio.isRunning
         } onChange: { [weak self] in
             Task { @MainActor in
                 self?.observe()
             }
         }
         model.showsFloatingPill ? show() : hide()
-        model.showsFloatingPill && model.showsFinishedTranscript ? watchEscape() : stopWatchingEscape()
+        let cardIsUp = model.showsFloatingPill && model.showsFinishedTranscript
+        cardIsUp || model.audio.isRunning ? watchEscape() : stopWatchingEscape()
     }
 
-    /// Esc closes the finished transcript card. The panel never takes key focus, so watch the
-    /// key in other apps (needs the Accessibility access fn already uses) and in HushKey.
+    /// Esc cancels a dictation that is listening (nothing is typed) and closes the finished
+    /// transcript card. The panel never takes key focus, so watch the key in other apps (needs
+    /// the Accessibility access fn already uses) and in HushKey. Idea from amirrsyed/hushkey (MIT).
     private func watchEscape() {
         guard escapeMonitors.isEmpty else { return }
         let dismiss: (NSEvent) -> Bool = { [weak self] event in
             guard event.keyCode == UInt16(kVK_Escape) else { return false }
-            Task { @MainActor in self?.model?.dismissFinishedTranscript() }
+            Task { @MainActor in
+                guard let model = self?.model else { return }
+                if model.audio.isRunning { model.cancelDictation() } else { model.dismissFinishedTranscript() }
+            }
             return true
         }
         if let global = NSEvent.addGlobalMonitorForEvents(matching: .keyDown, handler: { _ = dismiss($0) }) {

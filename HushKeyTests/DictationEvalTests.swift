@@ -90,7 +90,27 @@ final class DictationEvalTests: XCTestCase {
             generatedAt: formatter.string(from: Date()),
             system: "macOS \(version.majorVersion).\(version.minorVersion).\(version.patchVersion)",
             processor: processor, engines: engineResults)
-        try EvalReportWriter.write(report, to: EvalPaths.reports)
-        print(EvalReportWriter.markdown(report))
+        // The previous report is the baseline for "did this change help?" before it is overwritten.
+        let previous = try? JSONDecoder().decode(
+            EvalReport.self, from: Data(contentsOf: EvalPaths.reports.appending(path: "report.json")))
+        try EvalReportWriter.write(report, baseline: previous, to: EvalPaths.reports)
+        print(EvalReportWriter.markdown(report, baseline: previous))
+    }
+
+    func testPairedBootstrapSeparatesRealGainsFromNoise() throws {
+        let worse = Array(repeating: EditCounts(substitutions: 2, referenceTokens: 10), count: 12)
+        let better = Array(repeating: EditCounts(substitutions: 0, referenceTokens: 10), count: 12)
+        let gain = try XCTUnwrap(PairedBootstrap.compare(baseline: worse, candidate: better))
+        XCTAssertEqual(gain.delta, -0.2, accuracy: 1e-9)
+        XCTAssertLessThan(gain.high95, 0)
+        XCTAssertEqual(gain.verdict, "candidate better")
+        XCTAssertEqual(gain.pValue, 0)
+
+        let same = PairedBootstrap.compare(baseline: worse, candidate: worse)
+        XCTAssertEqual(same?.verdict, "no clear difference")
+        XCTAssertEqual(PairedBootstrap.compare(baseline: Array(worse.prefix(3)), candidate: Array(better.prefix(3)))?.verdict,
+                       "too few clips to tell")
+        XCTAssertEqual(PairedBootstrap.compare(baseline: worse, candidate: better),
+                       PairedBootstrap.compare(baseline: worse, candidate: better), "seeded and reproducible")
     }
 }
