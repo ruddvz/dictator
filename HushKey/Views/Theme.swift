@@ -22,8 +22,12 @@ enum Theme {
 
     // Sizes: W page column, H1 sidebar row, H2 control, I1 icon
     static let pageWidth: CGFloat = 800
-    static let sidebarRow: CGFloat = 38
+    static let sidebarWidth: CGFloat = 216
+    static let sidebarRow: CGFloat = 36
     static let controlHeight: CGFloat = 36
+    static let controlRadius: CGFloat = 10
+    static let menuWidth: CGFloat = 196
+    static let listRow: CGFloat = 52
     static let icon: CGFloat = 18
 
     // Color: warm paper and ink, each with a dark counterpart
@@ -65,13 +69,15 @@ enum Theme {
 /// HushKey's type scale. macOS defaults (13 pt body, 10 pt captions) read small in a
 /// full-window app, so every view uses these steps instead of system text styles.
 extension Font {
-    static let hkTitle1 = Font.display(32)                              // page titles
-    static let hkTitle2 = Font.system(size: 22, weight: .semibold)      // large card values
-    static let hkTitle3 = Font.system(size: 19, weight: .semibold)      // section titles
-    static let hkHeadline = Font.system(size: 16, weight: .semibold)    // card and row titles
-    static let hkBody = Font.system(size: 15)                           // reading text, controls
-    static let hkCallout = Font.system(size: 14)                        // secondary text
-    static let hkCaption = Font.system(size: 13)                        // descriptions, status
+    static let hkTitle1 = Font.display(28)                              // page titles
+    static let hkTitle2 = Font.display(22)                              // section titles, large values
+    static let hkTitle3 = Font.system(size: 18, weight: .semibold)      // card titles
+    static let hkHeadline = Font.system(size: 16, weight: .semibold)    // emphasised row titles
+    static let hkRowTitle = Font.system(size: 16, weight: .medium)      // settings and list row labels
+    static let hkBody = Font.system(size: 16)                           // reading text, list rows
+    static let hkCallout = Font.system(size: 15)                        // row descriptions, secondary text
+    static let hkControl = Font.system(size: 15, weight: .medium)       // buttons, menus, tabs
+    static let hkCaption = Font.system(size: 13)                        // status lines
     static let hkMeta = Font.system(size: 12)                           // timestamps, counts
 
     /// Rounded display face for page titles, hero copy, and big numbers.
@@ -106,36 +112,65 @@ extension View {
 
 // MARK: - Buttons
 
-/// Sage capsule for the one main action on a surface.
+/// Sage rounded button for the one main action on a surface (Wispr: 36 pt, radius 10).
 struct PrimaryButtonStyle: ButtonStyle {
     var tint: Color = Theme.signal
-    @Environment(\.isEnabled) private var isEnabled
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(Theme.inverseInk)
-            .padding(.horizontal, Theme.s4)
-            .frame(height: Theme.controlHeight)
-            .background(tint.opacity(isEnabled ? 1 : 0.35), in: Capsule())
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(Theme.snappy, value: configuration.isPressed)
-    }
-}
-
-/// Hairline capsule for secondary actions.
-struct SecondaryButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
     @State private var hovering = false
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 14, weight: .medium))
-            .foregroundStyle(Theme.ink.opacity(isEnabled ? 1 : 0.4))
-            .padding(.horizontal, Theme.s3 + 2)
+            .font(.hkControl)
+            .foregroundStyle(Theme.inverseInk)
+            .padding(.horizontal, Theme.s4)
             .frame(height: Theme.controlHeight)
-            .background(hovering && isEnabled ? Theme.hover : Theme.sheet, in: Capsule())
-            .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 1))
+            .background(tint.opacity(isEnabled ? (hovering ? 0.88 : 1) : 0.35),
+                        in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .onHover { hovering = $0 }
+            .animation(Theme.snappy, value: configuration.isPressed)
+            .animation(.easeOut(duration: 0.12), value: hovering)
+    }
+}
+
+/// Neutral filled button for secondary actions, such as a settings row's "Change".
+struct SecondaryButtonStyle: ButtonStyle {
+    var minWidth: CGFloat? = nil
+    @Environment(\.isEnabled) private var isEnabled
+    @State private var hovering = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.hkControl)
+            .foregroundStyle(Theme.ink.opacity(isEnabled ? 1 : 0.4))
+            .padding(.horizontal, Theme.s4)
+            .frame(minWidth: minWidth)
+            .frame(height: Theme.controlHeight)
+            .background(hovering && isEnabled ? Theme.selection : Theme.hover,
+                        in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .onHover { hovering = $0 }
+            .animation(Theme.snappy, value: configuration.isPressed)
+            .animation(.easeOut(duration: 0.12), value: hovering)
+    }
+}
+
+/// Red-text neutral button for destructive actions; the confirmation dialog does the warning.
+struct DestructiveButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+    @State private var hovering = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.hkControl)
+            .foregroundStyle(Theme.danger.opacity(isEnabled ? 1 : 0.4))
+            .padding(.horizontal, Theme.s4)
+            .frame(height: Theme.controlHeight)
+            .background(hovering && isEnabled ? Theme.danger.opacity(0.12) : Theme.hover,
+                        in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .onHover { hovering = $0 }
             .animation(Theme.snappy, value: configuration.isPressed)
@@ -149,9 +184,9 @@ struct IconButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .labelStyle(.iconOnly)
-            .font(.system(size: 14, weight: .medium))
-            .foregroundStyle(Theme.ink2)
-            .frame(width: 28, height: 28)
+            .font(.system(size: 15, weight: .medium))
+            .foregroundStyle(hovering ? Theme.ink : Theme.ink2)
+            .frame(width: 30, height: 30)
             .background(hovering ? Theme.hover : .clear, in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
             .contentShape(Rectangle())
             .onHover { hovering = $0 }

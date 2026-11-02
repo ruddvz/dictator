@@ -2,6 +2,8 @@ import CoreAudio
 import AppKit
 import SwiftUI
 
+/// Settings, laid out like Wispr Flow's: a section list on the left and grouped rows
+/// (label, one-line description, right-aligned control) on the right.
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
     @AppStorage("settingsSection") private var section: Section = .general
@@ -12,192 +14,397 @@ struct SettingsView: View {
         case data = "Data & privacy"
         case about = "About"
         var id: String { rawValue }
+
+        var symbol: String {
+            switch self {
+            case .general: "slider.horizontal.3"
+            case .insertion: "character.cursor.ibeam"
+            case .data: "lock.shield"
+            case .about: "info.circle"
+            }
+        }
     }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                PageHeader(
-                    eyebrow: "Manage",
-                    title: "Settings & data",
-                    subtitle: "Dictation, shortcuts, safe text insertion, and what stays on this Mac.")
+            VStack(alignment: .leading, spacing: Theme.s5) {
+                PageHeader(eyebrow: "", title: "Settings", subtitle: "")
 
-                Picker("Section", selection: $section) {
-                    ForEach(Section.allCases) { Text($0.rawValue).tag($0) }
+                HStack(alignment: .top, spacing: Theme.s6) {
+                    SettingsNav(section: $section)
+                        .frame(width: 176)
+                    VStack(alignment: .leading, spacing: Theme.s6) {
+                        switch section {
+                        case .general: GeneralSettings()
+                        case .insertion: InsertionSettings()
+                        case .data: DataSettings()
+                        case .about: AboutSettings()
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .id(section)
+                    .transition(.opacity.combined(with: .offset(y: 6)))
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(maxWidth: 460)
-
-                switch section {
-                case .general:
-                    AppearanceCard()
-                    DictationSettingsCard()
-                    ShortcutSettingsCard()
-                    MicrophoneCard()
-                case .insertion:
-                    TextInsertionSettingsCard()
-                case .data:
-                    RecordingCard()
-                    DataManagementCard()
-                case .about:
-                    ResearchReportsCard()
-                }
+                .animation(Theme.snappy, value: section)
             }
             .pageLayout()
         }
     }
 }
 
-private struct ResearchReportsCard: View {
-    @State private var status: String?
+private struct SettingsNav: View {
+    @Binding var section: SettingsView.Section
+    @State private var hovered: SettingsView.Section?
 
     var body: some View {
-        GroupBox("Reports, local models & licenses") {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("The supplied comparison and HushKey's competitor notes are bundled with this app and open locally.")
-                    .font(.hkCaption)
-                    .foregroundStyle(.secondary)
-                Button("Open Wispr Flow vs TypeWhisper report", systemImage: "doc.text.magnifyingglass") {
-                    openResource("Wispr_Flow_vs_TypeWhisper_Research_Report_2026-11-01", extension: "pdf")
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(SettingsView.Section.allCases) { item in
+                let selected = item == section
+                Button {
+                    section = item
+                } label: {
+                    HStack(spacing: Theme.s3) {
+                        Image(systemName: item.symbol)
+                            .font(.system(size: 15, weight: .medium))
+                            .frame(width: 18)
+                            .foregroundStyle(selected ? Theme.ink : Theme.ink2)
+                        Text(item.rawValue)
+                            .font(.system(size: 15, weight: selected ? .semibold : .regular))
+                            .foregroundStyle(Theme.ink)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, Theme.s3 - 2)
+                    .frame(height: Theme.sidebarRow)
+                    .background(selected ? Theme.selection : (hovered == item ? Theme.hover : .clear),
+                                in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
+                    .contentShape(Rectangle())
                 }
-                Button("Open HushKey competitor notes", systemImage: "list.bullet.rectangle") {
-                    openResource("COMPETITOR_RESEARCH", extension: "md")
-                }
-                Button("Open dictation alternatives research", systemImage: "text.magnifyingglass") {
-                    openResource("COMPETITOR_RESEARCH_ADDENDUM_2026-11-01", extension: "md")
-                }
-                Button("Open local speech model notes", systemImage: "waveform") {
-                    openResource("LOCAL_MODEL_EVALUATION", extension: "md")
-                }
-                Button("Open licenses and attribution", systemImage: "doc.text") {
-                    openResource("NOTICE", extension: "md")
-                }
-                Button("Open Argmax MIT license", systemImage: "doc.text") {
-                    openResource("ARGMAX-MIT-LICENSE", extension: "txt")
-                }
-                Button("Open third-party notices", systemImage: "doc.text") {
-                    openResource("ARGMAX-NOTICES", extension: "txt")
-                }
-                if let status {
-                    Text(status).font(.hkCaption).foregroundStyle(.secondary)
-                }
+                .buttonStyle(.plain)
+                .onHover { hovered = $0 ? item : (hovered == item ? nil : hovered) }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(8)
         }
-    }
-
-    private func openResource(_ name: String, extension fileExtension: String) {
-        guard let url = Bundle.main.url(forResource: name, withExtension: fileExtension) else {
-            status = "This report is missing from the app bundle."
-            return
-        }
-        status = NSWorkspace.shared.open(url) ? "Opened locally." : "macOS could not open this report."
+        .animation(.easeOut(duration: 0.12), value: hovered)
     }
 }
 
-private struct DictationSettingsCard: View {
+// MARK: - General
+
+private struct GeneralSettings: View {
     @Environment(AppModel.self) private var model
+    @AppStorage(AppearancePreference.storageKey) private var appearance: AppearancePreference = .light
 
     var body: some View {
         @Bindable var model = model
-        GroupBox("Voice & whisper dictation") {
-            VStack(alignment: .leading, spacing: 10) {
-                Picker("On-device speech language", selection: $model.dictationLanguage) {
-                    ForEach(DictationLanguage.onDevice) { language in
-                        Text(language.name).tag(language.identifier)
-                    }
-                    if !DictationLanguage.onDevice.contains(where: { $0.identifier == model.dictationLanguage }) {
-                        Text(Locale.current.localizedString(forIdentifier: model.dictationLanguage) ?? model.dictationLanguage)
-                            .tag(model.dictationLanguage)
-                    }
-                }
-                .frame(maxWidth: 340, alignment: .leading)
-                Text("Only languages supported for on-device recognition on this Mac appear here. No remote fallback is used.")
-                    .font(.hkCaption)
-                    .foregroundStyle(.secondary)
-                Toggle("Show the dictation pill at the bottom of the screen", isOn: $model.showsFloatingPill)
-                Text("A small on-screen indicator that shows when HushKey is listening. Click it to start or stop dictation without leaving your app.")
-                    .font(.hkCaption)
-                    .foregroundStyle(.secondary)
-                Toggle("Apply explicit spoken corrections", isOn: $model.appliesSpokenCorrections)
-                Text("Recognizes cues such as “scratch that” or “actually” after a pause. Personal phrase replacements under Snippets & Vocabulary → Corrections are separate local rules. The original recognition stays available to restore.")
-                    .font(.hkCaption)
-                    .foregroundStyle(.secondary)
-                Toggle("Remove common filler words", isOn: $model.cleansDictationFillers)
-                Text("Optional local cleanup removes only standalone “um”, “uh”, and “erm”. It does not rewrite your wording, and the raw transcript can be restored.")
-                    .font(.hkCaption)
-                    .foregroundStyle(.secondary)
-                Toggle("Use nearby text as optional vocabulary hints", isOn: $model.usesNearbyTextHints)
-                Text("When started with the global shortcut in another app, HushKey can read a small slice around the cursor in a supported text field. It extracts terms locally for on-device recognition, then discards the slice. Off by default.")
-                    .font(.hkCaption)
-                    .foregroundStyle(.secondary)
-                HStack(spacing: 10) {
-                    Button("Check local context access…") { model.requestNearbyTextAccess() }
-                    Text(model.insertion.contextAccessStatus)
-                        .font(.hkCaption)
-                        .foregroundStyle(.secondary)
-                }
-                DictationAppProfilesEditor()
-                Picker("Dictation key", selection: $model.dictationShortcut) {
-                    ForEach(DictationShortcut.allCases) { Text($0.menuTitle).tag($0) }
-                }
-                .frame(maxWidth: 280, alignment: .leading)
-                if !model.dictationShortcut.usesFunctionKey {
-                    Picker("Shortcut behavior", selection: $model.dictationCaptureBehavior) {
-                        ForEach(DictationCaptureBehavior.allCases) { Text($0.rawValue).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(maxWidth: 360)
-                }
-                Text(model.dictationShortcutStatus)
-                    .font(.hkCaption)
-                    .foregroundStyle(model.dictationShortcutNeedsAttention ? Theme.danger : .secondary)
-                if model.dictationShortcut.usesFunctionKey, model.dictationShortcutNeedsAttention {
+        @Bindable var audio = model.audio
+
+        SettingsGroup(title: "Dictation") {
+            SettingsRow(title: "Dictation key",
+                        detail: model.dictationShortcutStatus,
+                        detailTint: model.dictationShortcutNeedsAttention ? Theme.danger : Theme.ink2) {
+                MenuPicker(selection: $model.dictationShortcut,
+                           options: DictationShortcut.allCases.map { ($0, $0.menuTitle) })
+            }
+            if model.dictationShortcut.usesFunctionKey, model.dictationShortcutNeedsAttention {
+                GroupRow {
                     HStack(spacing: Theme.s2) {
                         if AXIsProcessTrusted() {
                             Button("Open Keyboard Settings") {
                                 NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!)
                             }
+                            .buttonStyle(PrimaryButtonStyle())
                         } else {
                             Button("Open Accessibility Settings") {
                                 NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
                             }
+                            .buttonStyle(PrimaryButtonStyle())
                         }
                         Button("Check again") { model.refreshFunctionKeyStatus() }
+                            .buttonStyle(SecondaryButtonStyle())
                     }
-                    .buttonStyle(SecondaryButtonStyle())
                 }
-
-                Picker("Voice edit selected text", selection: $model.selectedTextEditShortcut) {
-                    ForEach(SelectedTextEditShortcut.allCases) { Text($0.label).tag($0) }
-                }
-                .frame(maxWidth: 280, alignment: .leading)
-                Text("Select text in another app, then hold this shortcut and speak an edit instruction. The selected text is read only for that action. Review the local preview in Transforms before applying. Requires Accessibility insertion to be enabled below.")
-                    .font(.hkCaption)
-                    .foregroundStyle(.secondary)
-                Text(model.selectedTextEditShortcutStatus)
-                    .font(.hkCaption)
-                    .foregroundStyle(.secondary)
-
-                Button {
-                    model.screen = .personalization
-                } label: {
-                    Label("Manage vocabulary and snippets", systemImage: "text.badge.plus")
-                }
-                .buttonStyle(.bordered)
-                Text("Add recognition hints and reusable phrases in one searchable workspace.")
-                    .font(.hkCaption)
-                    .foregroundStyle(.secondary)
-                Toggle("Save recent transcripts on this Mac", isOn: $model.savesDictationHistory)
-                Text("Turn this off to stop adding new dictations to history. Clear saved text from the Dictation screen.")
-                    .font(.hkCaption)
-                    .foregroundStyle(.secondary)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(8)
+            if !model.dictationShortcut.usesFunctionKey {
+                SettingsRow(title: "Shortcut behaviour", detail: "Hold to talk, or press once to start and again to stop.") {
+                    MenuPicker(selection: $model.dictationCaptureBehavior,
+                               options: DictationCaptureBehavior.allCases.map { ($0, $0.rawValue) })
+                }
+            }
+            SettingsRow(title: "Language", detail: "Recognised on this Mac. Nothing is sent online.") {
+                MenuPicker(selection: $model.dictationLanguage, options: languageOptions)
+            }
+            SettingsRow(title: "Microphone", detail: microphoneDetail,
+                        detailTint: (audio.error ?? model.transcriber.error) == nil ? Theme.ink2 : Theme.danger) {
+                MenuPicker(selection: $audio.selectedDeviceID,
+                           options: [(AudioDeviceID?.none, "System default")]
+                            + audio.devices.map { (Optional($0.id), $0.name) })
+            }
+            SettingsRow(title: "Dictation bar", detail: "The small bar at the bottom of your screen.") {
+                RowToggle(isOn: $model.showsFloatingPill, label: "Show the dictation bar")
+            }
         }
+
+        SettingsGroup(title: "Cleanup") {
+            SettingsRow(title: "Spoken corrections", detail: "“Scratch that” and “actually” fix what you just said.") {
+                RowToggle(isOn: $model.appliesSpokenCorrections, label: "Apply spoken corrections")
+            }
+            SettingsRow(title: "Remove filler words", detail: "Drops a standalone um, uh or erm. The original is kept.") {
+                RowToggle(isOn: $model.cleansDictationFillers, label: "Remove filler words")
+            }
+            SettingsRow(title: "Use nearby text for names",
+                        detail: model.usesNearbyTextHints ? model.insertion.contextAccessStatus
+                            : "Reads a few words around the cursor, then forgets them.") {
+                RowToggle(isOn: $model.usesNearbyTextHints, label: "Use nearby text hints")
+            }
+            if model.usesNearbyTextHints {
+                GroupRow {
+                    Button("Check access") { model.requestNearbyTextAccess() }
+                        .buttonStyle(SecondaryButtonStyle())
+                }
+            }
+            SettingsRow(title: "Vocabulary and snippets", detail: "Names, terms and phrases HushKey should know.") {
+                Button("Open") { model.screen = .personalization }
+                    .buttonStyle(SecondaryButtonStyle(minWidth: 96))
+            }
+        }
+
+        SettingsGroup(title: "Shortcuts") {
+            SettingsRow(title: "Edit selected text by voice", detail: model.selectedTextEditShortcutStatus) {
+                MenuPicker(selection: $model.selectedTextEditShortcut,
+                           options: SelectedTextEditShortcut.allCases.map { ($0, $0.label) })
+            }
+            SettingsRow(title: "Silent capture", detail: "Hold to capture a word in Train or Silent Use.") {
+                MenuPicker(selection: $model.captureShortcut,
+                           options: CaptureShortcut.allCases.map { ($0, $0.label) })
+            }
+        }
+
+        SettingsGroup(title: "App profiles",
+                      footer: "In Automatic mode, HushKey writes in each app’s style. App names stay on this Mac.") {
+            DictationAppProfilesEditor()
+        }
+
+        SettingsGroup(title: "Appearance") {
+            SettingsRow(title: "Theme", detail: "Fog by day, deep sage at night.") {
+                MenuPicker(selection: $appearance,
+                           options: AppearancePreference.allCases.map { ($0, $0.rawValue) })
+            }
+        }
+    }
+
+    private var languageOptions: [(value: String, title: String)] {
+        var options = DictationLanguage.onDevice.map { ($0.identifier, $0.name) }
+        if !DictationLanguage.onDevice.contains(where: { $0.identifier == model.dictationLanguage }) {
+            options.append((model.dictationLanguage,
+                            Locale.current.localizedString(forIdentifier: model.dictationLanguage) ?? model.dictationLanguage))
+        }
+        return options
+    }
+
+    private var microphoneDetail: String {
+        if let error = model.audio.error ?? model.transcriber.error { return error }
+        if let name = model.audio.activeDeviceName { return "Listening with \(name)." }
+        return "Used for dictation and meeting notes. Audio is never saved."
+    }
+}
+
+// MARK: - Insertion
+
+private struct InsertionSettings: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        @Bindable var insertion = model.insertion
+        let enabled = Binding(get: { insertion.isEnabled },
+                              set: { $0 ? insertion.enable() : insertion.disable() })
+
+        SettingsGroup(title: "Typing into other apps",
+                      footer: "Password fields are always skipped. HushKey only types into the field you started in.") {
+            SettingsRow(title: "Type where your cursor is", detail: insertion.status) {
+                RowToggle(isOn: enabled, label: "Type into the focused field")
+            }
+            SettingsRow(title: "Insert shortcut", detail: "Types the last transcript or silent word again.") {
+                MenuPicker(selection: $insertion.shortcut,
+                           options: InsertionShortcut.allCases.map { ($0, $0.label) })
+            }
+            .disabled(!insertion.isEnabled)
+            .opacity(insertion.isEnabled ? 1 : 0.5)
+            SettingsRow(title: "Paste when typing is blocked", detail: "Your clipboard is put back afterwards.") {
+                RowToggle(isOn: $insertion.allowsPasteFallback, label: "Paste fallback")
+            }
+            .disabled(!insertion.isEnabled)
+            .opacity(insertion.isEnabled ? 1 : 0.5)
+            SettingsRow(title: "Undo the last insertion", detail: "Right after, while the field is unchanged.") {
+                KeycapShortcut(label: "⌥⇧U", size: 13)
+            }
+        }
+    }
+}
+
+// MARK: - Data & privacy
+
+private struct DataSettings: View {
+    @Environment(AppModel.self) private var model
+    @State private var confirmDeleteTemplates = false
+    @State private var confirmDeleteSessions = false
+
+    var body: some View {
+        @Bindable var model = model
+        @Bindable var recorder = model.recorder
+
+        PrivacyPromise()
+
+        SettingsGroup(title: "History") {
+            SettingsRow(title: "Keep recent transcripts", detail: "Clear them any time from the Dictation page.") {
+                RowToggle(isOn: $model.savesDictationHistory, label: "Save recent transcripts")
+            }
+        }
+
+        SettingsGroup(title: "Your files", footer: model.dataMessage) {
+            SettingsRow(title: "Training dataset", detail: "Silent Lab templates, saved in Application Support.") {
+                HStack(spacing: Theme.s2) {
+                    Button("Export…") { model.exportDataset() }
+                        .buttonStyle(SecondaryButtonStyle())
+                    Button("Delete…") { confirmDeleteTemplates = true }
+                        .buttonStyle(DestructiveButtonStyle())
+                }
+            }
+            SettingsRow(title: "Session logs", detail: "Motion CSV and optional audio, in Documents.") {
+                HStack(spacing: Theme.s2) {
+                    Button("Export…") { model.exportSessions() }
+                        .buttonStyle(SecondaryButtonStyle())
+                    Button("Delete…") { confirmDeleteSessions = true }
+                        .buttonStyle(DestructiveButtonStyle())
+                        .disabled(recorder.isRecording)
+                }
+            }
+        }
+        .confirmationDialog("Delete all training templates from this Mac?", isPresented: $confirmDeleteTemplates, titleVisibility: .visible) {
+            Button("Delete templates", role: .destructive) { model.clearTrainingData() }
+        }
+        .confirmationDialog("Delete all session logs and local audio files?", isPresented: $confirmDeleteSessions, titleVisibility: .visible) {
+            Button("Delete session logs", role: .destructive) { model.deleteSessionLogs() }
+        }
+
+        SettingsGroup(title: "Research recording",
+                      footer: recorder.error ?? "Saves synchronized motion and optional audio. While it runs, \(model.captureShortcut.label) marks an utterance.") {
+            SettingsRow(title: "Condition", detail: "Label for the next session.") {
+                MenuPicker(selection: $recorder.condition,
+                           options: SessionRecorder.Condition.allCases.map { ($0, $0.rawValue) })
+            }
+            .disabled(recorder.isRecording)
+            SettingsRow(title: "Phrase label", detail: nil) {
+                TextField("Optional", text: $recorder.prompt)
+                    .textFieldStyle(.plain)
+                    .font(.hkBody)
+                    .padding(.horizontal, Theme.s3)
+                    .frame(width: Theme.menuWidth, height: Theme.controlHeight)
+                    .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
+                        .strokeBorder(Theme.hairline, lineWidth: 1))
+            }
+            SettingsRow(title: recorder.isRecording ? "Recording" : "Session", detail: recordingDetail) {
+                HStack(spacing: Theme.s2) {
+                    if !recorder.isRecording, let url = recorder.lastSessionURL {
+                        Button("Show last") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+                            .buttonStyle(SecondaryButtonStyle())
+                    }
+                    Button {
+                        recorder.isRecording ? recorder.stop() : recorder.start(audio: model.audio)
+                    } label: {
+                        Label(recorder.isRecording ? "Stop" : "Start",
+                              systemImage: recorder.isRecording ? "stop.fill" : "record.circle")
+                    }
+                    .buttonStyle(PrimaryButtonStyle(tint: recorder.isRecording ? Theme.danger : Theme.signal))
+                }
+            }
+        }
+    }
+
+    private var recordingDetail: String {
+        let recorder = model.recorder
+        guard recorder.isRecording else { return "Not recording." }
+        return "\(recorder.motionCount) samples · \(recorder.eventCount) marks"
+    }
+}
+
+/// HushKey's edge over cloud dictation, said once and plainly.
+private struct PrivacyPromise: View {
+    var body: some View {
+        HStack(spacing: Theme.s4) {
+            Image(systemName: "lock.shield.fill")
+                .font(.system(size: 22, weight: .medium))
+                .foregroundStyle(Theme.signal)
+                .frame(width: 48, height: 48)
+                .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Nothing leaves this Mac")
+                    .font(.hkTitle3)
+                Text("Speech, motion, transcripts and templates are processed and stored locally. No account, no cloud.")
+                    .font(.hkCallout)
+                    .foregroundStyle(Theme.ink2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(Theme.s5)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.signalSoft, in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
+    }
+}
+
+// MARK: - About
+
+private struct AboutSettings: View {
+    @State private var status: String?
+
+    private let documents: [(title: String, detail: String, name: String, ext: String)] = [
+        ("Licenses and attribution", "Open-source code HushKey adapts.", "NOTICE", "md"),
+        ("Argmax MIT license", "On-device speech model runtime.", "ARGMAX-MIT-LICENSE", "txt"),
+        ("Third-party notices", "Bundled model notices.", "ARGMAX-NOTICES", "txt"),
+    ]
+    private let research: [(title: String, detail: String, name: String, ext: String)] = [
+        ("Wispr Flow vs TypeWhisper", "The supplied comparison report.", "Wispr_Flow_vs_TypeWhisper_Research_Report_2026-11-01", "pdf"),
+        ("Competitor notes", "What other dictation apps do.", "COMPETITOR_RESEARCH", "md"),
+        ("Dictation alternatives", "Follow-up research.", "COMPETITOR_RESEARCH_ADDENDUM_2026-11-01", "md"),
+        ("Local speech models", "Accuracy and speed on this Mac.", "LOCAL_MODEL_EVALUATION", "md"),
+    ]
+
+    var body: some View {
+        SettingsGroup(title: "HushKey") {
+            SettingsRow(title: "Version", detail: "Private, on-device dictation and silent input.") {
+                Text(version)
+                    .font(.hkCallout.monospacedDigit())
+                    .foregroundStyle(Theme.ink2)
+            }
+            ForEach(documents, id: \.name) { item in
+                SettingsRow(title: item.title, detail: item.detail) {
+                    Button("Open") { open(item.name, item.ext) }
+                        .buttonStyle(SecondaryButtonStyle(minWidth: 96))
+                }
+            }
+        }
+        SettingsGroup(title: "Research", footer: status) {
+            ForEach(research, id: \.name) { item in
+                SettingsRow(title: item.title, detail: item.detail) {
+                    Button("Open") { open(item.name, item.ext) }
+                        .buttonStyle(SecondaryButtonStyle(minWidth: 96))
+                }
+            }
+        }
+    }
+
+    private var version: String {
+        let info = Bundle.main.infoDictionary
+        let short = info?["CFBundleShortVersionString"] as? String ?? "–"
+        let build = info?["CFBundleVersion"] as? String ?? ""
+        return build.isEmpty ? short : "\(short) (\(build))"
+    }
+
+    private func open(_ name: String, _ fileExtension: String) {
+        guard let url = Bundle.main.url(forResource: name, withExtension: fileExtension) else {
+            status = "This document is missing from the app bundle."
+            return
+        }
+        status = NSWorkspace.shared.open(url) ? nil : "macOS could not open this document."
     }
 }
 
@@ -228,73 +435,69 @@ private struct DictationAppProfilesEditor: View {
     ]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Divider()
-            Text("App profiles")
-                .font(.hkHeadline)
-            Text("When writing mode is Automatic, use a profile’s format and vocabulary in that app. App names and terms stay on this Mac. HushKey does not read app text unless nearby text hints are separately enabled.")
-                .font(.hkCaption)
-                .foregroundStyle(.secondary)
-
-            if !model.dictationAppProfiles.isEmpty {
-                ForEach(model.dictationAppProfiles) { profile in
-                    HStack(alignment: .center, spacing: 8) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(profile.appName).font(.hkCallout.weight(.medium))
-                            Text("\(profile.mode.rawValue) · \(profile.bundleIdentifier)")
-                                .font(.hkCaption.monospaced())
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Button("Edit") { load(profile) }
-                            .buttonStyle(.borderless)
-                        Button(role: .destructive) {
-                            model.deleteDictationAppProfile(bundleIdentifier: profile.bundleIdentifier)
-                            if editingIdentifier == profile.id { resetForm() }
-                        } label: {
-                            Image(systemName: "trash")
-                        }
-                        .buttonStyle(.borderless)
-                        .help("Delete \(profile.appName) profile")
+        ForEach(model.dictationAppProfiles) { profile in
+            SettingsRow(title: profile.appName, detail: "\(profile.mode.rawValue) · \(profile.bundleIdentifier)") {
+                HStack(spacing: 2) {
+                    Button("Edit", systemImage: "pencil") { load(profile) }
+                        .buttonStyle(IconButtonStyle())
+                        .help("Edit \(profile.appName) profile")
+                    Button("Delete", systemImage: "trash") {
+                        model.deleteDictationAppProfile(bundleIdentifier: profile.bundleIdentifier)
+                        if editingIdentifier == profile.id { resetForm() }
                     }
-                    .padding(.vertical, 2)
+                    .buttonStyle(IconButtonStyle())
+                    .help("Delete \(profile.appName) profile")
                 }
             }
-
-            HStack(spacing: 8) {
-                TextField("App name", text: $appName)
-                    .textFieldStyle(.roundedBorder)
-                Menu("Common apps") {
+        }
+        GroupRow {
+            HStack(spacing: Theme.s2) {
+                field("App name", text: $appName)
+                Menu {
                     ForEach(commonApps) { app in
                         Button(app.name) { appName = app.name; bundleIdentifier = app.bundleIdentifier }
                     }
+                } label: {
+                    Label("Common apps", systemImage: "square.grid.2x2")
+                        .labelStyle(.titleAndIcon)
                 }
+                .menuStyle(.button)
+                .buttonStyle(SecondaryButtonStyle())
+                .fixedSize()
             }
-            TextField("Bundle identifier (example: com.apple.mail)", text: $bundleIdentifier)
-                .textFieldStyle(.roundedBorder)
-                Picker("Writing mode", selection: $mode) {
-                    ForEach(DictationMode.allCases.filter { $0 != .automatic }) { option in
-                        Label(option.rawValue, systemImage: option.symbol).tag(option)
-                    }
-                }
-                .frame(maxWidth: 260, alignment: .leading)
-            TextField("Extra names or terms, separated by commas", text: $vocabulary)
-                .textFieldStyle(.roundedBorder)
-            HStack {
+            field("Bundle identifier, e.g. com.apple.mail", text: $bundleIdentifier)
+            HStack(spacing: Theme.s2) {
+                MenuPicker(selection: $mode,
+                           options: DictationMode.allCases.filter { $0 != .automatic }.map { ($0, $0.rawValue) },
+                           width: 160)
+                field("Extra names or terms, comma separated", text: $vocabulary)
+            }
+            HStack(spacing: Theme.s2) {
                 Button(editingIdentifier == nil ? "Add profile" : "Save profile") { save() }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(PrimaryButtonStyle())
                     .disabled(appName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
                               appName.count > 80 || vocabulary.utf8.count > 4_000 ||
                               !DictationAppProfile.isValidBundleIdentifier(bundleIdentifier))
                 if editingIdentifier != nil {
                     Button("Cancel") { resetForm() }
+                        .buttonStyle(SecondaryButtonStyle())
                 }
                 if !status.isEmpty {
-                    Text(status).font(.hkCaption).foregroundStyle(.secondary)
+                    Text(status).font(.hkCaption).foregroundStyle(Theme.ink2)
                 }
             }
         }
-        .padding(.vertical, 5)
+    }
+
+    private func field(_ prompt: String, text: Binding<String>) -> some View {
+        TextField(prompt, text: text)
+            .textFieldStyle(.plain)
+            .font(.hkBody)
+            .padding(.horizontal, Theme.s3)
+            .frame(height: Theme.controlHeight)
+            .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
+                .strokeBorder(Theme.hairline, lineWidth: 1))
     }
 
     private func load(_ profile: DictationAppProfile) {
@@ -330,208 +533,3 @@ private struct DictationAppProfilesEditor: View {
     }
 }
 
-private struct ShortcutSettingsCard: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        @Bindable var model = model
-        GroupBox("Capture shortcut") {
-            VStack(alignment: .leading, spacing: 10) {
-                Picker("Hold to capture", selection: $model.captureShortcut) {
-                    ForEach(CaptureShortcut.allCases) { Text($0.label).tag($0) }
-                }
-                .frame(maxWidth: 260, alignment: .leading)
-                Text("Use it in Train to capture a word, or in Use after the evidence gate passes. While a synchronized session is recording, it can also mark utterances from any HushKey screen. It does not intercept Space in other apps.")
-                    .font(.hkCaption)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(8)
-        }
-    }
-}
-
-private struct TextInsertionSettingsCard: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        @Bindable var insertion = model.insertion
-        GroupBox("Optional Accessibility insertion") {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Button(insertion.isEnabled ? "Disable insertion" : "Enable insertion") {
-                        insertion.isEnabled ? insertion.disable() : insertion.enable()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    Picker("Shortcut", selection: $insertion.shortcut) {
-                        ForEach(InsertionShortcut.allCases) { Text($0.label).tag($0) }
-                    }
-                    .frame(width: 170)
-                    .disabled(!insertion.isEnabled)
-                }
-                Toggle("Paste in apps that block direct typing, then restore the clipboard", isOn: $insertion.allowsPasteFallback)
-                    .disabled(!insertion.isEnabled)
-                Label(insertion.status, systemImage: insertion.isEnabled ? "checkmark.shield" : "lock.shield")
-                    .font(.hkCaption)
-                    .foregroundStyle(.secondary)
-                Text("If the destination field remains focused and unchanged, press ⌥⇧U immediately after insertion to undo it. Undo is fail-closed if the target or text changes.")
-                    .font(.hkCaption)
-                    .foregroundStyle(.secondary)
-                Text("When enabled, the insertion shortcut adds your reviewed voice transcript, or the latest accepted silent word, to a supported text field in the frontmost app. Password fields are rejected. Explicit insertion does not use the clipboard. Silent Use still needs evidence to unlock.")
-                    .font(.hkCaption)
-                    .foregroundStyle(.secondary)
-                Text("For the Dictation screen’s one-click Insert button, start dictation with the global shortcut while the destination field is focused. HushKey remembers that field only in memory and returns to it only if the same app, field, and text selection are still unchanged.")
-                    .font(.hkCaption)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(8)
-        }
-    }
-}
-
-private struct MicrophoneCard: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        @Bindable var audio = model.audio
-        GroupBox("Microphone input") {
-            VStack(alignment: .leading, spacing: 10) {
-                Picker("Input", selection: $audio.selectedDeviceID) {
-                    Text("System default").tag(AudioDeviceID?.none)
-                    ForEach(audio.devices) { device in
-                        Text(device.name).tag(Optional(device.id))
-                    }
-                }
-                HStack {
-                    Button("Refresh inputs", systemImage: "arrow.clockwise") { audio.refreshDevices() }
-                    LevelMeter(value: Double(audio.level))
-                }
-                if let name = audio.activeDeviceName {
-                    Label("Listening with \(name)", systemImage: "mic.fill")
-                        .font(.hkCaption)
-                        .foregroundStyle(.secondary)
-                }
-                if let error = audio.error ?? model.transcriber.error {
-                    Text(error).font(.hkCaption).foregroundStyle(.red)
-                }
-                Text("Choose an input for Dictation and Meeting notes. On-device recognition stays on this Mac. Dictation and meeting capture do not save microphone audio; the separate research recorder saves audio only when you explicitly start a session.")
-                    .font(.hkCaption)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(8)
-        }
-    }
-}
-
-private struct RecordingCard: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        @Bindable var recorder = model.recorder
-        GroupBox("Synchronized session recording") {
-            VStack(alignment: .leading, spacing: 10) {
-                Picker("Condition", selection: $recorder.condition) {
-                    ForEach(SessionRecorder.Condition.allCases) { Text($0.rawValue).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .disabled(recorder.isRecording)
-
-                TextField("Prompt or phrase label", text: $recorder.prompt)
-                    .textFieldStyle(.roundedBorder)
-
-                HStack {
-                    Button {
-                        recorder.isRecording ? recorder.stop() : recorder.start(audio: model.audio)
-                    } label: {
-                        Label(recorder.isRecording ? "Stop recording" : "Start recording",
-                              systemImage: recorder.isRecording ? "stop.fill" : "record.circle")
-                    }
-                    .tint(recorder.isRecording ? Theme.listening : Theme.ink)
-                    .buttonStyle(.borderedProminent)
-
-                    if recorder.isRecording, let startedAt = recorder.startedAt {
-                        Text(startedAt, style: .timer).monospacedDigit()
-                        Text("· \(recorder.motionCount) samples · \(recorder.eventCount) marks")
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    if let url = recorder.lastSessionURL {
-                        Button("Show last session") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
-                    }
-                }
-                Text("This writes synchronized motion CSV and optional microphone audio to your local Sessions folder. It is separate from per-word templates. While recording, use \(model.captureShortcut.label) to mark an utterance.")
-                    .font(.hkCaption)
-                    .foregroundStyle(.secondary)
-                if let error = recorder.error {
-                    Text(error).font(.hkCaption).foregroundStyle(.red)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(8)
-        }
-    }
-}
-
-private struct DataManagementCard: View {
-    @Environment(AppModel.self) private var model
-    @State private var confirmDeleteTemplates = false
-    @State private var confirmDeleteSessions = false
-
-    var body: some View {
-        GroupBox("Local files & privacy") {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Templates stay in Application Support. Session CSV and optional audio stay in Documents. HushKey sends no recordings or templates anywhere.")
-                    .font(.hkCaption)
-                    .foregroundStyle(.secondary)
-                HStack {
-                    Button("Export dataset…", systemImage: "square.and.arrow.up") { model.exportDataset() }
-                    Button("Export sessions…", systemImage: "folder.badge.plus") { model.exportSessions() }
-                    Button("Delete templates…", systemImage: "trash", role: .destructive) {
-                        confirmDeleteTemplates = true
-                    }
-                    Button("Delete session logs…", systemImage: "trash.slash", role: .destructive) {
-                        confirmDeleteSessions = true
-                    }
-                    .disabled(model.recorder.isRecording)
-                }
-                if let message = model.dataMessage {
-                    Text(message).font(.hkCaption).textSelection(.enabled)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(8)
-        }
-        .confirmationDialog("Delete all training templates from this Mac?", isPresented: $confirmDeleteTemplates, titleVisibility: .visible) {
-            Button("Delete templates", role: .destructive) { model.clearTrainingData() }
-        }
-        .confirmationDialog("Delete all session logs and local audio files?", isPresented: $confirmDeleteSessions, titleVisibility: .visible) {
-            Button("Delete session logs", role: .destructive) { model.deleteSessionLogs() }
-        }
-    }
-}
-
-private struct AppearanceCard: View {
-    @AppStorage(AppearancePreference.storageKey) private var appearance: AppearancePreference = .light
-
-    var body: some View {
-        GroupBox("Appearance") {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Theme").font(.system(size: 14, weight: .medium))
-                    Text("Light uses warm paper; Dark keeps the same layout for night use.")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Theme.ink2)
-                }
-                Spacer()
-                Picker("Theme", selection: $appearance) {
-                    ForEach(AppearancePreference.allCases) { Text($0.rawValue).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(width: 220)
-            }
-        }
-    }
-}

@@ -12,7 +12,7 @@ struct ContentView: View {
     var body: some View {
         HStack(spacing: 0) {
             sidebar
-                .frame(width: 232)
+                .frame(width: Theme.sidebarWidth)
             page
                 .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: Theme.r1, style: .continuous)
@@ -39,7 +39,7 @@ struct ContentView: View {
                 .padding(.bottom, Theme.s4)
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: Theme.s1) {
                     ForEach(Self.mainScreens) { SidebarRow(screen: $0) }
                     HStack {
                         SectionLabel(title: "Silent lab")
@@ -49,21 +49,21 @@ struct ContentView: View {
                                 .help(model.motion.status.label)
                         }
                     }
-                    .padding(.horizontal, Theme.s3)
+                    .padding(.horizontal, Theme.s3 - 2)
                     .padding(.top, Theme.s5)
-                    .padding(.bottom, Theme.s1)
+                    .padding(.bottom, 2)
                     ForEach(Self.labScreens) { SidebarRow(screen: $0) }
                 }
-                .padding(.horizontal, Theme.s2)
+                .padding(.horizontal, Theme.s3)
             }
             .scrollIndicators(.never)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Theme.s1) {
                 SetupChecklist()
                     .padding(.bottom, Theme.s2)
                 SidebarRow(screen: .settings)
             }
-            .padding([.horizontal, .bottom], Theme.s2)
+            .padding([.horizontal, .bottom], Theme.s3)
         }
     }
 
@@ -148,15 +148,15 @@ private struct SidebarRow: View {
         } label: {
             HStack(spacing: Theme.s3) {
                 Image(systemName: screen.symbol)
-                    .font(.system(size: 15, weight: .medium))
-                    .frame(width: 18)
+                    .font(.system(size: 16, weight: .regular))
+                    .frame(width: 20)
                     .symbolEffect(.bounce, value: isSelected)
                 Text(screen.sidebarTitle)
-                    .font(.system(size: 15, weight: isSelected ? .semibold : .medium))
+                    .font(.system(size: 15, weight: isSelected ? .semibold : .regular))
                 Spacer(minLength: 0)
             }
-            .foregroundStyle(isSelected ? Theme.ink : Theme.ink.opacity(0.82))
-            .padding(.horizontal, Theme.s3)
+            .foregroundStyle(Theme.ink)
+            .padding(.horizontal, Theme.s3 - 2)
             .frame(height: Theme.sidebarRow)
             .background(isSelected ? Theme.selection : hovering ? Theme.hover : .clear,
                         in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
