@@ -299,14 +299,14 @@ private struct DataSettings: View {
         .confirmationDialog("Import personal HushKey backup?", isPresented: $confirmPersonalBackupImport,
                             titleVisibility: .visible) {
             Button("Merge backup") { model.applyPersonalDataBackup(using: .merge) }
-            Button("Replace local data", role: .destructive) { model.applyPersonalDataBackup(using: .replace) }
+            Button("Replace backed-up data", role: .destructive) { model.applyPersonalDataBackup(using: .replace) }
             Button("Cancel", role: .cancel) { model.cancelPersonalDataImport() }
         } message: {
             if let backup = model.pendingPersonalDataBackup {
                 if model.dictationHistoryArchiveUnreadable {
-                    Text("The backup contains \(backup.summary) Your unreadable dictation archive will be replaced; HushKey preserved its recovery copy where possible. Merge keeps local settings conflicts and adds matching records that are missing. Replace uses only the backup. Audio is not included.")
+                    Text("The backup contains \(backup.summary) Replace affects only dictations, vocabulary, snippets and corrections; file transcripts, meeting notes, Silent Lab templates and session logs stay on this Mac. Your unreadable dictation archive will be replaced, with a recovery copy preserved where possible. Merge keeps local conflicts and adds missing backup entries. Audio is not included.")
                 } else {
-                    Text("The backup contains \(backup.summary) Merge keeps your current entries and adds missing ones. Replace uses only the backup. Audio is not included.")
+                    Text("The backup contains \(backup.summary) Replace affects only dictations, vocabulary, snippets and corrections; file transcripts, meeting notes, Silent Lab templates and session logs stay on this Mac. Merge keeps your current entries and adds missing backup entries. Audio is not included.")
                 }
             } else {
                 Text("The selected backup is no longer available.")
