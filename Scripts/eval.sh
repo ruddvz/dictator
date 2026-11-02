@@ -1,7 +1,7 @@
 #!/bin/bash
 # Runs HushKey's local dictation eval and writes docs/eval/report.md and report.json.
 # Audio stays on this Mac: clips are recognized with on-device Apple Speech and any WhisperKit
-# model already downloaded in HushKey. Nothing is downloaded and no remote service is used.
+# or Parakeet model already downloaded in HushKey. Nothing is downloaded and no remote service is used.
 set -euo pipefail
 
 project_root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -28,8 +28,16 @@ for split in dev holdout; do
 done
 
 xcodegen generate --quiet
+xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build CODE_SIGNING_ALLOWED=NO \
+  build-for-testing -quiet
+# Sign the test host like dist/HushKey.app, so macOS treats it as the same app: Speech stays
+# allowed without a prompt, and dist's permissions aren't moved to an ad-hoc copy.
+identity="$(security find-identity -p codesigning 2>/dev/null | awk '/"HushKey Local Signing"/ { print $2; exit }')"
+if [[ -n "$identity" ]]; then
+  codesign --force --deep --sign "$identity" --timestamp=none .build/Build/Products/Debug/HushKey.app
+fi
 TEST_RUNNER_HUSHKEY_EVAL=1 TEST_RUNNER_HUSHKEY_EVAL_LOCALE="$locale" \
-  xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build \
-  -only-testing:HushKeyTests/DictationEvalTests -only-testing:HushKeyTests/PauseRecognitionTests test -quiet
+  xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build CODE_SIGNING_ALLOWED=NO \
+  -only-testing:HushKeyTests/DictationEvalTests -only-testing:HushKeyTests/PauseRecognitionTests test-without-building -quiet
 
 echo "Wrote $project_root/docs/eval/report.md"

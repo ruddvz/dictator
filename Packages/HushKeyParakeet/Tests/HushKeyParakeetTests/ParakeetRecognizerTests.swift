@@ -40,6 +40,35 @@ final class ParakeetRecognizerTests: XCTestCase {
         }
     }
 
+    /// Opt-in timing on a downloaded model: `PARAKEET_MODEL_ROOT=<ParakeetModels folder> swift test`.
+    func testLoadAndTranscribeTimingsOnADownloadedModel() async throws {
+        guard let path = ProcessInfo.processInfo.environment["PARAKEET_MODEL_ROOT"] else {
+            throw XCTSkip("Set PARAKEET_MODEL_ROOT to time a downloaded model.")
+        }
+        let root = URL(fileURLWithPath: path)
+        let model = try XCTUnwrap(ParakeetModel.allCases.first { $0.isDownloaded(in: root) })
+        let recognizer = ParakeetRecognizer()
+        let clock = ContinuousClock()
+        let load = try await clock.measure { try await recognizer.load(model, from: root) }
+        let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1))
+        for seconds in [2, 5, 10, 30] {
+            let buffer = try Self.tone(format: format, frames: AVAudioFrameCount(48_000 * seconds))
+            let samples = try ParakeetRecognizer.samples(from: [buffer])
+            let result = try await recognizer.transcribe(samples)
+            print(String(format: "parakeet-timing %@ %ds audio: %.3f s", model.rawValue, seconds, result.processingSeconds))
+        }
+        var info = mach_task_basic_info()
+        var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size / MemoryLayout<natural_t>.size)
+        _ = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &count)
+            }
+        }
+        print(String(format: "parakeet-timing load+warm-up %.2f s, resident %.0f MB", 
+                     Double(load.components.seconds) + Double(load.components.attoseconds) / 1e18,
+                     Double(info.resident_size) / 1_048_576))
+    }
+
     private static func tone(format: AVAudioFormat, frames: AVAudioFrameCount) throws -> AVAudioPCMBuffer {
         let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames))
         buffer.frameLength = frames

@@ -63,7 +63,7 @@ struct DictationEngineRows: View {
         case .appleSpeech:
             "Built into macOS. No download, and words appear as you speak."
         case .parakeet:
-            "NVIDIA Parakeet on this Mac's Neural Engine. More accurate; the text arrives when you let go."
+            "NVIDIA's model on this Mac's Neural Engine. Text appears when you let go."
         }
     }
 
@@ -71,8 +71,8 @@ struct DictationEngineRows: View {
         let parakeet = model.parakeet
         if !parakeet.model.supports(localeIdentifier: model.dictationLanguage) {
             let language = Locale.current.localizedString(forIdentifier: model.dictationLanguage) ?? model.dictationLanguage
-            return "\(parakeet.model.title) doesn't know \(language), so dictation uses Apple Speech. "
-                + "Choose the 25-language model or another language."
+            return "The \(parakeet.model.title) model doesn't know \(language), so dictation uses Apple Speech. "
+                + "Choose the 25-language model."
         }
         return parakeet.statusDescription
     }

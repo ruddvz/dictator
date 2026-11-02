@@ -24,15 +24,15 @@ enum DictationEngine: String, CaseIterable, Identifiable {
 extension ParakeetModel {
     var title: String {
         switch self {
-        case .englishV2: "English · Parakeet v2"
-        case .multilingualV3: "25 languages · Parakeet v3"
+        case .englishV2: "English (v2)"
+        case .multilingualV3: "25 languages (v3)"
         }
     }
 
     /// Approximate download, measured on this Mac; the real size is shown once it's on disk.
     var approximateBytes: Int64 {
         switch self {
-        case .englishV2: 470_000_000
+        case .englishV2: 451_000_000
         case .multilingualV3: 480_000_000
         }
     }

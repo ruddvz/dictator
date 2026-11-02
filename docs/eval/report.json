@@ -70,7 +70,7 @@
           "raw" : "Can you send a quarterly report to Priya before Friday?",
           "source" : "synthetic",
           "split" : "dev",
-          "transcribeSeconds" : 0.324091459,
+          "transcribeSeconds" : 0.295770417,
           "wordErrors" : {
             "deletions" : 0,
             "insertions" : 0,
@@ -146,7 +146,7 @@
           "raw" : "Let's user_ID equals (value)",
           "source" : "synthetic",
           "split" : "dev",
-          "transcribeSeconds" : 0.180641625,
+          "transcribeSeconds" : 0.20468225,
           "wordErrors" : {
             "deletions" : 0,
             "insertions" : 0,
@@ -222,7 +222,7 @@
           "raw" : "Hey team\nThe builders green",
           "source" : "synthetic",
           "split" : "dev",
-          "transcribeSeconds" : 0.12647775,
+          "transcribeSeconds" : 0.137867542,
           "wordErrors" : {
             "deletions" : 1,
             "insertions" : 0,
@@ -298,7 +298,7 @@
           "raw" : "Hi Sam,\n\nThanks for the update",
           "source" : "synthetic",
           "split" : "dev",
-          "transcribeSeconds" : 0.117291125,
+          "transcribeSeconds" : 0.128173125,
           "wordErrors" : {
             "deletions" : 0,
             "insertions" : 0,
@@ -375,7 +375,7 @@
           "raw" : "Send it to Alice actually Bob",
           "source" : "synthetic",
           "split" : "dev",
-          "transcribeSeconds" : 0.107595125,
+          "transcribeSeconds" : 0.111757666,
           "wordErrors" : {
             "deletions" : 0,
             "insertions" : 0,
@@ -451,7 +451,7 @@
           "raw" : "Please reply to my email address",
           "source" : "synthetic",
           "split" : "dev",
-          "transcribeSeconds" : 0.1003235,
+          "transcribeSeconds" : 0.117678583,
           "wordErrors" : {
             "deletions" : 0,
             "insertions" : 0,
@@ -527,7 +527,7 @@
           "raw" : "Oh, I think we should ship it today",
           "source" : "synthetic",
           "split" : "dev",
-          "transcribeSeconds" : 0.190165208,
+          "transcribeSeconds" : 0.219376167,
           "wordErrors" : {
             "deletions" : 1,
             "insertions" : 0,
@@ -603,7 +603,7 @@
           "raw" : "Please schedule a review with the design team next week",
           "source" : "synthetic",
           "split" : "dev",
-          "transcribeSeconds" : 0.116602666,
+          "transcribeSeconds" : 0.135006833,
           "wordErrors" : {
             "deletions" : 0,
             "insertions" : 0,
@@ -679,7 +679,7 @@
           "raw" : "Remind me to water the plants after lunch",
           "source" : "synthetic",
           "split" : "holdout",
-          "transcribeSeconds" : 0.102632917,
+          "transcribeSeconds" : 0.128397416,
           "wordErrors" : {
             "deletions" : 0,
             "insertions" : 0,
@@ -756,7 +756,7 @@
           "raw" : "Can't stop he_key equals process.nv.key",
           "source" : "synthetic",
           "split" : "holdout",
-          "transcribeSeconds" : 0.312695833,
+          "transcribeSeconds" : 0.358080916,
           "wordErrors" : {
             "deletions" : 0,
             "insertions" : 1,
@@ -832,7 +832,7 @@
           "raw" : "Running late.\nStart without me",
           "source" : "synthetic",
           "split" : "holdout",
-          "transcribeSeconds" : 0.082273875,
+          "transcribeSeconds" : 0.103975375,
           "wordErrors" : {
             "deletions" : 0,
             "insertions" : 0,
@@ -909,7 +909,7 @@
           "raw" : "Book a table for four actually five",
           "source" : "synthetic",
           "split" : "holdout",
-          "transcribeSeconds" : 0.09431625,
+          "transcribeSeconds" : 0.13661175,
           "wordErrors" : {
             "deletions" : 0,
             "insertions" : 0,
@@ -985,7 +985,7 @@
           "raw" : "Add my home address to the form",
           "source" : "synthetic",
           "split" : "holdout",
-          "transcribeSeconds" : 0.089296541,
+          "transcribeSeconds" : 0.105164958,
           "wordErrors" : {
             "deletions" : 0,
             "insertions" : 0,
@@ -1061,7 +1061,7 @@
           "raw" : "Hello Maria,\n\nThe invoice is attached.\nBest regards",
           "source" : "synthetic",
           "split" : "holdout",
-          "transcribeSeconds" : 0.152358792,
+          "transcribeSeconds" : 0.165082708,
           "wordErrors" : {
             "deletions" : 0,
             "insertions" : 0,
@@ -1074,13 +1074,1083 @@
     },
     {
       "clips" : [
+        {
+          "audioSeconds" : 3.16925,
+          "id" : "d01-plain",
+          "modes" : [
+            {
+              "checksTotal" : 3,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 10,
+                "substitutions" : 0
+              },
+              "mode" : "Natural",
+              "oracle" : "Can you send the quarterly report to Priya before Friday",
+              "output" : "Can you send the quarterly report to Priya before Friday"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 10,
+                "substitutions" : 0
+              },
+              "mode" : "Message",
+              "oracle" : "Can you send the quarterly report to Priya before Friday",
+              "output" : "Can you send the quarterly report to Priya before Friday"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 10,
+                "substitutions" : 0
+              },
+              "mode" : "Email",
+              "oracle" : "Can you send the quarterly report to Priya before Friday",
+              "output" : "Can you send the quarterly report to Priya before Friday"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 10,
+                "substitutions" : 0
+              },
+              "mode" : "Code",
+              "oracle" : "Can you send the quarterly report to Priya before Friday",
+              "output" : "Can you send the quarterly report to Priya before Friday"
+            }
+          ],
+          "raw" : "Can you send the quarterly report to Priya before Friday",
+          "source" : "synthetic",
+          "split" : "dev",
+          "transcribeSeconds" : 0.082482417,
+          "wordErrors" : {
+            "deletions" : 0,
+            "insertions" : 0,
+            "referenceTokens" : 10,
+            "substitutions" : 0
+          }
+        },
+        {
+          "audioSeconds" : 4.5555,
+          "id" : "d02-code-tokens",
+          "modes" : [
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 10,
+                "substitutions" : 0
+              },
+              "mode" : "Natural",
+              "oracle" : "let user underscore id equals open parenthesis value close parenthesis",
+              "output" : "Let user underscore id equals open parenthesis value close parenthesis"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 10,
+                "substitutions" : 0
+              },
+              "mode" : "Message",
+              "oracle" : "let user underscore id equals open parenthesis value close parenthesis",
+              "output" : "Let user underscore id equals open parenthesis value close parenthesis"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 10,
+                "substitutions" : 0
+              },
+              "mode" : "Email",
+              "oracle" : "let user underscore id equals open parenthesis value close parenthesis",
+              "output" : "Let user underscore id equals open parenthesis value close parenthesis"
+            },
+            {
+              "checksTotal" : 4,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 8,
+                "substitutions" : 0
+              },
+              "mode" : "Code",
+              "oracle" : "let user_id = (value)",
+              "output" : "Let user_id = (value)"
+            }
+          ],
+          "raw" : "Let user underscore id equals open parenthesis value close parenthesis",
+          "source" : "synthetic",
+          "split" : "dev",
+          "transcribeSeconds" : 0.083973833,
+          "wordErrors" : {
+            "deletions" : 0,
+            "insertions" : 0,
+            "referenceTokens" : 10,
+            "substitutions" : 0
+          }
+        },
+        {
+          "audioSeconds" : 1.98125,
+          "id" : "d03-message-line",
+          "modes" : [
+            {
+              "checksTotal" : 1,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 8,
+                "substitutions" : 0
+              },
+              "mode" : "Natural",
+              "oracle" : "Hey team new line the build is green",
+              "output" : "Hey team new line the build is green"
+            },
+            {
+              "checksTotal" : 2,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 7,
+                "substitutions" : 0
+              },
+              "mode" : "Message",
+              "oracle" : "Hey team\nthe build is green",
+              "output" : "Hey team\nthe build is green"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 7,
+                "substitutions" : 0
+              },
+              "mode" : "Email",
+              "oracle" : "Hey team\nthe build is green",
+              "output" : "Hey team\nthe build is green"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 7,
+                "substitutions" : 0
+              },
+              "mode" : "Code",
+              "oracle" : "Hey team\nthe build is green",
+              "output" : "Hey team\nthe build is green"
+            }
+          ],
+          "raw" : "Hey team new line the build is green",
+          "source" : "synthetic",
+          "split" : "dev",
+          "transcribeSeconds" : 0.069334083,
+          "wordErrors" : {
+            "deletions" : 0,
+            "insertions" : 0,
+            "referenceTokens" : 8,
+            "substitutions" : 0
+          }
+        },
+        {
+          "audioSeconds" : 2.678125,
+          "id" : "d04-email-paragraph",
+          "modes" : [
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 8,
+                "substitutions" : 0
+              },
+              "mode" : "Natural",
+              "oracle" : "Hi Sam new paragraph thanks for the update",
+              "output" : "Hi Sam new paragraph thanks for the update"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 7,
+                "substitutions" : 0
+              },
+              "mode" : "Message",
+              "oracle" : "Hi Sam\nthanks for the update",
+              "output" : "Hi Sam\nthanks for the update"
+            },
+            {
+              "checksTotal" : 2,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 8,
+                "substitutions" : 0
+              },
+              "mode" : "Email",
+              "oracle" : "Hi Sam\n\nthanks for the update",
+              "output" : "Hi Sam\n\nthanks for the update"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 8,
+                "substitutions" : 0
+              },
+              "mode" : "Code",
+              "oracle" : "Hi Sam new paragraph thanks for the update",
+              "output" : "Hi Sam new paragraph thanks for the update"
+            }
+          ],
+          "raw" : "Hi Sam new paragraph thanks for the update",
+          "source" : "synthetic",
+          "split" : "dev",
+          "transcribeSeconds" : 0.071609958,
+          "wordErrors" : {
+            "deletions" : 0,
+            "insertions" : 0,
+            "referenceTokens" : 8,
+            "substitutions" : 0
+          }
+        },
+        {
+          "audioSeconds" : 2.41775,
+          "id" : "d05-correction",
+          "modes" : [
+            {
+              "checksTotal" : 3,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 4,
+                "substitutions" : 0
+              },
+              "mode" : "Natural",
+              "oracle" : "Send it to Bob",
+              "output" : "Send it to Bob"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 4,
+                "substitutions" : 0
+              },
+              "mode" : "Message",
+              "oracle" : "Send it to Bob",
+              "output" : "Send it to Bob"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 4,
+                "substitutions" : 0
+              },
+              "mode" : "Email",
+              "oracle" : "Send it to Bob",
+              "output" : "Send it to Bob"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 4,
+                "substitutions" : 0
+              },
+              "mode" : "Code",
+              "oracle" : "Send it to Bob",
+              "output" : "Send it to Bob"
+            }
+          ],
+          "raw" : "Send it to Alice, actually, Bob",
+          "source" : "synthetic",
+          "split" : "dev",
+          "transcribeSeconds" : 0.068922333,
+          "wordErrors" : {
+            "deletions" : 0,
+            "insertions" : 0,
+            "referenceTokens" : 6,
+            "substitutions" : 0
+          }
+        },
+        {
+          "audioSeconds" : 2.262,
+          "id" : "d06-snippet",
+          "modes" : [
+            {
+              "checksTotal" : 1,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 8,
+                "substitutions" : 0
+              },
+              "mode" : "Natural",
+              "oracle" : "Please reply to person@example.com",
+              "output" : "Please reply to person@example.com"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 8,
+                "substitutions" : 0
+              },
+              "mode" : "Message",
+              "oracle" : "Please reply to person@example.com",
+              "output" : "Please reply to person@example.com"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 8,
+                "substitutions" : 0
+              },
+              "mode" : "Email",
+              "oracle" : "Please reply to person@example.com",
+              "output" : "Please reply to person@example.com"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 8,
+                "substitutions" : 0
+              },
+              "mode" : "Code",
+              "oracle" : "Please reply to person@example.com",
+              "output" : "Please reply to person@example.com"
+            }
+          ],
+          "raw" : "Please reply to my email address",
+          "source" : "synthetic",
+          "split" : "dev",
+          "transcribeSeconds" : 0.067617792,
+          "wordErrors" : {
+            "deletions" : 0,
+            "insertions" : 0,
+            "referenceTokens" : 6,
+            "substitutions" : 0
+          }
+        },
+        {
+          "audioSeconds" : 2.130875,
+          "id" : "d07-fillers",
+          "modes" : [
+            {
+              "checksTotal" : 3,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 7,
+                "substitutions" : 0
+              },
+              "mode" : "Natural",
+              "oracle" : "I think we should ship it today",
+              "output" : "I think we should ship it today"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 7,
+                "substitutions" : 0
+              },
+              "mode" : "Message",
+              "oracle" : "I think we should ship it today",
+              "output" : "I think we should ship it today"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 7,
+                "substitutions" : 0
+              },
+              "mode" : "Email",
+              "oracle" : "I think we should ship it today",
+              "output" : "I think we should ship it today"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 7,
+                "substitutions" : 0
+              },
+              "mode" : "Code",
+              "oracle" : "I think we should ship it today",
+              "output" : "I think we should ship it today"
+            }
+          ],
+          "raw" : "Um I think we should uh ship it today",
+          "source" : "synthetic",
+          "split" : "dev",
+          "transcribeSeconds" : 0.0661615,
+          "wordErrors" : {
+            "deletions" : 0,
+            "insertions" : 0,
+            "referenceTokens" : 9,
+            "substitutions" : 0
+          }
+        },
+        {
+          "audioSeconds" : 3.02825,
+          "id" : "d08-plain-names",
+          "modes" : [
+            {
+              "checksTotal" : 2,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 10,
+                "substitutions" : 0
+              },
+              "mode" : "Natural",
+              "oracle" : "Please schedule a review with the design team next week",
+              "output" : "Please schedule a review with the design team next week"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 10,
+                "substitutions" : 0
+              },
+              "mode" : "Message",
+              "oracle" : "Please schedule a review with the design team next week",
+              "output" : "Please schedule a review with the design team next week"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 10,
+                "substitutions" : 0
+              },
+              "mode" : "Email",
+              "oracle" : "Please schedule a review with the design team next week",
+              "output" : "Please schedule a review with the design team next week"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 10,
+                "substitutions" : 0
+              },
+              "mode" : "Code",
+              "oracle" : "Please schedule a review with the design team next week",
+              "output" : "Please schedule a review with the design team next week"
+            }
+          ],
+          "raw" : "Please schedule a review with the design team next week",
+          "source" : "synthetic",
+          "split" : "dev",
+          "transcribeSeconds" : 0.074375875,
+          "wordErrors" : {
+            "deletions" : 0,
+            "insertions" : 0,
+            "referenceTokens" : 10,
+            "substitutions" : 0
+          }
+        },
+        {
+          "audioSeconds" : 2.549875,
+          "id" : "h01-plain",
+          "modes" : [
+            {
+              "checksTotal" : 2,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 8,
+                "substitutions" : 0
+              },
+              "mode" : "Natural",
+              "oracle" : "Remind me to water the plants after lunch",
+              "output" : "Remind me to water the plants after lunch"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 8,
+                "substitutions" : 0
+              },
+              "mode" : "Message",
+              "oracle" : "Remind me to water the plants after lunch",
+              "output" : "Remind me to water the plants after lunch"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 8,
+                "substitutions" : 0
+              },
+              "mode" : "Email",
+              "oracle" : "Remind me to water the plants after lunch",
+              "output" : "Remind me to water the plants after lunch"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 8,
+                "substitutions" : 0
+              },
+              "mode" : "Code",
+              "oracle" : "Remind me to water the plants after lunch",
+              "output" : "Remind me to water the plants after lunch"
+            }
+          ],
+          "raw" : "Remind me to water the plants after lunch",
+          "source" : "synthetic",
+          "split" : "holdout",
+          "transcribeSeconds" : 0.068527458,
+          "wordErrors" : {
+            "deletions" : 0,
+            "insertions" : 0,
+            "referenceTokens" : 8,
+            "substitutions" : 0
+          }
+        },
+        {
+          "audioSeconds" : 3.796375,
+          "id" : "h02-code-tokens",
+          "modes" : [
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 1,
+                "referenceTokens" : 10,
+                "substitutions" : 3
+              },
+              "mode" : "Natural",
+              "oracle" : "const api underscore key equals process dot env dot key",
+              "output" : "const app e underscore key equals process dot nv.key"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 1,
+                "referenceTokens" : 10,
+                "substitutions" : 3
+              },
+              "mode" : "Message",
+              "oracle" : "const api underscore key equals process dot env dot key",
+              "output" : "const app e underscore key equals process dot nv.key"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 1,
+                "referenceTokens" : 10,
+                "substitutions" : 3
+              },
+              "mode" : "Email",
+              "oracle" : "const api underscore key equals process dot env dot key",
+              "output" : "const app e underscore key equals process dot nv.key"
+            },
+            {
+              "checksTotal" : 4,
+              "failedChecks" : [
+                "missing \"api_key\"",
+                "missing \"process.env.key\""
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 2,
+                "referenceTokens" : 8,
+                "substitutions" : 2
+              },
+              "mode" : "Code",
+              "oracle" : "const api_key = process. env. key",
+              "output" : "const app e_key = process. nv.key"
+            }
+          ],
+          "raw" : "const app e underscore key equals process dot nv.key",
+          "source" : "synthetic",
+          "split" : "holdout",
+          "transcribeSeconds" : 0.073394916,
+          "wordErrors" : {
+            "deletions" : 0,
+            "insertions" : 1,
+            "referenceTokens" : 10,
+            "substitutions" : 2
+          }
+        },
+        {
+          "audioSeconds" : 2.2478125,
+          "id" : "h03-message-line",
+          "modes" : [
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 7,
+                "substitutions" : 1
+              },
+              "mode" : "Natural",
+              "oracle" : "Running late new line start without me",
+              "output" : "Running late new lines start without me"
+            },
+            {
+              "checksTotal" : 2,
+              "failedChecks" : [
+                "missing \"⏎\""
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 1,
+                "referenceTokens" : 6,
+                "substitutions" : 1
+              },
+              "mode" : "Message",
+              "oracle" : "Running late\nstart without me",
+              "output" : "Running late new lines start without me"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 1,
+                "referenceTokens" : 6,
+                "substitutions" : 1
+              },
+              "mode" : "Email",
+              "oracle" : "Running late\nstart without me",
+              "output" : "Running late new lines start without me"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 1,
+                "referenceTokens" : 6,
+                "substitutions" : 1
+              },
+              "mode" : "Code",
+              "oracle" : "Running late\nstart without me",
+              "output" : "Running late new lines start without me"
+            }
+          ],
+          "raw" : "Running late new lines start without me",
+          "source" : "synthetic",
+          "split" : "holdout",
+          "transcribeSeconds" : 0.067806708,
+          "wordErrors" : {
+            "deletions" : 0,
+            "insertions" : 0,
+            "referenceTokens" : 7,
+            "substitutions" : 1
+          }
+        },
+        {
+          "audioSeconds" : 2.54675,
+          "id" : "h04-correction",
+          "modes" : [
+            {
+              "checksTotal" : 3,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 5,
+                "substitutions" : 0
+              },
+              "mode" : "Natural",
+              "oracle" : "Book a table for five",
+              "output" : "Book a table for five."
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 5,
+                "substitutions" : 0
+              },
+              "mode" : "Message",
+              "oracle" : "Book a table for five",
+              "output" : "Book a table for five."
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 5,
+                "substitutions" : 0
+              },
+              "mode" : "Email",
+              "oracle" : "Book a table for five",
+              "output" : "Book a table for five."
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 5,
+                "substitutions" : 0
+              },
+              "mode" : "Code",
+              "oracle" : "Book a table for five",
+              "output" : "Book a table for five."
+            }
+          ],
+          "raw" : "Book a table for four, actually, five.",
+          "source" : "synthetic",
+          "split" : "holdout",
+          "transcribeSeconds" : 0.069277125,
+          "wordErrors" : {
+            "deletions" : 0,
+            "insertions" : 0,
+            "referenceTokens" : 7,
+            "substitutions" : 0
+          }
+        },
+        {
+          "audioSeconds" : 1.95875,
+          "id" : "h05-snippet",
+          "modes" : [
+            {
+              "checksTotal" : 1,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 7,
+                "substitutions" : 0
+              },
+              "mode" : "Natural",
+              "oracle" : "Add 1 Infinite Loop to the form",
+              "output" : "Add 1 Infinite Loop to the form"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 7,
+                "substitutions" : 0
+              },
+              "mode" : "Message",
+              "oracle" : "Add 1 Infinite Loop to the form",
+              "output" : "Add 1 Infinite Loop to the form"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 7,
+                "substitutions" : 0
+              },
+              "mode" : "Email",
+              "oracle" : "Add 1 Infinite Loop to the form",
+              "output" : "Add 1 Infinite Loop to the form"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 0,
+                "insertions" : 0,
+                "referenceTokens" : 7,
+                "substitutions" : 0
+              },
+              "mode" : "Code",
+              "oracle" : "Add 1 Infinite Loop to the form",
+              "output" : "Add 1 Infinite Loop to the form"
+            }
+          ],
+          "raw" : "Add my home address to the form",
+          "source" : "synthetic",
+          "split" : "holdout",
+          "transcribeSeconds" : 0.0662405,
+          "wordErrors" : {
+            "deletions" : 0,
+            "insertions" : 0,
+            "referenceTokens" : 7,
+            "substitutions" : 0
+          }
+        },
+        {
+          "audioSeconds" : 4.2111875,
+          "id" : "h06-email-structure",
+          "modes" : [
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 1,
+                "insertions" : 0,
+                "referenceTokens" : 12,
+                "substitutions" : 1
+              },
+              "mode" : "Natural",
+              "oracle" : "Hello Maria new paragraph the invoice is attached new line best regards",
+              "output" : "Hello Maria new paragraph the invoices attached new line best regards"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 1,
+                "insertions" : 0,
+                "referenceTokens" : 10,
+                "substitutions" : 1
+              },
+              "mode" : "Message",
+              "oracle" : "Hello Maria\nthe invoice is attached\nbest regards",
+              "output" : "Hello Maria\nthe invoices attached\nbest regards"
+            },
+            {
+              "checksTotal" : 4,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 1,
+                "insertions" : 0,
+                "referenceTokens" : 11,
+                "substitutions" : 1
+              },
+              "mode" : "Email",
+              "oracle" : "Hello Maria\n\nthe invoice is attached\nbest regards",
+              "output" : "Hello Maria\n\nthe invoices attached\nbest regards"
+            },
+            {
+              "checksTotal" : 0,
+              "failedChecks" : [
+
+              ],
+              "formattedErrors" : {
+                "deletions" : 1,
+                "insertions" : 0,
+                "referenceTokens" : 11,
+                "substitutions" : 1
+              },
+              "mode" : "Code",
+              "oracle" : "Hello Maria new paragraph the invoice is attached\nbest regards",
+              "output" : "Hello Maria new paragraph the invoices attached\nbest regards"
+            }
+          ],
+          "raw" : "Hello Maria new paragraph the invoices attached new line best regards",
+          "source" : "synthetic",
+          "split" : "holdout",
+          "transcribeSeconds" : 0.078790375,
+          "wordErrors" : {
+            "deletions" : 1,
+            "insertions" : 0,
+            "referenceTokens" : 12,
+            "substitutions" : 1
+          }
+        }
+      ],
+      "engine" : "parakeet-v2 (on-device)"
+    },
+    {
+      "clips" : [
 
       ],
       "engine" : "whisperkit",
       "skippedReason" : "No WhisperKit model is downloaded in HushKey. Download one in Transcribe Files to include it; the harness never downloads models."
     }
   ],
-  "generatedAt" : "2026-11-02T02:16:17Z",
+  "generatedAt" : "2026-11-02T23:37:09Z",
   "processor" : [
     {
       "actual" : "(value)",
