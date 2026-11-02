@@ -114,6 +114,7 @@ private struct DictationSettingsCard: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                DictationAppProfilesEditor()
                 Picker("Start or stop dictation", selection: $model.dictationShortcut) {
                     ForEach(DictationShortcut.allCases) { Text($0.label).tag($0) }
                 }
@@ -155,6 +156,135 @@ private struct DictationSettingsCard: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(8)
         }
+    }
+}
+
+private struct DictationAppProfilesEditor: View {
+    private struct CommonApp: Identifiable {
+        var name: String
+        var bundleIdentifier: String
+        var id: String { bundleIdentifier }
+    }
+
+    @Environment(AppModel.self) private var model
+    @State private var appName = ""
+    @State private var bundleIdentifier = ""
+    @State private var mode: DictationMode = .natural
+    @State private var vocabulary = ""
+    @State private var editingIdentifier: String?
+    @State private var status = ""
+
+    private let commonApps: [CommonApp] = [
+        .init(name: "Mail", bundleIdentifier: "com.apple.mail"),
+        .init(name: "Messages", bundleIdentifier: "com.apple.MobileSMS"),
+        .init(name: "Slack", bundleIdentifier: "com.tinyspeck.slackmacgap"),
+        .init(name: "Discord", bundleIdentifier: "com.hnc.Discord"),
+        .init(name: "Xcode", bundleIdentifier: "com.apple.dt.Xcode"),
+        .init(name: "Visual Studio Code", bundleIdentifier: "com.microsoft.VSCode"),
+        .init(name: "Safari", bundleIdentifier: "com.apple.Safari"),
+        .init(name: "Google Chrome", bundleIdentifier: "com.google.Chrome")
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Divider()
+            Text("App profiles")
+                .font(.headline)
+            Text("When writing mode is Automatic, use a profile’s format and vocabulary in that app. App names and terms stay on this Mac. HushKey does not read app text unless nearby text hints are separately enabled.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            if !model.dictationAppProfiles.isEmpty {
+                ForEach(model.dictationAppProfiles) { profile in
+                    HStack(alignment: .center, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(profile.appName).font(.subheadline.weight(.medium))
+                            Text("\(profile.mode.rawValue) · \(profile.bundleIdentifier)")
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button("Edit") { load(profile) }
+                            .buttonStyle(.borderless)
+                        Button(role: .destructive) {
+                            model.deleteDictationAppProfile(bundleIdentifier: profile.bundleIdentifier)
+                            if editingIdentifier == profile.id { resetForm() }
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .buttonStyle(.borderless)
+                        .help("Delete \(profile.appName) profile")
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+
+            HStack(spacing: 8) {
+                TextField("App name", text: $appName)
+                    .textFieldStyle(.roundedBorder)
+                Menu("Common apps") {
+                    ForEach(commonApps) { app in
+                        Button(app.name) { appName = app.name; bundleIdentifier = app.bundleIdentifier }
+                    }
+                }
+            }
+            TextField("Bundle identifier (example: com.apple.mail)", text: $bundleIdentifier)
+                .textFieldStyle(.roundedBorder)
+                Picker("Writing mode", selection: $mode) {
+                    ForEach(DictationMode.allCases.filter { $0 != .automatic }) { option in
+                        Label(option.rawValue, systemImage: option.symbol).tag(option)
+                    }
+                }
+                .frame(maxWidth: 260, alignment: .leading)
+            TextField("Extra names or terms, separated by commas", text: $vocabulary)
+                .textFieldStyle(.roundedBorder)
+            HStack {
+                Button(editingIdentifier == nil ? "Add profile" : "Save profile") { save() }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(appName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                              appName.count > 80 || vocabulary.utf8.count > 4_000 ||
+                              !DictationAppProfile.isValidBundleIdentifier(bundleIdentifier))
+                if editingIdentifier != nil {
+                    Button("Cancel") { resetForm() }
+                }
+                if !status.isEmpty {
+                    Text(status).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(.vertical, 5)
+    }
+
+    private func load(_ profile: DictationAppProfile) {
+        appName = profile.appName
+        bundleIdentifier = profile.bundleIdentifier
+        mode = profile.mode
+        vocabulary = profile.vocabulary
+        editingIdentifier = profile.id
+        status = "Editing \(profile.appName)."
+    }
+
+    private func save() {
+        guard model.saveDictationAppProfile(appName: appName, bundleIdentifier: bundleIdentifier,
+                                            mode: mode, vocabulary: vocabulary) else {
+            status = "Check the app name, bundle identifier, and vocabulary length."
+            return
+        }
+        if let editingIdentifier,
+           DictationAppProfile.normalizedBundleIdentifier(editingIdentifier) !=
+            DictationAppProfile.normalizedBundleIdentifier(bundleIdentifier) {
+            model.deleteDictationAppProfile(bundleIdentifier: editingIdentifier)
+        }
+        resetForm(message: "Saved on this Mac.")
+    }
+
+    private func resetForm(message: String = "") {
+        appName = ""
+        bundleIdentifier = ""
+        mode = .natural
+        vocabulary = ""
+        editingIdentifier = nil
+        status = message
     }
 }
 

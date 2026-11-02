@@ -354,6 +354,30 @@ final class SafetyAndStorageTests: XCTestCase {
         XCTAssertTrue(hints.allSatisfy { ["AlphaWidget", "build_v3", "Redwood"].contains($0) })
     }
 
+    func testAppProfilesOverrideAutomaticModeAndAddLocalVocabulary() {
+        let profile = DictationAppProfile(appName: "Slack", bundleIdentifier: "com.tinyspeck.slackmacgap",
+                                          mode: .message, vocabulary: "HushKey, team sync\nhushkey")
+        XCTAssertEqual(DictationAppProfile.resolvedMode(requested: .automatic,
+                                                         bundleIdentifier: "COM.TINYSPECK.SLACKMACGAP",
+                                                         profiles: [profile]), .message)
+        XCTAssertEqual(DictationAppProfile.resolvedMode(requested: .email,
+                                                         bundleIdentifier: profile.bundleIdentifier,
+                                                         profiles: [profile]), .email)
+        XCTAssertEqual(DictationAppProfile.resolvedMode(requested: .automatic,
+                                                         bundleIdentifier: "com.apple.mail",
+                                                         profiles: [profile]), .email)
+        XCTAssertEqual(DictationAppProfile.vocabulary(for: profile.bundleIdentifier, in: [profile]),
+                       ["HushKey", "team sync"])
+        XCTAssertTrue(DictationAppProfile.isValidBundleIdentifier("com.example.editor"))
+        XCTAssertFalse(DictationAppProfile.isValidBundleIdentifier("editor"))
+
+        let replacement = DictationAppProfile(appName: "Slack", bundleIdentifier: profile.bundleIdentifier,
+                                              mode: .code, vocabulary: "PR-482")
+        let updated = DictationAppProfile.upserting(replacement, into: [profile])
+        XCTAssertEqual(updated.count, 1)
+        XCTAssertEqual(updated.first?.mode, .code)
+    }
+
     func testDictationHistoryLoadsEntriesWithoutRawTranscriptField() throws {
         let data = Data(#"[{"id":"00000000-0000-0000-0000-000000000001","createdAt":0,"text":"saved phrase"}]"#.utf8)
         let url = FileManager.default.temporaryDirectory.appending(path: "hushkey-legacy-\(UUID().uuidString).json")

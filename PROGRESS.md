@@ -232,12 +232,25 @@ Validate named-target insertion, stale-target rejection, global shortcut inserti
 - Kept selection and instruction in memory only. The voice-edit path is separate from normal dictation and requires the user to enable Accessibility insertion. It uses Apple's on-device Foundation Model for preview and has no cloud fallback.
 - Added UTF-16 selection boundary and prompt-separation unit coverage. Latest test run: `47 passed, 0 failed, 0 skipped` on the MacBook Pro.
 - `bash scripts/package-app.sh` succeeded. `dist/HushKey.app` passed `codesign --verify --deep --strict`; its display name is `HushKey` and bundle identifier is `com.ruddvz.hushkey`.
-- Live capture/insertion in TextEdit and a second app is still unverified. Computer Use's native UI pipe failed, so the updated Transforms flow was not visually inspected and a running app process may need a relaunch to load the new package.
+- Live capture/insertion in TextEdit and a second app is still unverified. After packaging, Computer Use opened the exact `dist/HushKey.app` bundle; its idle Dictation screen showed the microphone off, and the duplicate “Writing mode” label was gone. Only that HushKey instance was running. Attempts to navigate to Transforms hit the native UI pipe failure, so that screen remains visually unchecked.
 - Updated README, testing protocol, product plan, and competitor roadmap to mark the implementation and keep live acceptance as the next step.
 
 ## Next item — live selected-text acceptance
 
 In a fresh session, use the packaged app to test the selected-text shortcut, local instruction capture, preview invalidation, Apply once, undo, stale-target rejection, unsupported/secure controls, and permission refusal in TextEdit and one other app. Record actual results in `docs/TESTING_PROTOCOL.md`; then proceed with voice dictation and remaining file/meeting acceptance.
+
+## Completed — competitor review and local app profiles
+
+- Checked the user-supplied FreeFlow, OpenWhispr, OpenTypeless, Voibe, LumeVoice, SpeakType Reddit, and AssemblyAI sources. The linked feature matrix and roadmap distinguish repository-backed behavior from vendor claims and Reddit anecdotes; no competitor code or assets were copied.
+- Added editable app profiles to **Settings & Data**. With writing mode set to Automatic, a profile selects Natural, Message, Email, or Code and adds local vocabulary hints when dictation starts from that app. Profiles match the frontmost app bundle identifier and stay in local preferences; reading nearby app text remains a separate opt-in.
+- Added validation, case-insensitive profile matching, duplicate replacement, local persistence, visible last-capture profile status, and unit coverage. Updated README, product plan, and competitor roadmap.
+- `xcodebuild ... test`: **48 passed, 0 failed, 0 skipped** on the MacBook Pro. The CoreSimulator framework warning remains environmental; macOS tests completed.
+- An exploratory macOS UI test encountered a system Automation permission prompt and unreliable offscreen sidebar geometry. No Automation permission was granted; the UI test target was removed so normal tests and CI remain usable. Manual navigation and live audio/insertion acceptance remain open.
+- Rebuilt `dist/HushKey.app`, verified its strict code signature and `com.ruddvz.hushkey` identity, closed the older `/Users/rudra/Projects/HushKey` build, and launched the packaged app. The only HushKey process now runs from this `dist` bundle.
+
+## Next item — live end-to-end acceptance
+
+With the user present, validate the latest packaged app in TextEdit and a second app: voice and whisper capture, profile selection, selected-text edit preview/apply/undo, guarded insertion/recovery, file transcription, and meeting sources. Record outcomes in `docs/TESTING_PROTOCOL.md`; do not treat unit tests as proof that device permissions or live capture passed.
 
 ## Completed — local dictation eval harness
 
