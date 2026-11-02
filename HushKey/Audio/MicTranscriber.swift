@@ -16,7 +16,7 @@ final class MicTranscriber {
     @ObservationIgnored private var task: SFSpeechRecognitionTask?
     @ObservationIgnored private var sinkID: UUID?
     @ObservationIgnored private weak var sink: AudioSink?
-    @ObservationIgnored private var finalized = ""
+    @ObservationIgnored private var stitcher = TranscriptStitcher()
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var finalizationContinuation: CheckedContinuation<String, Never>?
     @ObservationIgnored private var finalizationTimeoutTask: Task<Void, Never>?
@@ -47,7 +47,8 @@ final class MicTranscriber {
         isFinalizing = true
 
         let request = SFSpeechAudioBufferRecognitionRequest()
-        request.shouldReportPartialResults = false
+        // Partials let the stitcher keep every phrase when Speech restarts after a pause.
+        request.shouldReportPartialResults = true
         request.addsPunctuation = true
         request.requiresOnDeviceRecognition = true
         request.contextualStrings = Array(contextualStrings.prefix(DictationContextHints.maximumCount))
@@ -123,13 +124,13 @@ final class MicTranscriber {
     }
 
     func clear() {
-        finalized = ""
+        stitcher = TranscriptStitcher()
         text = ""
     }
 
     func replaceText(_ value: String) {
         guard !isRunning else { return }
-        finalized = value
+        stitcher = TranscriptStitcher(text: value)
         text = value
     }
 
@@ -151,25 +152,28 @@ final class MicTranscriber {
 
     @ObservationIgnored private var contextualStrings: [String] = []
 
-    private func handle(generation: Int, partial: String?, isFinal: Bool, failure: String?) {
+    private func handle(generation: Int, result: SpeechResult) {
         guard generation == self.generation, isRunning || isFinalizing else { return }
-        if let partial {
-            text = finalized + partial
+        if let partial = result.text {
+            stitcher.update(partial: partial, start: result.start, end: result.end)
+            text = stitcher.text
             error = nil
         }
-        if isFinal || failure != nil {
-            if let partial, !partial.isEmpty { finalized += partial + " " }
-            if isFinal || partial != nil { text = finalized }
-            if let failure { error = "Speech recognition issue: \(failure)" }
-            if isFinalizing {
-                completeFinalization()
-                return
-            }
-            // Recognition tasks end on silence/timeout; keep listening with a fresh one.
-            Task { @MainActor [weak self] in
-                try? await Task.sleep(for: .milliseconds(failure != nil ? 500 : 50))
-                self?.startTask()
-            }
+        guard result.isFinal || result.failure != nil else { return }
+        // The task is over, by a final result, silence, or an error. Keep every word heard so far.
+        stitcher.commit()
+        text = stitcher.text
+        if let failure = result.failure, !result.isBenignEnd {
+            error = "Speech recognition issue: \(failure)"
+        }
+        if isFinalizing {
+            completeFinalization()
+            return
+        }
+        // Recognition tasks end on silence/timeout; keep listening with a fresh one.
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(result.failure != nil && !result.isBenignEnd ? 500 : 50))
+            self?.startTask()
         }
     }
 
@@ -186,15 +190,39 @@ final class MicTranscriber {
         finalizationContinuation = nil
     }
 
+    /// One Speech callback, copied off the recognition thread.
+    struct SpeechResult: Sendable {
+        var text: String?
+        var start: TimeInterval = 0
+        var end: TimeInterval = 0
+        var isFinal = false
+        var failure: String?
+        /// Silence or a cancelled task: normal between phrases, not worth showing as an error.
+        var isBenignEnd = false
+
+        /// kAFAssistantErrorDomain 1110 "No speech detected", 216/301 cancelled, 203 retry.
+        static func isBenign(domain: String, code: Int) -> Bool {
+            domain == "kAFAssistantErrorDomain" && [203, 216, 301, 1107, 1110].contains(code)
+        }
+    }
+
     nonisolated private static func resultHandler(owner: MicTranscriber, generation: Int)
         -> (SFSpeechRecognitionResult?, Error?) -> Void
     {
         { [weak owner] result, error in
-            let partial = result?.bestTranscription.formattedString
-            let isFinal = result?.isFinal ?? false
-            let failure = error?.localizedDescription
+            let segments = result?.bestTranscription.segments ?? []
+            var speech = SpeechResult(text: result?.bestTranscription.formattedString,
+                                      isFinal: result?.isFinal ?? false,
+                                      failure: error?.localizedDescription)
+            if let first = segments.first, let last = segments.last {
+                speech.start = first.timestamp
+                speech.end = last.timestamp + last.duration
+            }
+            if let error = error as NSError? {
+                speech.isBenignEnd = SpeechResult.isBenign(domain: error.domain, code: error.code)
+            }
             Task { @MainActor in
-                owner?.handle(generation: generation, partial: partial, isFinal: isFinal, failure: failure)
+                owner?.handle(generation: generation, result: speech)
             }
         }
     }

@@ -30,6 +30,6 @@ done
 xcodegen generate --quiet
 TEST_RUNNER_HUSHKEY_EVAL=1 TEST_RUNNER_HUSHKEY_EVAL_LOCALE="$locale" \
   xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build \
-  -only-testing:HushKeyTests/DictationEvalTests test -quiet
+  -only-testing:HushKeyTests/DictationEvalTests -only-testing:HushKeyTests/PauseRecognitionTests test -quiet
 
 echo "Wrote $project_root/docs/eval/report.md"
