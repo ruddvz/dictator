@@ -7,7 +7,7 @@ enum PersonalDataImportStrategy: Equatable {
 
 struct HushKeyPersonalDataBackup: Codable, Equatable {
     static let formatIdentifier = "com.ruddvz.hushkey.personal-data"
-    static let currentVersion = 1
+    static let currentVersion = 2
     static let maximumFileBytes = 10 * 1_024 * 1_024
     static let maximumHistoryEntries = 50
     static let maximumVocabularyTerms = 500
@@ -20,9 +20,10 @@ struct HushKeyPersonalDataBackup: Codable, Equatable {
     var vocabulary: [String]
     var snippets: String
     var correctionRules: String
+    var writingStyles: [WritingStylePreset]
 
     init(exportedAt: Date = Date(), dictationHistory: [DictationHistoryEntry], vocabulary: [String],
-         snippets: String, correctionRules: String) {
+         snippets: String, correctionRules: String, writingStyles: [WritingStylePreset] = []) {
         self.format = Self.formatIdentifier
         self.version = Self.currentVersion
         self.exportedAt = exportedAt
@@ -30,6 +31,23 @@ struct HushKeyPersonalDataBackup: Codable, Equatable {
         self.vocabulary = vocabulary
         self.snippets = snippets
         self.correctionRules = correctionRules
+        self.writingStyles = writingStyles
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case format, version, exportedAt, dictationHistory, vocabulary, snippets, correctionRules, writingStyles
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        format = try container.decode(String.self, forKey: .format)
+        version = try container.decode(Int.self, forKey: .version)
+        exportedAt = try container.decode(Date.self, forKey: .exportedAt)
+        dictationHistory = try container.decode([DictationHistoryEntry].self, forKey: .dictationHistory)
+        vocabulary = try container.decode([String].self, forKey: .vocabulary)
+        snippets = try container.decode(String.self, forKey: .snippets)
+        correctionRules = try container.decode(String.self, forKey: .correctionRules)
+        writingStyles = try container.decodeIfPresent([WritingStylePreset].self, forKey: .writingStyles) ?? []
     }
 
     static func decode(_ data: Data) throws -> HushKeyPersonalDataBackup {
@@ -50,7 +68,7 @@ struct HushKeyPersonalDataBackup: Codable, Equatable {
 
     func validate() throws {
         guard format == Self.formatIdentifier else { throw BackupError.wrongFormat }
-        guard version == Self.currentVersion else { throw BackupError.unsupportedVersion(version) }
+        guard version == 1 || version == Self.currentVersion else { throw BackupError.unsupportedVersion(version) }
         guard exportedAt.timeIntervalSince1970.isFinite else { throw BackupError.invalidExportDate }
         guard dictationHistory.count <= Self.maximumHistoryEntries else { throw BackupError.tooManyHistoryEntries }
         guard Set(dictationHistory.map(\.id)).count == dictationHistory.count else { throw BackupError.duplicateHistoryEntry }
@@ -76,11 +94,30 @@ struct HushKeyPersonalDataBackup: Codable, Equatable {
 
         try Self.validateDefinitions(snippets, kind: .snippet)
         try Self.validateDefinitions(correctionRules, kind: .correction)
+
+        guard writingStyles.count <= WritingStylePreset.maximumCount else { throw BackupError.tooManyWritingStyles }
+        var seenStyleIDs = Set<UUID>()
+        var seenStyleNames = Set<String>()
+        for style in writingStyles {
+            let nameKey = style.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            guard seenStyleIDs.insert(style.id).inserted,
+                  seenStyleNames.insert(nameKey).inserted,
+                  !style.name.contains(where: \.isNewline),
+                  WritingStylePreset.validationIssue(name: style.name, instructions: style.instructions) == nil else {
+                throw BackupError.invalidWritingStyles
+            }
+        }
     }
 
     func resolved(against current: HushKeyPersonalDataBackup,
                   using strategy: PersonalDataImportStrategy) -> HushKeyPersonalDataBackup {
-        guard strategy == .merge else { return self }
+        if strategy == .replace {
+            guard version == 1 else { return self }
+            return HushKeyPersonalDataBackup(
+                exportedAt: Date(), dictationHistory: dictationHistory, vocabulary: vocabulary,
+                snippets: snippets, correctionRules: correctionRules, writingStyles: current.writingStyles)
+        }
         var historyByID: [UUID: DictationHistoryEntry] = [:]
         for entry in current.dictationHistory { historyByID[entry.id] = entry }
         for entry in dictationHistory where historyByID[entry.id] == nil {
@@ -94,13 +131,14 @@ struct HushKeyPersonalDataBackup: Codable, Equatable {
             vocabulary: DictationVocabulary.terms(from: current.vocabulary.joined(separator: "\n") + "\n" +
                                                    vocabulary.joined(separator: "\n")),
             snippets: Self.mergingDefinitions(current.snippets, with: snippets),
-            correctionRules: Self.mergingDefinitions(current.correctionRules, with: correctionRules))
+            correctionRules: Self.mergingDefinitions(current.correctionRules, with: correctionRules),
+            writingStyles: Self.mergingStyles(current.writingStyles, with: writingStyles))
     }
 
     var summary: String {
         let snippetCount = DictationSnippetExpander.validation(for: snippets).validCount
         let correctionCount = DictationCorrectionRules.validation(for: correctionRules).validCount
-        return "\(dictationHistory.count) dictations, \(vocabulary.count) vocabulary terms, \(snippetCount) snippets and \(correctionCount) correction rules."
+        return "\(dictationHistory.count) dictations, \(vocabulary.count) vocabulary terms, \(snippetCount) snippets, \(correctionCount) correction rules and \(writingStyles.count) writing styles."
     }
 
     private static func validateDefinitions(_ definitions: String, kind: DefinitionKind) throws {
@@ -140,6 +178,22 @@ struct HushKeyPersonalDataBackup: Codable, Equatable {
         return lines.joined(separator: "\n")
     }
 
+    private static func mergingStyles(_ existing: [WritingStylePreset], with incoming: [WritingStylePreset]) -> [WritingStylePreset] {
+        var merged = existing
+        var ids = Set(existing.map(\.id))
+        var names = Set(existing.map {
+            $0.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+        })
+        for style in incoming {
+            let name = style.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            guard ids.insert(style.id).inserted, names.insert(name).inserted else { continue }
+            merged.append(style)
+        }
+        return merged
+    }
+
     enum DefinitionKind: Equatable {
         case snippet
         case correction
@@ -157,6 +211,8 @@ struct HushKeyPersonalDataBackup: Codable, Equatable {
         case invalidVocabulary
         case definitionsTooLarge
         case tooManyDefinitions
+        case tooManyWritingStyles
+        case invalidWritingStyles
         case invalidDefinitions(DefinitionKind, [Int])
         case definitionEntryTooLong(DefinitionKind)
 
@@ -173,6 +229,8 @@ struct HushKeyPersonalDataBackup: Codable, Equatable {
             case .invalidVocabulary: return "This backup contains an empty, repeated or invalid vocabulary term."
             case .definitionsTooLarge: return "The snippet or correction rules exceed the allowed size."
             case .tooManyDefinitions: return "The backup contains too many snippet or correction rules."
+            case .tooManyWritingStyles: return "The backup contains more writing styles than HushKey can store."
+            case .invalidWritingStyles: return "The backup contains an invalid or duplicate writing style."
             case .invalidDefinitions(let kind, let lines):
                 let name = kind == .snippet ? "snippet" : "correction"
                 return "The backup has invalid \(name) rules on line\(lines.count == 1 ? "" : "s") \(lines.map(String.init).joined(separator: ", "))."

@@ -9,7 +9,8 @@ final class PersonalDataBackupTests: XCTestCase {
             dictationHistory: history,
             vocabulary: ["HushKey", "Maya"],
             snippets: "email => maya@example.com",
-            correctionRules: "hush key => HushKey")
+            correctionRules: "hush key => HushKey",
+            writingStyles: [WritingStylePreset(name: "Friendly", instructions: "Keep it warm.")])
 
         let decoded = try HushKeyPersonalDataBackup.decode(backup.encoded())
 
@@ -37,17 +38,49 @@ final class PersonalDataBackupTests: XCTestCase {
         ]
         XCTAssertThrowsError(try duplicateHistory.encoded())
 
+        var duplicateStyles = valid
+        let sharedStyleID = UUID()
+        duplicateStyles.writingStyles = [
+            WritingStylePreset(id: sharedStyleID, name: "Warm", instructions: "Keep it warm."),
+            WritingStylePreset(id: sharedStyleID, name: "Brief", instructions: "Keep it brief.")
+        ]
+        XCTAssertThrowsError(try duplicateStyles.encoded())
+
+        duplicateStyles.writingStyles = [
+            WritingStylePreset(name: "Warm", instructions: "Keep it warm."),
+            WritingStylePreset(name: "wárm", instructions: "Keep it brief.")
+        ]
+        XCTAssertThrowsError(try duplicateStyles.encoded())
+
         let oversized = Data(repeating: 0, count: HushKeyPersonalDataBackup.maximumFileBytes + 1)
         XCTAssertThrowsError(try HushKeyPersonalDataBackup.decode(oversized))
     }
 
+    func testVersionOneBackupStillImportsWithoutWritingStyles() throws {
+        let data = Data(#"{"format":"com.ruddvz.hushkey.personal-data","version":1,"exportedAt":0,"dictationHistory":[],"vocabulary":[],"snippets":"","correctionRules":""}"#.utf8)
+
+        let backup = try HushKeyPersonalDataBackup.decode(data)
+
+        XCTAssertEqual(backup.version, 1)
+        XCTAssertTrue(backup.writingStyles.isEmpty)
+
+        let localStyle = WritingStylePreset(name: "Local", instructions: "Keep my style.")
+        let current = HushKeyPersonalDataBackup(
+            dictationHistory: [], vocabulary: [], snippets: "", correctionRules: "",
+            writingStyles: [localStyle])
+        let replaced = backup.resolved(against: current, using: .replace)
+        XCTAssertEqual(replaced.writingStyles, [localStyle])
+    }
+
     func testMergeAddsMissingDataAndKeepsLocalConflicts() throws {
         let sharedID = UUID()
+        let sharedStyleID = UUID()
         let local = HushKeyPersonalDataBackup(
             dictationHistory: [DictationHistoryEntry(id: sharedID, text: "Edited locally.")],
             vocabulary: ["HushKey", "local term"],
             snippets: "signature => Local sign-off",
-            correctionRules: "hush key => Local spelling")
+            correctionRules: "hush key => Local spelling",
+            writingStyles: [WritingStylePreset(id: sharedStyleID, name: "Warm", instructions: "Local style.")])
         let incoming = HushKeyPersonalDataBackup(
             dictationHistory: [
                 DictationHistoryEntry(id: sharedID, text: "Older backup version."),
@@ -55,7 +88,11 @@ final class PersonalDataBackupTests: XCTestCase {
             ],
             vocabulary: ["hushkey", "Maya"],
             snippets: "signature => Imported sign-off\nemail => maya@example.com",
-            correctionRules: "hush key => HushKey\ncolour => color")
+            correctionRules: "hush key => HushKey\ncolour => color",
+            writingStyles: [
+                WritingStylePreset(id: sharedStyleID, name: "Warm", instructions: "Old backup style."),
+                WritingStylePreset(name: "Technical", instructions: "Keep the technical detail.")
+            ])
 
         let merged = incoming.resolved(against: local, using: .merge)
         try merged.validate()
@@ -67,12 +104,35 @@ final class PersonalDataBackupTests: XCTestCase {
         XCTAssertTrue(merged.snippets.contains("email => maya@example.com"))
         XCTAssertTrue(merged.correctionRules.contains("hush key => Local spelling"))
         XCTAssertTrue(merged.correctionRules.contains("colour => color"))
+        XCTAssertEqual(merged.writingStyles, [local.writingStyles[0], incoming.writingStyles[1]])
 
         let replaced = incoming.resolved(against: local, using: .replace)
         XCTAssertEqual(replaced.dictationHistory, incoming.dictationHistory)
         XCTAssertEqual(replaced.vocabulary, incoming.vocabulary)
         XCTAssertEqual(replaced.snippets, incoming.snippets)
         XCTAssertEqual(replaced.correctionRules, incoming.correctionRules)
+        XCTAssertEqual(replaced.writingStyles, incoming.writingStyles)
+    }
+
+    func testMergeRejectsWritingStyleOverflowInsteadOfDroppingBackupStyles() throws {
+        let localStyles = (0..<WritingStylePreset.maximumCount).map {
+            WritingStylePreset(name: "Local \($0)", instructions: "Use local style \($0).")
+        }
+        let local = HushKeyPersonalDataBackup(
+            dictationHistory: [], vocabulary: [], snippets: "", correctionRules: "",
+            writingStyles: localStyles)
+        let importedStyle = WritingStylePreset(name: "Imported", instructions: "Keep the imported style.")
+        let incoming = HushKeyPersonalDataBackup(
+            dictationHistory: [], vocabulary: [], snippets: "", correctionRules: "",
+            writingStyles: [importedStyle])
+
+        let merged = incoming.resolved(against: local, using: .merge)
+
+        XCTAssertEqual(merged.writingStyles.count, WritingStylePreset.maximumCount + 1)
+        XCTAssertTrue(merged.writingStyles.contains(importedStyle))
+        XCTAssertThrowsError(try merged.validate()) { error in
+            XCTAssertTrue(error.localizedDescription.contains("more writing styles"))
+        }
     }
 
     @MainActor
@@ -84,6 +144,7 @@ final class PersonalDataBackupTests: XCTestCase {
         let termsBefore = UserDefaults.standard.string(forKey: "dictationTerms")
         let snippetsBefore = UserDefaults.standard.string(forKey: "dictationSnippets")
         let correctionsBefore = UserDefaults.standard.string(forKey: "dictationCorrectionRules")
+        let writingStylesBefore = UserDefaults.standard.data(forKey: WritingStylePresetStore.preferenceKey)
         defer {
             try? FileManager.default.removeItem(at: dictationURL)
             try? FileManager.default.removeItem(at: filesURL)
@@ -95,6 +156,8 @@ final class PersonalDataBackupTests: XCTestCase {
             else { UserDefaults.standard.removeObject(forKey: "dictationSnippets") }
             if let correctionsBefore { UserDefaults.standard.set(correctionsBefore, forKey: "dictationCorrectionRules") }
             else { UserDefaults.standard.removeObject(forKey: "dictationCorrectionRules") }
+            if let writingStylesBefore { UserDefaults.standard.set(writingStylesBefore, forKey: WritingStylePresetStore.preferenceKey) }
+            else { UserDefaults.standard.removeObject(forKey: WritingStylePresetStore.preferenceKey) }
         }
 
         let localEntry = DictationHistoryEntry(text: "Keep my local edit.")
@@ -103,12 +166,16 @@ final class PersonalDataBackupTests: XCTestCase {
         model.dictationTerms = "local term"
         model.dictationSnippets = "signature => Local sign-off"
         model.dictationCorrectionRules = "hush key => Local spelling"
+        let localStyle = WritingStylePreset(name: "Local", instructions: "Keep my local style.")
+        try model.saveWritingStylePresets([localStyle])
 
+        let importedStyle = WritingStylePreset(name: "Imported", instructions: "Keep it concise.")
         let backup = HushKeyPersonalDataBackup(
             dictationHistory: [DictationHistoryEntry(text: "Imported dictation.")],
             vocabulary: ["local term", "HushKey"],
             snippets: "signature => Imported sign-off\nemail => user@example.com",
-            correctionRules: "hush key => HushKey\ncolour => color")
+            correctionRules: "hush key => HushKey\ncolour => color",
+            writingStyles: [importedStyle])
         XCTAssertTrue(model.stagePersonalDataBackup(try backup.encoded()))
         model.applyPersonalDataBackup(using: .merge)
 
@@ -120,6 +187,7 @@ final class PersonalDataBackupTests: XCTestCase {
         XCTAssertTrue(model.dictationSnippets.contains("email => user@example.com"))
         XCTAssertTrue(model.dictationCorrectionRules.contains("hush key => Local spelling"))
         XCTAssertTrue(model.dictationCorrectionRules.contains("colour => color"))
+        XCTAssertEqual(model.writingStylePresets, [localStyle, importedStyle])
 
         let damagedBytes = Data("unreadable original archive".utf8)
         try damagedBytes.write(to: dictationURL)
@@ -134,6 +202,7 @@ final class PersonalDataBackupTests: XCTestCase {
         XCTAssertEqual(recoveryModel.dictationTerms, "local term\nHushKey")
         XCTAssertEqual(recoveryModel.dictationSnippets, backup.snippets)
         XCTAssertEqual(recoveryModel.dictationCorrectionRules, backup.correctionRules)
+        XCTAssertEqual(recoveryModel.writingStylePresets, [importedStyle])
         let recoveryURL = dictationURL.deletingLastPathComponent()
             .appending(path: "\(dictationURL.deletingPathExtension().lastPathComponent).corrupt-backup.json")
         XCTAssertEqual(try Data(contentsOf: recoveryURL), damagedBytes)

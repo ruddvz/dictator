@@ -279,7 +279,7 @@ private struct DataSettings: View {
                 }
             }
             SettingsRow(title: "Personal data backup",
-                        detail: "Recent dictations, vocabulary, snippets and corrections. No audio.") {
+                        detail: "Dictations, vocabulary, snippets, corrections and writing styles. No audio.") {
                 HStack(spacing: Theme.s2) {
                     Button("Export…") { model.exportPersonalDataBackup() }
                         .buttonStyle(SecondaryButtonStyle())
@@ -298,15 +298,21 @@ private struct DataSettings: View {
         }
         .confirmationDialog("Import personal HushKey backup?", isPresented: $confirmPersonalBackupImport,
                             titleVisibility: .visible) {
-            Button("Merge backup") { model.applyPersonalDataBackup(using: .merge) }
-            Button("Replace backed-up data", role: .destructive) { model.applyPersonalDataBackup(using: .replace) }
+            Button("Merge backup") {
+                model.applyPersonalDataBackup(using: .merge)
+                confirmPersonalBackupImport = model.pendingPersonalDataBackup != nil
+            }
+            Button("Replace backed-up data", role: .destructive) {
+                model.applyPersonalDataBackup(using: .replace)
+                confirmPersonalBackupImport = model.pendingPersonalDataBackup != nil
+            }
             Button("Cancel", role: .cancel) { model.cancelPersonalDataImport() }
         } message: {
             if let backup = model.pendingPersonalDataBackup {
                 if model.dictationHistoryArchiveUnreadable {
-                    Text("The backup contains \(backup.summary) Replace affects only dictations, vocabulary, snippets and corrections; file transcripts, meeting notes, Silent Lab templates and session logs stay on this Mac. Your unreadable dictation archive will be replaced, with a recovery copy preserved where possible. Merge keeps local conflicts and adds missing backup entries. Audio is not included.")
+                    Text("The backup contains \(backup.summary) Replace affects only dictations, vocabulary, snippets, corrections and writing styles; file transcripts, meeting notes, Silent Lab templates and session logs stay on this Mac. Your unreadable dictation archive will be replaced, with a recovery copy preserved where possible. Merge keeps local conflicts and adds missing backup entries. Audio is not included.")
                 } else {
-                    Text("The backup contains \(backup.summary) Replace affects only dictations, vocabulary, snippets and corrections; file transcripts, meeting notes, Silent Lab templates and session logs stay on this Mac. Merge keeps your current entries and adds missing backup entries. Audio is not included.")
+                    Text("The backup contains \(backup.summary) Replace affects only dictations, vocabulary, snippets, corrections and writing styles; file transcripts, meeting notes, Silent Lab templates and session logs stay on this Mac. Merge keeps your current entries and adds missing backup entries. Audio is not included.")
                 }
             } else {
                 Text("The selected backup is no longer available.")

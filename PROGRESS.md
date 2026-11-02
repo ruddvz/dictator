@@ -501,3 +501,10 @@ Same as above, plus: start a dictation with no field focused, click into TextEdi
 - Checked the packaged app’s accessibility tree across all three tabs: titles and add actions match the selected section, and empty states are clear.
 - `xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build test`: 119 passed, 2 skipped, 0 failed. Release packaging and strict signature verification passed.
 - Next: live user-approved microphone, insertion, meeting, and export acceptance; this UI-only task did not change permissions or personal data.
+
+## Completed — include writing styles in personal backups (2026-11-02)
+
+- Personal backup format v2 exports custom writing styles. Version-1 backups still import; Replace preserves local writing styles because older backups never contained that data.
+- Merge keeps local styles on ID/name conflicts and reports capacity overflow rather than silently discarding imported styles. Imported styles appear immediately in the transform screen.
+- `xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build test`: 121 passed, 2 skipped, 0 failed. Release package built and strict signature verification passed; only `~/Projects/HushKey/dist/HushKey.app` was opened.
+- Live microphone, Speech, Accessibility insertion, meeting capture, and export acceptance still need a user-approved device session. Start that as the next item in a fresh session.

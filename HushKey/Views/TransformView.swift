@@ -10,7 +10,6 @@ struct TransformView: View {
     @Environment(AppModel.self) private var model
     @State private var selectedAction: LocalWritingTransform = .polish
     @State private var selectedStyleID: UUID?
-    @State private var customStyles = WritingStylePresetStore.load()
     @State private var previewAction: LocalWritingTransform?
     @State private var previewLabel: String?
     @State private var draft = ""
@@ -24,7 +23,7 @@ struct TransformView: View {
     private var currentText: String { model.transcriber.text }
     private var isBusy: Bool { model.audio.isRunning || model.isFinalizingDictation || model.transcriber.isFinalizing }
     private var selectedStyle: WritingStylePreset? {
-        customStyles.first { $0.id == selectedStyleID }
+        model.writingStylePresets.first { $0.id == selectedStyleID }
     }
     private var normalizedSourceSnapshot: String {
         sourceSnapshot.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -53,7 +52,7 @@ struct TransformView: View {
                         styleEditorRequest = WritingStyleEditorRequest(preset: nil)
                     }
                     .buttonStyle(PrimaryButtonStyle())
-                    .disabled(customStyles.count >= WritingStylePreset.maximumCount || model.localTransformService.isTransforming)
+                    .disabled(model.writingStylePresets.count >= WritingStylePreset.maximumCount || model.localTransformService.isTransforming)
                 }
 
                 transformPicker
@@ -290,7 +289,7 @@ struct TransformView: View {
             HStack {
                 Text("Choose a transform").font(.hkTitle3)
                 Spacer()
-                Text("\(customStyles.count)/\(WritingStylePreset.maximumCount) styles")
+                Text("\(model.writingStylePresets.count)/\(WritingStylePreset.maximumCount) styles")
                     .font(.hkMeta.monospacedDigit())
                     .foregroundStyle(Theme.ink3)
             }
@@ -306,7 +305,7 @@ struct TransformView: View {
                     }
                     .disabled(model.localTransformService.isTransforming)
                 }
-                ForEach(customStyles) { style in
+                ForEach(model.writingStylePresets) { style in
                     TransformCard(symbol: "textformat", title: style.name, detail: style.instructions,
                                   badge: "Your style", isSelected: selectedStyleID == style.id) {
                         selectedStyleID = style.id
@@ -322,7 +321,7 @@ struct TransformView: View {
                         }
                     }
                 }
-                if customStyles.count < WritingStylePreset.maximumCount {
+                if model.writingStylePresets.count < WritingStylePreset.maximumCount {
                     Button {
                         styleEditorRequest = WritingStyleEditorRequest(preset: nil)
                     } label: {
@@ -348,7 +347,7 @@ struct TransformView: View {
                     .disabled(model.localTransformService.isTransforming)
                 }
             }
-            if !customStyles.isEmpty {
+            if !model.writingStylePresets.isEmpty {
                 Text("Right-click a style to edit or delete it.")
                     .font(.hkCaption)
                     .foregroundStyle(Theme.ink3)
@@ -479,21 +478,20 @@ struct TransformView: View {
     private func saveStyle(name: String, instructions: String, editing: WritingStylePreset?) -> String? {
         if let issue = WritingStylePreset.validationIssue(name: name, instructions: instructions) { return issue }
         let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !customStyles.contains(where: {
+        guard !model.writingStylePresets.contains(where: {
             $0.id != editing?.id && $0.name.compare(cleanName, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
         }) else { return "A style with that name already exists." }
-        guard editing != nil || customStyles.count < WritingStylePreset.maximumCount else {
+        guard editing != nil || model.writingStylePresets.count < WritingStylePreset.maximumCount else {
             return "You can save up to \(WritingStylePreset.maximumCount) writing styles."
         }
 
-        var updated = customStyles
+        var updated = model.writingStylePresets
         let preset = WritingStylePreset(id: editing?.id ?? UUID(), name: cleanName,
                                         instructions: instructions.trimmingCharacters(in: .whitespacesAndNewlines))
         if let index = updated.firstIndex(where: { $0.id == preset.id }) { updated[index] = preset }
         else { updated.append(preset) }
         do {
-            try WritingStylePresetStore.save(updated)
-            customStyles = updated
+            try model.saveWritingStylePresets(updated)
             selectedStyleID = preset.id
             clearPreview()
             return nil
@@ -503,10 +501,9 @@ struct TransformView: View {
     }
 
     private func deleteStyle(_ style: WritingStylePreset) {
-        let updated = customStyles.filter { $0.id != style.id }
+        let updated = model.writingStylePresets.filter { $0.id != style.id }
         do {
-            try WritingStylePresetStore.save(updated)
-            customStyles = updated
+            try model.saveWritingStylePresets(updated)
             if selectedStyleID == style.id { selectedStyleID = nil }
             clearPreview()
         } catch {

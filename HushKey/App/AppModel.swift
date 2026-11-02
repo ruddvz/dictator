@@ -140,6 +140,7 @@ final class AppModel {
     var dictationCorrectionRules = UserDefaults.standard.string(forKey: "dictationCorrectionRules") ?? "" {
         didSet { UserDefaults.standard.set(dictationCorrectionRules, forKey: "dictationCorrectionRules") }
     }
+    var writingStylePresets = WritingStylePresetStore.load()
     var dictationLanguage = UserDefaults.standard.string(forKey: "dictationLanguage") ?? "en-US" {
         didSet { UserDefaults.standard.set(dictationLanguage, forKey: "dictationLanguage") }
     }
@@ -607,10 +608,17 @@ final class AppModel {
         let resolved = pendingPersonalDataBackup.resolved(against: current, using: strategy)
         do {
             try resolved.validate()
-            if dictationHistoryArchiveUnreadable {
-                try DictationHistoryStore.replaceAfterExplicitImport(resolved.dictationHistory, to: dictationHistoryURL)
-            } else {
-                try DictationHistoryStore.save(resolved.dictationHistory, to: dictationHistoryURL)
+            let previousStyles = writingStylePresets
+            try saveWritingStylePresets(resolved.writingStyles)
+            do {
+                if dictationHistoryArchiveUnreadable {
+                    try DictationHistoryStore.replaceAfterExplicitImport(resolved.dictationHistory, to: dictationHistoryURL)
+                } else {
+                    try DictationHistoryStore.save(resolved.dictationHistory, to: dictationHistoryURL)
+                }
+            } catch {
+                try? saveWritingStylePresets(previousStyles)
+                throw error
             }
             dictationHistory = resolved.dictationHistory
             dictationHistoryRecoveryCopyURL = nil
@@ -633,7 +641,13 @@ final class AppModel {
             dictationHistory: dictationHistory,
             vocabulary: DictationVocabulary.terms(from: dictationTerms),
             snippets: dictationSnippets,
-            correctionRules: dictationCorrectionRules)
+            correctionRules: dictationCorrectionRules,
+            writingStyles: writingStylePresets)
+    }
+
+    func saveWritingStylePresets(_ presets: [WritingStylePreset]) throws {
+        try WritingStylePresetStore.save(presets)
+        writingStylePresets = presets
     }
 
     func exportSessions() {
