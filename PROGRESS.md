@@ -372,9 +372,17 @@ Record the 14 clip references as consented audio in `Fixtures/eval/<split>/audio
 - Added a regression test for clipped, out-of-range, negative, and non-finite subtitle cues. `xcodebuild ... test`: 103 tests, 101 passed, 2 skipped, 0 failed. The signed Release app was rebuilt and opened.
 - After rebuilding, the latest packaged app first stalled at “Waiting for macOS Speech permission…”. On a later retry, HushKey's setup checklist advanced to 3 of 4, but opening the sample did not complete file transcription and the app changed to Dictation/Listening. That session was stopped; no file transcript was saved. The final millisecond-bounded SRT/WebVTT export remains unverified live. The signed Release app is currently idle on Dictation; its pre-existing dictation history was left intact.
 
-## Next item — WhisperKit and file-history race acceptance
+## Completed — cancellable permission startup and modal shortcut guard (2026-11-01)
 
-Re-run Apple Speech file transcription on the packaged app from a stable window state, and verify the final bounded SRT/WebVTT export. Then download the Tiny model, verify offline transcription and timed exports, and exercise clearing history during a live job. Continue with microphone, insertion, and meeting acceptance afterward.
+- Added status-first microphone and Speech permission requests with one-shot callback handling, cancellation, and a 30-second timeout. An unanswered macOS prompt now produces a retryable error instead of leaving HushKey busy indefinitely.
+- Dictation now prepares on-device Speech before opening the microphone. Startup has a visible Preparing state and can be canceled by the button, Escape, or releasing the hold shortcut while permission is pending. Canceling also stops any pending microphone request.
+- File transcription uses the same bounded Speech permission request. Fn gestures are ignored while AppKit modal panels are open; an in-progress hold/hands-free gesture is stopped when a modal event arrives, and dictation startup is rejected while a panel is active.
+- Added tests for callback completion, timeout, cancellation, duplicate callbacks, and modal interruption. `xcodebuild ... test`: 107 passed, 2 skipped, 0 failed.
+- Rebuilt and opened `dist/HushKey.app`; signature verification passed. The machine has no valid signing identity, so packaging uses an ad-hoc signature. The new bundle now shows setup 1 of 4; microphone/Speech permission and live dictation were not re-approved or retested after repackaging.
+
+## Next item — restore permissions, then live acceptance
+
+After the user approves the current HushKey build's local microphone and Speech prompts, verify startup cancellation, live dictation, file transcription and the final bounded SRT/WebVTT export. Then download the Tiny model, verify offline transcription and timed exports, and exercise clearing history during a live job. Continue with insertion and meeting acceptance afterward.
 
 ## Completed — one working copy
 

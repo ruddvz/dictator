@@ -23,6 +23,8 @@ final class FloatingPillController {
             _ = model.showsFloatingPill
             _ = model.showsFinishedTranscript
             _ = model.audio.isRunning
+            _ = model.audio.isStarting
+            _ = model.isStartingDictation
         } onChange: { [weak self] in
             Task { @MainActor in
                 self?.observe()
@@ -30,7 +32,7 @@ final class FloatingPillController {
         }
         model.showsFloatingPill ? show() : hide()
         let cardIsUp = model.showsFloatingPill && model.showsFinishedTranscript
-        cardIsUp || model.audio.isRunning ? watchEscape() : stopWatchingEscape()
+        cardIsUp || model.audio.isRunning || model.isStartingDictation ? watchEscape() : stopWatchingEscape()
     }
 
     /// Esc cancels a dictation that is listening (nothing is typed) and closes the finished
@@ -42,7 +44,8 @@ final class FloatingPillController {
             guard event.keyCode == UInt16(kVK_Escape) else { return false }
             Task { @MainActor in
                 guard let model = self?.model else { return }
-                if model.audio.isRunning { model.cancelDictation() } else { model.dismissFinishedTranscript() }
+                if model.isStartingDictation || model.audio.isRunning { model.cancelDictation() }
+                else { model.dismissFinishedTranscript() }
             }
             return true
         }
@@ -128,12 +131,13 @@ struct FloatingPillView: View {
     @State private var cardCollapsed = false
     @State private var copied = false
 
-    private enum Phase { case idle, hover, listening, finishing, error, done }
+    private enum Phase { case idle, hover, preparing, listening, finishing, error, done }
 
     private var isFinishing: Bool { model.isFinalizingDictation || model.transcriber.isFinalizing }
 
     private var phase: Phase {
         if isFinishing { return .finishing }
+        if model.isStartingDictation { return .preparing }
         if model.audio.isRunning { return .listening }
         if model.dictationNotice != nil { return .error }
         if showsDone { return .done }
@@ -215,6 +219,15 @@ struct FloatingPillView: View {
         } else {
             HStack(spacing: 10) {
                 switch phase {
+                case .preparing:
+                    MorphIcon(phase: .working, lineWidth: 1.8)
+                        .frame(width: 16, height: 16)
+                        .foregroundStyle(Self.glow)
+                    Text(model.audio.isStarting ? "Waiting for microphone" : "Preparing locally")
+                        .font(.system(size: 13, weight: .medium))
+                    PillIconButton(systemImage: "xmark", title: "Cancel", help: "Cancel before the microphone starts") {
+                        model.cancelDictation()
+                    }
                 case .listening:
                     PillIconButton(systemImage: "xmark", help: "Cancel. Nothing is typed") { model.cancelDictation() }
                     VoiceRibbon(level: model.audio.level, isActive: true, tint: Self.glow)
@@ -365,6 +378,7 @@ struct FloatingPillView: View {
     private var help: String {
         switch phase {
         case .listening: "Click to finish"
+        case .preparing: "Preparing local speech recognition. Click to cancel."
         case .error: model.dictationNotice?.detail ?? ""
         default: "Start dictation (\(model.dictationShortcut.menuTitle))"
         }
@@ -383,6 +397,7 @@ struct FloatingPillView: View {
     private var accessibilityLabel: String {
         switch phase {
         case .idle, .hover: "Start dictation"
+        case .preparing: "Preparing local speech recognition. Cancel dictation startup"
         case .listening: "Listening. Stop dictation"
         case .finishing: "Transcribing"
         case .error: "Dictation problem: \(model.dictationNotice?.message ?? ""). \(model.dictationNotice?.detail ?? "")"

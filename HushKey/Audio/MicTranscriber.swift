@@ -12,6 +12,9 @@ final class MicTranscriber {
     private(set) var error: String?
 
     @ObservationIgnored private var recognizer: SFSpeechRecognizer?
+    @ObservationIgnored private var preparedLocaleIdentifier: String?
+    @ObservationIgnored private var authorizationTask: Task<LocalPermissionOutcome, Never>?
+    @ObservationIgnored private var authorizationRequestID: UUID?
     @ObservationIgnored private let box = RequestBox()
     @ObservationIgnored private var task: SFSpeechRecognitionTask?
     @ObservationIgnored private var sinkID: UUID?
@@ -20,6 +23,12 @@ final class MicTranscriber {
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var finalizationContinuation: CheckedContinuation<String, Never>?
     @ObservationIgnored private var finalizationTimeoutTask: Task<Void, Never>?
+
+    func prepare(localeIdentifier: String = "en-US") async -> Bool {
+        guard !isRunning, !isFinalizing else { return false }
+        error = nil
+        return await prepareRecognizer(localeIdentifier: localeIdentifier)
+    }
 
     func start(sink: AudioSink, localeIdentifier: String = "en-US", contextualStrings: [String] = []) async -> Bool {
         guard !isRunning, !isFinalizing else { return false }
@@ -67,23 +76,55 @@ final class MicTranscriber {
     }
 
     private func prepareRecognizer(localeIdentifier: String) async -> Bool {
-        let status = await withCheckedContinuation { continuation in
-            SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0) }
+        if SFSpeechRecognizer.authorizationStatus() == .authorized,
+           preparedLocaleIdentifier == localeIdentifier,
+           let recognizer, recognizer.isAvailable, recognizer.supportsOnDeviceRecognition {
+            self.recognizer = recognizer
+            return true
         }
-        guard status == .authorized else {
-            error = "Speech recognition not authorized."
+
+        let requestID = UUID()
+        authorizationRequestID = requestID
+        let request = Task { await LocalPermissionAccess.speechRecognition() }
+        authorizationTask = request
+        let outcome = await request.value
+        guard authorizationRequestID == requestID else { return false }
+        authorizationRequestID = nil
+        authorizationTask = nil
+        guard outcome == .authorized else {
+            switch outcome {
+            case .denied:
+                error = "Allow HushKey under System Settings → Privacy & Security → Speech Recognition."
+            case .restricted:
+                error = "macOS restricts Speech recognition for this account."
+            case .timedOut:
+                error = "macOS did not finish the Speech permission request. Allow HushKey in System Settings, then try again."
+            case .cancelled:
+                error = "Speech permission request was cancelled."
+            case .authorized:
+                error = nil
+            }
             return false
         }
         let recognizer = SFSpeechRecognizer(locale: Locale(identifier: localeIdentifier))
         self.recognizer = recognizer
         guard let recognizer, recognizer.isAvailable, recognizer.supportsOnDeviceRecognition else {
+            preparedLocaleIdentifier = nil
             error = "On-device speech recognition is unavailable for \(localeIdentifier) on this Mac. No audio was sent for remote recognition."
             return false
         }
+        preparedLocaleIdentifier = localeIdentifier
         return true
     }
 
+    func cancelPendingAuthorization() {
+        authorizationRequestID = nil
+        authorizationTask?.cancel()
+        authorizationTask = nil
+    }
+
     func stop() {
+        cancelPendingAuthorization()
         isRunning = false
         isFinalizing = false
         generation += 1

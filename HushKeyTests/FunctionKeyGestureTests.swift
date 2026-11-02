@@ -42,6 +42,26 @@ final class FunctionKeyGestureTests: XCTestCase {
         XCTAssertFalse(gesture.isHandsFree)
     }
 
+    func testOpeningModalPanelEndsHeldDictationAndIgnoresTheLaterRelease() {
+        var gesture = FunctionKeyGesture()
+        _ = gesture.fnDown(at: 0)
+        XCTAssertEqual(gesture.holdDelayElapsed(), .startHold)
+
+        XCTAssertEqual(gesture.modalPanelDidOpen(), .endHold)
+        XCTAssertEqual(gesture.fnUp(at: 1), .none)
+    }
+
+    func testOpeningModalPanelStopsHandsFreeDictation() {
+        var gesture = FunctionKeyGesture()
+        _ = gesture.fnDown(at: 0)
+        _ = gesture.fnUp(at: 0.08)
+        _ = gesture.fnDown(at: 0.25)
+        XCTAssertEqual(gesture.fnUp(at: 0.33), .startHandsFree)
+
+        XCTAssertEqual(gesture.modalPanelDidOpen(), .stopHandsFree)
+        XCTAssertFalse(gesture.isHandsFree)
+    }
+
     func testFnKeycapStaysOneKey() {
         XCTAssertEqual(KeycapShortcut.keys(in: "fn"), ["fn"])
         XCTAssertEqual(KeycapShortcut.keys(in: "⌥⇧D"), ["⌥", "⇧", "D"])

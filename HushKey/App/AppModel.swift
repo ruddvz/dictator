@@ -192,6 +192,7 @@ final class AppModel {
     private(set) var selectedTextEditStatus: String?
     var selectedTextEditLiveInstruction: String { selectedEditTranscriber.text }
     private(set) var isStartingSelectedTextEdit = false
+    private(set) var isStartingDictation = false
     private(set) var isSelectedTextEditCapturing = false
     private(set) var isFinalizingSelectedTextEdit = false
     private(set) var isGeneratingSelectedTextEdit = false
@@ -972,6 +973,8 @@ final class AppModel {
     }
 
     func startNewDictation() async {
+        guard NSApp.modalWindow == nil else { return }
+        guard !isStartingDictation else { return }
         guard !isFinalizingDictation, !transcriber.isFinalizing else { return }
         guard !isStartingSelectedTextEdit, !isFinalizingSelectedTextEdit else { return }
         if audio.isRunning {
@@ -999,7 +1002,9 @@ final class AppModel {
     }
 
     func toggleDictation() async {
-        if isStartingSelectedTextEdit {
+        if isStartingDictation {
+            cancelDictation()
+        } else if isStartingSelectedTextEdit {
             selectedTextEditShortcutHeld = false
             selectedTextEditStatus = "Voice edit start cancelled. Your selected text is unchanged."
         } else if isSelectedTextEditCapturing {
@@ -1121,6 +1126,8 @@ final class AppModel {
             insertion.report("Meeting capture is active. Stop it before starting dictation.")
             return
         }
+        isStartingDictation = true
+        defer { isStartingDictation = false }
         dictationStartGeneration += 1
         let generation = dictationStartGeneration
         dictationNotice = nil
@@ -1142,6 +1149,19 @@ final class AppModel {
                                                                 profiles: dictationAppProfiles)
         let nearbyHints = usesNearbyTextHints ? insertion.nearbyContextHints() : []
         usedNearbyTextHints = !nearbyHints.isEmpty
+
+        let speechReady = await transcriber.prepare(localeIdentifier: dictationLanguage)
+        guard generation == dictationStartGeneration else {
+            captureGate.release(.dictation)
+            return
+        }
+        guard speechReady else {
+            captureGate.release(.dictation)
+            dictationNotice = DictationRecovery.notice(
+                audioError: nil, transcriberError: transcriber.error ?? "Local speech recognition is unavailable.",
+                transcript: "", hasRetainedAudio: false)
+            return
+        }
 
         await audio.start()
         guard generation == dictationStartGeneration, audio.isRunning else {
@@ -1550,6 +1570,7 @@ final class AppModel {
     private func endShortcutDictation() {
         dictationShortcutHeld = false
         if audio.isRunning { stopDictation() }
+        else if isStartingDictation { cancelDictation() }
     }
 
     private func handleFunctionKey(_ action: FunctionKeyGesture.Action) {
@@ -1562,6 +1583,7 @@ final class AppModel {
             Task { @MainActor in await startNewDictation() }
         case .stopHandsFree:
             if audio.isRunning { stopDictation() }
+            else if isStartingDictation { cancelDictation() }
         case .none, .scheduleHoldStart, .cancelHoldStart: break
         }
     }
@@ -1598,13 +1620,20 @@ final class AppModel {
 
     /// Stops listening and throws the audio away: nothing is transcribed, saved, inserted, or kept.
     func cancelDictation() {
+        let wasStarting = isStartingDictation
+        let wasListening = audio.isRunning
         dictationShortcutHeld = false
         dictationStartGeneration += 1
         functionKey.reset()
-        guard audio.isRunning else { return }
-        transcriber.stop()
+        guard wasStarting || wasListening else { return }
+        transcriber.cancelPendingAuthorization()
         audio.stop()
         stopRetainingAudio(keep: false)
+        guard wasListening else {
+            captureGate.release(.dictation)
+            return
+        }
+        transcriber.stop()
         transcriber.clear()
         dictationStartedAt = nil
         captureGate.release(.dictation)

@@ -81,6 +81,12 @@ struct FunctionKeyGesture {
         lastTapAt = nil
         interrupted = isDown
     }
+
+    mutating func modalPanelDidOpen() -> Action {
+        let action: Action = isHandsFree ? .stopHandsFree : isHolding ? .endHold : .none
+        reset()
+        return action
+    }
 }
 
 /// Watches the fn key system-wide. Global key monitoring needs Accessibility access,
@@ -120,6 +126,12 @@ final class FunctionKeyMonitor {
     func reset() { gesture.reset() }
 
     private func handle(_ event: NSEvent) {
+        guard NSApp.modalWindow == nil else {
+            holdTimer?.cancel()
+            let action = gesture.modalPanelDidOpen()
+            if action != .none { onAction?(action) }
+            return
+        }
         let now = event.timestamp
         let action: FunctionKeyGesture.Action
         switch event.type {

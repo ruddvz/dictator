@@ -19,6 +19,8 @@ final class LocalFileTranscriber {
     private(set) var error: String?
 
     @ObservationIgnored private var task: SFSpeechRecognitionTask?
+    @ObservationIgnored private var authorizationTask: Task<LocalPermissionOutcome, Never>?
+    @ObservationIgnored private var authorizationRequestID: UUID?
     @ObservationIgnored private var completion: CheckedContinuation<Void, Never>?
     @ObservationIgnored private var generation = 0
     @ObservationIgnored var onSessionUpdate: ((FileTranscriptionSession) -> Void)?
@@ -40,19 +42,33 @@ final class LocalFileTranscriber {
         sourceDuration = nil
         status = "Checking local speech support…"
 
-        let currentAuthorization = SFSpeechRecognizer.authorizationStatus()
-        let authorization: SFSpeechRecognizerAuthorizationStatus
-        if currentAuthorization == .notDetermined {
+        if SFSpeechRecognizer.authorizationStatus() == .notDetermined {
             status = "Waiting for macOS Speech permission…"
-            authorization = await withCheckedContinuation { continuation in
-                SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0) }
-            }
-        } else {
-            authorization = currentAuthorization
         }
+        let authorizationRequest = Task { await LocalPermissionAccess.speechRecognition() }
+        let authorizationRequestID = UUID()
+        self.authorizationRequestID = authorizationRequestID
+        authorizationTask = authorizationRequest
+        let authorization = await authorizationRequest.value
+        guard self.authorizationRequestID == authorizationRequestID else { return }
+        self.authorizationRequestID = nil
+        authorizationTask = nil
         guard currentGeneration == generation else { return }
         guard authorization == .authorized else {
-            finish(error: "Allow HushKey under System Settings → Privacy & Security → Speech Recognition to transcribe files on this Mac.")
+            let message: String
+            switch authorization {
+            case .denied:
+                message = "Allow HushKey under System Settings → Privacy & Security → Speech Recognition to transcribe files on this Mac."
+            case .restricted:
+                message = "macOS restricts Speech recognition for this account. HushKey did not send the file to a remote service."
+            case .timedOut:
+                message = "macOS did not finish the Speech permission request. Allow HushKey in System Settings, then try again."
+            case .cancelled:
+                message = "Speech permission request was cancelled."
+            case .authorized:
+                message = ""
+            }
+            finish(error: message)
             return
         }
 
@@ -94,6 +110,9 @@ final class LocalFileTranscriber {
     func cancel() {
         guard isTranscribing else { return }
         generation += 1
+        authorizationRequestID = nil
+        authorizationTask?.cancel()
+        authorizationTask = nil
         task?.cancel()
         task = nil
         isTranscribing = false

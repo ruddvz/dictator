@@ -93,6 +93,7 @@ struct DictationView: View {
                 MorphIcon(phase: morphPhase, level: model.audio.level, lineWidth: 1.8)
                     .frame(width: 16, height: 16)
                 Text(isFinishing ? "Transcribing"
+                     : model.isStartingDictation ? "Cancel"
                      : model.isStartingSelectedTextEdit ? "Cancel"
                      : model.audio.isRunning ? "Stop" : "Dictate")
                     .contentTransition(.interpolate)
@@ -102,7 +103,8 @@ struct DictationView: View {
         .buttonStyle(PrimaryButtonStyle(tint: model.audio.isRunning ? Theme.ink : Theme.signal))
         .disabled(isFinishing)
         .animation(Theme.snappy, value: model.audio.isRunning)
-        .help(model.audio.isRunning ? "Stop dictation" : "Start dictation")
+        .help(model.isStartingDictation ? "Cancel dictation startup"
+              : model.audio.isRunning ? "Stop dictation" : "Start dictation")
     }
 
     // MARK: State
@@ -112,7 +114,8 @@ struct DictationView: View {
     }
 
     private var isBusy: Bool {
-        model.audio.isRunning || model.isFinalizingDictation || model.transcriber.isFinalizing || isEditingSelection
+        model.isStartingDictation || model.audio.isRunning || model.isFinalizingDictation
+            || model.transcriber.isFinalizing || isEditingSelection
     }
 
     private var isFinishing: Bool {
@@ -126,7 +129,7 @@ struct DictationView: View {
     private var showsComposer: Bool { (isBusy && !isEditingSelection) || hasText }
 
     private var morphPhase: MorphIcon.Phase {
-        model.audio.isRunning ? .listening : isFinishing ? .working : .idle
+        model.audio.isRunning ? .listening : model.isStartingDictation || isFinishing ? .working : .idle
     }
 
     // MARK: Composer
@@ -139,6 +142,8 @@ struct DictationView: View {
                     .foregroundStyle(model.audio.isRunning ? Theme.listening : Theme.ink)
                 Text(model.isSelectedTextEditCapturing ? "Listening for your edit"
                      : model.isFinalizingSelectedTextEdit ? "Applying your edit"
+                     : model.isStartingDictation
+                        ? (model.audio.isStarting ? "Waiting for microphone access" : "Preparing local recognition")
                      : model.audio.isRunning ? "Listening" : isFinishing ? "Transcribing" : "Latest dictation")
                     .font(.system(size: 15, weight: .semibold))
                 modeMenu
