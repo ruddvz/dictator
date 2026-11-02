@@ -1,5 +1,6 @@
 import Foundation
 import FoundationModels
+import NaturalLanguage
 import Observation
 
 enum LocalWritingTransform: String, CaseIterable, Identifiable {
@@ -315,15 +316,26 @@ final class LocalTransformService {
 
     nonisolated static func meetingChunks(from text: String, maxCharacters: Int = 9_000) -> [String] {
         guard maxCharacters > 0 else { return [] }
+        let tokenizer = NLTokenizer(unit: .sentence)
+        tokenizer.string = text
+        var sentenceEnds: [String.Index] = []
+        tokenizer.enumerateTokens(in: text.startIndex..<text.endIndex) { range, _ in
+            sentenceEnds.append(range.upperBound)
+            return true
+        }
+
         var chunks: [String] = []
         var start = text.startIndex
 
         while start < text.endIndex {
             let proposedEnd = text.index(start, offsetBy: maxCharacters, limitedBy: text.endIndex) ?? text.endIndex
             var end = proposedEnd
-            if proposedEnd < text.endIndex,
-               let boundary = text[start..<proposedEnd].lastIndex(where: \.isWhitespace), boundary > start {
-                end = boundary
+            if proposedEnd < text.endIndex {
+                if let sentenceEnd = sentenceEnds.last(where: { $0 > start && $0 <= proposedEnd }) {
+                    end = sentenceEnd
+                } else if let wordEnd = text[start..<proposedEnd].lastIndex(where: \.isWhitespace), wordEnd > start {
+                    end = wordEnd
+                }
             }
             let chunk = text[start..<end].trimmingCharacters(in: .whitespacesAndNewlines)
             if !chunk.isEmpty { chunks.append(chunk) }

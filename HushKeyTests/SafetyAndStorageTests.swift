@@ -391,6 +391,17 @@ final class SafetyAndStorageTests: XCTestCase {
         XCTAssertEqual(chunks.joined(separator: " "), source.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
+    func testMeetingTranscriptChunkerKeepsActionSentenceTogether() {
+        let action = "Mira will send the final copy to the client by Friday."
+        let source = "We approved the launch. \(action) Everyone agreed to review it."
+        let chunks = LocalTransformService.meetingChunks(from: source, maxCharacters: 64)
+
+        XCTAssertGreaterThan(chunks.count, 1)
+        XCTAssertTrue(chunks.allSatisfy { $0.count <= 64 })
+        XCTAssertTrue(chunks.contains { $0.contains(action) })
+        XCTAssertEqual(chunks.joined(separator: " "), source)
+    }
+
     func testMeetingSummaryReductionStopsWhenTheModelDoesNotCondense() {
         XCTAssertEqual(LocalTransformService.meetingReductionDecision(
             currentCharacterCount: 20_000, combinedCharacterCount: 20_000, reductionPass: 0), .noProgress)

@@ -531,3 +531,12 @@ Same as above, plus: start a dictation with no field focused, click into TextEdi
 - `xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build CODE_SIGNING_ALLOWED=NO test`: 123 passed, 2 skipped, 0 failed.
 - Release package built, strict signature verification passed, and the updated app is open.
 - Next: live file-transcription acceptance in a user-approved session.
+
+
+## Completed — keep meeting action sentences intact across chunks (2026-11-02)
+
+- Meeting transcripts now split at the latest complete sentence that fits within the chunk limit, preserving nearby owners, tasks, and deadlines for each local summary pass. Sentences longer than the limit still fall back to a word boundary.
+- Added regression coverage for an owner/task/deadline sentence near a chunk boundary.
+- `xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build CODE_SIGNING_ALLOWED=NO test`: 126 passed, 2 skipped, 0 failed.
+- Release package built, strict signature verification passed, and the updated app is open.
+- Next: live file-transcription and meeting-capture acceptance in a user-approved session.
