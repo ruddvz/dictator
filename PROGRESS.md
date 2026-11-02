@@ -5,6 +5,7 @@
 - Opened `/Users/rudra/Projects/HushKey/dist/HushKey.app` and verified the Files screen restored its saved local test transcript with 15 timed segments.
 - Exported SRT and WebVTT from the screen to temporary files and inspected them: both contained all 15 cues with the correct format-specific timestamp separators. This checks the UI and serialization, not timing accuracy against the original media.
 - The screen still offers the macOS Speech Recognition permission step. I did not start a new transcription or grant that permission, so fresh capture, recognition quality, and source-duration clamping remain unverified.
+- Closed the older Debug app under the Codex outputs folder after discovering it was still running; verified the only remaining HushKey process is `/Users/rudra/Projects/HushKey/dist/HushKey.app`.
 - Next fresh-session step: with the user present, authorize Speech Recognition if desired and run the documented short-file transcription, edit/reopen, subtitle timing, and recoverable save-failure checks.
 
 ## Completed — preserve unsaved file transcript drafts across navigation (2026-11-02)
