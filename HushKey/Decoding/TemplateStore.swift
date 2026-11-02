@@ -10,9 +10,7 @@ struct Dataset: Codable {
 /// Persists the training set as JSON in Application Support.
 enum TemplateStore {
     static var url: URL {
-        let dir = URL.applicationSupportDirectory.appending(path: "HushKey", directoryHint: .isDirectory)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appending(path: "dataset.json")
+        AppDataDirectory.url.appending(path: "dataset.json")
     }
 
     static func load() -> Dataset {

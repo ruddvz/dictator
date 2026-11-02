@@ -70,7 +70,7 @@
           "raw" : "Can you send a quarterly report to Priya before Friday?",
           "source" : "synthetic",
           "split" : "dev",
-          "transcribeSeconds" : 0.38059475,
+          "transcribeSeconds" : 0.324091459,
           "wordErrors" : {
             "deletions" : 0,
             "insertions" : 0,
@@ -146,7 +146,7 @@
           "raw" : "Let's user_ID equals (value)",
           "source" : "synthetic",
           "split" : "dev",
-          "transcribeSeconds" : 0.187816792,
+          "transcribeSeconds" : 0.180641625,
           "wordErrors" : {
             "deletions" : 0,
             "insertions" : 0,
@@ -222,7 +222,7 @@
           "raw" : "Hey team\nThe builders green",
           "source" : "synthetic",
           "split" : "dev",
-          "transcribeSeconds" : 0.12061725,
+          "transcribeSeconds" : 0.12647775,
           "wordErrors" : {
             "deletions" : 1,
             "insertions" : 0,
@@ -298,7 +298,7 @@
           "raw" : "Hi Sam,\n\nThanks for the update",
           "source" : "synthetic",
           "split" : "dev",
-          "transcribeSeconds" : 0.099381042,
+          "transcribeSeconds" : 0.117291125,
           "wordErrors" : {
             "deletions" : 0,
             "insertions" : 0,
@@ -375,7 +375,7 @@
           "raw" : "Send it to Alice actually Bob",
           "source" : "synthetic",
           "split" : "dev",
-          "transcribeSeconds" : 0.0907025,
+          "transcribeSeconds" : 0.107595125,
           "wordErrors" : {
             "deletions" : 0,
             "insertions" : 0,
@@ -451,7 +451,7 @@
           "raw" : "Please reply to my email address",
           "source" : "synthetic",
           "split" : "dev",
-          "transcribeSeconds" : 0.094387042,
+          "transcribeSeconds" : 0.1003235,
           "wordErrors" : {
             "deletions" : 0,
             "insertions" : 0,
@@ -527,7 +527,7 @@
           "raw" : "Oh, I think we should ship it today",
           "source" : "synthetic",
           "split" : "dev",
-          "transcribeSeconds" : 0.183858208,
+          "transcribeSeconds" : 0.190165208,
           "wordErrors" : {
             "deletions" : 1,
             "insertions" : 0,
@@ -603,7 +603,7 @@
           "raw" : "Please schedule a review with the design team next week",
           "source" : "synthetic",
           "split" : "dev",
-          "transcribeSeconds" : 0.111455208,
+          "transcribeSeconds" : 0.116602666,
           "wordErrors" : {
             "deletions" : 0,
             "insertions" : 0,
@@ -679,7 +679,7 @@
           "raw" : "Remind me to water the plants after lunch",
           "source" : "synthetic",
           "split" : "holdout",
-          "transcribeSeconds" : 0.103087333,
+          "transcribeSeconds" : 0.102632917,
           "wordErrors" : {
             "deletions" : 0,
             "insertions" : 0,
@@ -756,7 +756,7 @@
           "raw" : "Can't stop he_key equals process.nv.key",
           "source" : "synthetic",
           "split" : "holdout",
-          "transcribeSeconds" : 0.327767375,
+          "transcribeSeconds" : 0.312695833,
           "wordErrors" : {
             "deletions" : 0,
             "insertions" : 1,
@@ -832,7 +832,7 @@
           "raw" : "Running late.\nStart without me",
           "source" : "synthetic",
           "split" : "holdout",
-          "transcribeSeconds" : 0.094029209,
+          "transcribeSeconds" : 0.082273875,
           "wordErrors" : {
             "deletions" : 0,
             "insertions" : 0,
@@ -909,7 +909,7 @@
           "raw" : "Book a table for four actually five",
           "source" : "synthetic",
           "split" : "holdout",
-          "transcribeSeconds" : 0.098036,
+          "transcribeSeconds" : 0.09431625,
           "wordErrors" : {
             "deletions" : 0,
             "insertions" : 0,
@@ -985,7 +985,7 @@
           "raw" : "Add my home address to the form",
           "source" : "synthetic",
           "split" : "holdout",
-          "transcribeSeconds" : 0.101190541,
+          "transcribeSeconds" : 0.089296541,
           "wordErrors" : {
             "deletions" : 0,
             "insertions" : 0,
@@ -1061,7 +1061,7 @@
           "raw" : "Hello Maria,\n\nThe invoice is attached.\nBest regards",
           "source" : "synthetic",
           "split" : "holdout",
-          "transcribeSeconds" : 0.151372959,
+          "transcribeSeconds" : 0.152358792,
           "wordErrors" : {
             "deletions" : 0,
             "insertions" : 0,
@@ -1080,7 +1080,7 @@
       "skippedReason" : "No WhisperKit model is downloaded in HushKey. Download one in Transcribe Files to include it; the harness never downloads models."
     }
   ],
-  "generatedAt" : "2026-11-01T23:18:34Z",
+  "generatedAt" : "2026-11-02T02:16:17Z",
   "processor" : [
     {
       "actual" : "(value)",

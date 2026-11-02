@@ -1,6 +1,6 @@
 # HushKey dictation eval
 
-Generated 2026-11-01T23:18:34Z on macOS 27.0.1 by `Scripts/eval.sh`. Machine-readable results: [report.json](report.json).
+Generated 2026-11-02T02:16:17Z on macOS 27.0.1 by `Scripts/eval.sh`. Machine-readable results: [report.json](report.json).
 
 Tune against **dev**. Treat **holdout** as a fair check: read only its aggregate numbers while changing the processor.
 
@@ -61,4 +61,13 @@ Dev clips:
 ### whisperkit
 
 Skipped: No WhisperKit model is downloaded in HushKey. Download one in Transcribe Files to include it; the harness never downloads models.
+
+## Comparisons (paired bootstrap, 2000 resamples)
+
+Clips are paired by id. Δ is candidate WER minus baseline WER; negative is better. A gain counts only when the whole 95% interval is below zero.
+
+| Comparison | Split | Clips | Baseline WER | Candidate WER | Δ | 95% interval | p | Verdict |
+|---|---|---|---|---|---|---|---|---|
+| apple-speech (en-US, on-device): this run vs previous report | dev | 8 | 9.0% | 9.0% | +0.0 pts | +0.0 pts to +0.0 pts | 1.000 | no clear difference |
+| apple-speech (en-US, on-device): this run vs previous report | holdout | 6 | 7.8% | 7.8% | +0.0 pts | +0.0 pts to +0.0 pts | 1.000 | no clear difference |
 

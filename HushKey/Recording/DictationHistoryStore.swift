@@ -59,9 +59,7 @@ enum DictationHistoryStore {
     private static let fileManager = FileManager.default
 
     static var url: URL {
-        let directory = URL.applicationSupportDirectory.appending(path: "HushKey", directoryHint: .isDirectory)
-        try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
-        return directory.appending(path: "dictation-history.json")
+        AppDataDirectory.url.appending(path: "dictation-history.json")
     }
 
     static func containsFile(at url: URL = url) -> Bool {

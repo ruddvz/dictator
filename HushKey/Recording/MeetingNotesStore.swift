@@ -25,9 +25,7 @@ enum MeetingNotesStore {
     private static let fileManager = FileManager.default
 
     static var url: URL {
-        let directory = URL.applicationSupportDirectory.appending(path: "HushKey", directoryHint: .isDirectory)
-        try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
-        return directory.appending(path: "meeting-notes.json")
+        AppDataDirectory.url.appending(path: "meeting-notes.json")
     }
 
     static func load() -> [MeetingNote] {

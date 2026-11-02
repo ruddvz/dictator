@@ -85,7 +85,7 @@ final class WhisperKitFileTranscriber {
     }
 
     private static var modelRoot: URL {
-        let directory = URL.applicationSupportDirectory.appending(path: "HushKey/WhisperKitModels", directoryHint: .isDirectory)
+        let directory = AppDataDirectory.url.appending(path: "WhisperKitModels", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory
     }

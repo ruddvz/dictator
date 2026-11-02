@@ -35,9 +35,7 @@ enum FileTranscriptionSessionStore {
     private static let fileManager = FileManager.default
 
     static var url: URL {
-        let directory = URL.applicationSupportDirectory.appending(path: "HushKey", directoryHint: .isDirectory)
-        try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
-        return directory.appending(path: "file-transcription-history.json")
+        AppDataDirectory.url.appending(path: "file-transcription-history.json")
     }
 
     static func load() -> [FileTranscriptionSession] {
