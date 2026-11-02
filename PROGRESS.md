@@ -1,5 +1,13 @@
 # HushKey progress
 
+## Completed — preserve selected-text formatting (2026-11-02)
+
+- Fixed selected-text rewriting so it sends only the text body to the local model, then restores the selection's original leading indentation/whitespace and trailing spaces or line breaks exactly.
+- Applying the preview now inserts the draft verbatim instead of trimming its boundaries. Added regression coverage for indented lines, tabs/spaces, paragraph endings, and whitespace-only selections.
+- `xcodebuild ... test`: 113 passed, 2 skipped, 0 failed. The existing CoreSimulator version warning remains; the macOS test run passed.
+- Rebuilt `dist/HushKey.app`, passed `codesign --verify --deep --strict`, and reopened the packaged app. No capture or privacy permission prompts were started.
+- Next fresh-session step: complete consented live acceptance for microphone/Speech, Meeting Notes cancellation, dictation shortcuts, selected-text editing/insertion, and file exports; record any failures here.
+
 ## Completed — cancel Meeting Notes startup (2026-11-01)
 
 - Meeting Notes now offers **Cancel** while preparing local recognition or audio capture. Cancellation stops pending Speech and microphone work, invalidates late system-audio microphone permission responses, and releases the shared capture gate so another audio flow can proceed.

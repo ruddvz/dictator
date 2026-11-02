@@ -136,6 +136,26 @@ final class SafetyAndStorageTests: XCTestCase {
         XCTAssertTrue(prompt.contains("Return only the revised text"))
     }
 
+    func testSelectedTextEditPreservesLeadingIndentAndTrailingLineBreak() throws {
+        let content = try XCTUnwrap(SelectedTextEditContent("    Item one\n"))
+
+        XCTAssertEqual(content.text, "Item one")
+        XCTAssertEqual(content.applying("Revised item"), "    Revised item\n")
+    }
+
+    func testSelectedTextEditPreservesLeadingAndTrailingWhitespaceExactly() throws {
+        let source = "\t  Original wording \n\n"
+        let content = try XCTUnwrap(SelectedTextEditContent(source))
+
+        XCTAssertEqual(content.leadingWhitespace, "\t  ")
+        XCTAssertEqual(content.trailingWhitespace, " \n\n")
+        XCTAssertEqual(content.applying("Updated wording"), "\t  Updated wording \n\n")
+    }
+
+    func testSelectedTextEditRejectsWhitespaceOnlySelections() {
+        XCTAssertNil(SelectedTextEditContent(" \t\n"))
+    }
+
     func testDatasetRoundTripsLocallyWithConditionAndSessionMetadata() throws {
         let url = FileManager.default.temporaryDirectory
             .appending(path: "hushkey-\(UUID().uuidString).json")

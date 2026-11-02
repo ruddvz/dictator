@@ -854,7 +854,7 @@ final class AppModel {
     func applySelectedTextEdit() async {
         guard canApplySelectedTextEdit, let target = selectedTextEditTarget else { return }
         let generation = selectedTextEditGeneration
-        let draft = selectedTextEditDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        let draft = selectedTextEditDraft
         isApplyingSelectedTextEdit = true
         selectedTextEditStatus = "Checking the original app and selection…"
         defer { isApplyingSelectedTextEdit = false }

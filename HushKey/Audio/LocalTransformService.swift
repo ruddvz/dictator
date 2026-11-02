@@ -101,6 +101,35 @@ enum WritingStylePresetStore {
     }
 }
 
+struct SelectedTextEditContent: Equatable {
+    let leadingWhitespace: String
+    let text: String
+    let trailingWhitespace: String
+
+    init?(_ source: String) {
+        var textStart = source.startIndex
+        while textStart < source.endIndex, source[textStart].isWhitespace {
+            textStart = source.index(after: textStart)
+        }
+        guard textStart < source.endIndex else { return nil }
+
+        var textEnd = source.endIndex
+        while textEnd > textStart {
+            let previous = source.index(before: textEnd)
+            guard source[previous].isWhitespace else { break }
+            textEnd = previous
+        }
+
+        leadingWhitespace = String(source[..<textStart])
+        text = String(source[textStart..<textEnd])
+        trailingWhitespace = String(source[textEnd...])
+    }
+
+    func applying(_ revisedText: String) -> String {
+        leadingWhitespace + revisedText.trimmingCharacters(in: .whitespacesAndNewlines) + trailingWhitespace
+    }
+}
+
 enum LocalTransformError: LocalizedError {
     case emptyInput
     case inputTooLong
@@ -185,18 +214,20 @@ final class LocalTransformService {
     }
 
     func transformSelectedText(_ selectedText: String, instruction: String) async throws -> String {
-        let source = selectedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let selectedContent = SelectedTextEditContent(selectedText) else {
+            throw LocalTransformError.emptyInput
+        }
         let cleanInstruction = instruction.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !source.isEmpty else { throw LocalTransformError.emptyInput }
-        guard source.count <= 12_000 else { throw LocalTransformError.inputTooLong }
+        guard selectedText.count <= 12_000 else { throw LocalTransformError.inputTooLong }
         guard !cleanInstruction.isEmpty else { throw LocalTransformError.selectedEditInstructionEmpty }
         guard cleanInstruction.count <= 1_000 else { throw LocalTransformError.selectedEditInstructionTooLong }
         guard !isTransforming else { throw LocalTransformError.alreadyRunning }
         isTransforming = true
         defer { isTransforming = false }
 
-        return try await generateSingle(source, sourceLabel: "selected text",
-                                        instructions: Self.selectedTextEditInstructions(for: cleanInstruction))
+        let revisedText = try await generateSingle(selectedContent.text, sourceLabel: "selected text",
+                                                    instructions: Self.selectedTextEditInstructions(for: cleanInstruction))
+        return selectedContent.applying(revisedText)
     }
 
     nonisolated static func selectedTextEditInstructions(for instruction: String) -> String {
