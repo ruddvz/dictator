@@ -76,6 +76,10 @@ enum FileTranscriptionSessionStore {
     }
 
     static func deleteAll() throws {
+        try deleteAll(at: url)
+    }
+
+    static func deleteAll(at url: URL) throws {
         guard fileManager.fileExists(atPath: url.path) else { return }
         try fileManager.removeItem(at: url)
     }

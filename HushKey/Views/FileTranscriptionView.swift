@@ -223,7 +223,7 @@ struct FileTranscriptionView: View {
                             titleVisibility: .visible) {
             Button("Delete transcripts", role: .destructive) { clearHistory() }
         } message: {
-            Text("This removes HushKey’s saved transcript text and subtitle cues from this Mac. Original audio files are not stored here.")
+            Text("This removes HushKey’s saved transcript text and subtitle cues from this Mac. Original audio files are not stored here. Any transcription already running can still be exported, but will not be added back to history.")
         }
     }
 
@@ -364,8 +364,9 @@ struct FileTranscriptionView: View {
     }
 
     private func clearHistory() {
-        model.clearFileTranscriptionHistory()
-        activeSessionID = nil
+        if model.clearFileTranscriptionHistory() {
+            activeSessionID = nil
+        }
     }
 
     private func chooseFile() {

@@ -56,7 +56,7 @@ final class WhisperKitFileTranscriber {
     @ObservationIgnored private var downloadTask: Task<Void, Never>?
     @ObservationIgnored private var transcriptionTask: Task<Void, Never>?
     @ObservationIgnored var onSessionUpdate: ((FileTranscriptionSession) -> Void)?
-    @ObservationIgnored private var activeSessionID = UUID()
+    @ObservationIgnored private(set) var activeSessionID = UUID()
     @ObservationIgnored private var activeSourceName: String?
     @ObservationIgnored private var activeLanguageIdentifier = ""
     @ObservationIgnored private var activeModelVariant: String?

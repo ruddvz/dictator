@@ -92,7 +92,7 @@ final class AppModel {
     private(set) var experimentSessionID = UUID()
     var dataMessage: String?
     private(set) var dictationHistoryMessage: String?
-    private(set) var fileTranscriptionSessions = FileTranscriptionSessionStore.load()
+    private(set) var fileTranscriptionSessions: [FileTranscriptionSession]
     private(set) var fileTranscriptionHistoryMessage: String?
 
     var captureShortcut: CaptureShortcut = CaptureShortcut(
@@ -208,6 +208,8 @@ final class AppModel {
 
     var dictationStats: DictationStats { DictationStats(entries: dictationHistory) }
     @ObservationIgnored private let dictationHistoryURL: URL
+    @ObservationIgnored private let fileTranscriptionHistoryURL: URL
+    @ObservationIgnored private var fileTranscriptionSessionsDiscardedByClear = Set<UUID>()
     @ObservationIgnored private var dictationHistorySaveTask: Task<Void, Never>?
     @ObservationIgnored private var currentDictationHistoryEntryID: UUID?
     @ObservationIgnored private var capturedInsertionTarget: TextInsertionService.InsertionTarget?
@@ -240,9 +242,12 @@ final class AppModel {
     @ObservationIgnored private var dictationStartGeneration = 0
     @ObservationIgnored private var selectedTextEditGeneration = 0
 
-    init(dictationHistoryURL: URL = DictationHistoryStore.url) {
+    init(dictationHistoryURL: URL = DictationHistoryStore.url,
+         fileTranscriptionHistoryURL: URL = FileTranscriptionSessionStore.url) {
         self.dictationHistoryURL = dictationHistoryURL
         dictationHistory = DictationHistoryStore.load(from: dictationHistoryURL) ?? []
+        self.fileTranscriptionHistoryURL = fileTranscriptionHistoryURL
+        fileTranscriptionSessions = FileTranscriptionSessionStore.load(from: fileTranscriptionHistoryURL) ?? []
         let captureGate = AudioCaptureGate()
         self.captureGate = captureGate
         meetingNotes = MeetingNotesService(captureGate: captureGate)
@@ -259,9 +264,10 @@ final class AppModel {
     }
 
     func saveFileTranscriptionSession(_ session: FileTranscriptionSession) {
+        guard !fileTranscriptionSessionsDiscardedByClear.contains(session.id) else { return }
         let updated = FileTranscriptionSessionStore.upserting(session, into: fileTranscriptionSessions)
         do {
-            try FileTranscriptionSessionStore.save(updated)
+            try FileTranscriptionSessionStore.save(updated, to: fileTranscriptionHistoryURL)
             fileTranscriptionSessions = updated
             fileTranscriptionHistoryMessage = nil
         } catch {
@@ -272,7 +278,7 @@ final class AppModel {
     func deleteFileTranscriptionSession(_ session: FileTranscriptionSession) {
         let updated = FileTranscriptionSessionStore.deleting(id: session.id, from: fileTranscriptionSessions)
         do {
-            try FileTranscriptionSessionStore.save(updated)
+            try FileTranscriptionSessionStore.save(updated, to: fileTranscriptionHistoryURL)
             fileTranscriptionSessions = updated
             fileTranscriptionHistoryMessage = nil
         } catch {
@@ -280,13 +286,28 @@ final class AppModel {
         }
     }
 
-    func clearFileTranscriptionHistory() {
+    @discardableResult
+    func clearFileTranscriptionHistory() -> Bool {
+        let activeSessionIDs = Set([
+            fileTranscriber.isTranscribing ? fileTranscriber.activeSessionID : nil,
+            whisperFileTranscriber.isTranscribing ? whisperFileTranscriber.activeSessionID : nil
+        ].compactMap { $0 })
+        return clearFileTranscriptionHistory(discardingActiveSessionIDs: activeSessionIDs)
+    }
+
+    @discardableResult
+    func clearFileTranscriptionHistory(discardingActiveSessionIDs activeSessionIDs: Set<UUID>) -> Bool {
         do {
-            try FileTranscriptionSessionStore.deleteAll()
+            try FileTranscriptionSessionStore.deleteAll(at: fileTranscriptionHistoryURL)
+            fileTranscriptionSessionsDiscardedByClear.formUnion(activeSessionIDs)
             fileTranscriptionSessions.removeAll()
-            fileTranscriptionHistoryMessage = nil
+            fileTranscriptionHistoryMessage = activeSessionIDs.isEmpty
+                ? "Saved file transcript history was deleted from this Mac."
+                : "Saved history was deleted. The in-progress transcript can still be exported, but it will not be added back to history."
+            return true
         } catch {
             fileTranscriptionHistoryMessage = "Couldn’t delete saved transcripts: \(error.localizedDescription)"
+            return false
         }
     }
 

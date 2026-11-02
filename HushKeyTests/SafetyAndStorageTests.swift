@@ -435,6 +435,40 @@ final class SafetyAndStorageTests: XCTestCase {
     }
 
     @MainActor
+    func testClearingFileHistoryDoesNotRepersistAnInFlightTranscription() throws {
+        let directory = FileManager.default.temporaryDirectory
+        let dictationURL = directory.appending(path: "hushkey-clear-file-dictation-\(UUID().uuidString).json")
+        let fileHistoryURL = directory.appending(path: "hushkey-clear-file-transcripts-\(UUID().uuidString).json")
+        defer {
+            try? FileManager.default.removeItem(at: dictationURL)
+            try? FileManager.default.removeItem(at: fileHistoryURL)
+        }
+
+        let previous = FileTranscriptionSession(sourceName: "previous.m4a", engine: .apple,
+                                                languageIdentifier: "en-US", text: "Previous transcript.", cues: [])
+        try FileTranscriptionSessionStore.save([previous], to: fileHistoryURL)
+        let model = AppModel(dictationHistoryURL: dictationURL,
+                             fileTranscriptionHistoryURL: fileHistoryURL)
+        let activeID = UUID()
+        let completedAfterClear = FileTranscriptionSession(id: activeID, sourceName: "current.m4a",
+                                                           engine: .whisperKit, languageIdentifier: "en",
+                                                           modelVariant: "base", text: "Finished after clear.", cues: [])
+
+        XCTAssertTrue(model.clearFileTranscriptionHistory(discardingActiveSessionIDs: [activeID]))
+        model.saveFileTranscriptionSession(completedAfterClear)
+
+        XCTAssertTrue(model.fileTranscriptionSessions.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fileHistoryURL.path))
+        XCTAssertTrue(model.fileTranscriptionHistoryMessage?.contains("in-progress transcript") == true)
+
+        let later = FileTranscriptionSession(sourceName: "later.m4a", engine: .apple,
+                                             languageIdentifier: "en-US", text: "A later transcript.", cues: [])
+        model.saveFileTranscriptionSession(later)
+        XCTAssertEqual(model.fileTranscriptionSessions, [later])
+        XCTAssertEqual(FileTranscriptionSessionStore.load(from: fileHistoryURL), [later])
+    }
+
+    @MainActor
     func testDictationHistoryCanRestoreProcessedOrRawText() {
         let url = FileManager.default.temporaryDirectory
             .appending(path: "hushkey-restore-\(UUID().uuidString).json")

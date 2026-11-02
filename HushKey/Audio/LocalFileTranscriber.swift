@@ -21,7 +21,7 @@ final class LocalFileTranscriber {
     @ObservationIgnored private var completion: CheckedContinuation<Void, Never>?
     @ObservationIgnored private var generation = 0
     @ObservationIgnored var onSessionUpdate: ((FileTranscriptionSession) -> Void)?
-    @ObservationIgnored private var activeSessionID = UUID()
+    @ObservationIgnored private(set) var activeSessionID = UUID()
     @ObservationIgnored private var activeLanguageIdentifier = "en-US"
 
     func transcribe(file url: URL, localeIdentifier: String, sessionID: UUID = UUID()) async {

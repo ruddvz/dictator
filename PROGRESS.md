@@ -356,3 +356,13 @@ Record the 14 clip references as consented audio in `Fixtures/eval/<split>/audio
 1. Push `feature/flow-style-ui` and open a PR (or retarget PR #1).
 2. Live acceptance: the fn key in other apps, pill error/Retry/Paste again, Esc closing the card.
 3. Settings rewrite (one-line labels and right-aligned controls), including the Codex profile and correction-rule editors in Fog & sage.
+
+## Completed — prevent cleared file history from repopulating
+
+- Closing an audited race: clearing Recent file transcripts now suppresses save callbacks for transcription jobs that were already running. The current transcript stays available to export and is explicitly reported as excluded from the cleared archive; later jobs save normally.
+- Added an AppModel storage-URL seam and regression coverage that reproduces the clear-then-completion callback sequence.
+- Updated the live file-transcription checklist with the in-flight clear scenario. Runtime acceptance is still pending.
+
+## Next item — live file-transcription acceptance
+
+Test Apple Speech and downloaded WhisperKit transcription, editing, TXT/SRT/WebVTT export, and clearing history while a job runs. Confirm the running result remains exportable, does not return to Recent transcripts, and a later job saves normally. Then continue the microphone, insertion, and meeting acceptance checks.
