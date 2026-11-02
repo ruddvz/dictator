@@ -372,3 +372,16 @@ Test Apple Speech and downloaded WhisperKit transcription, editing, TXT/SRT/WebV
 - Codex had been working in a separate clone (`~/Documents/Codex/2026-11-01/…/outputs/HushKey`) on the retired `feature/hushkey-macos-prototype` branch. Its uncommitted fix for file history repopulating after a clear is now merged here as 6405ce5. 74 tests ran: 73 passed, 1 skipped, 0 failed.
 - Added `AGENTS.md`: `~/Projects/HushKey` on `feature/flow-style-ui` is the only working copy for every agent. The old Codex clone got an untracked `AGENTS.md` telling Codex to stop working there.
 - Checked `amirrsyed/hushkey`: an unrelated MIT webcam lip-reading project with the same name. Notes are in `docs/CRITIQUE_AND_ROADMAP.md`.
+
+## Completed — borrowed ideas, data-folder safety, end-to-end status
+
+- **Esc** cancels a listening dictation from any app; nothing is typed.
+- **Paste fallback with clipboard restore:** when a field refuses direct Accessibility typing (many browsers and Electron apps), HushKey pastes, then puts the user's clipboard back unless they copied something in the meantime. It never pastes into password fields or into a different field than the one dictated from. A Settings toggle controls it; on by default.
+- **Paired bootstrap** comparisons in `docs/eval/report.md`: engine against engine, and this run against the previous report. The live eval run shows apple-speech at 9.0% WER on dev and 7.8% on holdout, unchanged from the previous report.
+- **Data folder moved** to `~/Library/Application Support/com.ruddvz.hushkey`. On case-insensitive disks the old `…/HushKey` is the same folder amirrsyed/hushkey uses, and its uninstaller offers to delete it. Only HushKey's own files are moved, and the real user data migrated on relaunch.
+- Tests: 80 ran; 79 passed, 1 skipped, 0 failed.
+- **Not verified live:** a spoken dictation through the microphone. A speaker-to-mic test gave "No speech detected" at the user's volume settings. Also unverified: the fn key and the paste fallback in other apps (the debug build lacks Accessibility access), Esc, and the pill's error/Retry/Paste again.
+
+## Next item — live acceptance with the user
+
+Give the build Accessibility access and set Globe to Do Nothing. Then, with the user speaking, check: fn hold and double-tap in TextEdit, Safari or Chrome, and Slack; the paste fallback and clipboard restore; Esc; Retry and Paste again. Record the results in `docs/TESTING_PROTOCOL.md`.
