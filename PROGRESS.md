@@ -363,9 +363,18 @@ Record the 14 clip references as consented audio in `Fixtures/eval/<split>/audio
 - Added an AppModel storage-URL seam and regression coverage that reproduces the clear-then-completion callback sequence.
 - Updated the live file-transcription checklist with the in-flight clear scenario. Runtime acceptance is still pending.
 
-## Next item — live file-transcription acceptance
+## Completed — Apple Speech file acceptance and subtitle bounds (2026-11-01)
 
-Test Apple Speech and downloaded WhisperKit transcription, editing, TXT/SRT/WebVTT export, and clearing history while a job runs. Confirm the running result remains exportable, does not return to Recent transcripts, and a later job saves normally. Then continue the microphone, insertion, and meeting acceptance checks.
+- Used a locally generated 5.30-second synthetic speech file. Apple Speech transcribed it on this Mac without a remote fallback; the output was suitable for workflow checks, not an accuracy benchmark.
+- Edited the transcript, searched Recent, switched away and back, quit and reopened HushKey, and confirmed the edited text and timed cues restore from local history.
+- Exported TXT, SRT, and WebVTT through the packaged app's save panels. The source remained unchanged; the history archive contains transcript text and cues but no audio file or audio field.
+- The acceptance run found the final Apple Speech cue extended to 5.46 seconds for a 5.30-second source. An initial bounded export ended at 5.302 seconds. Both Apple Speech and WhisperKit now clamp cues to the source duration and round the final boundary down to milliseconds; a regression test verifies 5.301 seconds for a 5.30195-second source. That final rounding is unit-tested but has not yet been re-exported live.
+- Added a regression test for clipped, out-of-range, negative, and non-finite subtitle cues. `xcodebuild ... test`: 103 tests, 101 passed, 2 skipped, 0 failed. The signed Release app was rebuilt and opened.
+- After rebuilding, the latest packaged app first stalled at “Waiting for macOS Speech permission…”. On a later retry, HushKey's setup checklist advanced to 3 of 4, but opening the sample did not complete file transcription and the app changed to Dictation/Listening. That session was stopped; no file transcript was saved. The final millisecond-bounded SRT/WebVTT export remains unverified live. The signed Release app is currently idle on Dictation; its pre-existing dictation history was left intact.
+
+## Next item — WhisperKit and file-history race acceptance
+
+Re-run Apple Speech file transcription on the packaged app from a stable window state, and verify the final bounded SRT/WebVTT export. Then download the Tiny model, verify offline transcription and timed exports, and exercise clearing history during a live job. Continue with microphone, insertion, and meeting acceptance afterward.
 
 ## Completed — one working copy
 

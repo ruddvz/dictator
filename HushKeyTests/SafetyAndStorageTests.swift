@@ -457,6 +457,27 @@ final class SafetyAndStorageTests: XCTestCase {
                        "WEBVTT\n\n00:00:01.250 --> 00:00:02.050\nHello.\n\n00:01:01.100 --> 00:01:02.300\nGoodbye.\n")
     }
 
+    func testSubtitleCueLimiterClipsToSourceDurationAndDropsOutOfRangeCues() {
+        let cues = [SubtitleCue(start: 5.1, duration: 0.36, text: "Clipped."),
+                    SubtitleCue(start: 5.4, duration: 0.2, text: "Outside."),
+                    SubtitleCue(start: -0.2, duration: 0.5, text: "Starts early."),
+                    SubtitleCue(start: 1, duration: 0.5, text: "Within."),
+                    SubtitleCue(start: .infinity, duration: 1, text: "Invalid.")]
+
+        let bounded = SubtitleCueLimiter.clamp(cues, to: 5.3)
+
+        XCTAssertEqual(bounded.map(\.text), ["Clipped.", "Starts early.", "Within."])
+        XCTAssertEqual(bounded[0].start, 5.1, accuracy: 0.0001)
+        XCTAssertEqual(bounded[0].duration, 0.2, accuracy: 0.0001)
+        XCTAssertEqual(bounded[0].start + bounded[0].duration, 5.3, accuracy: 0.0001)
+        XCTAssertEqual(bounded[1].start, 0)
+        XCTAssertEqual(bounded[1].duration, 0.3, accuracy: 0.0001)
+        let fractionalLimit = SubtitleCueLimiter.clamp(
+            [SubtitleCue(start: 5.1, duration: 0.36, text: "Fractional boundary.")], to: 5.30195)
+        XCTAssertEqual(fractionalLimit[0].start + fractionalLimit[0].duration, 5.301, accuracy: 0.0001)
+        XCTAssertEqual(SubtitleCueLimiter.clamp(cues, to: nil), cues)
+    }
+
     func testAutomaticModeMapsCommonMacAppsAndContextExtractionIsBounded() {
         XCTAssertEqual(DictationMode.resolved(.automatic, bundleIdentifier: "com.apple.mail"), .email)
         XCTAssertEqual(DictationMode.resolved(.automatic, bundleIdentifier: "com.todesktop.230313mzl4w4u92"), .natural)

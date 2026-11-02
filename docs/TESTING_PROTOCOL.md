@@ -75,7 +75,7 @@ Run this separately from the AirPods motion study:
 ## Local file transcription acceptance
 
 1. Import a short consented audio file and transcribe it with Apple Speech. Confirm HushKey refuses remote fallback when the selected language lacks on-device support.
-2. Edit the transcript, save TXT, and export SRT and WebVTT. Check subtitle timestamps against the source audio and confirm the source file remains unchanged.
+2. Edit the transcript, save TXT, and export SRT and WebVTT. Check subtitle timestamps against the source audio, confirm no cue extends past the media duration, and confirm the source file remains unchanged.
 3. Confirm a completed job appears in searchable Recent file transcripts. Edit its text, switch screens, return, restore it, and verify the edited text and original timed cues remain. Choose a second source file and verify the first job remains recoverable.
 4. Delete one saved job, then clear all saved file transcripts. Also start a transcription and clear history before it finishes; confirm the running job remains exportable but never repopulates Recent file transcripts. Confirm deletion persists after reopening HushKey and that source audio was never copied into Application Support.
 5. Choose a WhisperKit model and explicitly download it. Verify the download state reaches completion and the model appears in `~/Library/Application Support/HushKey/WhisperKitModels/`.

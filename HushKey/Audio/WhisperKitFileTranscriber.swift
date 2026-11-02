@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import WhisperKit
+import AVFoundation
 
 struct WhisperKitLanguage: Identifiable, Hashable {
     let identifier: String
@@ -223,6 +224,8 @@ final class WhisperKitFileTranscriber {
         var whisper: WhisperKit?
         do {
             try Task.checkCancellation()
+            let sourceDuration = try? await AVURLAsset(url: url).load(.duration)
+            try Task.checkCancellation()
             let config = WhisperKitConfig(model: variant.rawValue, modelFolder: modelPath,
                                           verbose: false, logLevel: .error, download: false)
             whisper = try await WhisperKit(config)
@@ -238,9 +241,10 @@ final class WhisperKitFileTranscriber {
                 callback: { _ in !Task.isCancelled })
             try Task.checkCancellation()
             text = results.map(\.text).joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
-            cues = results.flatMap(\.segments).map {
+            let decodedCues = results.flatMap(\.segments).map {
                 SubtitleCue(start: TimeInterval($0.start), duration: TimeInterval(max(0, $0.end - $0.start)), text: $0.text)
             }
+            cues = SubtitleCueLimiter.clamp(decodedCues, to: sourceDuration?.seconds)
             status = text.isEmpty ? "No speech was detected in this file." : "Finished locally. The source audio was not changed."
         } catch {
             if Task.isCancelled || error is CancellationError {

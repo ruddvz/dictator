@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import Speech
+import AVFoundation
 
 struct SubtitleCue: Codable, Equatable {
     var start: TimeInterval
@@ -23,6 +24,7 @@ final class LocalFileTranscriber {
     @ObservationIgnored var onSessionUpdate: ((FileTranscriptionSession) -> Void)?
     @ObservationIgnored private(set) var activeSessionID = UUID()
     @ObservationIgnored private var activeLanguageIdentifier = "en-US"
+    @ObservationIgnored private var sourceDuration: TimeInterval?
 
     func transcribe(file url: URL, localeIdentifier: String, sessionID: UUID = UUID()) async {
         guard !isTranscribing else { return }
@@ -35,14 +37,22 @@ final class LocalFileTranscriber {
         cues = []
         error = nil
         sourceName = url.lastPathComponent
+        sourceDuration = nil
         status = "Checking local speech support…"
 
-        let authorization = await withCheckedContinuation { continuation in
-            SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0) }
+        let currentAuthorization = SFSpeechRecognizer.authorizationStatus()
+        let authorization: SFSpeechRecognizerAuthorizationStatus
+        if currentAuthorization == .notDetermined {
+            status = "Waiting for macOS Speech permission…"
+            authorization = await withCheckedContinuation { continuation in
+                SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0) }
+            }
+        } else {
+            authorization = currentAuthorization
         }
         guard currentGeneration == generation else { return }
         guard authorization == .authorized else {
-            finish(error: "Speech recognition permission is required to transcribe files on this Mac.")
+            finish(error: "Allow HushKey under System Settings → Privacy & Security → Speech Recognition to transcribe files on this Mac.")
             return
         }
 
@@ -52,6 +62,12 @@ final class LocalFileTranscriber {
             finish(error: "On-device recognition for this language is unavailable. HushKey did not send the file to a remote service.")
             return
         }
+
+        status = "Checking audio duration…"
+        if let loadedDuration = try? await AVURLAsset(url: url).load(.duration), loadedDuration.seconds.isFinite {
+            sourceDuration = max(0, loadedDuration.seconds)
+        }
+        guard currentGeneration == generation else { return }
 
         status = "Transcribing on this Mac…"
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
@@ -117,7 +133,7 @@ final class LocalFileTranscriber {
                          error message: String?, generation receivedGeneration: Int) {
         guard receivedGeneration == generation, isTranscribing else { return }
         if let value { text = value }
-        if let valueCues { cues = valueCues }
+        if let valueCues { cues = SubtitleCueLimiter.clamp(valueCues, to: sourceDuration) }
         guard isFinal || message != nil else { return }
         task = nil
         isTranscribing = false
@@ -172,5 +188,19 @@ enum SubtitleFormatter {
         let secs = (milliseconds / 1_000) % 60
         let millis = milliseconds % 1_000
         return String(format: "%02d:%02d:%02d%@%03d", hours, minutes, secs, separator, millis)
+    }
+}
+
+enum SubtitleCueLimiter {
+    static func clamp(_ cues: [SubtitleCue], to sourceDuration: TimeInterval?) -> [SubtitleCue] {
+        guard let sourceDuration, sourceDuration.isFinite else { return cues }
+        let limit = floor(max(0, sourceDuration) * 1_000) / 1_000
+        return cues.compactMap { cue in
+            guard cue.start.isFinite, cue.duration.isFinite else { return nil }
+            let start = min(max(0, cue.start), limit)
+            let end = min(max(start, cue.start + cue.duration), limit)
+            guard start < limit, end > start else { return nil }
+            return SubtitleCue(start: start, duration: end - start, text: cue.text)
+        }
     }
 }
