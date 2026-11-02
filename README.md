@@ -5,7 +5,7 @@ HushKey is a native macOS dictation app with a separate experimental lab for sil
 ## Current status
 
 - macOS 14 or later; designed for Apple Silicon and Intel Macs.
-- The app opens to Voice & Whisper dictation. Use the button, hold the configurable global shortcut (`⌥⇧D` by default), or choose press-to-toggle; then review/edit, copy, or optionally insert a complete phrase into a supported text field.
+- The app opens to Voice & Whisper dictation. Use the button, hold the configurable global shortcut (`⌥⇧D` by default), or choose press-to-toggle; then review/edit, copy, or optionally insert a complete phrase into a supported text field. For the one-click Insert button, start with the shortcut while the destination field is focused; HushKey keeps that target in memory and rechecks it before returning to insert.
 - Speech recognition uses Apple's on-device Speech framework and exposes languages supported for on-device recognition on this Mac. HushKey does not send audio to a remote service.
 - Dictation includes Natural, Message, Email, Code, and Automatic modes; explicit spoken corrections with raw-transcript restore; local vocabulary/snippets; and a one-step guarded insertion undo. Automatic mode maps common Mac app identifiers when started with the global shortcut.
 - **Transforms** offers review-first local polish, concise, professional, bullets, and action-item drafts using Apple's on-device Foundation Model when available (macOS 26+); conservative filler removal works without a model on macOS 14+. Create up to 12 local writing styles for tone, format, or translation. Every generated draft stays reviewable and can be undone; HushKey has no cloud fallback.

@@ -54,7 +54,7 @@ Run this separately from the AirPods motion study:
 3. Try an explicit “scratch that” correction, restore the original recognition, and confirm history keeps the processed text and raw text separately.
 4. Test Code formatting in a code editor and the Automatic mapping from TextEdit, Mail, Messages, and an editor using the global shortcut. Confirm the last-capture status shows the selected mode and app.
 5. Leave nearby text hints off first. If the user enables them, grant Accessibility access separately, confirm a supported non-secure text field is required, then verify HushKey only reports extracted terms and saves no surrounding text.
-6. In TextEdit and one other supported app, insert once, confirm the clipboard did not change, then press `⌥⇧U` immediately while the same field is unchanged. Confirm that the insert is removed; change focus or edit the field and confirm undo fails closed.
+6. In TextEdit and one other supported app, start dictation with the target field focused using the global shortcut, finish, then use the Dictation screen's named-target Insert button. Confirm HushKey returns to that app and inserts once only if the same field and selection remain unchanged. Change the target or field contents before pressing the button and confirm it fails closed. Also insert with the global `⌥⇧I` shortcut, confirm the clipboard did not change, then press `⌥⇧U` immediately while the same field is unchanged. Confirm undo removes the insert; changed focus or content must fail closed.
 7. Reload the local history entry, restore raw recognition, clear the current draft, and clear history. Confirm microphone audio is never stored by ordinary dictation.
 
 ## Local writing style acceptance

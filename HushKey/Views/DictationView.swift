@@ -178,14 +178,26 @@ struct DictationView: View {
                     Button("Copy text", systemImage: "doc.on.doc") { model.copyDictationText() }
                         .disabled(model.audio.isRunning || model.isFinalizingDictation || model.transcriber.isFinalizing ||
                                   model.transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    Button("Insert into current app", systemImage: "text.insert") { model.insertDictationText() }
+                    Button(model.capturedInsertionTargetName.map { "Insert into \($0)" } ?? "No safe target captured",
+                           systemImage: "text.insert") {
+                        Task { await model.insertDictationTextIntoCapturedTarget() }
+                    }
                         .buttonStyle(.borderedProminent)
-                        .disabled(!model.insertion.isEnabled || model.audio.isRunning || model.isFinalizingDictation || model.transcriber.isFinalizing ||
+                        .disabled(!model.canInsertIntoCapturedTarget || model.audio.isRunning || model.isFinalizingDictation || model.transcriber.isFinalizing ||
                                   model.transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     if !model.insertion.isEnabled {
                         Button("Enable insertion…") { model.screen = .settings }
                             .buttonStyle(.link)
                     }
+                }
+
+                if model.insertion.isEnabled, model.capturedInsertionTargetName == nil,
+                   !model.audio.isRunning, !model.isFinalizingDictation, !model.transcriber.isFinalizing {
+                    Label("To enable safe insertion here, start dictation with the global shortcut while the target text field is focused. The target is rechecked before HushKey switches back to it.",
+                          systemImage: "keyboard")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 if !model.audio.isRunning, !model.isFinalizingDictation, !model.transcriber.isFinalizing,

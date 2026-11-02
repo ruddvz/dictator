@@ -212,3 +212,15 @@ With the user present, verify the packaged app's Dictation and Meeting Notes flo
 ## Next item — manual voice acceptance, then selected-text editing
 
 In a fresh session, follow the non-AirPods voice acceptance checks in docs/TESTING_PROTOCOL.md with user-approved microphone/Speech and Accessibility access, fix any runtime failures, then design a preview-first selected-text edit that rechecks the original app and selection before replacing anything.
+
+## Completed — guarded named-target insertion
+
+- Fixed the Dictation screen's Insert button: a dictation started from HushKey cannot safely target whichever app is frontmost later. HushKey now snapshots a supported destination field only when dictation starts via the global shortcut in that app.
+- Before returning to insert, HushKey requires Accessibility, the same live app, exact focused field, unchanged full field text and selection, a supported non-secure text role, and a settable selected-text attribute. The target remains in memory only; no clipboard use.
+- Added clear Dictation and Settings guidance, fail-closed behavior, and a unit test for changed text/selection. Updated the testing protocol and README.
+- `xcodebuild -quiet -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build -destination 'platform=macOS,arch=arm64' test`: 45 passed, 0 failed, 0 skipped on the MacBook Pro. Live insertion into TextEdit/another app is still pending with the user.
+- The first test build exposed a main-actor isolation error in the new pure comparison helper; it was corrected and the final suite passed. Xcode reports an outdated CoreSimulator framework, but macOS tests completed.
+
+## Next item — package and publish, then live insertion acceptance
+
+Refresh and verify `dist/HushKey.app`, commit/push the guarded-insertion fix to PR #1, then validate named-target insertion, stale-target rejection, global shortcut insertion, and undo in TextEdit and a second app. Microphone, file-model, and meeting capture acceptance remain open.

@@ -141,12 +141,15 @@ final class AppModel {
     }
     private(set) var activeDictationMode: DictationMode = .natural
     private(set) var activeDictationTarget: String?
+    private(set) var capturedInsertionTargetName: String?
+    private(set) var isInsertingDictation = false
     private(set) var usedNearbyTextHints = false
     private(set) var isFinalizingDictation = false
     @ObservationIgnored private(set) var lastSavedDictationText: String?
     @ObservationIgnored private let dictationHistoryURL: URL
     @ObservationIgnored private var dictationHistorySaveTask: Task<Void, Never>?
     @ObservationIgnored private var currentDictationHistoryEntryID: UUID?
+    @ObservationIgnored private var capturedInsertionTarget: TextInsertionService.InsertionTarget?
 
     // MARK: Decoding
 
@@ -521,6 +524,40 @@ final class AppModel {
         if insertion.insert(text) { didInsertCurrentDictation = true }
     }
 
+    var canInsertIntoCapturedTarget: Bool {
+        capturedInsertionTarget != nil && insertion.isEnabled && !isInsertingDictation &&
+            !didInsertCurrentDictation && !audio.isRunning && !isFinalizingDictation &&
+            !transcriber.isRunning && !transcriber.isFinalizing && captureGate.owner != .meeting
+    }
+
+    func insertDictationTextIntoCapturedTarget() async {
+        if let reason = DictationInsertionGate.blockedReason(
+            audioIsRunning: audio.isRunning,
+            recognitionIsRunning: transcriber.isRunning,
+            isFinalizing: isFinalizingDictation || transcriber.isFinalizing,
+            meetingCaptureIsActive: captureGate.owner == .meeting
+        ) {
+            insertion.report(reason)
+            return
+        }
+        guard let target = capturedInsertionTarget else {
+            insertion.report("Start dictation with the global shortcut while the target text field is focused to enable safe insertion here.")
+            return
+        }
+        let text = transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else {
+            insertion.report("Dictate something first.")
+            return
+        }
+        guard !didInsertCurrentDictation, !isInsertingDictation else {
+            insertion.report("This transcript was already inserted once.")
+            return
+        }
+        isInsertingDictation = true
+        defer { isInsertingDictation = false }
+        if await insertion.insert(text, into: target) { didInsertCurrentDictation = true }
+    }
+
     func undoLastInsertion() {
         if insertion.undoLastInsertion() { didInsertCurrentDictation = false }
     }
@@ -566,6 +603,8 @@ final class AppModel {
         cancelPendingDictationHistorySave()
         saveCurrentDictation()
         screen = .dictation
+        capturedInsertionTarget = nil
+        capturedInsertionTargetName = nil
         transcriber.clear()
         rawDictationText = ""
         clearLocalTransformUndo()
@@ -598,6 +637,8 @@ final class AppModel {
         }
         if !audio.isRunning, !isFinalizingDictation, !transcriber.isFinalizing {
             transcriber.clear()
+            capturedInsertionTarget = nil
+            capturedInsertionTargetName = nil
             rawDictationText = ""
             clearLocalTransformUndo()
             didInsertCurrentDictation = false
@@ -610,6 +651,8 @@ final class AppModel {
         cancelPendingDictationHistorySave()
         let restoredText = useRawText ? (entry.rawText ?? entry.text) : entry.text
         transcriber.replaceText(restoredText)
+        capturedInsertionTarget = nil
+        capturedInsertionTargetName = nil
         rawDictationText = entry.rawText ?? entry.text
         clearLocalTransformUndo()
         didInsertCurrentDictation = false
@@ -639,6 +682,8 @@ final class AppModel {
         guard !audio.isRunning, !isFinalizingDictation, !transcriber.isFinalizing else { return }
         cancelPendingDictationHistorySave()
         transcriber.clear()
+        capturedInsertionTarget = nil
+        capturedInsertionTargetName = nil
         rawDictationText = ""
         clearLocalTransformUndo()
         didInsertCurrentDictation = false
@@ -666,6 +711,8 @@ final class AppModel {
         let target = NSWorkspace.shared.frontmostApplication
         let isHushKey = target?.bundleIdentifier == "com.ruddvz.hushkey"
         activeDictationTarget = isHushKey ? nil : target?.localizedName
+        capturedInsertionTarget = isHushKey ? nil : insertion.captureInsertionTarget()
+        capturedInsertionTargetName = capturedInsertionTarget?.applicationName
         activeDictationMode = DictationMode.resolved(dictationMode,
                                                       bundleIdentifier: isHushKey ? nil : target?.bundleIdentifier)
         let nearbyHints = usesNearbyTextHints ? insertion.nearbyContextHints() : []

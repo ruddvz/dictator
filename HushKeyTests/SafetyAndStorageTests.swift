@@ -106,6 +106,19 @@ final class SafetyAndStorageTests: XCTestCase {
         XCTAssertFalse(TextInsertionService.isSupportedTextTarget(role: "AXButton", subrole: ""))
     }
 
+    func testCapturedInsertionTargetRequiresTheSameFieldTextAndSelection() {
+        let originalRange = CFRange(location: 8, length: 4)
+        XCTAssertTrue(TextInsertionService.selectionContextMatches(
+            originalValue: "Write this phrase here", originalRange: originalRange,
+            currentValue: "Write this phrase here", currentRange: CFRange(location: 8, length: 4)))
+        XCTAssertFalse(TextInsertionService.selectionContextMatches(
+            originalValue: "Write this phrase here", originalRange: originalRange,
+            currentValue: "Write this other phrase here", currentRange: CFRange(location: 8, length: 4)))
+        XCTAssertFalse(TextInsertionService.selectionContextMatches(
+            originalValue: "Write this phrase here", originalRange: originalRange,
+            currentValue: "Write this phrase here", currentRange: CFRange(location: 13, length: 5)))
+    }
+
     func testDatasetRoundTripsLocallyWithConditionAndSessionMetadata() throws {
         let url = FileManager.default.temporaryDirectory
             .appending(path: "hushkey-\(UUID().uuidString).json")
