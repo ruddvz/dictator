@@ -129,6 +129,8 @@ Matched to Wispr's measured sizes; SF Pro / SF Pro Rounded instead of Wispr's sa
 - **Rows:** `SettingsRow` (label, one-line detail, right-aligned control), `ListRow` (hover fill and actions).
 - **Controls:** `PrimaryButtonStyle(tint:foreground:)`, `SecondaryButtonStyle(minWidth:)`, `DestructiveButtonStyle`, `IconButtonStyle`, `MenuPicker`, `RowToggle`, `UnderlineTabs`, `Keycap` / `KeycapShortcut`.
 - **Style page:** `StyleView`: `UnderlineTabs` for the four contexts, plain app chips, and three `ToneCard`s (`well`, or `signalSoft` with a 1.5 pt `signal` border when selected) whose previews run through `DictationTone.apply`.
+- **Insights page:** `InsightsView`: `InsightCard`s on `well` with a hairline border, display-font metrics with uppercase `ink2` labels, a `PaceArc` gauge (hairline track, `signal` progress), category bars in `signal` at falling opacity with `inverseInk` percentages, and the shared `ActivityHeatmap`.
+- **Languages sheet:** `LanguagePickerSheet` on `sheet`: a `well` search field, a `signalSoft` "Selected" chip, and a 3-column grid of `LanguageTile`s (language on top, native name and region in `ink2` below; selected tiles match `ToneCard`).
 - **Page:** `PageHeader` (title, optional subtitle, trailing actions), `pageLayout(maxWidth:)`, `EmptyState`.
 - **Silent Lab:** `LabProgress` (Connect → Train → Evaluate → Silent Use strip on every lab page), `LabHero`, `HeroMetric`.
 - **Motion:** `MorphIcon`, `PillMeter`, `VoiceRibbon`, `LiveWaveform`, `StatusChip`, `SectionLabel`, `ActivityHeatmap`.

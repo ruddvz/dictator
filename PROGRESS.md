@@ -1,5 +1,16 @@
 # HushKey progress
 
+## Completed — recover cancelled dictations, Insights and Languages (2026-11-02)
+
+- **Recover:** cancelling with × or Esc (after at least 1 s of listening) keeps the audio in memory until HushKey quits. History shows "You cancelled a m:ss dictation in App" with **Recover** and Discard. Recover transcribes it with the settings of that run and saves it to History without typing it anywhere.
+- **Insights** page (sidebar, after Dictation): words per minute with a gauge and "× typing speed" (against 40 wpm), words cleaned up, dictation count, total words with the monthly change and a novels or pages comparison, where you dictate (Work, Personal, Email, Code, Other), and the day streak with a 20-week heatmap. It's backed by `UsageLedger` (`usage.json` beside the history): daily counts only, no text or app names. It's seeded once from saved history (as Other), written only while history saving is on, and has its own reset. Wispr's Leaderboard is left out: it needs accounts and a server.
+- **Languages:** Settings › Language opens a searchable grid sheet (language, native name, region; Save and close). There's a single choice, because on-device recognition has no auto-detect.
+- Fixed while checking live: `DateInterval.contains` includes the end, so the 1st of a month also counted toward the previous month (showed a false "0% this month"). Fixed the "1 dictations" plural.
+- Tests: `UsageLedgerTests` (10, including language search). `xcodebuild ... test`: 175 passed, 2 skipped, 0 failed.
+- **Seen live (packaged app):** the Insights page with real data; the language sheet (tiles, search "canada", the "was English (United States)" hint, the no-match state, Close without saving kept US English); × cancel → History Recover row → Recover → row cleared → "Didn't catch that" (quiet room, so no words to save).
+- **Not seen live:** a recovered dictation that contains speech landing in History; Insights updating after a new finished dictation; Save and close actually switching the recogniser language; Reset insights.
+- Next: a 2-minute guided tour from the setup checklist.
+
 ## Completed — app-wide Wispr comparison and Style page (2026-11-02)
 
 - Wrote `docs/APP_UX_ANALYSIS.md`. HushKey already matches Wispr Flow on breadth. The biggest visible gap was **Style**: Wispr sets a tone (Formal / Casual / Very casual) for each kind of app, with previews; HushKey had only modes.

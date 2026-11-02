@@ -92,6 +92,7 @@ private struct SettingsNav: View {
 private struct GeneralSettings: View {
     @Environment(AppModel.self) private var model
     @AppStorage(AppearancePreference.storageKey) private var appearance: AppearancePreference = .light
+    @State private var choosingLanguage = false
 
     var body: some View {
         @Bindable var model = model
@@ -130,7 +131,16 @@ private struct GeneralSettings: View {
                 }
             }
             SettingsRow(title: "Language", detail: "Recognised on this Mac. Nothing is sent online.") {
-                MenuPicker(selection: $model.dictationLanguage, options: languageOptions)
+                Button {
+                    choosingLanguage = true
+                } label: {
+                    Label(DictationLanguage.named(model.dictationLanguage).name, systemImage: "globe")
+                }
+                .buttonStyle(SecondaryButtonStyle())
+                .accessibilityHint("Opens the language list")
+                .sheet(isPresented: $choosingLanguage) {
+                    LanguagePickerSheet(selection: $model.dictationLanguage)
+                }
             }
             SettingsRow(title: "Microphone", detail: microphoneDetail,
                         detailTint: (audio.error ?? model.transcriber.error) == nil ? Theme.ink2 : Theme.danger) {
@@ -192,15 +202,6 @@ private struct GeneralSettings: View {
                            options: AppearancePreference.allCases.map { ($0, $0.rawValue) })
             }
         }
-    }
-
-    private var languageOptions: [(value: String, title: String)] {
-        var options = DictationLanguage.onDevice.map { ($0.identifier, $0.name) }
-        if !DictationLanguage.onDevice.contains(where: { $0.identifier == model.dictationLanguage }) {
-            options.append((model.dictationLanguage,
-                            Locale.current.localizedString(forIdentifier: model.dictationLanguage) ?? model.dictationLanguage))
-        }
-        return options
     }
 
     private var microphoneDetail: String {

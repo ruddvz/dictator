@@ -316,6 +316,11 @@ struct DictationView: View {
                     .textSelection(.enabled)
             }
 
+            if let cancelled = model.cancelledDictation {
+                CancelledDictationRow(cancelled: cancelled, isLocked: isBusy)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+
             if model.dictationHistory.isEmpty {
                 emptyHistory
             } else if groupedHistory.isEmpty {
@@ -609,5 +614,48 @@ private struct HistoryRow: View {
         Button(title, systemImage: symbol, action: perform)
             .buttonStyle(IconButtonStyle())
             .help(title)
+    }
+}
+
+/// The last cancelled dictation, offered back like Wispr's "dismissed, Recover" row. The audio
+/// only lives in memory for this session.
+private struct CancelledDictationRow: View {
+    @Environment(AppModel.self) private var model
+    var cancelled: CancelledDictation
+    var isLocked: Bool
+
+    var body: some View {
+        HStack(alignment: .center, spacing: Theme.s4) {
+            Text(cancelled.cancelledAt, style: .time)
+                .font(.system(size: 14))
+                .foregroundStyle(Theme.ink2)
+                .frame(width: 82, alignment: .leading)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("You cancelled a \(cancelled.durationLabel) dictation\(cancelled.appName.map { " in \($0)" } ?? "").")
+                    .font(.hkBody)
+                    .foregroundStyle(Theme.ink2)
+                Text("Kept in memory until you quit HushKey. Nothing was typed or saved.")
+                    .font(.hkCaption)
+                    .foregroundStyle(Theme.ink3)
+            }
+            Spacer(minLength: Theme.s2)
+            Button("Recover", systemImage: "arrow.uturn.backward") {
+                Task { await model.recoverCancelledDictation() }
+            }
+            .buttonStyle(SecondaryButtonStyle())
+            .disabled(isLocked)
+            .help("Transcribe it on this Mac and add it to History")
+            Button("Discard", systemImage: "xmark") { withAnimation(Theme.snappy) { model.discardCancelledDictation() } }
+                .buttonStyle(IconButtonStyle())
+                .help("Forget this recording")
+        }
+        .padding(.horizontal, Theme.s4)
+        .padding(.vertical, Theme.s3)
+        .frame(minHeight: Theme.listRow)
+        .background(Theme.well, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
+            .strokeBorder(Theme.hairline, style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Cancelled dictation, \(cancelled.durationLabel)")
     }
 }

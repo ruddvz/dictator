@@ -95,6 +95,34 @@ enum DictationRecovery {
     }
 }
 
+/// A dictation the person cancelled, offered back in History for the rest of the session.
+struct CancelledDictation: Identifiable, Equatable {
+    let id = UUID()
+    let cancelledAt: Date
+    let duration: TimeInterval
+    /// The app it was meant for, if any.
+    let appName: String?
+
+    var durationLabel: String {
+        let seconds = Int(duration.rounded())
+        return String(format: "%d:%02d", seconds / 60, seconds % 60)
+    }
+}
+
+/// How a dictation was set up when it started, so a recovered recording is formatted the same way.
+struct DictationRunSettings {
+    var mode: DictationMode
+    var languageIdentifier: String
+    var snippets: String
+    var correctionRules: String
+    var cleansFillers: Bool
+    var tone: DictationTone
+    var contextualStrings: [String]
+    var profileName: String?
+    var writingStylePresetID: UUID?
+    var usageCategory: UsageCategory
+}
+
 /// Whether "Paste again" may type the last dictation into its original target right now.
 enum PasteAgainGate {
     enum Decision: Equatable {

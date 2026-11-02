@@ -12,6 +12,41 @@ struct DictationLanguage: Identifiable, Hashable {
         return DictationLanguage(identifier: locale.identifier, name: name)
     }
     .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+
+    /// The name in the language itself, for example "Deutsch (Deutschland)".
+    var nativeName: String {
+        Locale(identifier: identifier).localizedString(forIdentifier: identifier) ?? name
+    }
+
+    /// The language alone, for example "German".
+    var languageName: String {
+        let code = Locale(identifier: identifier).language.languageCode?.identifier ?? identifier
+        return Locale.current.localizedString(forLanguageCode: code) ?? name
+    }
+
+    /// The region, with the language's own name when it differs, for example "Deutsch · Germany".
+    var detail: String {
+        let locale = Locale(identifier: identifier)
+        let code = locale.language.languageCode?.identifier ?? identifier
+        let native = locale.localizedString(forLanguageCode: code)?.localizedCapitalized
+        let region = locale.region.flatMap { Locale.current.localizedString(forRegionCode: $0.identifier) }
+        return [native == languageName ? nil : native, region].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    /// Matches the query against the local name, the native name and the identifier.
+    func matches(_ query: String) -> Bool {
+        let query = query.trimmingCharacters(in: .whitespaces)
+        guard !query.isEmpty else { return true }
+        return [name, nativeName, detail, identifier].contains {
+            $0.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+        }
+    }
+
+    static func named(_ identifier: String) -> DictationLanguage {
+        onDevice.first { $0.identifier == identifier }
+            ?? DictationLanguage(identifier: identifier,
+                                 name: Locale.current.localizedString(forIdentifier: identifier) ?? identifier)
+    }
 }
 
 enum DictationMode: String, CaseIterable, Identifiable, Codable {

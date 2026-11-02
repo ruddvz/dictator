@@ -633,13 +633,25 @@ struct SectionLabel: View {
 
 /// GitHub-style grid of the last few weeks; darker cells mean more dictations that day.
 struct ActivityHeatmap: View {
-    var entries: [DictationHistoryEntry]
+    /// Dictations per day, keyed by the start of the day.
+    var counts: [Date: Int]
     var weeks = 12
     var now = Date()
 
+    init(entries: [DictationHistoryEntry], weeks: Int = 12, now: Date = Date()) {
+        counts = Dictionary(grouping: entries) { Calendar.current.startOfDay(for: $0.createdAt) }.mapValues(\.count)
+        self.weeks = weeks
+        self.now = now
+    }
+
+    init(counts: [Date: Int], weeks: Int = 12, now: Date = Date()) {
+        self.counts = counts
+        self.weeks = weeks
+        self.now = now
+    }
+
     var body: some View {
         let calendar = Calendar.current
-        let counts = Dictionary(grouping: entries) { calendar.startOfDay(for: $0.createdAt) }.mapValues(\.count)
         let today = calendar.startOfDay(for: now)
         // Columns are weeks ending with the current one; rows are weekdays from the locale's first day.
         let weekdayOffset = (calendar.component(.weekday, from: today) - calendar.firstWeekday + 7) % 7

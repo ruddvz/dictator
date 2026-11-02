@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import Observation
 import UniformTypeIdentifiers
 
@@ -21,6 +22,7 @@ final class AppModel {
         case use = "Silent Use"
         case personalization = "Snippets & Vocabulary"
         case style = "Style"
+        case insights = "Insights"
         case settings = "Settings & Data"
         var id: String { rawValue }
         var symbol: String {
@@ -35,6 +37,7 @@ final class AppModel {
             case .use: "text.bubble"
             case .personalization: "character.book.closed"
             case .style: "textformat"
+            case .insights: "chart.bar"
             case .settings: "gearshape"
             }
         }
@@ -230,6 +233,13 @@ final class AppModel {
     @ObservationIgnored private(set) var lastSavedDictationText: String?
     @ObservationIgnored private(set) var dictationStartedAt: Date?
     @ObservationIgnored private var lastDictationDuration: TimeInterval?
+    /// The last cancelled recording, kept in memory for this session so History can recover it.
+    /// Never written to disk; dropped on Recover, Discard, the next cancel, or quit.
+    private(set) var cancelledDictation: CancelledDictation?
+    @ObservationIgnored private var cancelledDictationAudio: [AVAudioPCMBuffer] = []
+    @ObservationIgnored private var cancelledDictationSettings: DictationRunSettings?
+    /// A recovered dictation is saved and shown, never typed into whatever has focus now.
+    @ObservationIgnored private var finishesWithoutTyping = false
     /// The tone picked from the Style page when this dictation started.
     @ObservationIgnored private var activeDictationTone: DictationTone = .formal
     /// The input the last dictation used, for "We couldn't hear you".
@@ -247,6 +257,10 @@ final class AppModel {
                                            transcriptionFinalizing: transcriber.isFinalizing)
     }
     @ObservationIgnored private let dictationHistoryURL: URL
+    /// Lifetime totals for Insights: counts by day, no text. Recorded only while history saving is on.
+    private(set) var usageLedger = UsageLedger()
+    @ObservationIgnored private let usageLedgerURL: URL
+    @ObservationIgnored private var activeUsageCategory: UsageCategory = .other
     @ObservationIgnored private let fileTranscriptionHistoryURL: URL
     @ObservationIgnored private var fileTranscriptionSessionsDiscardedByClear = Set<UUID>()
     @ObservationIgnored private var dictationHistorySaveTask: Task<Void, Never>?
@@ -292,17 +306,22 @@ final class AppModel {
     init(dictationHistoryURL: URL = DictationHistoryStore.url,
          fileTranscriptionHistoryURL: URL = FileTranscriptionSessionStore.url) {
         self.dictationHistoryURL = dictationHistoryURL
+        var loadedHistory: [DictationHistoryEntry] = []
         switch DictationHistoryStore.loadState(from: dictationHistoryURL) {
         case .missing:
             dictationHistory = []
         case .loaded(let entries):
             dictationHistory = entries
+            loadedHistory = entries
         case .unreadable(let recoveryCopyURL):
             dictationHistory = []
             dictationHistoryRecoveryCopyURL = recoveryCopyURL
             dictationHistoryArchiveUnreadable = true
             dictationHistoryMessage = Self.archiveRecoveryMessage("Dictation history", copy: recoveryCopyURL)
         }
+        let usageLedgerURL = dictationHistoryURL.deletingLastPathComponent().appending(path: "usage.json")
+        self.usageLedgerURL = usageLedgerURL
+        usageLedger = UsageLedgerStore.load(from: usageLedgerURL) ?? UsageLedger.seeded(from: loadedHistory)
         self.fileTranscriptionHistoryURL = fileTranscriptionHistoryURL
         switch FileTranscriptionSessionStore.loadState(from: fileTranscriptionHistoryURL) {
         case .missing:
@@ -448,7 +467,7 @@ final class AppModel {
                               label: prediction.best?.label ?? "", confidence: prediction.confidence)
         case .settings:
             recorder.logEvent(segment, kind: "segment", label: recorder.prompt, confidence: nil)
-        case .dictation, .transforms, .files, .meetings, .setup, .evaluate, .personalization, .style:
+        case .dictation, .transforms, .files, .meetings, .setup, .evaluate, .personalization, .style, .insights:
             if recorder.isRecording {
                 recorder.logEvent(segment, kind: "segment", label: recorder.prompt, confidence: nil)
             }
@@ -490,6 +509,7 @@ final class AppModel {
         case .meetings: return false
         case .personalization: return false
         case .style: return false
+        case .insights: return false
         case .settings: return false
         case .setup, .evaluate: return false
         }
@@ -1358,6 +1378,7 @@ final class AppModel {
             globalCleansFillers: cleansDictationFillers)
         activeDictationMode = profileSettings.mode
         activeDictationTone = dictationToneSettings.tone(forBundle: targetBundleIdentifier, mode: profileSettings.mode)
+        activeUsageCategory = UsageCategory.category(mode: profileSettings.mode, bundleIdentifier: targetBundleIdentifier)
         activeDictationLanguageIdentifier = profileSettings.languageIdentifier
         activeDictationSnippets = profileSettings.snippets
         activeDictationCorrectionRules = profileSettings.correctionRules
@@ -1470,13 +1491,17 @@ final class AppModel {
         } else {
             retainedAudio.reset()
             let finished = processed.trimmingCharacters(in: .whitespacesAndNewlines)
+            recordUsage(raw: rawText, final: finished)
             if dictationHasTarget {
                 await typeFinishedDictation(finished)
+            } else if finishesWithoutTyping {
+                showsFinishedTranscript = false
             } else if !typeIntoFieldFocusedNow(finished) {
                 showsFinishedTranscript = true
             }
             completedDictationCount += 1
         }
+        finishesWithoutTyping = false
         isFinalizingDictation = false
         captureGate.release(.dictation)
     }
@@ -1544,6 +1569,7 @@ final class AppModel {
             dismissDictationNotice()
             return
         }
+        if dictationNotice?.kind == .cancelled { discardCancelledDictation() }
         guard captureGate.claim(.dictation) else {
             insertion.report("Meeting capture is active. Stop it before retrying dictation.")
             return
@@ -1906,6 +1932,9 @@ final class AppModel {
             return
         }
         lastDictationDuration = recorded
+        cancelledDictationAudio = retainedAudio.snapshot()
+        cancelledDictationSettings = currentRunSettings()
+        cancelledDictation = CancelledDictation(cancelledAt: Date(), duration: recorded, appName: activeDictationTarget)
         dictationNotice = DictationRecovery.cancelled()
         cancelNoticeToken += 1
         let token = cancelNoticeToken
@@ -1914,6 +1943,97 @@ final class AppModel {
             guard let self, token == cancelNoticeToken, dictationNotice?.kind == .cancelled else { return }
             dismissDictationNotice()
         }
+    }
+
+    /// Transcribes the last cancelled recording into History and the home composer. It is not
+    /// typed anywhere: the field it was meant for has long lost focus.
+    func recoverCancelledDictation() async {
+        guard cancelledDictation != nil, !cancelledDictationAudio.isEmpty, let saved = cancelledDictationSettings,
+              !audio.isRunning, !isStartingDictation, !isFinalizingDictation,
+              !transcriber.isRunning, !transcriber.isFinalizing else { return }
+        guard captureGate.claim(.dictation) else {
+            insertion.report("Meeting capture is active. Stop it before recovering a dictation.")
+            return
+        }
+        let recorded = cancelledDictationAudio
+        let duration = cancelledDictation?.duration
+        discardCancelledDictation()
+        if dictationNotice?.kind == .cancelled { dictationNotice = nil }
+        retainedAudio.reset()
+        cancelPendingDictationHistorySave()
+        saveCurrentDictation()
+        lastSavedDictationText = nil
+        currentDictationHistoryEntryID = nil
+        transcriber.clear()
+        rawDictationText = ""
+        didInsertCurrentDictation = false
+        insertion.clearUndoRecord()
+        capturedInsertionTarget = nil
+        capturedPasteTarget = nil
+        capturedInsertionTargetName = nil
+        dictationTargetApp = nil
+        dictationHasTarget = false
+        apply(saved)
+        lastDictationDuration = duration
+        finishesWithoutTyping = true
+        isFinalizingDictation = true
+        let started = await transcriber.transcribe(recorded: recorded, localeIdentifier: activeDictationLanguageIdentifier,
+                                                   contextualStrings: lastDictationContextualStrings)
+        guard started else {
+            finishesWithoutTyping = false
+            isFinalizingDictation = false
+            captureGate.release(.dictation)
+            dictationNotice = DictationRecovery.notice(
+                audioError: nil, transcriberError: transcriber.error ?? "Speech recognition did not start.",
+                transcript: "", hasRetainedAudio: false)
+            return
+        }
+        let rawText = await transcriber.waitForFinalization()
+        await finishDictation(rawText: rawText)
+    }
+
+    private func recordUsage(raw: String, final: String) {
+        guard savesDictationHistory else { return }
+        let words = final.split(whereSeparator: { $0.isWhitespace || $0.isNewline }).count
+        usageLedger.record(words: words, seconds: lastDictationDuration,
+                           wordsCleaned: UsageLedger.wordsCleaned(raw: raw, final: final), category: activeUsageCategory)
+        try? UsageLedgerStore.save(usageLedger, to: usageLedgerURL)
+    }
+
+    /// Clears the Insights totals; History is left alone.
+    func resetUsageInsights() {
+        usageLedger = UsageLedger()
+        try? UsageLedgerStore.save(usageLedger, to: usageLedgerURL)
+    }
+
+    /// Forgets the cancelled recording kept for History.
+    func discardCancelledDictation() {
+        cancelledDictation = nil
+        cancelledDictationAudio = []
+        cancelledDictationSettings = nil
+    }
+
+    private func currentRunSettings() -> DictationRunSettings {
+        DictationRunSettings(mode: activeDictationMode, languageIdentifier: activeDictationLanguageIdentifier,
+                             snippets: activeDictationSnippets, correctionRules: activeDictationCorrectionRules,
+                             cleansFillers: activeDictationCleansFillers, tone: activeDictationTone,
+                             contextualStrings: lastDictationContextualStrings,
+                             profileName: captureDictationProfileName,
+                             writingStylePresetID: captureDictationWritingStylePresetID,
+                             usageCategory: activeUsageCategory)
+    }
+
+    private func apply(_ settings: DictationRunSettings) {
+        activeDictationMode = settings.mode
+        activeDictationLanguageIdentifier = settings.languageIdentifier
+        activeDictationSnippets = settings.snippets
+        activeDictationCorrectionRules = settings.correctionRules
+        activeDictationCleansFillers = settings.cleansFillers
+        activeDictationTone = settings.tone
+        lastDictationContextualStrings = settings.contextualStrings
+        captureDictationProfileName = settings.profileName
+        captureDictationWritingStylePresetID = settings.writingStylePresetID
+        activeUsageCategory = settings.usageCategory
     }
 
     private static func loadToneSettings() -> DictationToneSettings {
