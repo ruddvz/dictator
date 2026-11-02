@@ -136,6 +136,100 @@ final class PersonalDataBackupTests: XCTestCase {
     }
 
     @MainActor
+    func testReplacePersonalBackupPreservesOpenTranscriptAcrossRelaunch() throws {
+        let suffix = UUID().uuidString
+        let directory = FileManager.default.temporaryDirectory
+        let dictationURL = directory.appending(path: "hushkey-backup-replace-draft-\(suffix).json")
+        let filesURL = directory.appending(path: "hushkey-backup-replace-draft-files-\(suffix).json")
+        let saveHistoryBefore = UserDefaults.standard.object(forKey: "saveDictationHistory")
+        defer {
+            try? FileManager.default.removeItem(at: dictationURL)
+            try? FileManager.default.removeItem(at: filesURL)
+            if let saveHistoryBefore { UserDefaults.standard.set(saveHistoryBefore, forKey: "saveDictationHistory") }
+            else { UserDefaults.standard.removeObject(forKey: "saveDictationHistory") }
+        }
+        UserDefaults.standard.set(true, forKey: "saveDictationHistory")
+
+        let importedEntry = DictationHistoryEntry(text: "From the backup.")
+        let backup = HushKeyPersonalDataBackup(dictationHistory: [importedEntry], vocabulary: [],
+                                               snippets: "", correctionRules: "")
+        let model = AppModel(dictationHistoryURL: dictationURL, fileTranscriptionHistoryURL: filesURL)
+        model.transcriber.replaceText("Unsaved open transcript.")
+        XCTAssertTrue(model.stagePersonalDataBackup(try backup.encoded()))
+
+        model.applyPersonalDataBackup(using: .replace)
+
+        XCTAssertNil(model.pendingPersonalDataBackup)
+        XCTAssertEqual(model.dictationHistory.map(\.text), ["Unsaved open transcript.", "From the backup."])
+        XCTAssertEqual(model.lastSavedDictationText, "Unsaved open transcript.")
+        XCTAssertTrue(model.dataMessage?.contains("open transcript was kept in history") == true)
+
+        let relaunchedModel = AppModel(dictationHistoryURL: dictationURL, fileTranscriptionHistoryURL: filesURL)
+        XCTAssertEqual(relaunchedModel.dictationHistory.map(\.text), ["Unsaved open transcript.", "From the backup."])
+    }
+
+    @MainActor
+    func testReplacePersonalBackupKeepsPendingWhenHistoryIsFullAndDraftCannotFit() throws {
+        let suffix = UUID().uuidString
+        let directory = FileManager.default.temporaryDirectory
+        let dictationURL = directory.appending(path: "hushkey-backup-full-\(suffix).json")
+        let filesURL = directory.appending(path: "hushkey-backup-full-files-\(suffix).json")
+        let saveHistoryBefore = UserDefaults.standard.object(forKey: "saveDictationHistory")
+        defer {
+            try? FileManager.default.removeItem(at: dictationURL)
+            try? FileManager.default.removeItem(at: filesURL)
+            if let saveHistoryBefore { UserDefaults.standard.set(saveHistoryBefore, forKey: "saveDictationHistory") }
+            else { UserDefaults.standard.removeObject(forKey: "saveDictationHistory") }
+        }
+        UserDefaults.standard.set(true, forKey: "saveDictationHistory")
+
+        let entries = (0..<HushKeyPersonalDataBackup.maximumHistoryEntries).map {
+            DictationHistoryEntry(text: "Backup transcript \($0).")
+        }
+        let backup = HushKeyPersonalDataBackup(dictationHistory: entries, vocabulary: [],
+                                               snippets: "", correctionRules: "")
+        let model = AppModel(dictationHistoryURL: dictationURL, fileTranscriptionHistoryURL: filesURL)
+        model.transcriber.replaceText("Keep this open draft.")
+        XCTAssertTrue(model.stagePersonalDataBackup(try backup.encoded()))
+
+        model.applyPersonalDataBackup(using: .replace)
+
+        XCTAssertNotNil(model.pendingPersonalDataBackup)
+        XCTAssertTrue(model.dataMessage?.contains("already has 50 dictations") == true)
+        XCTAssertEqual(model.dictationHistory, [])
+        XCTAssertFalse(DictationHistoryStore.containsFile(at: dictationURL))
+    }
+
+    @MainActor
+    func testReplacePersonalBackupDoesNotPersistOpenDraftWhenHistorySavingIsOff() throws {
+        let suffix = UUID().uuidString
+        let directory = FileManager.default.temporaryDirectory
+        let dictationURL = directory.appending(path: "hushkey-backup-private-draft-\(suffix).json")
+        let filesURL = directory.appending(path: "hushkey-backup-private-draft-files-\(suffix).json")
+        let saveHistoryBefore = UserDefaults.standard.object(forKey: "saveDictationHistory")
+        defer {
+            try? FileManager.default.removeItem(at: dictationURL)
+            try? FileManager.default.removeItem(at: filesURL)
+            if let saveHistoryBefore { UserDefaults.standard.set(saveHistoryBefore, forKey: "saveDictationHistory") }
+            else { UserDefaults.standard.removeObject(forKey: "saveDictationHistory") }
+        }
+        UserDefaults.standard.set(false, forKey: "saveDictationHistory")
+
+        let backup = HushKeyPersonalDataBackup(dictationHistory: [DictationHistoryEntry(text: "From backup.")],
+                                               vocabulary: [], snippets: "", correctionRules: "")
+        let model = AppModel(dictationHistoryURL: dictationURL, fileTranscriptionHistoryURL: filesURL)
+        model.transcriber.replaceText("Private open draft.")
+        XCTAssertTrue(model.stagePersonalDataBackup(try backup.encoded()))
+
+        model.applyPersonalDataBackup(using: .replace)
+
+        XCTAssertEqual(model.transcriber.text, "Private open draft.")
+        XCTAssertNil(model.lastSavedDictationText)
+        XCTAssertEqual(model.dictationHistory.map(\.text), ["From backup."])
+        XCTAssertTrue(model.dataMessage?.contains("transcript history is off") == true)
+    }
+
+    @MainActor
     func testAppModelImportsValidatedBackupAndPreservesLocalArchiveBeforeRecovery() throws {
         let suffix = UUID().uuidString
         let directory = FileManager.default.temporaryDirectory

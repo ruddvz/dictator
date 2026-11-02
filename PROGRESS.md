@@ -1,5 +1,13 @@
 # HushKey progress
 
+## Completed — preserve open dictation during backup replacement (2026-11-02)
+
+- Replacing a personal-data backup now keeps the open transcript in local history when transcript saving is enabled, and marks it saved only when it is actually present in the restored archive. With history saving off, the editor stays open and the transcript remains correctly unsaved without changing that privacy setting.
+- If the backup already contains 50 entries and the open transcript is not among them, import remains pending and no archive is changed; the user can clear or save the draft before retrying.
+- Added regression coverage for the draft surviving app-model relaunch and for a full backup refusing replacement without data loss.
+- `xcodebuild ... test`: 135 passed, 2 skipped, 0 failed. Release packaging succeeded and `codesign --verify --deep --strict` passed. Opened the updated `dist/HushKey.app`; it is the only HushKey process.
+- Live text insertion remains unverified until Accessibility is enabled by the user. Next fresh-session engineering item: extend per-app profiles to snippets, corrections, language, cleanup and writing style.
+
 ## Live insertion acceptance — awaiting Accessibility permission (2026-11-02)
 
 - Opened the current packaged app at `~/Projects/HushKey/dist/HushKey.app`. Its setup screen says to allow HushKey in Accessibility settings; text insertion is off. I did not change macOS privacy permissions.

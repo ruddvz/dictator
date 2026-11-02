@@ -600,8 +600,11 @@ final class AppModel {
             return
         }
 
+        let currentText = transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let currentRawText = rawDictationText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedRawText = currentRawText.isEmpty || currentRawText == currentText ? nil : currentRawText
+
         if strategy == .merge, !dictationHistoryArchiveUnreadable, savesDictationHistory {
-            let currentText = transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines)
             if DictationHistorySaveGate.shouldSave(text: currentText, lastSavedText: lastSavedDictationText,
                                                   enabled: true) {
                 cancelPendingDictationHistorySave()
@@ -614,7 +617,33 @@ final class AppModel {
         }
 
         let current = currentPersonalDataBackup()
-        let resolved = pendingPersonalDataBackup.resolved(against: current, using: strategy)
+        var resolved = pendingPersonalDataBackup.resolved(against: current, using: strategy)
+        var preservedActiveEntryID: UUID?
+        if strategy == .replace, savesDictationHistory, !currentText.isEmpty {
+            if let matchingEntry = resolved.dictationHistory.first(where: {
+                $0.text == currentText && $0.rawText == normalizedRawText
+            }) {
+                preservedActiveEntryID = matchingEntry.id
+            } else {
+                guard resolved.dictationHistory.count < HushKeyPersonalDataBackup.maximumHistoryEntries else {
+                    dataMessage = "This backup already has 50 dictations. Save or clear the open transcript before replacing history, then import again."
+                    return
+                }
+                let previousEntry = currentDictationHistoryEntryID.flatMap { id in
+                    dictationHistory.first { $0.id == id }
+                }
+                let candidateID = currentDictationHistoryEntryID.flatMap { id in
+                    resolved.dictationHistory.contains { $0.id == id } ? nil : id
+                } ?? UUID()
+                let entry = DictationHistoryEntry(id: candidateID,
+                                                  createdAt: previousEntry?.createdAt ?? Date(),
+                                                  text: currentText,
+                                                  rawText: normalizedRawText,
+                                                  duration: lastDictationDuration ?? previousEntry?.duration)
+                resolved.dictationHistory.insert(entry, at: 0)
+                preservedActiveEntryID = entry.id
+            }
+        }
         do {
             try resolved.validate()
             let previousStyles = writingStylePresets
@@ -636,10 +665,23 @@ final class AppModel {
             dictationTerms = DictationVocabulary.encode(resolved.vocabulary)
             dictationSnippets = resolved.snippets
             dictationCorrectionRules = resolved.correctionRules
-            currentDictationHistoryEntryID = nil
-            lastSavedDictationText = transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let activeEntry = preservedActiveEntryID.flatMap { id in
+                resolved.dictationHistory.first { $0.id == id && $0.text == currentText }
+            } ?? resolved.dictationHistory.first(where: {
+                !currentText.isEmpty && $0.text == currentText && $0.rawText == normalizedRawText
+            })
+            currentDictationHistoryEntryID = activeEntry?.id
+            lastSavedDictationText = activeEntry?.text
             self.pendingPersonalDataBackup = nil
-            dataMessage = "Personal backup \(strategy == .merge ? "merged" : "restored"): \(resolved.summary) Audio is not included."
+            let transcriptNote: String
+            if !currentText.isEmpty, activeEntry != nil, strategy == .replace {
+                transcriptNote = " The open transcript was kept in history."
+            } else if !currentText.isEmpty, activeEntry == nil {
+                transcriptNote = " The open transcript remains in the editor; transcript history is off, so it is not saved."
+            } else {
+                transcriptNote = ""
+            }
+            dataMessage = "Personal backup \(strategy == .merge ? "merged" : "restored"): \(resolved.summary).\(transcriptNote) Audio is not included."
         } catch {
             dataMessage = "Personal backup could not be applied: \(error.localizedDescription)"
         }
