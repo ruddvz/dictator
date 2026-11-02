@@ -206,7 +206,8 @@ With the user present, verify the packaged app's Dictation and Meeting Notes flo
 - Updated README, product plan, competitor notes, and the local style acceptance checklist.
 - `xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build test`: 44 passed, 0 failed, 0 skipped; the custom-style model test ran successfully on this Mac.
 - Refreshed `dist/HushKey.app`, confirmed the research addendum is bundled, and passed strict code-signature verification. The bundle display name and identifier remain HushKey / `com.ruddvz.hushkey`.
-- The new Transforms UI was not visually checked in Computer Use; microphone, permissions, insertion, and meeting workflows were not exercised.
+- GitHub Actions run 62 passed.
+- Computer Use opened the new `dist/HushKey.app` and exposed its Dictation accessibility state. Navigating to Transforms and trying to quit the older build both hit a native UI-pipe failure. The new Transforms screen remains visually unchecked, and two HushKey processes remain running: the older `.build` copy and the latest `dist` app. Microphone, permissions, insertion, and meeting workflows were not exercised.
 
 ## Next item — manual voice acceptance, then selected-text editing
 
