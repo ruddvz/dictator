@@ -35,7 +35,11 @@ cp "$project_root/NOTICE.md" "$resources/"
 cp "$project_root/LICENSE" "$resources/"
 cp "$project_root/docs/licenses/ARGMAX-MIT-LICENSE.txt" "$resources/"
 cp "$project_root/docs/licenses/ARGMAX-NOTICES.txt" "$resources/"
-codesign --force --deep --sign - --timestamp=none "$staged_app"
+# Ad-hoc signatures default to a cdhash requirement, so macOS treats every build as a new app
+# and asks for microphone, Speech and Accessibility again. Naming the bundle identifier keeps
+# those grants across local builds. Distribution builds should use a real signing identity.
+codesign --force --deep --sign - --timestamp=none \
+  -r='designated => identifier "com.ruddvz.hushkey"' "$staged_app"
 destination="$project_root/dist/HushKey.app"
 if [[ -e "$destination" ]]; then
   backup_dir="$(mktemp -d "$project_root/dist/.HushKey-backup.XXXXXX")"
