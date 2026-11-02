@@ -306,14 +306,17 @@ final class AppModel {
         }
     }
 
-    func deleteFileTranscriptionSession(_ session: FileTranscriptionSession) {
+    @discardableResult
+    func deleteFileTranscriptionSession(_ session: FileTranscriptionSession) -> Bool {
         let updated = FileTranscriptionSessionStore.deleting(id: session.id, from: fileTranscriptionSessions)
         do {
             try FileTranscriptionSessionStore.save(updated, to: fileTranscriptionHistoryURL)
             fileTranscriptionSessions = updated
             if fileTranscriptionHistoryRecoveryCopyURL == nil { fileTranscriptionHistoryMessage = nil }
+            return true
         } catch {
             fileTranscriptionHistoryMessage = "Couldn’t delete this transcript: \(error.localizedDescription)"
+            return false
         }
     }
 
@@ -944,6 +947,11 @@ final class AppModel {
             if remaining.isEmpty { try DictationHistoryStore.delete(at: dictationHistoryURL) }
             else { try DictationHistoryStore.save(remaining, to: dictationHistoryURL) }
             dictationHistory = remaining
+            if currentDictationHistoryEntryID == entry.id {
+                cancelPendingDictationHistorySave()
+                currentDictationHistoryEntryID = nil
+                lastSavedDictationText = transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
             dictationHistoryMessage = nil
         } catch {
             dictationHistoryMessage = "Could not delete this dictation: \(error.localizedDescription)"

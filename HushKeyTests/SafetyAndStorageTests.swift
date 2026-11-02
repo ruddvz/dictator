@@ -631,6 +631,27 @@ final class SafetyAndStorageTests: XCTestCase {
         XCTAssertTrue(FileTranscriptionSessionStore.deleting(id: existing.id, from: updated).isEmpty)
     }
 
+    @MainActor
+    func testFileTranscriptionDeleteFailureKeepsSessionAndReportsFailure() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "hushkey-file-delete-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let historyURL = directory.appending(path: "file-transcripts.json")
+        let dictationURL = directory.appending(path: "dictation-history.json")
+        let session = FileTranscriptionSession(sourceName: "draft.m4a", engine: .apple,
+                                               languageIdentifier: "en-US", text: "Saved transcript.", cues: [])
+        try FileTranscriptionSessionStore.save([session], to: historyURL)
+        let model = AppModel(dictationHistoryURL: dictationURL, fileTranscriptionHistoryURL: historyURL)
+
+        try FileManager.default.removeItem(at: historyURL)
+        try FileManager.default.createDirectory(at: historyURL, withIntermediateDirectories: false)
+
+        XCTAssertFalse(model.deleteFileTranscriptionSession(session))
+        XCTAssertEqual(model.fileTranscriptionSessions, [session])
+        XCTAssertTrue(model.fileTranscriptionHistoryMessage?.lowercased().contains("delete") == true)
+    }
+
     func testFileTranscriptionSessionSwitchSnapshotsEditsAndSkipsTheCurrentRow() throws {
         let activeID = UUID()
         let targetID = UUID()
@@ -746,6 +767,31 @@ final class SafetyAndStorageTests: XCTestCase {
         XCTAssertEqual(model.dictationHistory.first?.createdAt, firstEdit.createdAt)
         XCTAssertEqual(model.dictationHistory.first?.text, "Human-edited words again.")
         XCTAssertEqual(DictationHistoryStore.load(from: url)?.count, 2)
+    }
+
+    @MainActor
+    func testDeletingCurrentDictationCancelsItsPendingAutosave() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appending(path: "hushkey-delete-current-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let model = AppModel(dictationHistoryURL: url)
+        let previousHistorySetting = model.savesDictationHistory
+        model.savesDictationHistory = true
+        defer { model.savesDictationHistory = previousHistorySetting }
+
+        model.editCurrentDictation("Saved transcript.")
+        try await Task.sleep(for: .milliseconds(700))
+        let savedEntry = try XCTUnwrap(model.dictationHistory.first)
+
+        model.editCurrentDictation("An edit pending autosave.")
+        model.deleteDictation(savedEntry)
+
+        XCTAssertEqual(model.transcriber.text, "An edit pending autosave.")
+        XCTAssertTrue(model.dictationHistory.isEmpty)
+        try await Task.sleep(for: .milliseconds(700))
+        XCTAssertTrue(model.dictationHistory.isEmpty)
+        XCTAssertTrue((DictationHistoryStore.load(from: url) ?? []).isEmpty)
     }
 
     func testPersonalVocabularySplitsAndDeduplicatesLocalHints() {

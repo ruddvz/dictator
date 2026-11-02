@@ -380,8 +380,9 @@ struct FileTranscriptionView: View {
     }
 
     private func delete(_ session: FileTranscriptionSession) {
-        if activeSessionID == session.id { activeSessionID = nil }
-        model.deleteFileTranscriptionSession(session)
+        if model.deleteFileTranscriptionSession(session), activeSessionID == session.id {
+            activeSessionID = nil
+        }
     }
 
     private func clearHistory() {

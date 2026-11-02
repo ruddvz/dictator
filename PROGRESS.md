@@ -478,3 +478,11 @@ Same as above, plus: start a dictation with no field focused, click into TextEdi
 - Added regression coverage for backup preservation, overwrite prevention, repeated corruption with different contents, visible recovery state, explicit reset, and successful writes afterward.
 - `xcodebuild ... test`: 98 tests ran, 96 passed, 2 skipped, 0 failed.
 - Live microphone, Accessibility insertion, and device validation remain unverified; use the acceptance checklist above.
+
+## Completed — prevent history deletion from undoing itself (2026-11-02)
+
+- Deleting the active dictation cancels its delayed autosave and prevents the removed entry from returning while preserving the current transcript on screen.
+- File-transcript deletion now reports success or failure. The editor leaves a failed-to-delete session active so later edits continue saving.
+- Added regression tests for both cases. `xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build test`: 118 passed, 2 skipped, 0 failed.
+- Packaged Release app at `~/Projects/HushKey/dist/HushKey.app`; strict code-signature verification passed, and the latest app bundle is open.
+- Live microphone, Speech, Accessibility insertion, meeting capture, and export acceptance still need a user-approved device session. Start that as the next item in a fresh session.
