@@ -50,8 +50,9 @@ struct TransformView: View {
                 PageHeader(
                     eyebrow: "LOCAL WRITING TOOLS",
                     title: "Make it read like you",
-                    subtitle: "Preview a change to your current transcript, then choose whether to use it. Your original recognition remains available to restore.")
+                    subtitle: "Preview a change to your transcript or selected text, then choose whether to use it. Originals stay available until you apply a change.")
 
+                selectedTextEditCard
                 transcriptCard
                 transformPicker
                 if !draft.isEmpty { previewCard }
@@ -92,6 +93,130 @@ struct TransformView: View {
         .onChange(of: currentText) { oldText, newText in
             guard oldText != newText else { return }
             invalidatePreviewForTranscriptChange()
+        }
+    }
+
+    private var selectedTextEditCard: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 12) {
+                if model.selectedTextEditOriginal.isEmpty {
+                    Text("Select text in another app, then hold \(model.selectedTextEditShortcut.label) and say what you want changed. The selected text stays on this Mac and is only read for that shortcut.")
+                        .font(.subheadline)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if !model.insertion.isEnabled {
+                        Button("Enable safe text access…") { model.screen = .settings }
+                            .buttonStyle(.link)
+                    }
+                } else {
+                    HStack {
+                        Label("Selection from \(model.selectedTextEditTargetName ?? "another app")", systemImage: "text.cursor")
+                            .font(.subheadline.weight(.semibold))
+                        Spacer()
+                        Button(model.selectedTextEditApplied ? "Done" : "Discard", systemImage: "xmark") {
+                            model.clearSelectedTextEdit()
+                        }
+                            .disabled(model.isSelectedTextEditCapturing || model.isFinalizingSelectedTextEdit || model.isApplyingSelectedTextEdit)
+                    }
+
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("Original selection").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                        Text(model.selectedTextEditOriginal)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(10)
+                            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+                    }
+
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(model.isSelectedTextEditCapturing ? "Live edit instruction" : "Edit instruction")
+                            .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                        if model.isSelectedTextEditCapturing {
+                            Text(model.selectedTextEditLiveInstruction.isEmpty
+                                 ? "Listening…"
+                                 : model.selectedTextEditLiveInstruction)
+                                .frame(maxWidth: .infinity, minHeight: 54, alignment: .topLeading)
+                                .padding(10)
+                                .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+                        } else {
+                            TextEditor(text: Binding(
+                                get: { model.selectedTextEditInstruction },
+                                set: { model.updateSelectedTextEditInstruction($0) }))
+                                .font(.body)
+                                .frame(minHeight: 75, maxHeight: 120)
+                                .disabled(model.isFinalizingSelectedTextEdit || model.isGeneratingSelectedTextEdit || model.isApplyingSelectedTextEdit)
+                                .padding(4)
+                                .background(.background, in: RoundedRectangle(cornerRadius: 8))
+                        }
+                    }
+
+                    HStack(spacing: 10) {
+                        Button {
+                            Task { await model.previewSelectedTextEdit() }
+                        } label: {
+                            Label(model.isGeneratingSelectedTextEdit ? "Creating preview…" : "Preview edit",
+                                  systemImage: model.isGeneratingSelectedTextEdit ? "hourglass" : "sparkles")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(!model.canPreviewSelectedTextEdit)
+
+                        if !model.selectedTextEditDraft.isEmpty {
+                            if model.selectedTextEditApplied {
+                                Label("Applied once · undo with ⌥⇧U in the target field", systemImage: "checkmark.circle")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Button("Apply to \(model.selectedTextEditTargetName ?? "original app")",
+                                       systemImage: "text.insert") {
+                                    Task { await model.applySelectedTextEdit() }
+                                }
+                                .buttonStyle(.bordered)
+                                .disabled(!model.canApplySelectedTextEdit)
+                            }
+                        }
+                    }
+
+                    if !model.selectedTextEditDraft.isEmpty {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text("Preview · review before applying").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                            TextEditor(text: Binding(
+                                get: { model.selectedTextEditDraft },
+                                set: { model.updateSelectedTextEditDraft($0) }))
+                                .font(.body)
+                                .frame(minHeight: 90, maxHeight: 180)
+                                .disabled(model.isApplyingSelectedTextEdit || model.selectedTextEditApplied)
+                                .padding(4)
+                                .background(.background, in: RoundedRectangle(cornerRadius: 8))
+                        }
+                    }
+
+                    if let status = model.selectedTextEditStatus {
+                        Label(status, systemImage: model.selectedTextEditApplied ? "checkmark.circle" : "info.circle")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                if !model.localTransformService.modelIsAvailable {
+                    Label(model.localTransformService.availabilityMessage, systemImage: "info.circle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Text(model.selectedTextEditShortcutStatus)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Label("Requires Accessibility insertion to be enabled. HushKey uses the selected text and your spoken instruction for an on-device preview; neither is added to dictation history or sent to a server. Apply rechecks the original app, field, text, and selection.",
+                      systemImage: "lock.shield")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(10)
+        } label: {
+            Label("Voice edit selected text", systemImage: "text.cursor")
         }
     }
 

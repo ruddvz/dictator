@@ -42,7 +42,8 @@ struct DictationView: View {
                         }
                     }
                     .pickerStyle(.menu)
-                    .disabled(model.audio.isRunning || model.isFinalizingDictation || model.transcriber.isFinalizing)
+                    .disabled(model.audio.isRunning || model.isFinalizingDictation || model.transcriber.isFinalizing ||
+                              model.isSelectedTextEditCapturing || model.isFinalizingSelectedTextEdit)
                     Spacer()
                 }
                 Text(model.dictationMode == .automatic
@@ -64,10 +65,19 @@ struct DictationView: View {
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(model.audio.isRunning ? Color.red : Color.accentColor)
                     VStack(alignment: .leading, spacing: 5) {
-                        Text(model.isFinalizingDictation ? "Finishing transcription" :
+                        Text(model.isFinalizingSelectedTextEdit ? "Finishing voice edit" :
+                             model.isStartingSelectedTextEdit ? "Starting voice edit" :
+                             model.isSelectedTextEditCapturing ? "Voice edit listening" :
+                             model.isFinalizingDictation ? "Finishing transcription" :
                              model.audio.isRunning ? "Listening" : "Ready when you are")
                             .font(.title3.weight(.semibold))
-                        Text(model.isFinalizingDictation
+                        Text(model.isFinalizingSelectedTextEdit
+                             ? "The spoken edit instruction is being finalized locally and will not be saved to dictation history."
+                             : model.isStartingSelectedTextEdit
+                             ? "HushKey is preparing on-device capture for the selected text. Choose Cancel if you changed your mind."
+                             : model.isSelectedTextEditCapturing
+                             ? "Your edit instruction is recognized on this Mac. Release \(model.selectedTextEditShortcut.label) or choose Stop voice edit."
+                             : model.isFinalizingDictation
                              ? "HushKey is collecting the final on-device recognition result."
                              : model.audio.isRunning
                              ? "Your speech is being recognized locally. Select Stop when you’re done."
@@ -89,16 +99,20 @@ struct DictationView: View {
                     Button {
                         Task { await model.toggleDictation() }
                     } label: {
-                        Label(model.isFinalizingDictation ? "Finishing…" :
+                        Label(model.isFinalizingSelectedTextEdit ? "Finishing…" :
+                              model.isStartingSelectedTextEdit ? "Cancel voice edit start" :
+                              model.isSelectedTextEditCapturing ? "Stop voice edit" :
+                              model.isFinalizingDictation ? "Finishing…" :
                               model.audio.isRunning ? "Stop dictation" : "Start dictation",
-                              systemImage: model.isFinalizingDictation ? "hourglass" :
+                              systemImage: model.isFinalizingSelectedTextEdit || model.isFinalizingDictation ? "hourglass" :
                                   model.audio.isRunning ? "stop.fill" : "mic.fill")
                             .frame(minWidth: 150)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(model.audio.isRunning ? .red : .accentColor)
                     .controlSize(.large)
-                    .disabled(model.isFinalizingDictation || model.transcriber.isFinalizing)
+                    .disabled(model.isFinalizingDictation || model.transcriber.isFinalizing ||
+                              model.isFinalizingSelectedTextEdit)
 
                     if model.audio.isRunning {
                         Text(model.audio.activeDeviceName ?? "Default microphone")

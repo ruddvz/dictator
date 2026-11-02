@@ -127,6 +127,17 @@ private struct DictationSettingsCard: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
+                Picker("Voice edit selected text", selection: $model.selectedTextEditShortcut) {
+                    ForEach(SelectedTextEditShortcut.allCases) { Text($0.label).tag($0) }
+                }
+                .frame(maxWidth: 280, alignment: .leading)
+                Text("Select text in another app, then hold this shortcut and speak an edit instruction. The selected text is read only for that action. Review the local preview in Transforms before applying. Requires Accessibility insertion to be enabled below.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(model.selectedTextEditShortcutStatus)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                 Button {
                     model.screen = .personalization
                 } label: {

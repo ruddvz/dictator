@@ -225,6 +225,20 @@ In a fresh session, follow the non-AirPods voice acceptance checks in docs/TESTI
 
 Validate named-target insertion, stale-target rejection, global shortcut insertion, and undo in TextEdit and a second app. Microphone, file-model, and meeting capture acceptance remain open.
 
+## Completed — selected-text voice-edit implementation
+
+- Added a dedicated hold shortcut for editing selected text in another app (`⌥⇧E` by default; `⌃⇧E` is the alternate). HushKey snapshots a supported non-secure selection, captures an on-device spoken instruction, and keeps that instruction out of dictation history.
+- Added a Transform screen card with the source selection, editable instruction, local preview, explicit Apply, clear status, and discard/done controls. Apply rechecks the exact app, focused field, text, and selection; stale or secure targets fail closed. One successful replacement can be undone with `⌥⇧U` while the target stays unchanged.
+- Kept selection and instruction in memory only. The voice-edit path is separate from normal dictation and requires the user to enable Accessibility insertion. It uses Apple's on-device Foundation Model for preview and has no cloud fallback.
+- Added UTF-16 selection boundary and prompt-separation unit coverage. Latest test run: `47 passed, 0 failed, 0 skipped` on the MacBook Pro.
+- `bash scripts/package-app.sh` succeeded. `dist/HushKey.app` passed `codesign --verify --deep --strict`; its display name is `HushKey` and bundle identifier is `com.ruddvz.hushkey`.
+- Live capture/insertion in TextEdit and a second app is still unverified. Computer Use's native UI pipe failed, so the updated Transforms flow was not visually inspected and a running app process may need a relaunch to load the new package.
+- Updated README, testing protocol, product plan, and competitor roadmap to mark the implementation and keep live acceptance as the next step.
+
+## Next item — live selected-text acceptance
+
+In a fresh session, use the packaged app to test the selected-text shortcut, local instruction capture, preview invalidation, Apply once, undo, stale-target rejection, unsupported/secure controls, and permission refusal in TextEdit and one other app. Record actual results in `docs/TESTING_PROTOCOL.md`; then proceed with voice dictation and remaining file/meeting acceptance.
+
 ## Completed — local dictation eval harness
 
 - Added a StarHarness-style eval with separate `dev` and `holdout` splits under [Fixtures/eval](Fixtures/eval/README.md). StarHarness itself was not run, and no remote model or service is used.

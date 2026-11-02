@@ -18,6 +18,9 @@ struct HushKeyApp: App {
             let meetingBusy = model.meetingNotes.isStarting || model.meetingNotes.isFinalizing
             Button(model.meetingNotes.isCapturing ? "Stop meeting capture" :
                    meetingBusy ? "Meeting capture…" :
+                   model.isFinalizingSelectedTextEdit ? "Finishing voice edit…" :
+                   model.isSelectedTextEditCapturing ? "Stop voice edit" :
+                   model.isStartingSelectedTextEdit ? "Cancel voice edit start" :
                    model.audio.isRunning ? "Stop dictation" : "Start dictation") {
                 if model.meetingNotes.isCapturing {
                     model.meetingNotes.stop()
