@@ -238,13 +238,23 @@ enum DictationTranscriptProcessor {
     static func process(_ raw: String, mode: DictationMode, snippets: String,
                         applyCorrections: Bool = true, cleanupFillers: Bool = false,
                         correctionRules: String = "") -> String {
-        var result = applyCorrections ? DictationBacktrack.apply(to: raw) : raw
-        result = DictationCorrectionRules.apply(to: result, rules: correctionRules)
-        if cleanupFillers { result = DictationLocalCleanup.removeFillers(from: result) }
-        if mode == .code { result = DictationCodeFormatter.format(result) }
-        else { result = DictationModeFormatter.format(result, mode: mode) }
-        return DictationSnippetExpander.expand(result, definitions: snippets)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let source = applyCorrections ? DictationBacktrack.apply(to: raw) : raw
+        let corrected = DictationSnippetExpander.expandSegments(source, definitions: correctionRules)
+        let formatted = corrected.flatMap { segment -> [DictationTextSegment] in
+            guard !segment.isProtected else { return [segment] }
+            let leading = segment.text.prefix(while: \.isWhitespace)
+            let remainder = segment.text.dropFirst(leading.count)
+            let trailing = remainder.reversed().prefix(while: \.isWhitespace).reversed()
+            var text = String(remainder.dropLast(trailing.count))
+            if cleanupFillers { text = DictationLocalCleanup.removeFillers(from: text) }
+            if mode == .code { text = DictationCodeFormatter.format(text) }
+            else { text = DictationModeFormatter.format(text, mode: mode) }
+            let leadingWhitespace = text.hasPrefix("\n") ? "" : String(leading)
+            let trailingWhitespace = text.hasSuffix("\n") ? "" : String(trailing)
+            let preservedWhitespace = leadingWhitespace + text + trailingWhitespace
+            return DictationSnippetExpander.expandSegments(preservedWhitespace, definitions: snippets)
+        }
+        return formatted.map(\.text).joined().trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 
@@ -275,6 +285,14 @@ enum DictationLocalCleanup {
 }
 
 enum DictationSnippetExpander {
+    private struct Match {
+        let range: NSRange
+        let cueLength: Int
+        let definitionIndex: Int
+        let replacement: String
+        let punctuation: String
+    }
+
     static func validation(for definitions: String) -> (validCount: Int, invalidLines: [Int]) {
         var validCount = 0
         var invalidLines: [Int] = []
@@ -298,7 +316,11 @@ enum DictationSnippetExpander {
 
     /// Lines use `spoken cue => expanded text`; only complete word or phrase matches expand.
     static func expand(_ text: String, definitions: String) -> String {
-        var result = text
+        expandSegments(text, definitions: definitions).map(\.text).joined()
+    }
+
+    /// Replacement text is protected so later rules or formatting never reinterpret what the user inserted.
+    static func expandSegments(_ text: String, definitions: String) -> [DictationTextSegment] {
         let snippets = definitions
             .split(whereSeparator: \.isNewline)
             .compactMap { line -> (String, String)? in
@@ -314,32 +336,68 @@ enum DictationSnippetExpander {
                 }
                 if !alreadyPresent { unique.append(snippet) }
             }
-            .sorted { $0.0.count > $1.0.count }
-
-        for (cue, replacement) in snippets {
+        let source = text as NSString
+        let fullRange = NSRange(location: 0, length: source.length)
+        var matches: [Match] = []
+        for (definitionIndex, (cue, replacement)) in snippets.enumerated() {
             guard let expression = try? NSRegularExpression(
                 pattern: boundaryPattern(for: cue) + "([,.;:!?])?",
                 options: [.caseInsensitive]) else { continue }
-            let range = NSRange(result.startIndex..., in: result)
-            for match in expression.matches(in: result, range: range).reversed() {
-                guard let whole = Range(match.range, in: result) else { continue }
-                let hasFollowingPunctuation = match.range(at: 1).location != NSNotFound && match.range(at: 1).length > 0
-                let punctuation = hasFollowingPunctuation
-                    ? String(result[Range(match.range(at: 1), in: result)!])
-                    : ""
-                var expanded = replacement
-                if hasFollowingPunctuation, let last = expanded.last, ".!?".contains(last) {
-                    expanded.removeLast()
-                }
-                result.replaceSubrange(whole, with: expanded + punctuation)
+            for match in expression.matches(in: text, range: fullRange) {
+                let punctuationRange = match.range(at: 1)
+                let punctuation = punctuationRange.location == NSNotFound || punctuationRange.length == 0
+                    ? ""
+                    : source.substring(with: punctuationRange)
+                matches.append(Match(range: match.range,
+                                     cueLength: match.range.length - punctuationRange.length,
+                                     definitionIndex: definitionIndex,
+                                     replacement: replacement,
+                                     punctuation: punctuation))
             }
         }
-        return result
+
+        matches.sort {
+            if $0.range.location != $1.range.location { return $0.range.location < $1.range.location }
+            if $0.cueLength != $1.cueLength { return $0.cueLength > $1.cueLength }
+            return $0.definitionIndex < $1.definitionIndex
+        }
+        var selected: [Match] = []
+        var consumedUntil = 0
+        for match in matches where match.range.location >= consumedUntil {
+            selected.append(match)
+            consumedUntil = NSMaxRange(match.range)
+        }
+        guard !selected.isEmpty else { return [DictationTextSegment(text: text, isProtected: false)] }
+
+        var segments: [DictationTextSegment] = []
+        var cursor = 0
+        for match in selected {
+            if match.range.location > cursor {
+                segments.append(DictationTextSegment(
+                    text: source.substring(with: NSRange(location: cursor, length: match.range.location - cursor)),
+                    isProtected: false))
+            }
+            var replacement = match.replacement
+            if !match.punctuation.isEmpty, let last = replacement.last, ".!?".contains(last) {
+                replacement.removeLast()
+            }
+            segments.append(DictationTextSegment(text: replacement + match.punctuation, isProtected: true))
+            cursor = NSMaxRange(match.range)
+        }
+        if cursor < source.length {
+            segments.append(DictationTextSegment(text: source.substring(from: cursor), isProtected: false))
+        }
+        return segments
     }
 
     private static func boundaryPattern(for cue: String) -> String {
         "(?<![\\p{L}\\p{N}_])" + NSRegularExpression.escapedPattern(for: cue) + "(?![\\p{L}\\p{N}_])"
     }
+}
+
+struct DictationTextSegment {
+    let text: String
+    let isProtected: Bool
 }
 
 enum DictationVocabulary {

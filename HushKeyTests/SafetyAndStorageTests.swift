@@ -411,6 +411,28 @@ final class SafetyAndStorageTests: XCTestCase {
         XCTAssertEqual(validation.invalidLines, [2, 3])
     }
 
+    func testCustomReplacementTextIsNotExpandedOrFormattedAgain() {
+        XCTAssertEqual(DictationSnippetExpander.expand(
+            "email", definitions: "email => name@example.com\nname => Rudra"), "name@example.com")
+        XCTAssertEqual(DictationCorrectionRules.apply(
+            to: "email", rules: "email => name@example.com\nname => Rudra"), "name@example.com")
+        XCTAssertEqual(DictationTranscriptProcessor.process(
+            "email", mode: .natural, snippets: "name => Rudra", applyCorrections: false,
+            correctionRules: "email => name@example.com"), "name@example.com")
+        XCTAssertEqual(DictationTranscriptProcessor.process(
+            "shortcut", mode: .message, snippets: "", applyCorrections: false,
+            correctionRules: "shortcut => new line"), "new line")
+        XCTAssertEqual(DictationTranscriptProcessor.process(
+            "Please um email now", mode: .natural, snippets: "", applyCorrections: false,
+            cleanupFillers: true, correctionRules: "email => name@example.com"),
+            "Please name@example.com now")
+    }
+
+    func testOverlappingCustomCuesPreferTheLongestMatchAtTheSamePosition() {
+        XCTAssertEqual(DictationSnippetExpander.expand(
+            "New York, new!", definitions: "new => short\nnew york => Big Apple"), "Big Apple, short!")
+    }
+
     func testSpokenCorrectionsReplaceThePreviousPhraseAndKeepRawInputSeparate() {
         XCTAssertEqual(DictationBacktrack.apply(to: "Send it to Alice, actually Bob."), "Send it to Bob.")
         XCTAssertEqual(DictationBacktrack.apply(to: "Use the old route, scratch that, new route."), "Use the new route.")

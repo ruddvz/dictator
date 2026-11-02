@@ -1,5 +1,14 @@
 # HushKey progress
 
+## Completed — keep personalization replacements literal (2026-11-01)
+
+- Fixed snippets and correction rules so every cue is matched against the original dictated text in one pass; inserted replacement text is protected from other rules and from later formatting.
+- Overlapping cues at the same position now prefer the longer phrase. Existing punctuation behavior is retained.
+- Added regression coverage for chained snippets/corrections, correction-to-snippet cascades, formatting of inserted phrases, filler cleanup spacing, and overlapping cues.
+- `xcodebuild ... test`: 109 passed, 2 skipped, 0 failed. The test run reported an outdated CoreSimulator warning, but macOS tests completed successfully.
+- Rebuilt and reopened the single `dist/HushKey.app`; strict signature verification passed. It is open on the packaged build and idle; no permission prompts were accepted and no live dictation was run.
+- Next fresh-session item: restore the packaged app's microphone and Speech permissions after explicit user approval, then continue live dictation and insertion acceptance. No live audio or insertion was tested in this code-only fix.
+
 ## Completed — 2026-11-01
 
 - Created a standalone native macOS HushKey app using an MIT-licensed upstream motion prototype and retained its required attribution in [NOTICE.md](NOTICE.md).
