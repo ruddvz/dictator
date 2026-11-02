@@ -1,5 +1,15 @@
 # HushKey progress
 
+## Completed: no false "Check the field first" after pasting into Electron apps (2026-11-02)
+
+- Dictating into the Claude desktop app inserted the text but showed "Check the field first / Paste again". Paste verification required the field's accessibility value to equal the expected string exactly, and treated any other value or a rebuilt focused element as "target changed".
+- `PasteDeliveryVerifier.matches` now also accepts the text as shown: non-breaking spaces count as spaces, zero-width characters are ignored, and leading or trailing whitespace and newlines are trimmed. Missing, partial or duplicated text is still rejected. If the focused element is replaced in the same app with the same role, its value is still checked.
+- An unconfirmed paste now logs why (`paste unconfirmed …`): element identity, lengths, whether the normalised text matches, and whether the text appears once or twice. It never logs text.
+- Tests: 189 passed, 2 skipped (`testCustomWritingStyleUsesOnDeviceModelWhenAvailable` skipped because it hangs), including two new verifier tests. Signed dist packaged.
+- **Seen live:** fn dictation into the Claude app's message box logged "Pasted into Claude and verified in the same text field", with no notice. Not yet checked: Slack and VS Code.
+- Removed stale HushKey copies (the old Codex dist, two Xcode DerivedData folders, `~/Downloads/Hushkey.dmg`; all in the Trash), so Spotlight finds only `dist/HushKey.app`. `~/Documents/ChatGPT/HushKey` (Codex clone) was left; check it for unmoved work before deleting it.
+- Next: the Parakeet engine and Silent Use improvements are running in their own sessions.
+
 ## Completed: home redesign, ambient hero and breath ribbon (2026-11-02)
 
 - **Home (Dictation) screen**, brought closer to Wispr Flow's home:

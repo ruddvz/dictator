@@ -166,6 +166,28 @@ final class SafetyAndStorageTests: XCTestCase {
         XCTAssertEqual(observations.count, 1)
     }
 
+    @MainActor
+    func testPasteDeliveryAcceptsHowChromiumEditorsReportText() async {
+        // Claude and Slack report a typed space as a non-breaking space and add a newline for
+        // the empty paragraph, so the exact string never matches.
+        var observations: [PasteDeliveryVerifier.Observation] = [
+            .fieldValue("\n"), .fieldValue("Hello\u{00A0}world\n")
+        ]
+        let result = await PasteDeliveryVerifier.waitForConfirmation(
+            originalValue: "", expectedValue: "Hello world", maximumChecks: 5,
+            interval: .nanoseconds(1)) {
+                observations.removeFirst()
+            }
+        XCTAssertEqual(result, .confirmed)
+    }
+
+    @MainActor
+    func testPasteMatchingStillRejectsMissingOrDuplicatedText() {
+        XCTAssertFalse(PasteDeliveryVerifier.matches("Hello wor", "Hello world"))
+        XCTAssertFalse(PasteDeliveryVerifier.matches("Hello world world", "Hello world"))
+        XCTAssertFalse(PasteDeliveryVerifier.matches("Helloworld", "Hello world"))
+    }
+
     func testSelectedTextCaptureUsesUTF16RangesAndRejectsEmptyOrInvalidSelections() {
         XCTAssertEqual(TextInsertionService.selectedText(in: "A🧡BCD", range: CFRange(location: 3, length: 2)), "BC")
         XCTAssertNil(TextInsertionService.selectedText(in: "A🧡BCD", range: CFRange(location: 3, length: 0)))

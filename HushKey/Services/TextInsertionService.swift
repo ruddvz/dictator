@@ -427,6 +427,7 @@ final class TextInsertionService {
         }
         let restored = saved.restore(to: pasteboard, ifChangeCountIs: ours)
         guard verification == .confirmed else {
+            logPasteMismatch(verification, target: target, expectedValue: expectedValue, insertedText: text, in: app)
             undoRecord = nil
             let clipboard = restored ? "Your clipboard was put back." : "The clipboard changed meanwhile, so it was left as is."
             status = verification == .targetChanged
@@ -487,9 +488,43 @@ final class TextInsertionService {
 
     private func pasteObservation(target: PasteTarget, in app: NSRunningApplication)
         -> PasteDeliveryVerifier.Observation {
-        guard !app.isTerminated, app.processIdentifier == target.processIdentifier,
-              let value = validatedPasteTargetValue(target, in: app) else { return .targetChanged }
+        guard !app.isTerminated, app.processIdentifier == target.processIdentifier else { return .targetChanged }
+        if let value = validatedPasteTargetValue(target, in: app) { return .fieldValue(value) }
+        // Electron editors (Claude, Slack) can rebuild the focused element when a paste lands.
+        // A replacement in the same app with the same role still counts as the field; its value
+        // must then match the expected text before the paste is confirmed.
+        guard let value = replacementFieldValue(target, in: app) else { return .targetChanged }
         return .fieldValue(value)
+    }
+
+    private func replacementFieldValue(_ target: PasteTarget, in app: NSRunningApplication) -> String? {
+        var pid: pid_t = 0
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier,
+              let current = focusedElement(),
+              AXUIElementGetPid(current, &pid) == .success, pid == target.processIdentifier,
+              stringAttribute(kAXRoleAttribute, of: current) == target.role else { return nil }
+        return stringAttribute(kAXValueAttribute, of: current)
+    }
+
+    /// Says why a paste could not be confirmed, so a field that reports its text differently can be
+    /// diagnosed. Logs only lengths and flags, never text.
+    private func logPasteMismatch(_ result: PasteDeliveryVerifier.Result, target: PasteTarget,
+                                  expectedValue: String, insertedText: String, in app: NSRunningApplication) {
+        let sameElement = validatedPasteTargetValue(target, in: app) != nil
+        let observed = validatedPasteTargetValue(target, in: app) ?? replacementFieldValue(target, in: app)
+        var line = "paste unconfirmed result=\(result) app=\(target.bundleIdentifier ?? "none") sameElement=\(sameElement)"
+        line += " original=\(target.fieldValue.utf16.count) expected=\(expectedValue.utf16.count)"
+        if let observed {
+            let inserted = PasteDeliveryVerifier.normalized(insertedText)
+            line += " observed=\(observed.utf16.count)"
+            line += " normalizedMatch=\(PasteDeliveryVerifier.matches(observed, expectedValue))"
+            line += " containsInsertedOnce=\(observed.components(separatedBy: inserted).count == 2)"
+            line += " containsInsertedTwice=\(observed.components(separatedBy: inserted).count > 2)"
+            line += " nbsp=\(observed.filter { $0 == "\u{00A0}" }.count) newlines=\(observed.filter(\.isNewline).count)"
+        } else {
+            line += " observed=none"
+        }
+        log.notice("\(line, privacy: .public)")
     }
 
     @discardableResult
@@ -789,9 +824,9 @@ enum PasteDeliveryVerifier {
         guard maximumChecks > 0 else { return .timedOut }
         for check in 0..<maximumChecks {
             switch observe() {
-            case .fieldValue(let value) where value == expectedValue:
+            case .fieldValue(let value) where matches(value, expectedValue):
                 return .confirmed
-            case .fieldValue(let value) where value == originalValue:
+            case .fieldValue(let value) where matches(value, originalValue):
                 break
             case .fieldValue:
                 return .targetChanged
@@ -806,5 +841,21 @@ enum PasteDeliveryVerifier {
             }
         }
         return .timedOut
+    }
+
+    /// Whether a field shows the same text, as a reader would see it. Chromium editors report a
+    /// typed space as a non-breaking space, add a newline for an empty paragraph, and may carry
+    /// zero-width characters, none of which the pasted text contains.
+    static func matches(_ observed: String, _ expected: String) -> Bool {
+        observed == expected || normalized(observed) == normalized(expected)
+    }
+
+    static func normalized(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "\u{00A0}", with: " ")
+            .replacingOccurrences(of: "\u{200B}", with: "")
+            .replacingOccurrences(of: "\u{FEFF}", with: "")
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
