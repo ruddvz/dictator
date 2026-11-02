@@ -50,6 +50,15 @@ final class CaptureController {
         finish()
     }
 
+    /// Drops a held capture without emitting it, for a key hold that turned out to be a shortcut.
+    func cancel() {
+        guard isCapturing, isManual else { return }
+        buffer = []
+        isCapturing = false
+        isManual = false
+        quietSince = nil
+    }
+
     func calibrate() {
         calibration = []
         calibrationEnd = nil

@@ -8,7 +8,7 @@ struct UseView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.s5) {
                 PageHeader(eyebrow: "", title: "Silent Use",
-                           subtitle: "Mouth a trained word. Unsure matches are shown faded, never typed.") {
+                           subtitle: "Hold Control in any app and mouth a trained word. Unsure matches are shown faded, never typed.") {
                     if model.insertion.isEnabled {
                         StatusChip(title: "Types with \(model.insertion.shortcut.label)", systemImage: "checkmark.shield",
                                    tint: Theme.signal)
@@ -48,14 +48,16 @@ struct UseView: View {
         if model.motion.status != .streaming {
             return "Connect your AirPods first, on the Connect step."
         }
-        if model.trainingCondition != .silent {
-            return "Evaluation is set to \(model.trainingCondition.rawValue). Silent mouthing needs its own passing evidence."
-        }
         if !meetsTemplateProtocol {
             return "Record 10 silent takes for each of 5 words."
         }
-        guard let result = model.evaluation else {
-            return "Run Evaluate. It must beat chance and held-out sessions."
+        guard let result = model.silentEvidence else {
+            return model.isCheckingSilentEvidence
+                ? "Checking your silent takes…"
+                : "Run Evaluate. It must beat chance and held-out sessions."
+        }
+        if result.sessionHoldoutAccuracy == nil {
+            return "Record takes in a second session (Train → New session) so one can be held out."
         }
         if result.pValue >= 0.05 {
             return "The result isn’t clear of chance yet. HushKey won’t guess."
@@ -84,7 +86,7 @@ struct UseView: View {
         @Bindable var capture = model.capture
         return SettingsGroup(title: "Capture") {
             SettingsRow(title: "Capture mode",
-                        detail: model.useCaptureMode == .hold ? "Hold the shortcut while you mouth a word."
+                        detail: model.useCaptureMode == .hold ? "Hold Control, or \(model.captureShortcut.label) here, while you mouth a word."
                             : "Starts on its own when you move.") {
                 MenuPicker(selection: $model.useCaptureMode,
                            options: CaptureController.Mode.allCases.map { ($0, $0.rawValue) }, width: 150)
@@ -94,7 +96,7 @@ struct UseView: View {
                 if model.useCaptureMode == .hold {
                     HoldToCaptureButton(
                         title: "Mouth a word",
-                        shortcut: model.captureShortcut.label,
+                        shortcut: "Control",
                         isCapturing: capture.isCapturing,
                         isEnabled: model.isMotionInferenceEnabled && model.motion.status == .streaming,
                         onBegin: capture.begin,
@@ -106,6 +108,13 @@ struct UseView: View {
                         .font(.hkCallout)
                         .foregroundStyle(Theme.ink2)
                 }
+            }
+            SettingsRow(title: "Type into the front app",
+                        detail: "Accepted words go straight into the field you’re in. Rejected ones never do.") {
+                Toggle("", isOn: $model.silentTypesIntoFrontApp)
+                    .toggleStyle(.switch)
+                    .labelsHidden()
+                    .tint(Theme.signal)
             }
             SettingsRow(title: "Maximum distance", detail: "Lower is stricter.") {
                 HStack(spacing: Theme.s2) {
@@ -213,6 +222,11 @@ struct UseView: View {
                                 prediction.accepted ? "accepted" : "rejected"))
                         .font(.hkCaption)
                         .foregroundStyle(Theme.ink2)
+                    if let issue = model.lastTakeIssue {
+                        Label(issue.message, systemImage: "exclamationmark.triangle")
+                            .font(.hkCaption)
+                            .foregroundStyle(Theme.finishing)
+                    }
                     SignalPlot(title: "Rotation rate", samples: model.lastSegment,
                                channels: SignalPlot.rotation, minScale: 0.05, height: 60)
                 } else {

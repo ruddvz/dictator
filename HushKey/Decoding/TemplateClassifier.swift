@@ -33,25 +33,32 @@ struct Prediction: Hashable, Sendable {
 /// Deliberately simple — the question this prototype answers is whether the signal is
 /// there at all, not how far a big model can push it.
 struct TemplateClassifier: Sendable {
+    /// Takes of this word (still, mouth closed) teach the classifier what to ignore. A match is never typed.
+    static let restLabel = "nothing"
+
     let featureSet: FeatureSet
+    let smoothing: Int
     private let entries: [(label: String, frames: [[Double]])]
     private let scales: [Double]
 
     var labels: [String] { Array(Set(entries.map(\.label))).sorted() }
 
-    init?(templates: [Template], featureSet: FeatureSet) {
+    init?(templates: [Template], featureSet: FeatureSet, smoothing: Int = MotionFeatures.defaultSmoothing) {
         guard !featureSet.isEmpty else { return nil }
-        let raw = templates.map { MotionFeatures.frames(MotionFeatures.trim($0.samples), set: featureSet) }
+        let raw = templates.map {
+            MotionFeatures.frames(MotionFeatures.trim($0.samples), set: featureSet, smoothing: smoothing)
+        }
         guard Set(templates.map(\.label)).count >= 2 else { return nil }
         let scales = MotionFeatures.channelScales(raw)
         self.featureSet = featureSet
+        self.smoothing = smoothing
         self.scales = scales
         self.entries = zip(templates, raw).map { ($0.label, MotionFeatures.scaled($1, by: scales)) }
     }
 
     func rank(_ samples: [MotionSample]) -> [RankedLabel] {
         let query = MotionFeatures.scaled(
-            MotionFeatures.frames(MotionFeatures.trim(samples), set: featureSet), by: scales)
+            MotionFeatures.frames(MotionFeatures.trim(samples), set: featureSet, smoothing: smoothing), by: scales)
         var best: [String: Double] = [:]
         for entry in entries {
             let d = DTW.distance(query, entry.frames)
@@ -64,6 +71,7 @@ struct TemplateClassifier: Sendable {
         let ranked = rank(samples)
         let confidence = Self.margin(ranked.map(\.distance))
         let accepted = (ranked.first?.distance ?? .infinity) <= maxDistance && confidence >= minConfidence
+            && ranked.first?.label != Self.restLabel
         return Prediction(ranked: ranked, confidence: confidence, accepted: accepted)
     }
 
@@ -91,12 +99,15 @@ struct Evaluation: Sendable {
     var sessionHoldoutChance: Double?
     var sessionHoldoutSessions: Int
 
-    static func run(templates: [Template], featureSet: FeatureSet, permutations: Int = 500) -> Evaluation? {
+    static func run(templates: [Template], featureSet: FeatureSet, permutations: Int = 500,
+                    smoothing: Int = MotionFeatures.defaultSmoothing) -> Evaluation? {
         let labels = Array(Set(templates.map(\.label))).sorted()
         let counts = Dictionary(grouping: templates, by: \.label).mapValues(\.count)
         guard labels.count >= 2, counts.values.allSatisfy({ $0 >= 2 }), !featureSet.isEmpty else { return nil }
 
-        let raw = templates.map { MotionFeatures.frames(MotionFeatures.trim($0.samples), set: featureSet) }
+        let raw = templates.map {
+            MotionFeatures.frames(MotionFeatures.trim($0.samples), set: featureSet, smoothing: smoothing)
+        }
         let scales = MotionFeatures.channelScales(raw)
         let seqs = raw.map { MotionFeatures.scaled($0, by: scales) }
         let n = seqs.count

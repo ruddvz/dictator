@@ -88,6 +88,12 @@ final class AppModel {
     }
     private(set) var classifier: TemplateClassifier?
     private(set) var evaluation: Evaluation?
+    /// Evidence for the silent templates the classifier uses, recomputed whenever they change, so Silent Use
+    /// unlocks again after a relaunch without a trip to Evaluate.
+    private(set) var silentEvidence: Evaluation?
+    private(set) var isCheckingSilentEvidence = false
+    /// Why the latest capture was not saved (Train) or not trusted (Silent Use).
+    private(set) var lastTakeIssue: TakeIssue?
     private(set) var isEvaluating = false
     private(set) var lastTemplateID: Template.ID?
     var trainingCondition: SessionRecorder.Condition = .silent {
@@ -289,6 +295,10 @@ final class AppModel {
     }
     var maxDistance: Double = 1.5
     var minConfidence: Double = 0.05
+    /// Types each accepted Silent Use word into the frontmost app. Rejected matches are never typed.
+    var silentTypesIntoFrontApp = UserDefaults.standard.object(forKey: "silentTypesIntoFrontApp") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(silentTypesIntoFrontApp, forKey: "silentTypesIntoFrontApp") }
+    }
     private(set) var decoded: [DecodedWord] = []
     private(set) var lastSegment: [MotionSample] = []
     private(set) var lastInsertedPredictionID: UUID?
@@ -298,6 +308,10 @@ final class AppModel {
     @ObservationIgnored private let functionKey = FunctionKeyMonitor()
     @ObservationIgnored private var functionKeyInstalledTrusted = false
     @ObservationIgnored private let selectedTextEditHotKey = GlobalHotKeyRegistration(id: 4)
+    /// Hold Control on its own to capture a silent word, the way fn holds dictation. Works in other apps.
+    @ObservationIgnored private let silentControlKey = FunctionKeyMonitor(key: .control)
+    @ObservationIgnored private var silentControlKeyInstalledTrusted = false
+    @ObservationIgnored private var silentEvidenceTask: Task<Void, Never>?
     @ObservationIgnored private var started = false
     @ObservationIgnored private var motionStarted = false
     /// The dictation key is held down (hold to talk). Observed so the pill can drop its buttons.
@@ -421,10 +435,12 @@ final class AppModel {
         installSelectedTextEditShortcut()
         insertion.restore()
         updateMotionActivity()
+        syncCaptureMode()
         NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification,
                                                object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.refreshFunctionKeyStatus()
+                self?.syncSilentControlKey()
                 self?.insertion.restore()
             }
         }
@@ -437,6 +453,48 @@ final class AppModel {
 
     private func syncCaptureMode() {
         capture.autoEnabled = isMotionInferenceEnabled && screen == .use && useCaptureMode == .auto
+        syncSilentControlKey()
+    }
+
+    /// Control works as the silent hold key only on Train and Silent Use, so it never interferes elsewhere.
+    private func syncSilentControlKey() {
+        let wanted = started && [.train, .use].contains(screen)
+        let trusted = AXIsProcessTrusted()
+        if wanted, !silentControlKey.isInstalled || (trusted && !silentControlKeyInstalledTrusted) {
+            // Monitors added before Accessibility access was granted stay deaf, so add them again.
+            silentControlKey.uninstall()
+            silentControlKey.onAction = { [weak self] action in self?.handleSilentControlKey(action) }
+            silentControlKey.install()
+            silentControlKeyInstalledTrusted = trusted
+        } else if !wanted, silentControlKey.isInstalled {
+            silentControlKey.uninstall()
+        }
+    }
+
+    /// Whether holding Control should capture right now: a selected word on Train, or an unlocked
+    /// Silent Use in hold mode.
+    var silentControlKeyCaptures: Bool {
+        switch screen {
+        case .train: selectedWord != nil
+        case .use: useCaptureMode == .hold && isMotionInferenceEnabled && classifier != nil
+        default: false
+        }
+    }
+
+    private func handleSilentControlKey(_ action: FunctionKeyGesture.Action) {
+        switch action {
+        case .startHold:
+            guard silentControlKeyCaptures, motion.status == .streaming, captureGate.owner == nil else { return }
+            capture.begin()
+        case .endHold:
+            capture.end()
+        case .abortHold:
+            capture.cancel() // Control was part of a shortcut such as ⌃C
+        case .startHandsFree, .stopHandsFree:
+            silentControlKey.reset() // no hands-free mode for silent capture
+        case .none, .scheduleHoldStart, .cancelHoldStart:
+            break
+        }
     }
 
     private func updateMotionActivity() {
@@ -456,6 +514,12 @@ final class AppModel {
         switch screen {
         case .train:
             if let word = selectedWord {
+                if let issue = MotionFeatures.takeIssue(segment) {
+                    lastTakeIssue = issue
+                    recorder.logEvent(segment, kind: "train-rejected", label: word, confidence: nil)
+                    return
+                }
+                lastTakeIssue = nil
                 addTemplate(Template(label: word, samples: segment,
                                      condition: trainingCondition, sessionID: experimentSessionID))
                 recorder.logEvent(segment, kind: "train", label: word, confidence: nil)
@@ -467,11 +531,15 @@ final class AppModel {
                 recorder.logEvent(segment, kind: "blocked-no-evidence", label: "", confidence: nil)
                 return
             }
-            let prediction = classifier.predict(segment, maxDistance: maxDistance, minConfidence: minConfidence)
+            var prediction = classifier.predict(segment, maxDistance: maxDistance, minConfidence: minConfidence)
+            lastTakeIssue = MotionFeatures.takeIssue(segment)
+            if lastTakeIssue != nil { prediction.accepted = false }
             lastInsertedPredictionID = nil
-            decoded.append(DecodedWord(prediction: prediction))
+            let word = DecodedWord(prediction: prediction)
+            decoded.append(word)
             recorder.logEvent(segment, kind: prediction.accepted ? "decode" : "reject",
                               label: prediction.best?.label ?? "", confidence: prediction.confidence)
+            if prediction.accepted { typeSilentWordIfAllowed(word) }
         case .settings:
             recorder.logEvent(segment, kind: "segment", label: recorder.prompt, confidence: nil)
         case .dictation, .transforms, .files, .meetings, .setup, .evaluate, .personalization, .style, .insights:
@@ -863,7 +931,32 @@ final class AppModel {
         let silentTemplates = dataset.templates.filter { ($0.condition ?? .silent) == .silent }
         classifier = TemplateClassifier(templates: silentTemplates, featureSet: featureSet)
         evaluation = nil
+        refreshSilentEvidence(silentTemplates)
         syncCaptureMode()
+    }
+
+    /// Re-runs the evidence check in the background for the templates the classifier now uses.
+    private func refreshSilentEvidence(_ templates: [Template]) {
+        silentEvidenceTask?.cancel()
+        silentEvidence = nil
+        guard templates.count >= Self.minimumEvidenceTemplates else {
+            isCheckingSilentEvidence = false
+            return
+        }
+        isCheckingSilentEvidence = true
+        let featureSet = featureSet
+        silentEvidenceTask = Task {
+            // Coalesce bursts of edits (several deletes in a row) into one run.
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled else { return }
+            let result = await Task.detached(priority: .utility) {
+                Evaluation.run(templates: templates, featureSet: featureSet)
+            }.value
+            guard !Task.isCancelled else { return }
+            self.silentEvidence = result
+            self.isCheckingSilentEvidence = false
+            self.syncCaptureMode()
+        }
     }
 
     func evaluate() {
@@ -876,6 +969,12 @@ final class AppModel {
                 Evaluation.run(templates: templates, featureSet: featureSet)
             }.value
             self.evaluation = result
+            if self.trainingCondition == .silent, featureSet == self.featureSet,
+               templates == self.dataset.templates.filter({ ($0.condition ?? .silent) == .silent }) {
+                self.silentEvidenceTask?.cancel()
+                self.silentEvidence = result
+                self.isCheckingSilentEvidence = false
+            }
             self.isEvaluating = false
             self.syncCaptureMode()
         }
@@ -891,15 +990,27 @@ final class AppModel {
         decoded.filter(\.prediction.accepted).map(\.text).joined(separator: " ")
     }
 
-    var isMotionInferenceEnabled: Bool {
-        guard trainingCondition == .silent,
-              let evaluation,
+    nonisolated static let minimumEvidenceTemplates = 50
+
+    var isMotionInferenceEnabled: Bool { Self.evidenceUnlocksSilentUse(silentEvidence) }
+
+    /// The silent-mouthing evidence gate: enough takes, better than chance, unlikely to be luck,
+    /// and still better than the baseline on a session it never trained on.
+    nonisolated static func evidenceUnlocksSilentUse(_ evaluation: Evaluation?) -> Bool {
+        guard let evaluation,
               let holdout = evaluation.sessionHoldoutAccuracy,
               let holdoutBaseline = evaluation.sessionHoldoutChance else { return false }
-        return evaluation.templateCount >= 50 &&
+        return evaluation.templateCount >= minimumEvidenceTemplates &&
             evaluation.accuracy > evaluation.chance &&
             evaluation.pValue < 0.05 &&
             holdout > holdoutBaseline
+    }
+
+    /// Types an accepted word into the frontmost app when that app is not HushKey. With HushKey in front
+    /// the word stays in the transcript and the insert shortcut can place it later.
+    private func typeSilentWordIfAllowed(_ word: DecodedWord) {
+        guard silentTypesIntoFrontApp, insertion.isEnabled, captureGate.owner == nil, !NSApp.isActive else { return }
+        if insertion.insert(word.text) { lastInsertedPredictionID = word.id }
     }
 
     func clearDecoded() {
