@@ -232,8 +232,7 @@ Validate named-target insertion, stale-target rejection, global shortcut inserti
 - Kept selection and instruction in memory only. The voice-edit path is separate from normal dictation and requires the user to enable Accessibility insertion. It uses Apple's on-device Foundation Model for preview and has no cloud fallback.
 - Added UTF-16 selection boundary and prompt-separation unit coverage. Latest test run: `47 passed, 0 failed, 0 skipped` on the MacBook Pro.
 - `bash scripts/package-app.sh` succeeded. `dist/HushKey.app` passed `codesign --verify --deep --strict`; its display name is `HushKey` and bundle identifier is `com.ruddvz.hushkey`.
-- Live capture/insertion in TextEdit and a second app is still unverified. Computer Use's native UI pipe failed, so the updated Transforms flow was not visually inspected and a running app process may need a relaunch to load the new package.
-- A screenshot of the packaged app's idle Dictation screen exposed a duplicated “Writing mode” label. The duplicate was removed and the app was rebuilt; the suite still passes 47/47. Navigation to Transforms then hit the same native UI pipe failure, so that screen remains visually unchecked.
+- Live capture/insertion in TextEdit and a second app is still unverified. After packaging, Computer Use opened the exact `dist/HushKey.app` bundle; its idle Dictation screen showed the microphone off, and the duplicate “Writing mode” label was gone. Only that HushKey instance was running. Attempts to navigate to Transforms hit the native UI pipe failure, so that screen remains visually unchecked.
 - Updated README, testing protocol, product plan, and competitor roadmap to mark the implementation and keep live acceptance as the next step.
 
 ## Next item — live selected-text acceptance
