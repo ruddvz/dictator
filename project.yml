@@ -8,6 +8,8 @@ packages:
   argmax-oss-swift:
     url: https://github.com/argmaxinc/argmax-oss-swift.git
     exactVersion: 1.1.1
+  HushKeyParakeet:
+    path: Packages/HushKeyParakeet
 settings:
   base:
     SWIFT_VERSION: "5.0"
@@ -22,6 +24,7 @@ targets:
     dependencies:
       - package: argmax-oss-swift
         product: WhisperKit
+      - package: HushKeyParakeet
     info:
       path: HushKey/Info.plist
       properties:

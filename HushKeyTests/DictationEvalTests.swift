@@ -73,6 +73,8 @@ final class DictationEvalTests: XCTestCase {
         engines += installed.map {
             WhisperKitEvalEngine(variant: $0, languageIdentifier: String(locale.prefix(2)))
         }
+        let parakeetModels = ParakeetEvalEngine.installedModels()
+        engines += parakeetModels.map { ParakeetEvalEngine(model: $0) }
         var engineResults: [EngineResult] = []
         for engine in engines {
             engineResults.append(try await AudioEval.run(engine, splits: EvalSplit.allCases))
@@ -81,6 +83,12 @@ final class DictationEvalTests: XCTestCase {
             engineResults.append(EngineResult(
                 engine: "whisperkit", skippedReason: "No WhisperKit model is downloaded in HushKey. Download one in "
                     + "Transcribe Files to include it; the harness never downloads models.", clips: []))
+        }
+
+        if parakeetModels.isEmpty {
+            engineResults.append(EngineResult(
+                engine: "parakeet", skippedReason: "No Parakeet model is downloaded in HushKey. Download one in "
+                    + "Settings → General to include it; the harness never downloads models.", clips: []))
         }
 
         let version = ProcessInfo.processInfo.operatingSystemVersion

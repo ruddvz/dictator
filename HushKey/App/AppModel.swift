@@ -2,6 +2,7 @@ import AppKit
 import AVFoundation
 import Speech
 import Observation
+import os
 import UniformTypeIdentifiers
 
 struct DecodedWord: Identifiable, Hashable {
@@ -62,6 +63,8 @@ final class AppModel {
     let motion = HeadphoneMotionService()
     let audio = AudioService()
     let transcriber = MicTranscriber()
+    /// Parakeet: an optional, downloaded dictation engine that runs when the key is released.
+    let parakeet = ParakeetDictationEngine()
     let captureGate: AudioCaptureGate
     let meetingNotes: MeetingNotesService
     let localTransformService = LocalTransformService()
@@ -150,6 +153,13 @@ final class AppModel {
     var writingStylePresets = WritingStylePresetStore.load()
     var dictationLanguage = UserDefaults.standard.string(forKey: "dictationLanguage") ?? "en-US" {
         didSet { UserDefaults.standard.set(dictationLanguage, forKey: "dictationLanguage") }
+    }
+    var dictationEngine = DictationEngine(rawValue: UserDefaults.standard.string(forKey: DictationEngine.storageKey) ?? "")
+        ?? .appleSpeech {
+        didSet {
+            UserDefaults.standard.set(dictationEngine.rawValue, forKey: DictationEngine.storageKey)
+            if dictationEngine == .parakeet, parakeet.isDownloaded { parakeet.warmUp() }
+        }
     }
     var dictationMode = DictationMode(rawValue: UserDefaults.standard.string(forKey: "dictationMode") ?? "") ?? .automatic {
         didSet { UserDefaults.standard.set(dictationMode.rawValue, forKey: "dictationMode") }
@@ -275,6 +285,9 @@ final class AppModel {
     @ObservationIgnored private let retainedAudio = RetainedDictationAudio()
     @ObservationIgnored private var retainedAudioSinkID: UUID?
     @ObservationIgnored private var lastDictationContextualStrings: [String] = []
+    /// This dictation is recognized by Parakeet on release; Apple Speech, if allowed, only previews it.
+    @ObservationIgnored private var activeDictationUsesParakeet = false
+    @ObservationIgnored private let parakeetLog = Logger(subsystem: "com.ruddvz.hushkey", category: "parakeet")
     @ObservationIgnored private var activeDictationLanguageIdentifier = "en-US"
     @ObservationIgnored private var activeDictationSnippets = ""
     @ObservationIgnored private var activeDictationCorrectionRules = ""
@@ -350,6 +363,8 @@ final class AppModel {
         insertion.onInsertShortcut = { [weak self] in self?.insertLatestOutput() }
         insertion.onUndoShortcut = { [weak self] in self?.undoLastInsertion() }
         rebuildClassifier()
+        // Load Parakeet now, so the first dictation doesn't wait for the Neural Engine.
+        if dictationEngine == .parakeet, parakeet.isDownloaded, !AppDataDirectory.isRunningTests { parakeet.warmUp() }
     }
 
     @discardableResult
@@ -1458,17 +1473,23 @@ final class AppModel {
         captureDictationWritingStylePresetID = profileSettings.writingStylePresetID
         let nearbyHints = usesNearbyTextHints ? insertion.nearbyContextHints() : []
         usedNearbyTextHints = !nearbyHints.isEmpty
+        let usesParakeet = usesParakeet(for: activeDictationLanguageIdentifier)
+        activeDictationUsesParakeet = usesParakeet
+        if usesParakeet { parakeet.warmUp() }
+        // With Parakeet, Apple Speech only shows words while you talk, and only if it's already allowed.
+        let showsApplePreview = !usesParakeet || SFSpeechRecognizer.authorizationStatus() == .authorized
 
         // Open the microphone while Speech gets ready, and buffer what it hears, so words
         // spoken during the start aren't lost.
-        async let speechPreparation = transcriber.prepare(localeIdentifier: activeDictationLanguageIdentifier)
+        async let speechPreparation = showsApplePreview
+            ? transcriber.prepare(localeIdentifier: activeDictationLanguageIdentifier) : false
         await audio.start()
         if audio.isRunning, generation == dictationStartGeneration {
-            transcriber.beginBuffering(sink: audio.sink)
+            if showsApplePreview { transcriber.beginBuffering(sink: audio.sink) }
             retainedAudioSinkID = audio.sink.add { [retainedAudio] buffer, _ in retainedAudio.append(buffer) }
         }
         let speechReady = await speechPreparation
-        guard generation == dictationStartGeneration, speechReady, audio.isRunning else {
+        guard generation == dictationStartGeneration, speechReady || usesParakeet, audio.isRunning else {
             transcriber.stop()
             audio.stop()
             stopRetainingAudio(keep: false)
@@ -1493,19 +1514,14 @@ final class AppModel {
         dictationStartedAt = Date()
         lastDictationDuration = nil
         let customWords = profileSettings.vocabulary
-        let modeHints: [String]
-        switch activeDictationMode {
-        case .message: modeHints = ["DM", "FYI", "ASAP", "RSVP", "TL;DR"]
-        case .email: modeHints = ["subject", "greeting", "regards", "sincerely", "attachment", "forward"]
-        case .code: modeHints = ["underscore", "camelCase", "snake_case", "open parenthesis", "close parenthesis", "semicolon", "arrow"]
-        case .automatic, .natural: modeHints = []
-        }
         lastDictationContextualStrings = DictationContextHints.prioritized(customWords: customWords,
-                                                                           modeHints: modeHints,
+                                                                           modeHints: Self.modeHints(for: activeDictationMode),
                                                                            nearbyHints: nearbyHints,
                                                                            learnedWords: dataset.vocabulary)
-        let started = await transcriber.start(sink: audio.sink, localeIdentifier: activeDictationLanguageIdentifier,
-                                              contextualStrings: lastDictationContextualStrings)
+        let started = speechReady
+            ? await transcriber.start(sink: audio.sink, localeIdentifier: activeDictationLanguageIdentifier,
+                                      contextualStrings: lastDictationContextualStrings)
+            : false
         guard generation == dictationStartGeneration, audio.isRunning else {
             transcriber.stop()
             audio.stop()
@@ -1513,7 +1529,14 @@ final class AppModel {
             captureGate.release(.dictation)
             return
         }
-        if !started {
+        if !started, usesParakeet {
+            // No live preview; Parakeet still gets the whole recording on release.
+            transcriber.stop()
+            if stopsWhenStarted {
+                stopsWhenStarted = false
+                stopDictation()
+            }
+        } else if !started {
             audio.stop()
             stopRetainingAudio(keep: false)
             captureGate.release(.dictation)
@@ -1538,16 +1561,45 @@ final class AppModel {
         functionKey.reset()
         lastDictationDuration = dictationStartedAt.map { Date().timeIntervalSince($0) }
         dictationStartedAt = nil
+        let usesParakeet = activeDictationUsesParakeet
         Task { @MainActor [weak self] in
             guard let self else { return }
+            // Apple's preview keeps finalizing meanwhile, as the fallback if Parakeet fails.
+            if usesParakeet, let text = await parakeetText(retainedAudio.snapshot()) {
+                transcriber.stop()
+                await finishDictation(rawText: text, recognitionError: nil)
+                return
+            }
             let rawText = await transcriber.waitForFinalization()
-            await finishDictation(rawText: rawText)
+            await finishDictation(rawText: rawText, recognitionError: transcriber.error)
+        }
+    }
+
+    /// Parakeet is chosen, downloaded, and knows the dictation's language.
+    private func usesParakeet(for localeIdentifier: String) -> Bool {
+        dictationEngine == .parakeet && parakeet.isDownloaded && parakeet.model.supports(localeIdentifier: localeIdentifier)
+    }
+
+    /// Recognizes a recording with Parakeet, then applies the vocabulary Apple Speech would get as
+    /// hints. Nil when Parakeet fails or hears nothing, so the caller can fall back to Apple Speech.
+    private func parakeetText(_ recorded: [AVAudioPCMBuffer]) async -> String? {
+        guard !recorded.isEmpty else { return nil }
+        do {
+            let transcript = try await parakeet.transcribe(recorded)
+            let model = parakeet.model.rawValue
+            parakeetLog.info("\(model, privacy: .public): \(transcript.processingSeconds, format: .fixed(precision: 3), privacy: .public) s for \(transcript.audioSeconds, format: .fixed(precision: 2), privacy: .public) s of audio")
+            guard !transcript.text.isEmpty else { return nil }
+            let vocabulary = lastDictationContextualStrings.filter { !Self.allModeHints.contains($0) }
+            return DictationVocabularySnapper.apply(transcript.text, terms: vocabulary)
+        } catch {
+            parakeetLog.error("Parakeet failed, using Apple Speech: \(error.localizedDescription, privacy: .public)")
+            return nil
         }
     }
 
     /// Shared end of a live dictation and of a retry: process, save, then either type the
     /// text into the captured field or raise a notice the pill can recover from.
-    private func finishDictation(rawText: String) async {
+    private func finishDictation(rawText: String, recognitionError: String?) async {
         rawDictationText = rawText
         let processed = DictationTranscriptProcessor.process(rawText, mode: activeDictationMode,
                                                               snippets: activeDictationSnippets,
@@ -1562,7 +1614,7 @@ final class AppModel {
             dictationResultGeneration += 1
         }
         saveCurrentDictation()
-        if let notice = DictationRecovery.notice(audioError: nil, transcriberError: transcriber.error,
+        if let notice = DictationRecovery.notice(audioError: nil, transcriberError: recognitionError,
                                                  transcript: processed, hasRetainedAudio: retainedAudio.isUsable,
                                                  heardSound: audio.peakLevel >= DictationRecovery.silenceLevel,
                                                  microphoneName: lastDictationMicrophoneName) {
@@ -1685,6 +1737,10 @@ final class AppModel {
         }
         dictationNotice = nil
         isFinalizingDictation = true
+        if usesParakeet(for: activeDictationLanguageIdentifier), let text = await parakeetText(recorded) {
+            await finishDictation(rawText: text, recognitionError: nil)
+            return
+        }
         let started = await transcriber.transcribe(recorded: recorded, localeIdentifier: activeDictationLanguageIdentifier,
                                                    contextualStrings: lastDictationContextualStrings)
         guard started else {
@@ -1696,7 +1752,7 @@ final class AppModel {
             return
         }
         let rawText = await transcriber.waitForFinalization()
-        await finishDictation(rawText: rawText)
+        await finishDictation(rawText: rawText, recognitionError: transcriber.error)
     }
 
     /// Types the last dictation again, only into the original app and field and only while
@@ -2100,6 +2156,10 @@ final class AppModel {
         lastDictationDuration = duration
         finishesWithoutTyping = true
         isFinalizingDictation = true
+        if usesParakeet(for: activeDictationLanguageIdentifier), let text = await parakeetText(recorded) {
+            await finishDictation(rawText: text, recognitionError: nil)
+            return
+        }
         let started = await transcriber.transcribe(recorded: recorded, localeIdentifier: activeDictationLanguageIdentifier,
                                                    contextualStrings: lastDictationContextualStrings)
         guard started else {
@@ -2112,7 +2172,7 @@ final class AppModel {
             return
         }
         let rawText = await transcriber.waitForFinalization()
-        await finishDictation(rawText: rawText)
+        await finishDictation(rawText: rawText, recognitionError: transcriber.error)
     }
 
     private func recordUsage(raw: String, final: String) {
@@ -2135,6 +2195,19 @@ final class AppModel {
         cancelledDictationAudio = []
         cancelledDictationSettings = nil
     }
+
+    /// Spoken command words Apple Speech is told to expect in each mode.
+    static func modeHints(for mode: DictationMode) -> [String] {
+        switch mode {
+        case .message: ["DM", "FYI", "ASAP", "RSVP", "TL;DR"]
+        case .email: ["subject", "greeting", "regards", "sincerely", "attachment", "forward"]
+        case .code: ["underscore", "camelCase", "snake_case", "open parenthesis", "close parenthesis", "semicolon", "arrow"]
+        case .automatic, .natural: []
+        }
+    }
+
+    /// Not vocabulary: "camel case" must reach the code formatter as words, not as "camelCase".
+    private static let allModeHints = Set(DictationMode.allCases.flatMap(modeHints(for:)))
 
     private func currentRunSettings() -> DictationRunSettings {
         DictationRunSettings(mode: activeDictationMode, languageIdentifier: activeDictationLanguageIdentifier,

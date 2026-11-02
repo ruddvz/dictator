@@ -132,6 +132,7 @@ private struct GeneralSettings: View {
             SettingsRow(title: "Language", detail: "Recognised on this Mac. Nothing is sent online.") {
                 LanguageButton(selection: $model.dictationLanguage)
             }
+            DictationEngineRows()
             SettingsRow(title: "Microphone", detail: microphoneDetail,
                         detailTint: (audio.error ?? model.transcriber.error) == nil ? Theme.ink2 : Theme.danger) {
                 MenuPicker(selection: $audio.selectedDeviceID,

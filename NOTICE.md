@@ -15,3 +15,12 @@ HushKey uses the [Argmax Open Source SDK](https://github.com/argmaxinc/argmax-os
 ## Ideas from amirrsyed/hushkey (MIT)
 
 HushKey's Esc-to-cancel during dictation, the clipboard restore after a fallback paste, and the paired-bootstrap comparisons in the eval report follow ideas from [amirrsyed/hushkey](https://github.com/amirrsyed/hushkey) (MIT License, Copyright (c) 2026 Hushkey contributors). No code was copied; the implementations are HushKey's own.
+
+## Parakeet dictation (FluidAudio and NVIDIA Parakeet)
+
+HushKey's optional Parakeet dictation engine uses [FluidAudio](https://github.com/FluidInference/FluidAudio) by FluidInference, version 0.18.2 (Apache License 2.0; full text in [docs/licenses/FLUIDAUDIO-APACHE-LICENSE.txt](docs/licenses/FLUIDAUDIO-APACHE-LICENSE.txt)). HushKey calls it through the local package `Packages/HushKeyParakeet` and changes none of its code.
+
+- FluidAudio is linked with every package trait turned off (`traits: []`). Its default `TTS` trait bundles a G2P lexicon generated from espeak-ng data under GPL-3.0-or-later; that bundle, the TTS and diarization code paths, and the NeMo text-processing binary are not built into HushKey. Recheck this if the FluidAudio version or the traits change.
+- FluidAudio compiles in `fastcluster` (BSD 2-Clause, © 2011 Daniel Müllner and © Google Inc.; notice in [docs/licenses/FLUIDAUDIO-FASTCLUSTER-LICENSE.md](docs/licenses/FLUIDAUDIO-FASTCLUSTER-LICENSE.md)). HushKey doesn't call it.
+
+The speech model is NVIDIA's **Parakeet TDT 0.6B**, either [v2](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2) (English) or [v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) (25 European languages), © NVIDIA Corporation, licensed under [Creative Commons Attribution 4.0 International (CC-BY-4.0)](https://creativecommons.org/licenses/by/4.0/). HushKey downloads FluidInference's Core ML conversions ([v2](https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml), [v3](https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml), also CC-BY-4.0) only after the user selects **Download model** in Settings, and keeps them in HushKey's Application Support folder. The model is not modified. Audio is recognized on this Mac and is never uploaded. Licences reviewed 2026-11-02.

@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import HushKeyParakeet
 import Speech
 @testable import HushKey
 
@@ -134,6 +135,53 @@ final class WhisperKitEvalEngine: DictationEvalEngine {
     private static func isInstalled(_ variant: WhisperModelVariant, in transcriber: WhisperKitFileTranscriber) -> Bool {
         guard let path = transcriber.downloadedModels[variant.rawValue] else { return false }
         return FileManager.default.fileExists(atPath: path)
+    }
+}
+
+/// Parakeet through the app's own `ParakeetDictationEngine` (the dictation path), using a model
+/// already downloaded in HushKey's real Application Support folder. Read-only; never downloads.
+@MainActor
+final class ParakeetEvalEngine: DictationEvalEngine {
+    let model: ParakeetModel
+    private let engine: ParakeetDictationEngine
+
+    init(model: ParakeetModel) {
+        self.model = model
+        engine = ParakeetDictationEngine(modelRoot: Self.installedRoot, model: model)
+    }
+
+    /// The tests' `AppDataDirectory` is a temporary folder, so point at the user's models directly.
+    static var installedRoot: URL {
+        URL.applicationSupportDirectory.appending(path: AppDataDirectory.folderName, directoryHint: .isDirectory)
+            .appending(path: "ParakeetModels", directoryHint: .isDirectory)
+    }
+
+    static func installedModels() -> [ParakeetModel] {
+        ParakeetModel.allCases.filter { $0.isDownloaded(in: installedRoot) }
+    }
+
+    var name: String { "parakeet-\(model == .englishV2 ? "v2" : "v3") (on-device)" }
+
+    func unavailableReason() async -> String? {
+        guard engine.isDownloaded else {
+            return "\(model.rawValue) is not downloaded in HushKey; the harness does not download models."
+        }
+        // Load before timing, as the app does at launch.
+        return await engine.warmUp().value ? nil : "\(model.rawValue) did not load."
+    }
+
+    func transcribe(_ url: URL) async -> EvalTranscript {
+        do {
+            let file = try AVAudioFile(forReading: url)
+            guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat,
+                                                frameCapacity: AVAudioFrameCount(file.length)) else {
+                return EvalTranscript(text: "", error: "Could not read \(url.lastPathComponent).")
+            }
+            try file.read(into: buffer)
+            return EvalTranscript(text: try await engine.transcribe([buffer]).text, error: nil)
+        } catch {
+            return EvalTranscript(text: "", error: error.localizedDescription)
+        }
     }
 }
 

@@ -35,6 +35,8 @@ cp "$project_root/NOTICE.md" "$resources/"
 cp "$project_root/LICENSE" "$resources/"
 cp "$project_root/docs/licenses/ARGMAX-MIT-LICENSE.txt" "$resources/"
 cp "$project_root/docs/licenses/ARGMAX-NOTICES.txt" "$resources/"
+cp "$project_root/docs/licenses/FLUIDAUDIO-APACHE-LICENSE.txt" "$resources/"
+cp "$project_root/docs/licenses/FLUIDAUDIO-FASTCLUSTER-LICENSE.md" "$resources/"
 # macOS ties Accessibility to the signing certificate. An ad-hoc build has none, so every
 # rebuild loses Accessibility (fn key and typing into apps) even when microphone and Speech
 # survive. Sign with the local identity from Scripts/make-signing-identity.sh when it exists.
