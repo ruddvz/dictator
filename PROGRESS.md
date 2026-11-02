@@ -259,6 +259,7 @@ With the user present, validate the latest packaged app in TextEdit and a second
 - Added regression coverage for punctuation, whole-phrase boundaries, formatting order, malformed/duplicate rules, and the independent explicit spoken-correction setting. Updated README, acceptance protocol, product plan, and competitor roadmap.
 - `xcodebuild ... test`: **49 passed, 0 failed, 0 skipped** on the MacBook Pro. The CoreSimulator version warning remains unrelated to macOS test execution.
 - Rebuilt `dist/HushKey.app`; strict signature verification passed. Computer Use confirms the packaged app opens to Dictation with the microphone off and the latest bundle as the only running HushKey instance.
+- Both GitHub Actions build-and-test runs for commit `66c0f63` passed on PR #1.
 
 ## Next item — live correction and voice acceptance
 
