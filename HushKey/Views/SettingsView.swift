@@ -228,7 +228,7 @@ private struct InsertionSettings: View {
             }
             .disabled(!insertion.isEnabled)
             .opacity(insertion.isEnabled ? 1 : 0.5)
-            SettingsRow(title: "Paste when typing is blocked", detail: "Supported text fields only; clipboard restores when safe.") {
+            SettingsRow(title: "Paste when typing is blocked", detail: "Verifies the exact text field; restores the clipboard when safe.") {
                 RowToggle(isOn: $insertion.allowsPasteFallback, label: "Paste fallback")
             }
             .disabled(!insertion.isEnabled)

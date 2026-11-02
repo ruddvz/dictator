@@ -1,5 +1,13 @@
 # HushKey progress
 
+## Completed — verify clipboard paste delivery before reporting success (2026-11-02)
+
+- Paste fallback now snapshots the readable text field before dictation, revalidates the same app, field, contents, and selection before sending Cmd-V, and waits up to two seconds for the exact expected field contents before reporting success.
+- A timed-out or changed target is surfaced as uncertain, keeps the transcript available, restores the clipboard only if it has not changed, and tells the user to inspect the destination before choosing an explicit retry. Retrying reuses the original field snapshot, preventing a second paste after a delayed successful delivery.
+- Added regression checks for UTF-16 range replacement, delayed field updates, target edits during delivery, and the uncertainty recovery message. Updated Settings, README, and the manual acceptance protocol.
+- `xcodebuild -quiet test -project HushKey.xcodeproj -scheme HushKey -destination 'platform=macOS'`: 132 passed, 2 skipped, 0 failed. Release packaging succeeded and `codesign --verify --deep --strict` passed.
+- Live Accessibility paste into third-party apps still needs a user-approved acceptance session. Next: verify live insertion and clipboard restoration in TextEdit and one other supported app in a fresh session.
+
 ## Completed — packaged Files UI and subtitle export check (2026-11-02)
 
 - Opened `/Users/rudra/Projects/HushKey/dist/HushKey.app` and verified the Files screen restored its saved local test transcript with 15 timed segments.

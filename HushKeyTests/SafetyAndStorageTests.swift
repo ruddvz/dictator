@@ -126,6 +126,46 @@ final class SafetyAndStorageTests: XCTestCase {
             currentValue: "Write this phrase here", currentRange: CFRange(location: 13, length: 5)))
     }
 
+    func testPasteExpectedValueReplacesOnlyTheCapturedSelection() {
+        XCTAssertEqual(TextInsertionService.expectedPasteValue(
+            originalValue: "Hello world", selectedRange: CFRange(location: 6, length: 5),
+            insertedText: "HushKey"), "Hello HushKey")
+        XCTAssertEqual(TextInsertionService.expectedPasteValue(
+            originalValue: "A🧡B", selectedRange: CFRange(location: 1, length: 2),
+            insertedText: "quiet"), "AquietB")
+        XCTAssertNil(TextInsertionService.expectedPasteValue(
+            originalValue: "short", selectedRange: CFRange(location: 4, length: 2),
+            insertedText: "text"))
+    }
+
+    @MainActor
+    func testPasteDeliveryWaitsForExactDelayedFieldValue() async {
+        var observations: [PasteDeliveryVerifier.Observation] = [
+            .fieldValue("before"), .fieldValue("before"), .fieldValue("after")
+        ]
+        let result = await PasteDeliveryVerifier.waitForConfirmation(
+            originalValue: "before", expectedValue: "after", maximumChecks: 5,
+            interval: .nanoseconds(1)) {
+                observations.removeFirst()
+            }
+        XCTAssertEqual(result, .confirmed)
+        XCTAssertTrue(observations.isEmpty)
+    }
+
+    @MainActor
+    func testPasteDeliveryStopsIfTargetFieldChangesBeforeConfirmation() async {
+        var observations: [PasteDeliveryVerifier.Observation] = [
+            .fieldValue("before"), .fieldValue("other field edit"), .fieldValue("after")
+        ]
+        let result = await PasteDeliveryVerifier.waitForConfirmation(
+            originalValue: "before", expectedValue: "after", maximumChecks: 5,
+            interval: .nanoseconds(1)) {
+                observations.removeFirst()
+            }
+        XCTAssertEqual(result, .targetChanged)
+        XCTAssertEqual(observations.count, 1)
+    }
+
     func testSelectedTextCaptureUsesUTF16RangesAndRejectsEmptyOrInvalidSelections() {
         XCTAssertEqual(TextInsertionService.selectedText(in: "A🧡BCD", range: CFRange(location: 3, length: 2)), "BC")
         XCTAssertNil(TextInsertionService.selectedText(in: "A🧡BCD", range: CFRange(location: 3, length: 0)))

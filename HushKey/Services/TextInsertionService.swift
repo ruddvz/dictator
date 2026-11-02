@@ -8,6 +8,25 @@ import Observation
 /// HushKey never writes to or replaces the clipboard.
 @MainActor @Observable
 final class TextInsertionService {
+    struct PasteTarget {
+        let processIdentifier: pid_t
+        let bundleIdentifier: String?
+        let applicationName: String
+        let element: AXUIElement
+        let role: String
+        let subrole: String
+        let fieldValue: String
+        let selectedRange: CFRange
+    }
+
+    enum PasteOutcome: Equatable {
+        case inserted
+        /// Cmd-V was sent, but the same field did not expose the exact expected text in time.
+        case unconfirmed
+        /// No paste was sent because the target could not be safely validated.
+        case unavailable
+    }
+
     struct InsertionTarget {
         let processIdentifier: pid_t
         let bundleIdentifier: String?
@@ -278,6 +297,14 @@ final class TextInsertionService {
         return (true, CFEqual(target.element, focused))
     }
 
+    func focusState(of target: PasteTarget) -> (appIsFrontmost: Bool, fieldIsFocused: Bool) {
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == target.processIdentifier else {
+            return (false, false)
+        }
+        guard let focused = focusedElement() else { return (true, false) }
+        return (true, CFEqual(target.element, focused))
+    }
+
     /// Types at the current cursor of a captured field, but only while that exact field still
     /// has keyboard focus. Unlike `insert(_:into:)` it never switches apps, so text cannot land
     /// somewhere the user has since moved away from.
@@ -305,48 +332,132 @@ final class TextInsertionService {
                                 selectedRange: selectedTextRange(of: focused))
     }
 
-    /// Whether `app` is in front with a non-password field focused, so a paste would land in it.
-    func canPaste(into app: NSRunningApplication) -> Bool {
+    /// Captures a readable, non-password text field before dictation starts. The snapshot lets
+    /// paste validate that neither focus nor field contents changed while the user was speaking.
+    func capturePasteTarget(into app: NSRunningApplication) -> PasteTarget? {
         guard isEnabled, allowsPasteFallback, AXIsProcessTrusted(), !app.isTerminated,
               NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier,
-              let focused = focusedElement() else { return false }
+              let focused = focusedElement() else { return nil }
         var pid: pid_t = 0
-        guard AXUIElementGetPid(focused, &pid) == .success, pid == app.processIdentifier else { return false }
+        guard AXUIElementGetPid(focused, &pid) == .success, pid == app.processIdentifier else { return nil }
         let role = stringAttribute(kAXRoleAttribute, of: focused) ?? ""
         let subrole = stringAttribute(kAXSubroleAttribute, of: focused) ?? ""
-        return Self.isSupportedPasteTarget(role: role, subrole: subrole)
+        guard Self.isSupportedPasteTarget(role: role, subrole: subrole),
+              let fieldValue = stringAttribute(kAXValueAttribute, of: focused),
+              fieldValue.utf16.count <= 20_000,
+              let selectedRange = selectedTextRange(of: focused),
+              selectedRange.location <= fieldValue.utf16.count,
+              selectedRange.length <= fieldValue.utf16.count - selectedRange.location else { return nil }
+        return PasteTarget(processIdentifier: app.processIdentifier,
+                           bundleIdentifier: app.bundleIdentifier,
+                           applicationName: app.localizedName ?? "The app",
+                           element: focused, role: role, subrole: subrole,
+                           fieldValue: fieldValue, selectedRange: selectedRange)
     }
 
-    /// Pastes into the focused field of `app` for apps that refuse direct Accessibility typing
-    /// (many browsers and Electron apps). Borrows the clipboard and puts the user's contents back
-    /// unless something else copied in the meantime.
-    func paste(_ text: String, into app: NSRunningApplication) async -> Bool {
-        let name = app.localizedName ?? "The app"
-        guard !text.isEmpty, canPaste(into: app) else {
-            status = "\(name) or a text field in it is no longer focused. Nothing was pasted."
-            return false
+    /// Whether a readable, non-password field is in front and eligible for verified paste.
+    func canPaste(into app: NSRunningApplication) -> Bool {
+        capturePasteTarget(into: app) != nil
+    }
+
+    /// Pastes only into the exact readable field captured before dictation. The operation is
+    /// considered successful only after that field exposes the expected replacement text.
+    func paste(_ text: String, into app: NSRunningApplication, target: PasteTarget) async -> PasteOutcome {
+        let name = target.applicationName
+        guard !text.isEmpty, isEnabled, allowsPasteFallback, AXIsProcessTrusted(),
+              !app.isTerminated, app.processIdentifier == target.processIdentifier,
+              app.bundleIdentifier == target.bundleIdentifier,
+              let currentValue = validatedPasteTargetValue(target, in: app),
+              currentValue == target.fieldValue,
+              let expectedValue = Self.expectedPasteValue(originalValue: target.fieldValue,
+                                                           selectedRange: target.selectedRange,
+                                                           insertedText: text) else {
+            status = "The original text field or selection changed. Nothing was pasted."
+            return .unavailable
+        }
+        // Replacing a selection with identical text has no observable value change, so do not
+        // send a paste that could not be distinguished from a missed paste.
+        guard expectedValue != target.fieldValue else {
+            status = "The selected text already matches this dictation. Nothing needed to change."
+            return .inserted
         }
         let pasteboard = NSPasteboard.general
         let saved = ClipboardSnapshot(pasteboard)
         let ours = ClipboardSnapshot.placeTransient(text, on: pasteboard)
-        Self.postCommandV()
-        // Give the app time to read the pasteboard before it is restored.
-        try? await Task.sleep(for: .milliseconds(450))
+        guard Self.postCommandV() else {
+            _ = saved.restore(to: pasteboard, ifChangeCountIs: ours)
+            status = "The paste shortcut could not be sent to \(name). Nothing was inserted."
+            return .unavailable
+        }
+        let verification = await PasteDeliveryVerifier.waitForConfirmation(
+            originalValue: target.fieldValue, expectedValue: expectedValue) {
+            self.pasteObservation(target: target, in: app)
+        }
         let restored = saved.restore(to: pasteboard, ifChangeCountIs: ours)
-        undoRecord = nil
-        status = restored
-            ? "Pasted into \(name). Your clipboard was put back."
-            : "Pasted into \(name). The clipboard changed meanwhile, so it was left as is."
+        guard verification == .confirmed else {
+            undoRecord = nil
+            let clipboard = restored ? "Your clipboard was put back." : "The clipboard changed meanwhile, so it was left as is."
+            status = verification == .targetChanged
+                ? "Paste was sent to \(name), but focus or field contents changed before confirmation. Check the field before retrying; a retry could duplicate text. \(clipboard)"
+                : "Paste was sent to \(name), but HushKey could not verify the exact field contents. Check the field before retrying; a retry could duplicate text. \(clipboard)"
+            return .unconfirmed
+        }
+        if let possibleUndo = Self.makeUndoRecord(processIdentifier: target.processIdentifier,
+                                                  bundleIdentifier: target.bundleIdentifier,
+                                                  element: target.element,
+                                                  originalValue: target.fieldValue,
+                                                  selectedRange: target.selectedRange,
+                                                  insertedText: text) {
+            undoRecord = possibleUndo
+        } else {
+            undoRecord = nil
+        }
+        let clipboard = restored ? "Your clipboard was put back." : "The clipboard changed meanwhile, so it was left as is."
+        status = "Pasted into \(name) and verified in the same text field. \(clipboard)"
+        return .inserted
+    }
+
+    private static func postCommandV() -> Bool {
+        let source = CGEventSource(stateID: .combinedSessionState)
+        guard let source,
+              let down = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: true),
+              let up = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: false) else {
+            return false
+        }
+        down.flags = .maskCommand
+        up.flags = .maskCommand
+        down.post(tap: .cghidEventTap)
+        up.post(tap: .cghidEventTap)
         return true
     }
 
-    private static func postCommandV() {
-        let source = CGEventSource(stateID: .combinedSessionState)
-        for isDown in [true, false] {
-            let event = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: isDown)
-            event?.flags = .maskCommand
-            event?.post(tap: .cghidEventTap)
+    private func validatedPasteTargetValue(_ target: PasteTarget, in app: NSRunningApplication) -> String? {
+        guard !app.isTerminated, app.processIdentifier == target.processIdentifier,
+              app.bundleIdentifier == target.bundleIdentifier,
+              NSWorkspace.shared.frontmostApplication?.processIdentifier == target.processIdentifier,
+              let current = focusedElement(), CFEqual(target.element, current) else { return nil }
+        var pid: pid_t = 0
+        guard AXUIElementGetPid(current, &pid) == .success, pid == target.processIdentifier,
+              stringAttribute(kAXRoleAttribute, of: current) == target.role,
+              (stringAttribute(kAXSubroleAttribute, of: current) ?? "") == target.subrole,
+              Self.isSupportedPasteTarget(role: target.role, subrole: target.subrole),
+              let currentValue = stringAttribute(kAXValueAttribute, of: current),
+              let currentRange = selectedTextRange(of: current),
+              currentRange.location <= currentValue.utf16.count,
+              currentRange.length <= currentValue.utf16.count - currentRange.location else {
+            return nil
         }
+        if currentValue == target.fieldValue,
+           !Self.selectionContextMatches(originalValue: target.fieldValue, originalRange: target.selectedRange,
+                                         currentValue: currentValue, currentRange: currentRange) { return nil }
+        return currentValue
+    }
+
+    private func pasteObservation(target: PasteTarget, in app: NSRunningApplication)
+        -> PasteDeliveryVerifier.Observation {
+        guard !app.isTerminated, app.processIdentifier == target.processIdentifier,
+              let value = validatedPasteTargetValue(target, in: app) else { return .targetChanged }
+        return .fieldValue(value)
     }
 
     @discardableResult
@@ -395,6 +506,17 @@ final class TextInsertionService {
 
     static func isSupportedPasteTarget(role: String, subrole: String) -> Bool {
         isSupportedTextTarget(role: role, subrole: subrole)
+    }
+
+    nonisolated static func expectedPasteValue(originalValue: String, selectedRange: CFRange,
+                                               insertedText: String) -> String? {
+        let field = originalValue as NSString
+        guard selectedRange.location >= 0, selectedRange.length >= 0,
+              selectedRange.location <= field.length,
+              selectedRange.length <= field.length - selectedRange.location else { return nil }
+        return field.replacingCharacters(
+            in: NSRange(location: selectedRange.location, length: selectedRange.length),
+            with: insertedText)
     }
 
     nonisolated static func selectionContextMatches(originalValue: String, originalRange: CFRange,
@@ -509,5 +631,46 @@ final class TextInsertionService {
 
     private static func fingerprint(_ value: String) -> String {
         SHA256.hash(data: Data(value.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+}
+
+@MainActor
+enum PasteDeliveryVerifier {
+    enum Observation: Equatable {
+        case fieldValue(String)
+        case targetChanged
+    }
+
+    enum Result: Equatable {
+        case confirmed
+        case timedOut
+        case targetChanged
+    }
+
+    static func waitForConfirmation(originalValue: String,
+                                    expectedValue: String,
+                                    maximumChecks: Int = 20,
+                                    interval: Duration = .milliseconds(100),
+                                    observe: () -> Observation) async -> Result {
+        guard maximumChecks > 0 else { return .timedOut }
+        for check in 0..<maximumChecks {
+            switch observe() {
+            case .fieldValue(let value) where value == expectedValue:
+                return .confirmed
+            case .fieldValue(let value) where value == originalValue:
+                break
+            case .fieldValue:
+                return .targetChanged
+            case .targetChanged:
+                return .targetChanged
+            }
+            guard check + 1 < maximumChecks else { continue }
+            do {
+                try await Task.sleep(for: interval)
+            } catch {
+                return .timedOut
+            }
+        }
+        return .timedOut
     }
 }

@@ -230,6 +230,7 @@ final class AppModel {
     @ObservationIgnored private var dictationHistorySaveTask: Task<Void, Never>?
     @ObservationIgnored private var currentDictationHistoryEntryID: UUID?
     @ObservationIgnored private var capturedInsertionTarget: TextInsertionService.InsertionTarget?
+    @ObservationIgnored private var capturedPasteTarget: TextInsertionService.PasteTarget?
     @ObservationIgnored private var selectedTextEditTarget: TextInsertionService.InsertionTarget?
     @ObservationIgnored private let selectedEditTranscriber = MicTranscriber()
     @ObservationIgnored private let retainedAudio = RetainedDictationAudio()
@@ -1023,6 +1024,7 @@ final class AppModel {
         saveCurrentDictation()
         screen = .dictation
         capturedInsertionTarget = nil
+        capturedPasteTarget = nil
         capturedInsertionTargetName = nil
         transcriber.clear()
         rawDictationText = ""
@@ -1073,6 +1075,7 @@ final class AppModel {
         if !audio.isRunning, !isFinalizingDictation, !transcriber.isFinalizing {
             transcriber.clear()
             capturedInsertionTarget = nil
+            capturedPasteTarget = nil
             capturedInsertionTargetName = nil
             rawDictationText = ""
             clearLocalTransformUndo()
@@ -1087,6 +1090,7 @@ final class AppModel {
         let restoredText = useRawText ? (entry.rawText ?? entry.text) : entry.text
         transcriber.replaceText(restoredText)
         capturedInsertionTarget = nil
+        capturedPasteTarget = nil
         capturedInsertionTargetName = nil
         rawDictationText = entry.rawText ?? entry.text
         clearLocalTransformUndo()
@@ -1120,6 +1124,7 @@ final class AppModel {
         cancelPendingDictationHistorySave()
         transcriber.clear()
         capturedInsertionTarget = nil
+        capturedPasteTarget = nil
         capturedInsertionTargetName = nil
         rawDictationText = ""
         clearLocalTransformUndo()
@@ -1174,10 +1179,13 @@ final class AppModel {
         let isHushKey = target?.bundleIdentifier == "com.ruddvz.hushkey"
         activeDictationTarget = isHushKey ? nil : target?.localizedName
         capturedInsertionTarget = isHushKey ? nil : insertion.captureInsertionTarget()
+        capturedPasteTarget = nil
+        if !isHushKey, let target {
+            capturedPasteTarget = insertion.capturePasteTarget(into: target)
+        }
         capturedInsertionTargetName = capturedInsertionTarget?.applicationName
         dictationTargetApp = isHushKey ? nil : target
-        dictationHasTarget = insertion.isEnabled && (capturedInsertionTarget != nil
-            || dictationTargetApp.map(insertion.canPaste(into:)) == true)
+        dictationHasTarget = insertion.isEnabled && (capturedInsertionTarget != nil || capturedPasteTarget != nil)
         let targetBundleIdentifier = isHushKey ? nil : target?.bundleIdentifier
         let activeProfile = DictationAppProfile.profile(for: targetBundleIdentifier, in: dictationAppProfiles)
         activeDictationProfileName = activeProfile?.appName
@@ -1302,14 +1310,32 @@ final class AppModel {
             }
             // The same field is still focused but refused direct typing: paste instead.
             // If focus moved, never paste somewhere else; offer Paste again.
-            if insertion.focusState(of: target).fieldIsFocused, let app = dictationTargetApp,
-               await insertion.paste(text, into: app) {
-                didInsertCurrentDictation = true
-                return
+            if insertion.focusState(of: target).fieldIsFocused,
+               let app = dictationTargetApp, let pasteTarget = capturedPasteTarget {
+                switch await insertion.paste(text, into: app, target: pasteTarget) {
+                case .inserted:
+                    didInsertCurrentDictation = true
+                    return
+                case .unconfirmed:
+                    dictationNotice = DictationRecovery.pasteUnconfirmed(
+                        insertion.status, canPasteAgain: capturedPasteTarget != nil)
+                    return
+                case .unavailable:
+                    break
+                }
             }
-            dictationNotice = DictationRecovery.insertionFailed(insertion.status, canPasteAgain: true)
-        } else if let app = dictationTargetApp, await insertion.paste(text, into: app) {
-            didInsertCurrentDictation = true
+            dictationNotice = DictationRecovery.insertionFailed(
+                insertion.status, canPasteAgain: capturedInsertionTarget != nil || capturedPasteTarget != nil)
+        } else if let app = dictationTargetApp, let pasteTarget = capturedPasteTarget {
+            switch await insertion.paste(text, into: app, target: pasteTarget) {
+            case .inserted:
+                didInsertCurrentDictation = true
+            case .unconfirmed:
+                dictationNotice = DictationRecovery.pasteUnconfirmed(
+                    insertion.status, canPasteAgain: capturedPasteTarget != nil)
+            case .unavailable:
+                showsFinishedTranscript = true
+            }
         } else {
             showsFinishedTranscript = true
         }
@@ -1358,22 +1384,37 @@ final class AppModel {
 
     /// Types the last dictation again, only into the original app and field and only while
     /// they have focus. Otherwise it says where to click instead of guessing.
-    func pasteLastDictationAgain() {
+    func pasteLastDictationAgain() async {
         let text = transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        let focus = capturedInsertionTarget.map { insertion.focusState(of: $0) } ?? (appIsFrontmost: false, fieldIsFocused: false)
+        let focus = capturedInsertionTarget.map { insertion.focusState(of: $0) }
+            ?? capturedPasteTarget.map { insertion.focusState(of: $0) }
+            ?? (appIsFrontmost: false, fieldIsFocused: false)
         let decision = PasteAgainGate.decision(
-            text: text, hasTarget: capturedInsertionTarget != nil,
+            text: text, hasTarget: capturedInsertionTarget != nil || capturedPasteTarget != nil,
             isBusy: audio.isRunning || isFinalizingDictation || transcriber.isRunning || transcriber.isFinalizing,
             alreadyInserted: didInsertCurrentDictation, insertionEnabled: insertion.isEnabled,
             targetIsFrontmost: focus.appIsFrontmost, targetFieldIsFocused: focus.fieldIsFocused)
         switch decision {
         case .allowed:
-            guard let target = capturedInsertionTarget else { return }
-            if insertion.insert(text, ifStillFocused: target) {
+            if let target = capturedInsertionTarget, insertion.insert(text, ifStillFocused: target) {
                 didInsertCurrentDictation = true
                 dictationNotice = nil
                 completedDictationCount += 1
-            } else {
+                return
+            }
+            guard let app = dictationTargetApp, let pasteTarget = capturedPasteTarget else {
+                dictationNotice = DictationRecovery.insertionFailed(insertion.status, canPasteAgain: true)
+                return
+            }
+            switch await insertion.paste(text, into: app, target: pasteTarget) {
+            case .inserted:
+                didInsertCurrentDictation = true
+                dictationNotice = nil
+                completedDictationCount += 1
+            case .unconfirmed:
+                dictationNotice = DictationRecovery.pasteUnconfirmed(
+                    insertion.status, canPasteAgain: true)
+            case .unavailable:
                 dictationNotice = DictationRecovery.insertionFailed(insertion.status, canPasteAgain: true)
             }
         case .focusLost:

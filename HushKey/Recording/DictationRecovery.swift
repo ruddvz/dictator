@@ -50,6 +50,12 @@ enum DictationRecovery {
                         canRetry: false, canPasteAgain: canPasteAgain)
     }
 
+    static func pasteUnconfirmed(_ reason: String, canPasteAgain: Bool) -> DictationNotice {
+        DictationNotice(kind: .insertion, message: "Check the field first",
+                        detail: reason + " The transcript is saved in HushKey. Check the destination before retrying, because another paste could duplicate it.",
+                        canRetry: false, canPasteAgain: canPasteAgain)
+    }
+
     static func focusLost(appName: String) -> DictationNotice {
         DictationNotice(kind: .focusLost, message: "Click back into \(appName)",
                         detail: "Paste again only types into the field you dictated from. Focus it in \(appName), then try again.",

@@ -49,6 +49,17 @@ final class DictationRecoveryTests: XCTestCase {
         XCTAssertTrue(lost.canPasteAgain)
     }
 
+    func testUnconfirmedPasteWarnsBeforeExplicitRetry() {
+        let notice = DictationRecovery.pasteUnconfirmed(
+            "Paste was sent, but the field did not confirm it.", canPasteAgain: true)
+
+        XCTAssertEqual(notice.message, "Check the field first")
+        XCTAssertTrue(notice.detail.contains("Check the destination before retrying"))
+        XCTAssertTrue(notice.detail.contains("transcript is saved in HushKey"))
+        XCTAssertTrue(notice.canPasteAgain)
+        XCTAssertFalse(notice.canRetry)
+    }
+
     func testPasteAgainRequiresOriginalAppAndField() {
         func decide(frontmost: Bool, field: Bool) -> PasteAgainGate.Decision {
             PasteAgainGate.decision(text: "hi", hasTarget: true, isBusy: false, alreadyInserted: false, insertionEnabled: true,

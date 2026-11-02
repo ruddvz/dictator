@@ -359,8 +359,10 @@ struct FloatingPillView: View {
         }
         if notice.canPasteAgain {
             PillIconButton(systemImage: "text.insert", title: "Paste again",
-                           help: "Type it again, only if \(model.capturedInsertionTargetName ?? "the original app") still has focus") {
-                model.pasteLastDictationAgain()
+                           help: notice.message == "Check the field first"
+                               ? "Check \(model.capturedInsertionTargetName ?? "the original app") first. Retry only if the transcript is missing; it may already have arrived."
+                               : "Type it again, only if \(model.capturedInsertionTargetName ?? "the original app") still has focus") {
+                Task { await model.pasteLastDictationAgain() }
             }
         }
         PillIconButton(systemImage: "xmark", help: "Dismiss", tint: Theme.danger) { model.dismissDictationNotice() }
