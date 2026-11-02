@@ -204,12 +204,14 @@ private struct SetupChecklist: View {
         var isDone: Bool
         var opens: AppModel.Screen
         var settingsSection: SettingsView.Section?
+        /// The macOS permission this step asks for, instead of just opening a page.
+        var permission: DictationNotice.Privacy?
     }
 
     private var steps: [Step] {
         [
-            Step(title: "Allow microphone", isDone: microphoneGranted, opens: .dictation),
-            Step(title: "Allow speech recognition", isDone: speechGranted, opens: .dictation),
+            Step(title: "Allow microphone", isDone: microphoneGranted, opens: .dictation, permission: .microphone),
+            Step(title: "Allow speech recognition", isDone: speechGranted, opens: .dictation, permission: .speechRecognition),
             Step(title: "Turn on text insertion", isDone: model.insertion.isEnabled, opens: .settings, settingsSection: .insertion),
             Step(title: "Finish a first dictation", isDone: !model.dictationHistory.isEmpty, opens: .dictation),
         ]
@@ -238,6 +240,10 @@ private struct SetupChecklist: View {
                     .animation(Theme.gentle, value: completed)
                     ForEach(steps) { step in
                         Button {
+                            if let permission = step.permission {
+                                request(permission)
+                                return
+                            }
                             if let section = step.settingsSection {
                                 UserDefaults.standard.set(section.rawValue, forKey: "settingsSection")
                             }
@@ -271,6 +277,21 @@ private struct SetupChecklist: View {
         .onAppear(perform: refresh)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in refresh() }
         .onChange(of: model.audio.isRunning) { _, _ in refresh() }
+    }
+
+    /// Shows the macOS prompt the first time; once it has been answered "Don't Allow", only
+    /// System Settings can change it, so open that pane instead.
+    private func request(_ permission: DictationNotice.Privacy) {
+        Task { @MainActor in
+            let outcome: LocalPermissionOutcome = switch permission {
+            case .microphone: await LocalPermissionAccess.microphone()
+            case .speechRecognition: await LocalPermissionAccess.speechRecognition()
+            }
+            refresh()
+            if outcome == .denied || outcome == .restricted {
+                model.openPrivacySettings(permission)
+            }
+        }
     }
 
     private func refresh() {
