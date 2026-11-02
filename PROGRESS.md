@@ -1,5 +1,12 @@
 # HushKey progress
 
+## Completed — local builds keep Accessibility (2026-11-02)
+
+- Ad-hoc builds have no certificate, so macOS dropped HushKey's Accessibility grant on every rebuild. fn then did nothing and the pill said "Typing into apps is off". Microphone and Speech survived, which hid the cause.
+- `Scripts/make-signing-identity.sh` creates a self-signed "HushKey Local Signing" identity in the login keychain (done on this Mac). `Scripts/package-app.sh` signs with it when present; the designated requirement is now `identifier "com.ruddvz.hushkey" and certificate leaf = H"e4ff…520d"`, stable across builds. Without the identity it falls back to ad-hoc and warns.
+- Tests 184 passed, 2 skipped; `codesign --verify --deep --strict` passes. The user must allow the new build in Accessibility once. Not yet verified that the grant survives the next rebuild.
+- Other sessions also launch their own HushKey builds (Xcode Release from a scratch folder); only one copy should run, and only `dist/HushKey.app` carries the stable signature.
+
 ## Completed — verify text insertion before reporting success (2026-11-02)
 
 - The user reported that HushKey shows a transcript and an insertion-success message, but the target field stays empty.

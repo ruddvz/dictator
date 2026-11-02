@@ -35,11 +35,18 @@ cp "$project_root/NOTICE.md" "$resources/"
 cp "$project_root/LICENSE" "$resources/"
 cp "$project_root/docs/licenses/ARGMAX-MIT-LICENSE.txt" "$resources/"
 cp "$project_root/docs/licenses/ARGMAX-NOTICES.txt" "$resources/"
-# Ad-hoc signatures default to a cdhash requirement, so macOS treats every build as a new app
-# and asks for microphone, Speech and Accessibility again. Naming the bundle identifier keeps
-# those grants across local builds. Distribution builds should use a real signing identity.
-codesign --force --deep --sign - --timestamp=none \
-  -r='designated => identifier "com.ruddvz.hushkey"' "$staged_app"
+# macOS ties Accessibility to the signing certificate. An ad-hoc build has none, so every
+# rebuild loses Accessibility (fn key and typing into apps) even when microphone and Speech
+# survive. Sign with the local identity from Scripts/make-signing-identity.sh when it exists.
+# Distribution builds should use a real Developer ID.
+identity="$(security find-identity -p codesigning 2>/dev/null | awk '/"HushKey Local Signing"/ { print $2; exit }')"
+if [[ -n "$identity" ]]; then
+  codesign --force --deep --sign "$identity" --timestamp=none "$staged_app"
+else
+  echo "warning: no HushKey Local Signing identity; Accessibility resets on each build (run Scripts/make-signing-identity.sh)" >&2
+  codesign --force --deep --sign - --timestamp=none \
+    -r='designated => identifier "com.ruddvz.hushkey"' "$staged_app"
+fi
 destination="$project_root/dist/HushKey.app"
 if [[ -e "$destination" ]]; then
   backup_dir="$(mktemp -d "$project_root/dist/.HushKey-backup.XXXXXX")"
