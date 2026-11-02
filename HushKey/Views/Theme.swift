@@ -22,6 +22,7 @@ enum Theme {
 
     // Sizes: W page column, H1 sidebar row, H2 control, I1 icon
     static let pageWidth: CGFloat = 800
+    static let homeWidth: CGFloat = 1040     // Wispr's home: 770 column + 24 gap + 248 stats
     static let sidebarWidth: CGFloat = 216
     static let sidebarRow: CGFloat = 36
     static let controlHeight: CGFloat = 36

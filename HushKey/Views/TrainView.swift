@@ -38,11 +38,11 @@ struct TrainView: View {
                 Text("VOCABULARY")
                     .font(.hkCaption.weight(.semibold))
                     .tracking(0.8)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.ink2)
                 Spacer()
                 Text("\(model.dataset.vocabulary.count) words")
                     .font(.hkCaption.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.ink2)
             }
             .padding(.horizontal, 12)
             .padding(.top, 12)
@@ -55,7 +55,7 @@ struct TrainView: View {
                             Spacer()
                             Text("\(min(model.templateCount(for: word, condition: model.trainingCondition), 10))/10")
                                 .monospacedDigit()
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Theme.ink2)
                         }
                         ProgressView(value: min(Double(model.templateCount(for: word, condition: model.trainingCondition)), 10), total: 10)
                     }
@@ -91,12 +91,12 @@ struct TrainView: View {
                 HStack {
                     Label("Session \(model.experimentSessionID.uuidString.prefix(8))", systemImage: "square.stack.3d.up")
                         .font(.hkCaption.monospaced())
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.ink2)
                     Button("New session", systemImage: "plus") { model.beginNewExperimentSession() }
                     Spacer()
                 }
                 Text(conditionGuidance)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.ink2)
                 HoldToCaptureButton(
                     title: "Capture “\(word)”",
                     shortcut: model.captureShortcut.label,
@@ -107,7 +107,7 @@ struct TrainView: View {
                 if model.motion.status != .streaming {
                     Label(model.motion.status.label, systemImage: "headphones")
                         .font(.hkCaption)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Theme.finishing)
                 }
             }
             .padding(6)
@@ -132,7 +132,7 @@ struct TrainView: View {
             GroupBox("\(word) · \(takes.count) \(model.trainingCondition.rawValue.lowercased()) examples") {
                 if takes.isEmpty {
                     Text("No takes yet.")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.ink2)
                         .frame(maxWidth: .infinity, minHeight: 60)
                 } else {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 10)], spacing: 10) {
@@ -149,7 +149,7 @@ struct TrainView: View {
             GroupBox("Start with a word") {
                 Label("Add a short word in the vocabulary list, then choose it to capture examples.", systemImage: "plus.circle")
                     .font(.hkCallout)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.ink2)
                     .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
                     .padding(8)
             }
@@ -174,7 +174,7 @@ private struct TakeTile: View {
             HStack {
                 Text(String(format: "%.2f s · %d", template.duration, template.samples.count))
                     .font(.hkMeta.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.ink2)
                 Spacer()
                 Button("Delete", systemImage: "trash", role: .destructive, action: onDelete)
                     .labelStyle(.iconOnly)

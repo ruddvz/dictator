@@ -46,23 +46,25 @@ struct TransformView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                PageHeader(
-                    eyebrow: "LOCAL WRITING TOOLS",
-                    title: "Make it read like you",
-                    subtitle: "Preview a change to your transcript or selected text, then choose whether to use it. Originals stay available until you apply a change.")
+            VStack(alignment: .leading, spacing: Theme.s6) {
+                PageHeader(eyebrow: "", title: "Transforms",
+                           subtitle: "Rewrite a transcript or selected text on this Mac. You always see the result first.") {
+                    Button("New style", systemImage: "plus") {
+                        styleEditorRequest = WritingStyleEditorRequest(preset: nil)
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(customStyles.count >= WritingStylePreset.maximumCount || model.localTransformService.isTransforming)
+                }
 
-                selectedTextEditCard
-                transcriptCard
                 transformPicker
+                transcriptCard
                 if !draft.isEmpty { previewCard }
                 if model.canUndoLocalTransform { undoCard }
+                selectedTextEditCard
 
-                Label("Text transforms use Apple’s on-device Foundation Model when it is available. HushKey has no cloud fallback, and generated text is always shown for review before it replaces your transcript.",
-                      systemImage: "lock.shield")
+                Label("Runs on Apple’s on-device model. No cloud fallback.", systemImage: "lock.shield")
                     .font(.hkCaption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .foregroundStyle(Theme.ink3)
             }
             .pageLayout()
         }
@@ -95,17 +97,25 @@ struct TransformView: View {
     }
 
     private var selectedTextEditCard: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 12) {
-                if model.selectedTextEditOriginal.isEmpty {
-                    Text("Select text in another app, then hold \(model.selectedTextEditShortcut.label) and say what you want changed. The selected text stays on this Mac and is only read for that shortcut.")
-                        .font(.hkCallout)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if !model.insertion.isEnabled {
-                        Button("Enable safe text access…") { model.screen = .settings }
-                            .buttonStyle(.link)
+        SettingsGroup(title: "Edit selected text by voice") {
+            if model.selectedTextEditOriginal.isEmpty {
+                SettingsRow(title: "Select text anywhere, hold the shortcut, say the change",
+                            detail: model.insertion.isEnabled ? model.selectedTextEditShortcutStatus
+                                : "Needs “Type where your cursor is” in Settings → Insertion.") {
+                    if model.insertion.isEnabled {
+                        KeycapShortcut(label: model.selectedTextEditShortcut.label, size: 13)
+                    } else {
+                        Button("Turn on") {
+                            UserDefaults.standard.set(SettingsView.Section.insertion.rawValue, forKey: "settingsSection")
+                            model.screen = .settings
+                        }
+                        .buttonStyle(SecondaryButtonStyle(minWidth: 96))
                     }
-                } else {
+                }
+            } else {
+            GroupRow {
+            VStack(alignment: .leading, spacing: 12) {
+                Group {
                     HStack {
                         Label("Selection from \(model.selectedTextEditTargetName ?? "another app")", systemImage: "text.cursor")
                             .font(.hkCallout.weight(.semibold))
@@ -117,24 +127,24 @@ struct TransformView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 5) {
-                        Text("Original selection").font(.hkCaption.weight(.semibold)).foregroundStyle(.secondary)
+                        Text("Original selection").font(.hkCaption.weight(.semibold)).foregroundStyle(Theme.ink2)
                         Text(model.selectedTextEditOriginal)
                             .textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(10)
-                            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+                            .background(Theme.sheet, in: RoundedRectangle(cornerRadius: 8))
                     }
 
                     VStack(alignment: .leading, spacing: 5) {
                         Text(model.isSelectedTextEditCapturing ? "Live edit instruction" : "Edit instruction")
-                            .font(.hkCaption.weight(.semibold)).foregroundStyle(.secondary)
+                            .font(.hkCaption.weight(.semibold)).foregroundStyle(Theme.ink2)
                         if model.isSelectedTextEditCapturing {
                             Text(model.selectedTextEditLiveInstruction.isEmpty
                                  ? "Listening…"
                                  : model.selectedTextEditLiveInstruction)
                                 .frame(maxWidth: .infinity, minHeight: 54, alignment: .topLeading)
                                 .padding(10)
-                                .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+                                .background(Theme.sheet, in: RoundedRectangle(cornerRadius: 8))
                         } else {
                             TextEditor(text: Binding(
                                 get: { model.selectedTextEditInstruction },
@@ -143,7 +153,8 @@ struct TransformView: View {
                                 .frame(minHeight: 75, maxHeight: 120)
                                 .disabled(model.isFinalizingSelectedTextEdit || model.isGeneratingSelectedTextEdit || model.isApplyingSelectedTextEdit)
                                 .padding(4)
-                                .background(.background, in: RoundedRectangle(cornerRadius: 8))
+                                .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: Theme.r3, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
                         }
                     }
 
@@ -154,20 +165,20 @@ struct TransformView: View {
                             Label(model.isGeneratingSelectedTextEdit ? "Creating preview…" : "Preview edit",
                                   systemImage: model.isGeneratingSelectedTextEdit ? "hourglass" : "sparkles")
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(PrimaryButtonStyle())
                         .disabled(!model.canPreviewSelectedTextEdit)
 
                         if !model.selectedTextEditDraft.isEmpty {
                             if model.selectedTextEditApplied {
                                 Label("Applied once · undo with ⌥⇧U in the target field", systemImage: "checkmark.circle")
                                     .font(.hkCaption)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Theme.ink2)
                             } else {
                                 Button("Apply to \(model.selectedTextEditTargetName ?? "original app")",
                                        systemImage: "text.insert") {
                                     Task { await model.applySelectedTextEdit() }
                                 }
-                                .buttonStyle(.bordered)
+                                .buttonStyle(SecondaryButtonStyle())
                                 .disabled(!model.canApplySelectedTextEdit)
                             }
                         }
@@ -175,7 +186,7 @@ struct TransformView: View {
 
                     if !model.selectedTextEditDraft.isEmpty {
                         VStack(alignment: .leading, spacing: 5) {
-                            Text("Preview · review before applying").font(.hkCaption.weight(.semibold)).foregroundStyle(.secondary)
+                            Text("Preview · review before applying").font(.hkCaption.weight(.semibold)).foregroundStyle(Theme.ink2)
                             TextEditor(text: Binding(
                                 get: { model.selectedTextEditDraft },
                                 set: { model.updateSelectedTextEditDraft($0) }))
@@ -183,14 +194,15 @@ struct TransformView: View {
                                 .frame(minHeight: 90, maxHeight: 180)
                                 .disabled(model.isApplyingSelectedTextEdit || model.selectedTextEditApplied)
                                 .padding(4)
-                                .background(.background, in: RoundedRectangle(cornerRadius: 8))
+                                .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: Theme.r3, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
                         }
                     }
 
                     if let status = model.selectedTextEditStatus {
                         Label(status, systemImage: model.selectedTextEditApplied ? "checkmark.circle" : "info.circle")
                             .font(.hkCaption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.ink2)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -198,57 +210,73 @@ struct TransformView: View {
                 if !model.localTransformService.modelIsAvailable {
                     Label(model.localTransformService.availabilityMessage, systemImage: "info.circle")
                         .font(.hkCaption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.ink2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-
-                Text(model.selectedTextEditShortcutStatus)
-                    .font(.hkCaption)
-                    .foregroundStyle(.secondary)
-                Label("Requires Accessibility insertion to be enabled. HushKey uses the selected text and your spoken instruction for an on-device preview; neither is added to dictation history or sent to a server. Apply rechecks the original app, field, text, and selection.",
-                      systemImage: "lock.shield")
-                    .font(.hkCaption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(10)
-        } label: {
-            Label("Voice edit selected text", systemImage: "text.cursor")
+            }
+            }
         }
     }
 
     private var transcriptCard: some View {
-        return GroupBox {
-            VStack(alignment: .leading, spacing: 12) {
-                if currentText.isEmpty {
-                    ContentUnavailableView(
-                        "No transcript to transform",
-                        systemImage: "text.alignleft",
-                        description: Text("Start or restore a dictation first. Your transcript will appear here for review."))
-                        .frame(minHeight: 140)
-                } else {
-                    TextEditor(text: transcriptBinding)
-                        .font(.hkBody)
-                        .frame(minHeight: 150)
-                        .disabled(isBusy)
-                        .padding(4)
-                        .background(.background, in: RoundedRectangle(cornerRadius: 8))
-                    HStack {
-                        Text("\(currentText.count.formatted()) characters")
-                            .font(.hkCaption.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Button("Open Dictation", systemImage: "arrow.up.right") {
-                            model.screen = .dictation
-                        }
-                        .buttonStyle(.link)
-                    }
+        VStack(alignment: .leading, spacing: Theme.s3) {
+            HStack {
+                Text("Your text").font(.hkTitle3)
+                Spacer()
+                if !currentText.isEmpty {
+                    Text("\(currentText.count.formatted()) characters")
+                        .font(.hkMeta.monospacedDigit())
+                        .foregroundStyle(Theme.ink3)
                 }
             }
-            .padding(10)
-        } label: {
-            Label("Current transcript", systemImage: "text.bubble")
+            if currentText.isEmpty {
+                EmptyState(systemImage: "text.alignleft", title: "Nothing to transform yet",
+                           message: "Dictate something, or pick a dictation from history to edit it again.") {
+                    Button("Go to Dictation") { model.screen = .dictation }
+                        .buttonStyle(SecondaryButtonStyle())
+                }
+                .card(padding: 0, style: .outlined)
+            } else {
+                VStack(alignment: .leading, spacing: 0) {
+                    TextEditor(text: transcriptBinding)
+                        .font(.hkBody)
+                        .lineSpacing(3)
+                        .scrollContentBackground(.hidden)
+                        .frame(minHeight: 140, maxHeight: 260)
+                        .disabled(isBusy)
+                        .padding(Theme.s3)
+                    RowDivider()
+                    HStack(spacing: Theme.s2) {
+                        Text(selectedStyle?.name ?? selectedAction.rawValue)
+                            .font(.hkCallout.weight(.medium))
+                        Text(selectedStyle == nil && !selectedAction.requiresLanguageModel
+                             ? "Text rules, instant"
+                             : model.localTransformService.modelIsAvailable ? "On-device model" : model.localTransformService.availabilityMessage)
+                            .font(.hkCaption)
+                            .foregroundStyle(Theme.ink3)
+                            .lineLimit(1)
+                        Spacer()
+                        if let statusMessage {
+                            Text(statusMessage).font(.hkCaption).foregroundStyle(Theme.ink2).lineLimit(1)
+                        }
+                        Button {
+                            Task { await createPreview() }
+                        } label: {
+                            Label(model.localTransformService.isTransforming ? "Working…" : "Preview",
+                                  systemImage: model.localTransformService.isTransforming ? "hourglass" : "sparkles")
+                        }
+                        .buttonStyle(PrimaryButtonStyle())
+                        .disabled(!canGenerate)
+                    }
+                    .padding(.horizontal, Theme.s4)
+                    .padding(.vertical, Theme.s3)
+                }
+                .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
+                    .strokeBorder(Theme.hairline, lineWidth: 1))
+            }
         }
     }
 
@@ -256,179 +284,113 @@ struct TransformView: View {
         Binding(get: { model.transcriber.text }, set: { model.editCurrentDictation($0) })
     }
 
+    /// Wispr-style card grid: built-in transforms, then your styles, then a "create" card.
     private var transformPicker: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 14) {
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
-                    ForEach(LocalWritingTransform.allCases) { action in
-                        Button {
-                            selectedAction = action
-                            selectedStyleID = nil
-                            clearPreview()
-                        } label: {
-                            HStack(alignment: .top, spacing: 12) {
-                                Image(systemName: action.symbol)
-                                    .font(.hkTitle3)
-                                    .foregroundStyle(selectedStyle == nil && selectedAction == action ? Theme.ink : Color.secondary)
-                                    .frame(width: 26)
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(action.rawValue).font(.hkHeadline)
-                                    Text(action.description)
-                                        .font(.hkCaption)
-                                        .foregroundStyle(.secondary)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                                Spacer(minLength: 0)
-                            }
-                            .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
-                            .padding(12)
-                            .background(selectedStyle == nil && selectedAction == action ? Theme.ink.opacity(0.09) : Color(nsColor: .controlBackgroundColor),
-                                        in: RoundedRectangle(cornerRadius: 10))
-                            .overlay(RoundedRectangle(cornerRadius: 10)
-                                .stroke(selectedStyle == nil && selectedAction == action ? Theme.ink.opacity(0.6) : Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 1))
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(model.localTransformService.isTransforming)
-                    }
-                }
-
-                customStylesSection
-
-                if selectedStyle != nil || selectedAction.requiresLanguageModel {
-                    Label(model.localTransformService.availabilityMessage,
-                          systemImage: model.localTransformService.modelIsAvailable ? "checkmark.circle" : "info.circle")
-                        .font(.hkCaption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                } else {
-                    Label("This cleanup runs locally with text rules and does not need a language model.", systemImage: "checkmark.circle")
-                        .font(.hkCaption)
-                        .foregroundStyle(.secondary)
-                }
-
-                HStack {
-                    Button {
-                        Task { await createPreview() }
-                    } label: {
-                        Label(model.localTransformService.isTransforming ? "Working on this Mac…" : "Preview transform",
-                              systemImage: model.localTransformService.isTransforming ? "hourglass" : "sparkles")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(!canGenerate)
-
-                    if let statusMessage {
-                        Text(statusMessage).font(.hkCaption).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                }
-            }
-            .padding(10)
-        } label: {
-            Label("Choose a transformation", systemImage: "wand.and.stars")
-        }
-    }
-
-    private var customStylesSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Theme.s3) {
             HStack {
-                Label("Your writing styles", systemImage: "textformat")
-                    .font(.hkHeadline)
+                Text("Choose a transform").font(.hkTitle3)
                 Spacer()
-                Text("\(customStyles.count)/\(WritingStylePreset.maximumCount)")
-                    .font(.hkCaption.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                Button("Add style", systemImage: "plus") {
-                    styleEditorRequest = WritingStyleEditorRequest(preset: nil)
-                }
-                .disabled(customStyles.count >= WritingStylePreset.maximumCount || model.localTransformService.isTransforming)
+                Text("\(customStyles.count)/\(WritingStylePreset.maximumCount) styles")
+                    .font(.hkMeta.monospacedDigit())
+                    .foregroundStyle(Theme.ink3)
             }
-
-            if customStyles.isEmpty {
-                Text("Create a style for a tone, format, or translation. It will run locally and appear here next time.")
-                    .font(.hkCaption)
-                    .foregroundStyle(.secondary)
-            } else {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Theme.s3), count: 3),
+                      alignment: .leading, spacing: Theme.s3) {
+                ForEach(LocalWritingTransform.allCases) { action in
+                    TransformCard(symbol: action.symbol, title: action.rawValue, detail: action.description,
+                                  badge: action.requiresLanguageModel ? "Model" : "Instant",
+                                  isSelected: selectedStyle == nil && selectedAction == action) {
+                        selectedAction = action
+                        selectedStyleID = nil
+                        clearPreview()
+                    }
+                    .disabled(model.localTransformService.isTransforming)
+                }
                 ForEach(customStyles) { style in
-                    HStack(spacing: 8) {
-                        Button {
-                            selectedStyleID = style.id
-                            clearPreview()
-                        } label: {
-                            HStack(alignment: .top, spacing: 10) {
-                                Image(systemName: "textformat")
-                                    .foregroundStyle(selectedStyleID == style.id ? Theme.ink : Color.secondary)
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(style.name).font(.hkCallout.weight(.semibold))
-                                    Text(style.instructions).font(.hkCaption).foregroundStyle(.secondary).lineLimit(2)
-                                }
-                                Spacer(minLength: 0)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(10)
-                            .background(selectedStyleID == style.id ? Theme.ink.opacity(0.09) : Color(nsColor: .controlBackgroundColor),
-                                        in: RoundedRectangle(cornerRadius: 9))
-                            .overlay(RoundedRectangle(cornerRadius: 9)
-                                .stroke(selectedStyleID == style.id ? Theme.ink.opacity(0.6) : Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 1))
+                    TransformCard(symbol: "textformat", title: style.name, detail: style.instructions,
+                                  badge: "Your style", isSelected: selectedStyleID == style.id) {
+                        selectedStyleID = style.id
+                        clearPreview()
+                    }
+                    .disabled(model.localTransformService.isTransforming)
+                    .contextMenu {
+                        Button("Edit style", systemImage: "pencil") {
+                            styleEditorRequest = WritingStyleEditorRequest(preset: style)
                         }
-                        .buttonStyle(.plain)
-                        .disabled(model.localTransformService.isTransforming)
-
-                        Menu {
-                            Button("Edit style", systemImage: "pencil") {
-                                styleEditorRequest = WritingStyleEditorRequest(preset: style)
-                            }
-                            Button("Delete style", systemImage: "trash", role: .destructive) {
-                                stylePendingDeletion = style
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
-                                .font(.hkTitle3)
-                                .foregroundStyle(.secondary)
-                                .frame(width: 32, height: 40)
-                                .contentShape(Rectangle())
+                        Button("Delete style", systemImage: "trash", role: .destructive) {
+                            stylePendingDeletion = style
                         }
-                        .menuStyle(.borderlessButton)
-                        .disabled(model.localTransformService.isTransforming)
-                        .help("Edit or delete \(style.name)")
                     }
                 }
+                if customStyles.count < WritingStylePreset.maximumCount {
+                    Button {
+                        styleEditorRequest = WritingStyleEditorRequest(preset: nil)
+                    } label: {
+                        VStack(alignment: .leading, spacing: Theme.s2) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 14, weight: .semibold))
+                                .frame(width: 28, height: 28)
+                                .background(Theme.well, in: Circle())
+                            Spacer(minLength: Theme.s2)
+                            Text("Create your own").font(.hkHeadline)
+                            Text("A tone, format or translation you reuse.")
+                                .font(.hkCaption)
+                                .foregroundStyle(Theme.ink2)
+                                .lineLimit(2)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 132, alignment: .topLeading)
+                        .padding(Theme.s4)
+                        .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
+                            .strokeBorder(Theme.hairline, style: StrokeStyle(lineWidth: 1, dash: [5, 4])))
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(model.localTransformService.isTransforming)
+                }
             }
-            Text("Styles are saved on this Mac. The selected instruction and transcript are sent only to Apple’s on-device model; HushKey has no cloud fallback.")
-                .font(.hkCaption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            if !customStyles.isEmpty {
+                Text("Right-click a style to edit or delete it.")
+                    .font(.hkCaption)
+                    .foregroundStyle(Theme.ink3)
+            }
         }
-        .padding(.top, 4)
     }
 
     private var previewCard: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Theme.s3) {
+            HStack {
+                Text("Preview").font(.hkTitle3)
+                Text(previewLabel ?? (previewAction ?? selectedAction).rawValue)
+                    .font(.hkCallout)
+                    .foregroundStyle(Theme.ink2)
+                Spacer()
+            }
+            VStack(alignment: .leading, spacing: 0) {
                 TextEditor(text: $draft)
                     .font(.hkBody)
-                    .frame(minHeight: 180)
-                    .padding(4)
-                    .background(.background, in: RoundedRectangle(cornerRadius: 8))
-                if normalizedDraft == normalizedSourceSnapshot {
-                    Label("This preview matches your transcript; there is nothing to apply.", systemImage: "checkmark.circle")
-                        .font(.hkCaption)
-                        .foregroundStyle(.secondary)
-                }
-                if sourceSnapshot != currentText {
-                    Label("The transcript changed after this preview. Generate a fresh preview before applying it.",
-                          systemImage: "exclamationmark.triangle")
-                        .font(.hkCaption)
-                        .foregroundStyle(.orange)
-                }
-                HStack(spacing: 10) {
-                    Button("Copy preview", systemImage: "doc.on.doc") {
+                    .lineSpacing(3)
+                    .scrollContentBackground(.hidden)
+                    .frame(minHeight: 160)
+                    .padding(Theme.s3)
+                RowDivider()
+                HStack(spacing: Theme.s2) {
+                    if sourceSnapshot != currentText {
+                        Label("Your text changed. Preview again.", systemImage: "exclamationmark.triangle")
+                            .font(.hkCaption)
+                            .foregroundStyle(Theme.finishing)
+                    } else if normalizedDraft == normalizedSourceSnapshot {
+                        Label("Same as your text.", systemImage: "checkmark.circle")
+                            .font(.hkCaption)
+                            .foregroundStyle(Theme.ink2)
+                    }
+                    Spacer()
+                    Button("Copy", systemImage: "doc.on.doc") {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(draft, forType: .string)
                         statusMessage = "Preview copied."
                     }
-                    .buttonStyle(.bordered)
-
-                    Button("Apply to Dictation", systemImage: "checkmark") {
+                    .buttonStyle(SecondaryButtonStyle())
+                    Button("Use this", systemImage: "checkmark") {
                         guard model.applyLocalTransform(draft, basedOn: sourceSnapshot) else {
                             statusMessage = currentText == sourceSnapshot
                                 ? "The transcript could not be updated. Try again."
@@ -439,25 +401,25 @@ struct TransformView: View {
                         draft = ""
                         previewAction = nil
                         previewLabel = nil
-                        statusMessage = "Applied. You can undo this transform below."
+                        statusMessage = "Applied. You can undo it."
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(PrimaryButtonStyle())
                     .disabled(!canApplyPreview)
                 }
+                .padding(.horizontal, Theme.s4)
+                .padding(.vertical, Theme.s3)
             }
-            .padding(10)
-        } label: {
-            Label("Review preview · \(previewLabel ?? (previewAction ?? selectedAction).rawValue)", systemImage: "doc.text.magnifyingglass")
+            .background(Theme.signalSoft.opacity(0.5), in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
+                .strokeBorder(Theme.signal.opacity(0.35), lineWidth: 1))
         }
+        .transition(.opacity.combined(with: .move(edge: .top)))
     }
 
     private var undoCard: some View {
-        GroupBox {
-            HStack {
-                Label("The last local transform can be undone.", systemImage: "arrow.uturn.backward.circle")
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Button("Undo transform", systemImage: "arrow.uturn.backward") {
+        SettingsGroup {
+            SettingsRow(title: "Undo the last transform", detail: "Puts your previous text back.") {
+                Button("Undo", systemImage: "arrow.uturn.backward") {
                     model.undoLocalTransform()
                     draft = ""
                     sourceSnapshot = ""
@@ -465,9 +427,8 @@ struct TransformView: View {
                     previewLabel = nil
                     statusMessage = "Previous transcript restored."
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(SecondaryButtonStyle())
             }
-            .padding(8)
         }
     }
 
@@ -583,25 +544,77 @@ private struct WritingStylePresetEditor: View {
                     .accessibilityLabel("Writing style instruction")
                 Text("Describe the tone or format. Example: Translate into French, keep product names unchanged, and return only the translation.")
                     .font(.hkCaption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.ink2)
             }
             if let validationMessage {
-                Text(validationMessage).font(.hkCaption).foregroundStyle(.orange)
+                Text(validationMessage).font(.hkCaption).foregroundStyle(Theme.finishing)
             }
             HStack {
                 Text("Up to 32 characters for the name and 500 for the instruction.")
                     .font(.hkCaption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.ink2)
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
                 Button("Save style") {
                     validationMessage = onSave(name, instructions)
                     if validationMessage == nil { dismiss() }
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(PrimaryButtonStyle())
             }
         }
         .padding(22)
         .frame(width: 540)
+    }
+}
+
+/// One transform choice, laid out like Wispr's transform cards: badge, title, short description.
+private struct TransformCard: View {
+    var symbol: String
+    var title: String
+    var detail: String
+    var badge: String
+    var isSelected: Bool
+    var action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: Theme.s2) {
+                HStack {
+                    Image(systemName: symbol)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(isSelected ? Theme.signal : Theme.ink2)
+                        .frame(width: 28, height: 28)
+                        .background(isSelected ? Theme.sheet : Theme.well,
+                                    in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
+                    Spacer()
+                    Text(badge)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.ink3)
+                        .padding(.horizontal, 7)
+                        .frame(height: 20)
+                        .background(Theme.well, in: Capsule())
+                }
+                Spacer(minLength: Theme.s2)
+                Text(title).font(.hkHeadline).foregroundStyle(Theme.ink)
+                Text(detail)
+                    .font(.hkCaption)
+                    .foregroundStyle(Theme.ink2)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, minHeight: 132, alignment: .topLeading)
+            .padding(Theme.s4)
+            .background(isSelected ? Theme.signalSoft : hovering ? Theme.well : Theme.sheet,
+                        in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
+                .strokeBorder(isSelected ? Theme.signal : Theme.hairline, lineWidth: isSelected ? 1.5 : 1))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .animation(Theme.snappy, value: isSelected)
+        .animation(.easeOut(duration: 0.12), value: hovering)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 }

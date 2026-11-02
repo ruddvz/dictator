@@ -53,7 +53,7 @@ struct MeetingNotesView: View {
             if let message = service.message {
                 Label(message, systemImage: "exclamationmark.circle")
                     .font(.hkCallout)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.ink2)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -103,26 +103,26 @@ struct MeetingNotesView: View {
                 if service.isCapturing {
                     Label(captureStatusTitle,
                           systemImage: "waveform.circle.fill")
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Theme.danger)
                     ProgressView(value: Double(service.activeAudioLevel))
                         .frame(maxWidth: 120)
                         .accessibilityLabel("Meeting audio input level")
                     Text(durationLabel(service.activeDuration))
                         .font(.hkCaption.monospacedDigit())
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.ink2)
                     Spacer()
                     Button("Stop and save", systemImage: "stop.fill") { service.stop() }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(PrimaryButtonStyle())
                 } else if service.isFinalizing {
                     ProgressView()
                     Text("Finishing the on-device transcript…")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.ink2)
                     Spacer()
                     Button("Finishing…") {}.disabled(true)
                 } else if service.isStarting {
                     ProgressView()
                     Text("Preparing local speech recognition…")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.ink2)
                     Spacer()
                     Button("Starting…") {}.disabled(true)
                 } else {
@@ -137,12 +137,12 @@ struct MeetingNotesView: View {
 
                         Text(audioSourceDescription)
                             .font(.hkCaption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.ink2)
                     }
                     Spacer()
                     Button("Start meeting", systemImage: service.audioSource == .microphone ? "record.circle" : "waveform",
                            action: startMeeting)
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(PrimaryButtonStyle())
                     .disabled(model.captureGate.owner != nil)
                 }
             }
@@ -171,11 +171,11 @@ struct MeetingNotesView: View {
                         Text(note.title).font(.hkHeadline).lineLimit(1)
                         Text(note.transcript.isEmpty ? "No transcript" : note.transcript)
                             .font(.hkCaption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.ink2)
                             .lineLimit(2)
                         Text(note.createdAt.formatted(date: .abbreviated, time: .shortened))
                             .font(.hkMeta)
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(Theme.ink3)
                     }
                     .padding(.vertical, 4)
                     .tag(note.id)
@@ -211,11 +211,12 @@ struct MeetingNotesView: View {
                 .font(.hkBody)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(6)
-                .background(.background, in: RoundedRectangle(cornerRadius: 8))
+                .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: Theme.r3, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
                 .disabled(true)
             Text("Live text is temporary until you stop the capture. No microphone audio is written to disk.")
                 .font(.hkCaption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.ink2)
         }
         .padding(10)
     }
@@ -247,7 +248,7 @@ struct MeetingNotesView: View {
             }
             Text("\(note.createdAt.formatted(date: .complete, time: .shortened)) · \(durationLabel(note.duration)) · Stored on this Mac")
                 .font(.hkCaption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.ink2)
 
             if service.isGenerating {
                 ProgressView("Creating a local draft…")
@@ -271,7 +272,7 @@ struct MeetingNotesView: View {
                         .disabled(service.isGenerating)
                     Text(model.localTransformService.availabilityMessage)
                         .font(.hkCaption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.ink2)
                 }
                 .padding(6)
             }
@@ -304,7 +305,7 @@ struct MeetingNotesView: View {
                         .disabled(service.isGenerating)
                     Text("\(note.transcript.count.formatted()) characters · Edit to correct recognition before generating notes.")
                         .font(.hkCaption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.ink2)
                 }
                 .padding(6)
             }
@@ -341,7 +342,7 @@ struct MeetingNotesView: View {
         Label("Start capture explicitly. Both sides combines your microphone with sound playing from apps. macOS may ask separately for microphone and System Audio Recording access. Speech recognition and notes stay on this Mac; audio is not saved and speakers are not identified.",
               systemImage: "lock.shield")
             .font(.hkCaption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Theme.ink2)
             .fixedSize(horizontal: false, vertical: true)
     }
 

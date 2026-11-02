@@ -19,7 +19,7 @@ struct UseView: View {
                 if model.insertion.isEnabled {
                     Label("Accessibility insertion is enabled · \(model.insertion.shortcut.label)", systemImage: "checkmark.shield")
                         .font(.hkCaption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.ink2)
                 }
                 DisclosureGroup("Advanced diagnostics and comparison") {
                     VStack(alignment: .leading, spacing: 14) {
@@ -38,13 +38,13 @@ struct UseView: View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "lock.shield")
                 .font(.hkTitle2)
-                .foregroundStyle(.orange)
+                .foregroundStyle(Theme.finishing)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 Text("Silent use is locked").font(.hkHeadline)
                 Text(eligibilityMessage)
                     .font(.hkCallout)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.ink2)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 12)
@@ -59,7 +59,7 @@ struct UseView: View {
                     model.screen = .evaluate
                 }
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(SecondaryButtonStyle())
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -127,7 +127,7 @@ struct UseView: View {
                     Label("Auto capture is locked until silent-motion evidence passes and a live motion stream is available.",
                           systemImage: "lock.shield")
                         .font(.hkCallout)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.ink2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
@@ -160,11 +160,11 @@ struct UseView: View {
                 }
                 .disabled(capture.isCalibrating || model.motion.status != .streaming)
                 if let floor = capture.noiseFloor {
-                    Text(String(format: "floor %.4f", floor)).font(.hkCaption.monospacedDigit()).foregroundStyle(.secondary)
+                    Text(String(format: "floor %.4f", floor)).font(.hkCaption.monospacedDigit()).foregroundStyle(Theme.ink2)
                 }
                 Spacer()
                 Circle()
-                    .fill(capture.isCapturing ? Theme.signal : Color.secondary.opacity(0.3))
+                    .fill(capture.isCapturing ? Theme.signal : Theme.ink2.opacity(0.3))
                     .frame(width: 10, height: 10)
                 Text(capture.isCapturing ? "Capturing" : "Listening")
                     .font(.hkCaption)
@@ -180,7 +180,7 @@ struct UseView: View {
             if capture.noiseFloor == nil {
                 Text("Calibrate first: keep still for 2 s so the detector learns your resting motion.")
                     .font(.hkCaption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.ink2)
             }
         }
     }
@@ -198,7 +198,7 @@ struct UseView: View {
                 if model.decoded.isEmpty {
                     Text(model.isMotionInferenceEnabled ? "Mouth a trained word…" : "Complete the evidence checks to begin.")
                         .font(.hkTitle2)
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(Theme.ink3)
                         .frame(maxWidth: .infinity, minHeight: 80, alignment: .topLeading)
                 } else {
                     decodedText
@@ -208,7 +208,7 @@ struct UseView: View {
                 }
                 Text("Accepted words appear normally. Rejected matches stay faded and will not be inserted.")
                     .font(.hkMeta)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.ink2)
             }
             .padding(6)
         }
@@ -241,13 +241,13 @@ struct UseView: View {
                     Text(String(format: "Confidence %.2f · %@", prediction.confidence,
                                 prediction.accepted ? "accepted" : "rejected"))
                         .font(.hkCaption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.ink2)
                     SignalPlot(title: "Rotation rate", samples: model.lastSegment,
                                channels: SignalPlot.rotation, minScale: 0.05, height: 60)
                 } else {
                     Text("DTW distance to each word's closest take appears here.")
                         .font(.hkCaption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.ink2)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

@@ -55,7 +55,7 @@ struct FileTranscriptionView: View {
                             Label("This transcript is saved in Recent file transcripts. Choose an audio file to start a separate job or switch engines.",
                                   systemImage: "checkmark.circle")
                                 .font(.hkCaption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Theme.ink2)
                         }
 
                         Label(engine == .apple
@@ -63,7 +63,7 @@ struct FileTranscriptionView: View {
                               : "WhisperKit uses a model you choose and download. The model download needs internet; transcription itself runs locally after setup.",
                               systemImage: "lock.shield")
                             .font(.hkCallout)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.ink2)
                             .fixedSize(horizontal: false, vertical: true)
 
                         if engine == .whisperKit {
@@ -77,14 +77,14 @@ struct FileTranscriptionView: View {
                                 .disabled(isBusy)
                                 if whisper.selectedModelIsDownloaded {
                                     Label("On this Mac", systemImage: "checkmark.circle.fill")
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(Theme.ink2)
                                     Button("Remove model", role: .destructive) { whisper.removeSelectedModel() }
                                         .disabled(isBusy)
                                 } else {
                                     Button("Download model", systemImage: "arrow.down.circle") {
                                         whisper.downloadSelectedModel()
                                     }
-                                    .buttonStyle(.borderedProminent)
+                                    .buttonStyle(PrimaryButtonStyle())
                                     .disabled(isBusy)
                                 }
                             }
@@ -94,13 +94,13 @@ struct FileTranscriptionView: View {
                                         .accessibilityLabel("Downloading local speech model")
                                     Text(whisper.downloadProgressDescription)
                                         .font(.hkCaption.monospacedDigit())
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(Theme.ink2)
                                     Button("Cancel", role: .cancel) { whisper.cancelDownload() }
                                         .disabled(whisper.status == "Cancelling model download…")
                                 }
                                 Text("Model files stay in HushKey’s local Application Support folder. You can remove them here.")
                                     .font(.hkCaption)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Theme.ink2)
                             }
                         }
 
@@ -121,7 +121,7 @@ struct FileTranscriptionView: View {
                                       systemImage: isBusy ? "hourglass" : "waveform")
                                     .frame(minWidth: 150)
                             }
-                            .buttonStyle(.borderedProminent)
+                            .buttonStyle(PrimaryButtonStyle())
                             .disabled(selectedURL == nil || isBusy ||
                                       (engine == .whisperKit && !whisper.selectedModelIsDownloaded))
 
@@ -154,11 +154,11 @@ struct FileTranscriptionView: View {
 
                         if let error = currentError {
                             Label(error, systemImage: "exclamationmark.triangle.fill")
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(Theme.finishing)
                                 .fixedSize(horizontal: false, vertical: true)
                         } else if let status = currentStatus {
                             Label(status, systemImage: isBusy ? "gearshape.2" : "checkmark.circle")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Theme.ink2)
                         }
                     }
                     .padding(10)
@@ -178,7 +178,8 @@ struct FileTranscriptionView: View {
                                 .frame(minHeight: 220)
                                 .disabled(isBusy)
                                 .padding(4)
-                                .background(.background, in: RoundedRectangle(cornerRadius: 8))
+                                .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: Theme.r3, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
 
                             HStack(spacing: 10) {
                                 Button("Save text…", systemImage: "doc.text") { save(content: currentText, fileExtension: "txt", type: .plainText) }
@@ -189,14 +190,14 @@ struct FileTranscriptionView: View {
                                 Spacer()
                                 Text("\(currentCues.count) timed segments")
                                     .font(.hkCaption)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Theme.ink2)
                             }
                             Text("Transcript edits save automatically to Recent file transcripts and appear in TXT export. Subtitle exports keep the original timed recognition segments.")
                                 .font(.hkCaption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Theme.ink2)
                         }
                         if let exportMessage {
-                            Text(exportMessage).font(.hkCaption).foregroundStyle(.secondary)
+                            Text(exportMessage).font(.hkCaption).foregroundStyle(Theme.ink2)
                         }
                     }
                     .padding(8)
@@ -239,7 +240,7 @@ struct FileTranscriptionView: View {
                         .textFieldStyle(.roundedBorder)
                     if !historySessions.isEmpty {
                         Button("Delete all…", role: .destructive) { confirmClearHistory = true }
-                            .buttonStyle(.bordered)
+                            .buttonStyle(SecondaryButtonStyle())
                     }
                 }
 
@@ -258,11 +259,11 @@ struct FileTranscriptionView: View {
                                 VStack(alignment: .leading, spacing: 4) {
                                     HStack(spacing: 8) {
                                         Text(session.sourceName).font(.hkHeadline).lineLimit(1)
-                                        Text(session.engine.rawValue).font(.hkCaption).foregroundStyle(.secondary)
+                                        Text(session.engine.rawValue).font(.hkCaption).foregroundStyle(Theme.ink2)
                                     }
-                                    Text(session.text).font(.hkCallout).foregroundStyle(.secondary).lineLimit(2)
+                                    Text(session.text).font(.hkCallout).foregroundStyle(Theme.ink2).lineLimit(2)
                                     Text(session.createdAt.formatted(date: .abbreviated, time: .shortened))
-                                        .font(.hkMeta).foregroundStyle(.tertiary)
+                                        .font(.hkMeta).foregroundStyle(Theme.ink3)
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .contentShape(Rectangle())
@@ -282,10 +283,10 @@ struct FileTranscriptionView: View {
                 }
 
                 Text("Transcript text and timed cues stay on this Mac. HushKey does not copy or retain the source audio.")
-                    .font(.hkCaption).foregroundStyle(.secondary)
+                    .font(.hkCaption).foregroundStyle(Theme.ink2)
                 if let message = model.fileTranscriptionHistoryMessage {
                     Label(message, systemImage: "exclamationmark.triangle")
-                        .font(.hkCaption).foregroundStyle(.orange)
+                        .font(.hkCaption).foregroundStyle(Theme.finishing)
                 }
             }
             .padding(8)

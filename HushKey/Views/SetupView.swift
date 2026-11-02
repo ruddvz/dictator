@@ -38,7 +38,7 @@ struct SetupView: View {
                 Label("Headphone motion is not an inward-facing microphone or a lip-reading sensor.",
                       systemImage: "info.circle")
                     .font(.hkCallout)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.ink2)
             }
             .pageLayout()
         }
@@ -61,7 +61,7 @@ struct SetupView: View {
                             .font(.hkHeadline)
                         Text(statusMessage)
                             .font(.hkCallout)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.ink2)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -153,26 +153,26 @@ struct SetupView: View {
             Button("Continue to training", systemImage: "arrow.right") {
                 model.screen = .train
             }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(PrimaryButtonStyle())
         case .denied:
             Button("Open Motion Settings", systemImage: "lock.open") {
                 openSystemSettings("x-apple.systempreferences:com.apple.preference.security?Privacy_Motion")
             }
-                .buttonStyle(.bordered)
+                .buttonStyle(SecondaryButtonStyle())
         case .waiting:
             Button("Bluetooth Settings", systemImage: "dot.radiowaves.left.and.right") {
                 openSystemSettings("x-apple.systempreferences:com.apple.BluetoothSettings")
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(PrimaryButtonStyle())
             Button("Sound Settings", systemImage: "speaker.wave.2") {
                 openSystemSettings("x-apple.systempreferences:com.apple.Sound-Settings.extension")
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(SecondaryButtonStyle())
         case .unsupported, .error:
             Button("Open Sound Settings", systemImage: "speaker.wave.2") {
                 openSystemSettings("x-apple.systempreferences:com.apple.Sound-Settings.extension")
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(SecondaryButtonStyle())
         }
     }
 
@@ -185,7 +185,7 @@ struct SetupView: View {
         VStack(alignment: .leading, spacing: 3) {
             Text(title)
                 .font(.hkCaption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.ink2)
             Text(value)
                 .font(.hkTitle3.monospacedDigit().weight(.semibold))
         }
@@ -203,7 +203,7 @@ private struct StudyStep: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: state == .done ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(state == .done ? Color.green : state == .current ? Theme.ink : Color.secondary)
+                .foregroundStyle(state == .done ? Color.green : state == .current ? Theme.ink : Theme.ink2)
                 .font(.hkTitle3)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
@@ -211,7 +211,7 @@ private struct StudyStep: View {
                     .font(.hkCallout.weight(state == .current ? .semibold : .medium))
                 Text(detail)
                     .font(.hkCaption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.ink2)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }

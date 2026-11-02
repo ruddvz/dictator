@@ -14,6 +14,7 @@ struct DictationView: View {
                     NextStepBanner()
                     statsCard.frame(width: 248)
                 }
+                .fixedSize(horizontal: false, vertical: true)
                 if showsComposer {
                     composer
                         .transition(.asymmetric(insertion: .opacity.combined(with: .move(edge: .top)),
@@ -21,7 +22,7 @@ struct DictationView: View {
                 }
                 historySection
             }
-            .pageLayout()
+            .pageLayout(maxWidth: Theme.homeWidth)
             .animation(Theme.gentle, value: showsComposer)
         }
         .scrollIndicators(.automatic)
@@ -36,20 +37,20 @@ struct DictationView: View {
         HStack(alignment: .center, spacing: Theme.s4) {
             VStack(alignment: .leading, spacing: Theme.s2) {
                 Text("Hey \(firstName)")
-                    .font(.display(34))
-                    .tracking(-0.4)
+                    .font(.hkTitle1)
+                    .tracking(-0.3)
                 HStack(spacing: Theme.s2) {
                     Text(holds ? "Hold" : "Press")
-                    KeycapShortcut(label: model.dictationShortcut.label, size: 12)
+                    KeycapShortcut(label: model.dictationShortcut.label, size: 13)
                     Text(model.dictationShortcut.usesFunctionKey
                          ? "anywhere and talk. Double-tap for hands-free."
                          : holds ? "anywhere and talk. Let go to finish." : "anywhere to start and stop.")
                 }
-                .font(.system(size: 15))
+                .font(.hkCallout)
                 .foregroundStyle(Theme.ink2)
                 if let problem {
                     Label(problem, systemImage: "exclamationmark.triangle.fill")
-                        .font(.system(size: 13.5, weight: .medium))
+                        .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(Theme.finishing)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -230,7 +231,7 @@ struct DictationView: View {
 
     private var statsCard: some View {
         let stats = model.dictationStats
-        return VStack(alignment: .leading, spacing: Theme.s3) {
+        return VStack(alignment: .leading, spacing: Theme.s4) {
             statRow(value: stats.totalWords.formatted(), label: "words dictated")
             statRow(value: stats.wordsPerMinute.map { "\($0)" } ?? "–", label: "words per minute")
             statRow(value: "\(stats.dayStreak)", label: stats.dayStreak == 1 ? "day streak" : "days in a row")
@@ -240,19 +241,19 @@ struct DictationView: View {
                 ActivityHeatmap(entries: model.dictationHistory)
             }
         }
-        .card(padding: Theme.s4)
+        .card(padding: Theme.s5)
         .accessibilityElement(children: .combine)
     }
 
     private func statRow(value: String, label: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: Theme.s2) {
             Text(value)
-                .font(.display(30))
+                .font(.display(28))
                 .monospacedDigit()
                 .contentTransition(.numericText())
                 .animation(Theme.gentle, value: value)
             Text(label)
-                .font(.system(size: 14))
+                .font(.hkCallout)
                 .foregroundStyle(Theme.ink2)
         }
     }
@@ -262,7 +263,7 @@ struct DictationView: View {
     private var historySection: some View {
         VStack(alignment: .leading, spacing: Theme.s3) {
             HStack(spacing: Theme.s2) {
-                Text("History").font(.system(size: 16, weight: .semibold))
+                Text("History").font(.hkTitle3)
                 Spacer()
                 if !model.dictationHistory.isEmpty {
                     if searching || !historySearch.isEmpty {
@@ -277,9 +278,10 @@ struct DictationView: View {
                     } label: {
                         Image(systemName: "ellipsis")
                     }
-                    .menuStyle(.borderlessButton)
+                    .menuStyle(.button)
+                    .buttonStyle(IconButtonStyle())
                     .menuIndicator(.hidden)
-                    .frame(width: 28, height: 28)
+                    .fixedSize()
                     .help("History options")
                 }
             }
@@ -330,14 +332,14 @@ struct DictationView: View {
                 .frame(width: 36, height: 36)
                 .foregroundStyle(Theme.ink3)
             Text(model.savesDictationHistory ? "Your dictations collect here" : "History is off")
-                .font(.system(size: 15, weight: .semibold))
+                .font(.hkHeadline)
             Text(model.savesDictationHistory
                  ? "Each one is kept on this Mac, grouped by day, ready to copy or edit again."
                  : "Turn it on in Settings to keep recent dictations on this Mac.")
-                .font(.system(size: 14))
+                .font(.hkCallout)
                 .foregroundStyle(Theme.ink2)
                 .multilineTextAlignment(.center)
-                .frame(maxWidth: 340)
+                .frame(maxWidth: 380)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, Theme.s6)
@@ -363,11 +365,12 @@ struct DictationView: View {
             .buttonStyle(.plain)
             .foregroundStyle(Theme.ink3)
         }
-        .font(.system(size: 14))
+        .font(.hkCallout)
         .padding(.horizontal, Theme.s3)
-        .frame(height: 30)
-        .background(Theme.well, in: Capsule())
-        .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 1))
+        .frame(height: Theme.controlHeight - 4)
+        .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
+            .strokeBorder(Theme.hairline, lineWidth: 1))
     }
 
     private struct DayGroup {
@@ -458,10 +461,10 @@ private struct NextStepBanner: View {
                 HStack(alignment: .bottom, spacing: Theme.s4) {
                     VStack(alignment: .leading, spacing: Theme.s2) {
                         Text(step.title)
-                            .font(.display(26))
-                            .tracking(-0.2)
+                            .font(.display(28))
+                            .tracking(-0.3)
                         Text(step.detail)
-                            .font(.system(size: 14))
+                            .font(.hkCallout)
                             .foregroundStyle(Theme.ink2)
                             .fixedSize(horizontal: false, vertical: true)
                         Button(step.action) { step.perform(model) }
@@ -472,7 +475,7 @@ private struct NextStepBanner: View {
                     BannerWave()
                         .frame(width: 150, height: 80)
                 }
-                .padding(Theme.s5)
+                .padding(Theme.s6 - 4)
 
                 Button("Dismiss", systemImage: "xmark") {
                     withAnimation(Theme.gentle) {
@@ -489,7 +492,7 @@ private struct NextStepBanner: View {
                 .help("Hide this suggestion")
             }
             .foregroundStyle(Theme.ink)
-            .frame(maxWidth: .infinity, minHeight: 168, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 180, alignment: .leading)
             .background(Theme.signalSoft, in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
             .id(step.id)
             .transition(.opacity.combined(with: .scale(scale: 0.98)))
@@ -533,12 +536,12 @@ private struct HistoryRow: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: Theme.s4) {
             Text(entry.createdAt.formatted(date: .omitted, time: .shortened))
-                .font(.system(size: 13.5).monospacedDigit())
-                .foregroundStyle(Theme.ink3)
-                .frame(width: 64, alignment: .leading)
+                .font(.system(size: 14).monospacedDigit())
+                .foregroundStyle(Theme.ink2)
+                .frame(width: 82, alignment: .leading)
             Text(entry.text)
-                .font(.system(size: 15))
-                .lineSpacing(2)
+                .font(.hkBody)
+                .lineSpacing(3)
                 .lineLimit(3)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .textSelection(.enabled)
@@ -560,8 +563,9 @@ private struct HistoryRow: View {
             .offset(x: isHovering ? 0 : 6)
         }
         .padding(.horizontal, Theme.s4)
-        .padding(.vertical, Theme.s3)
-        .background(isHovering ? Theme.hover : .clear)
+        .padding(.vertical, 15)
+        .frame(minHeight: Theme.listRow)
+        .background(isHovering ? Theme.well : .clear)
         .contentShape(Rectangle())
         .onHover { hovering in withAnimation(.easeOut(duration: 0.14)) { isHovering = hovering } }
         .contextMenu {

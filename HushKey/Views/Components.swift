@@ -41,8 +41,8 @@ extension PageHeader where Actions == EmptyView {
 
 extension View {
     /// The one page layout: a centered 800 pt column, 48 pt from the top of the sheet.
-    func pageLayout() -> some View {
-        frame(maxWidth: Theme.pageWidth, alignment: .leading)
+    func pageLayout(maxWidth: CGFloat = Theme.pageWidth) -> some View {
+        frame(maxWidth: maxWidth, alignment: .leading)
             .padding(.horizontal, Theme.s7 - 8)
             .padding(.top, Theme.s7)
             .padding(.bottom, Theme.s6)
@@ -377,7 +377,7 @@ struct SignalPlot: View {
                     Spacer()
                     Text("±\(scale, specifier: "%.3f")")
                         .font(.hkMeta.monospacedDigit())
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.ink2)
                 }
             }
             Canvas { context, size in
@@ -448,7 +448,7 @@ struct HoldToCaptureButton: View {
                 .font(.hkHeadline)
             Text("Hold \(shortcut) or press and hold here")
                 .font(.hkCaption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.ink2)
         }
         .frame(maxWidth: .infinity, minHeight: 120)
         .background(

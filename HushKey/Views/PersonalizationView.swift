@@ -113,7 +113,7 @@ struct PersonalizationView: View {
                         .frame(maxWidth: 340)
 
                         HStack(spacing: 8) {
-                            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                            Image(systemName: "magnifyingglass").foregroundStyle(Theme.ink2)
                             TextField("Search \(section.rawValue.lowercased())", text: $query)
                                 .textFieldStyle(.plain)
                                 .accessibilityLabel("Search \(section.rawValue.lowercased())")
@@ -121,7 +121,7 @@ struct PersonalizationView: View {
                                 Button("Clear search", systemImage: "xmark.circle.fill") { query = "" }
                                     .labelStyle(.iconOnly)
                                     .buttonStyle(.plain)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Theme.ink2)
                             }
                         }
                         .padding(.horizontal, 11)
@@ -132,7 +132,7 @@ struct PersonalizationView: View {
                         Button("Add", systemImage: "plus") {
                             editor = PersonalizationEditorRequest(section: section, snippet: nil, term: nil)
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(PrimaryButtonStyle())
                     }
                     .padding(8)
                 }
@@ -158,7 +158,7 @@ struct PersonalizationView: View {
                     Label("Your saved terms are prioritized ahead of optional mode, nearby-text, and Silent Lab hints. Up to 100 hints go to on-device Speech per capture; recognition can still misspell unfamiliar names.",
                           systemImage: "info.circle")
                         .font(.hkCaption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.ink2)
                 } else {
                     advancedCorrectionEditor
                 }
@@ -166,7 +166,7 @@ struct PersonalizationView: View {
                 Label("HushKey uses personalization entries locally. It does not upload your words, corrections, or snippets.",
                       systemImage: "lock.shield")
                     .font(.hkCaption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.ink2)
             }
             .pageLayout()
         }
@@ -200,7 +200,7 @@ struct PersonalizationView: View {
                 HStack(alignment: .center, spacing: 14) {
                     VStack(alignment: .leading, spacing: 5) {
                         Text(entry.cue).font(.hkHeadline)
-                        Text(entry.expansion).font(.hkBody).foregroundStyle(.secondary).lineLimit(2)
+                        Text(entry.expansion).font(.hkBody).foregroundStyle(Theme.ink2).lineLimit(2)
                     }
                     Spacer(minLength: 12)
                     Button("Edit \(entry.cue)", systemImage: "pencil") {
@@ -233,7 +233,7 @@ struct PersonalizationView: View {
         } else {
             ForEach(filteredVocabulary, id: \.self) { term in
                 HStack(spacing: 12) {
-                    Image(systemName: "character.book.closed").foregroundStyle(.secondary)
+                    Image(systemName: "character.book.closed").foregroundStyle(Theme.ink2)
                     Text(term).font(.hkBody)
                     Spacer()
                     Button("Edit \(term)", systemImage: "pencil") {
@@ -272,7 +272,7 @@ struct PersonalizationView: View {
                         Text(rule.cue).font(.hkHeadline)
                         Label(rule.expansion, systemImage: "arrow.right")
                             .font(.hkBody)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.ink2)
                             .lineLimit(2)
                     }
                     Spacer(minLength: 12)
@@ -302,18 +302,19 @@ struct PersonalizationView: View {
                 .font(.hkBody.monospaced())
                 .frame(minHeight: 90)
                 .padding(5)
-                .background(.background, in: RoundedRectangle(cornerRadius: 8))
+                .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: Theme.r3, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
                 .padding(.top, 8)
             Text("One per line: spoken cue => expanded phrase. Use this editor to repair malformed older entries.")
                 .font(.hkCaption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.ink2)
             let validation = DictationSnippetExpander.validation(for: model.dictationSnippets)
             Label(validation.invalidLines.isEmpty
                   ? "\(validation.validCount) ready"
                   : "\(validation.validCount) ready · check line\(validation.invalidLines.count == 1 ? "" : "s") \(validation.invalidLines.map(String.init).joined(separator: ", "))",
                   systemImage: validation.invalidLines.isEmpty ? "checkmark.circle" : "exclamationmark.circle")
                 .font(.hkCaption)
-                .foregroundStyle(validation.invalidLines.isEmpty ? Color.secondary : Theme.danger)
+                .foregroundStyle(validation.invalidLines.isEmpty ? Theme.ink2 : Theme.danger)
         }
         .padding(12)
         .background(.quaternary.opacity(0.22), in: RoundedRectangle(cornerRadius: 10))
@@ -326,18 +327,19 @@ struct PersonalizationView: View {
                 .font(.hkBody.monospaced())
                 .frame(minHeight: 90)
                 .padding(5)
-                .background(.background, in: RoundedRectangle(cornerRadius: 8))
+                .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: Theme.r3, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
                 .padding(.top, 8)
             Text("One per line: recognized phrase => corrected phrase. Matches are case-insensitive and respect whole-word boundaries. Raw recognition remains available to restore.")
                 .font(.hkCaption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.ink2)
             let validation = DictationCorrectionRules.validation(for: model.dictationCorrectionRules)
             Label(validation.invalidLines.isEmpty
                   ? "\(validation.validCount) ready"
                   : "\(validation.validCount) ready · check line\(validation.invalidLines.count == 1 ? "" : "s") \(validation.invalidLines.map(String.init).joined(separator: ", "))",
                   systemImage: validation.invalidLines.isEmpty ? "checkmark.circle" : "exclamationmark.circle")
                 .font(.hkCaption)
-                .foregroundStyle(validation.invalidLines.isEmpty ? Color.secondary : Color.orange)
+                .foregroundStyle(validation.invalidLines.isEmpty ? Theme.ink2 : Color.orange)
         }
         .padding(12)
         .background(.quaternary.opacity(0.22), in: RoundedRectangle(cornerRadius: 10))
@@ -350,7 +352,7 @@ struct PersonalizationView: View {
                     .frame(width: 40, height: 40)
                     .background(Theme.ink.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(title).font(.hkCaption).foregroundStyle(.secondary)
+                    Text(title).font(.hkCaption).foregroundStyle(Theme.ink2)
                     Text("\(count)").font(.hkTitle3.weight(.semibold).monospacedDigit())
                 }
                 Spacer(minLength: 0)
@@ -479,7 +481,7 @@ private struct PersonalizationEntryEditor: View {
                              ? "Corrects complete word or phrase matches in the recognized transcript."
                              : "HushKey matches the full cue at the end of a spoken phrase.")
                             .font(.hkCaption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.ink2)
                     }
                     Section(section == .corrections ? "Use instead" : "Expanded phrase") {
                         TextField(section == .corrections ? "For example: HushKey" : "Text to insert into the transcript", text: $expansion)
@@ -490,11 +492,11 @@ private struct PersonalizationEntryEditor: View {
                     }
                     Text("This stays on this Mac and is provided as an on-device recognition hint.")
                         .font(.hkCaption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.ink2)
                 }
                 if let validationMessage {
                     Label(validationMessage, systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Theme.finishing)
                         .font(.hkCallout)
                 }
             }

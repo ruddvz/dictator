@@ -29,7 +29,7 @@ struct EvaluateView: View {
                         .pickerStyle(.segmented)
                         Text(conditionNote)
                             .font(.hkCaption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.ink2)
                     }
                     .padding(8)
                 }
@@ -70,7 +70,7 @@ struct EvaluateView: View {
                     complete: uniqueSessions >= 2)
                 Text("Evaluation can run once the first two study-size checks pass. Silent use also requires significant permutation results and held-out session accuracy above baseline.")
                     .font(.hkCaption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.ink2)
                     .padding(.top, 2)
             }
             .padding(8)
@@ -97,7 +97,7 @@ struct EvaluateView: View {
                     Button(model.isEvaluating ? "Evaluating…" : "Evaluate") {
                         model.evaluate()
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(PrimaryButtonStyle())
                     .disabled(model.isEvaluating || model.featureSet.isEmpty || !meetsTemplateProtocol)
                 }
                 if model.trainingCondition == .silent {
@@ -129,11 +129,11 @@ private struct ReadinessRow: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Image(systemName: complete ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(complete ? Color.green : Color.secondary)
+                .foregroundStyle(complete ? Color.green : Theme.ink2)
                 .accessibilityHidden(true)
             Text(title).font(.hkCallout.weight(.medium))
             Spacer()
-            Text(detail).font(.hkCaption).foregroundStyle(.secondary)
+            Text(detail).font(.hkCaption).foregroundStyle(Theme.ink2)
         }
         .accessibilityElement(children: .combine)
     }
@@ -172,12 +172,12 @@ private struct EvaluationResultView: View {
                         metric("Holdout baseline", percent(baseline))
                         Text("\(result.sessionHoldoutSessions) folds")
                             .font(.hkCaption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.ink2)
                     }
                 } else {
                     Label("Session holdout needs examples from at least two distinct sessions.", systemImage: "info.circle")
                         .font(.hkCaption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.ink2)
                 }
                 Text(verdict)
                     .font(.hkCallout.weight(.medium))
@@ -196,7 +196,7 @@ private struct EvaluationResultView: View {
     private var confusionMatrix: some View {
         Grid(horizontalSpacing: 2, verticalSpacing: 2) {
             GridRow {
-                Text("actual ↓ / predicted →").font(.hkMeta).foregroundStyle(.secondary)
+                Text("actual ↓ / predicted →").font(.hkMeta).foregroundStyle(Theme.ink2)
                 ForEach(result.labels, id: \.self) { Text($0).font(.hkMeta).lineLimit(1) }
             }
             ForEach(result.labels.indices, id: \.self) { row in
@@ -247,7 +247,7 @@ private struct EvaluationResultView: View {
 
     private func metric(_ title: String, _ value: String, highlight: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(title).font(.hkCaption).foregroundStyle(.secondary)
+            Text(title).font(.hkCaption).foregroundStyle(Theme.ink2)
             Text(value).font(highlight ? .title2.bold().monospacedDigit() : .title3.monospacedDigit())
         }
     }
