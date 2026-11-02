@@ -97,14 +97,16 @@ struct MeetingNotesView: View {
     }
 
     private var captureControls: some View {
-        GroupBox {
+        @Bindable var meeting = service
+        return GroupBox {
             HStack(spacing: 14) {
                 if service.isCapturing {
-                    Label("Capturing on this Mac", systemImage: "waveform.circle.fill")
+                    Label(captureStatusTitle,
+                          systemImage: "waveform.circle.fill")
                         .foregroundStyle(.red)
-                    ProgressView(value: Double(service.audio.level))
+                    ProgressView(value: Double(service.activeAudioLevel))
                         .frame(maxWidth: 120)
-                        .accessibilityLabel("Microphone input level")
+                        .accessibilityLabel("Meeting audio input level")
                     Text(durationLabel(service.activeDuration))
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(.secondary)
@@ -124,27 +126,22 @@ struct MeetingNotesView: View {
                     Spacer()
                     Button("Starting…") {}.disabled(true)
                 } else {
-                    Label("Ready", systemImage: "mic")
-                        .foregroundStyle(.secondary)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Microphone only · No audio is saved")
-                            .font(.callout)
-                        Text("Remote voices routed directly to headphones may be missed.")
+                    VStack(alignment: .leading, spacing: 6) {
+                        Picker("Meeting audio source", selection: $meeting.audioSource) {
+                            ForEach(MeetingAudioSource.allCases) { source in
+                                Text(source.rawValue).tag(source)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(maxWidth: 360)
+
+                        Text(audioSourceDescription)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button("Start meeting", systemImage: "record.circle") {
-                        service.audio.selectedDeviceID = model.audio.selectedDeviceID
-                        Task {
-                            await service.start(
-                                localeIdentifier: model.dictationLanguage,
-                                contextualStrings: Array(Set(model.dataset.vocabulary +
-                                    DictationVocabulary.terms(from: model.dictationTerms))).prefix(100).map { $0 },
-                                dictationIsBusy: model.audio.isRunning || model.isFinalizingDictation ||
-                                    model.transcriber.isRunning || model.transcriber.isFinalizing)
-                        }
-                    }
+                    Button("Start meeting", systemImage: service.audioSource == .microphone ? "record.circle" : "waveform",
+                           action: startMeeting)
                     .buttonStyle(.borderedProminent)
                     .disabled(model.captureGate.owner != nil)
                 }
@@ -320,12 +317,47 @@ struct MeetingNotesView: View {
             model.localTransformService.modelIsAvailable
     }
 
+    private var captureStatusTitle: String {
+        switch service.activeAudioSource {
+        case .microphone: "Capturing microphone"
+        case .systemAudio: "Capturing system audio"
+        case .both: "Capturing both sides"
+        case nil: "Capturing meeting audio"
+        }
+    }
+
+    private var audioSourceDescription: String {
+        switch service.audioSource {
+        case .microphone:
+            "Captures your selected microphone. Remote voices routed to headphones may be missed."
+        case .systemAudio:
+            "Captures audio playing from apps on this Mac. Your microphone is not included."
+        case .both:
+            "Captures your selected microphone and Mac audio together. Requires both permissions."
+        }
+    }
+
     private var privacyNote: some View {
-        Label("Start capture explicitly. Speech recognition and generated notes stay on this Mac; microphone audio is not saved. Remote voices routed to headphones may be missed, and speaker identities are not inferred.",
+        Label("Start capture explicitly. Both sides combines your microphone with sound playing from apps. macOS may ask separately for microphone and System Audio Recording access. Speech recognition and notes stay on this Mac; audio is not saved and speakers are not identified.",
               systemImage: "lock.shield")
             .font(.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func startMeeting() {
+        if service.audioSource == .microphone || service.audioSource == .both {
+            service.audio.selectedDeviceID = model.audio.selectedDeviceID
+        }
+        Task {
+            await service.start(
+                localeIdentifier: model.dictationLanguage,
+                contextualStrings: DictationContextHints.prioritized(
+                    customWords: DictationVocabulary.terms(from: model.dictationTerms),
+                    learnedWords: model.dataset.vocabulary),
+                dictationIsBusy: model.audio.isRunning || model.isFinalizingDictation ||
+                    model.transcriber.isRunning || model.transcriber.isFinalizing)
+        }
     }
 
     private func binding<Value>(for note: MeetingNote, keyPath: WritableKeyPath<MeetingNote, Value>) -> Binding<Value> {

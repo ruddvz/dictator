@@ -1,13 +1,31 @@
 import Foundation
 import Observation
 
-/// Explicit, microphone-only meeting capture. Audio buffers are streamed to on-device Speech and never written to disk.
+enum MeetingAudioSource: String, CaseIterable, Identifiable {
+    case microphone = "Microphone"
+    case systemAudio = "System audio"
+    case both = "Both sides"
+
+    var id: String { rawValue }
+
+    var captureRoute: MeetingAudioCaptureRoute {
+        self == .microphone ? .microphone : .systemAudio
+    }
+}
+
+enum MeetingAudioCaptureRoute: Equatable {
+    case microphone
+    case systemAudio
+}
+
+/// Explicit meeting capture. Audio buffers are streamed to on-device Speech and never written to disk.
 @MainActor @Observable
 final class MeetingNotesService {
     let audio = AudioService()
+    let systemAudio = SystemAudioService()
     let transcriber = MicTranscriber()
 
-    private(set) var notes: [MeetingNote] = MeetingNotesStore.load()
+    private(set) var notes: [MeetingNote]
     private(set) var isStarting = false
     private(set) var isCapturing = false
     private(set) var isFinalizing = false
@@ -15,17 +33,29 @@ final class MeetingNotesService {
     private(set) var message: String?
     private(set) var activeMeetingStartedAt: Date?
     private(set) var selectedNoteID: UUID?
+    private(set) var activeAudioSource: MeetingAudioSource?
+    var audioSource: MeetingAudioSource = MeetingAudioSource(
+        rawValue: UserDefaults.standard.string(forKey: "meetingAudioSource") ?? "") ?? .microphone {
+        didSet { UserDefaults.standard.set(audioSource.rawValue, forKey: "meetingAudioSource") }
+    }
 
     @ObservationIgnored private let captureGate: AudioCaptureGate
+    @ObservationIgnored private let notesURL: URL
     @ObservationIgnored private var generation = 0
 
-    init(captureGate: AudioCaptureGate) {
+    init(captureGate: AudioCaptureGate, notesURL: URL = MeetingNotesStore.url) {
         self.captureGate = captureGate
+        self.notesURL = notesURL
+        self.notes = MeetingNotesStore.load(from: notesURL) ?? []
     }
 
     var activeDuration: TimeInterval {
         guard let activeMeetingStartedAt else { return 0 }
         return Date().timeIntervalSince(activeMeetingStartedAt)
+    }
+
+    var activeAudioLevel: Float {
+        activeAudioSource?.captureRoute == .microphone ? audio.level : systemAudio.level
     }
 
     func start(localeIdentifier: String, contextualStrings: [String] = [], dictationIsBusy: Bool) async {
@@ -41,8 +71,10 @@ final class MeetingNotesService {
         let startGeneration = generation
         transcriber.clear()
 
-        let speechReady = await transcriber.start(sink: audio.sink, localeIdentifier: localeIdentifier,
-                                                 contextualStrings: Array(contextualStrings.prefix(100)))
+        let source = audioSource
+        let sink = source == .microphone ? audio.sink : systemAudio.sink
+        let speechReady = await transcriber.start(sink: sink, localeIdentifier: localeIdentifier,
+                                                 contextualStrings: Array(contextualStrings.prefix(DictationContextHints.maximumCount)))
         guard startGeneration == generation else {
             transcriber.stop()
             captureGate.release(.meeting)
@@ -56,15 +88,28 @@ final class MeetingNotesService {
             return
         }
 
-        await audio.start()
-        guard startGeneration == generation, audio.isRunning else {
+        switch source.captureRoute {
+        case .microphone:
+            await audio.start()
+        case .systemAudio:
+            await systemAudio.start(includeMicrophone: source == .both,
+                                    microphoneDeviceID: source == .both ? audio.selectedDeviceID : nil)
+        }
+        let sourceStarted = source.captureRoute == .microphone ? audio.isRunning : systemAudio.isRunning
+        guard startGeneration == generation, sourceStarted else {
             transcriber.stop()
-            message = audio.error ?? "Microphone capture could not start."
+            switch source.captureRoute {
+            case .microphone:
+                message = audio.error ?? "Microphone capture could not start."
+            case .systemAudio:
+                message = systemAudio.error ?? "Meeting audio capture could not start."
+            }
             captureGate.release(.meeting)
             isStarting = false
             return
         }
 
+        activeAudioSource = source
         activeMeetingStartedAt = Date()
         isCapturing = true
         isStarting = false
@@ -77,13 +122,21 @@ final class MeetingNotesService {
         isFinalizing = true
         let stoppedAt = Date()
         transcriber.beginFinalization()
-        audio.stop()
+        switch activeAudioSource?.captureRoute {
+        case .microphone:
+            audio.stop()
+        case .systemAudio:
+            systemAudio.stop()
+        case nil:
+            break
+        }
 
         Task { @MainActor [weak self] in
             guard let self else { return }
             let transcript = await transcriber.waitForFinalization()
             let startedAt = activeMeetingStartedAt ?? stoppedAt
             activeMeetingStartedAt = nil
+            activeAudioSource = nil
             transcriber.clear()
 
             let cleanTranscript = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -124,9 +177,17 @@ final class MeetingNotesService {
     }
 
     func deleteNote(_ id: UUID) {
-        notes.removeAll { $0.id == id }
-        if selectedNoteID == id { selectedNoteID = notes.first?.id }
-        persist()
+        guard notes.contains(where: { $0.id == id }) else { return }
+        let updatedNotes = notes.filter { $0.id != id }
+        let updatedSelection = selectedNoteID == id ? updatedNotes.first?.id : selectedNoteID
+        do {
+            try MeetingNotesStore.save(updatedNotes, to: notesURL)
+            notes = updatedNotes
+            selectedNoteID = updatedSelection
+            message = nil
+        } catch {
+            message = "Meeting note could not be deleted: \(error.localizedDescription)"
+        }
     }
 
     func generateSummary(for id: UUID, with transforms: LocalTransformService) async {
@@ -163,7 +224,7 @@ final class MeetingNotesService {
 
     private func persist() {
         do {
-            try MeetingNotesStore.save(notes)
+            try MeetingNotesStore.save(notes, to: notesURL)
             message = nil
         } catch {
             message = "Meeting note could not be saved: \(error.localizedDescription)"

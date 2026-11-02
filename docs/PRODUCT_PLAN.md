@@ -27,10 +27,10 @@ Make ordinary voice and whispered dictation usable locally on a Mac, while keepi
 ## Primary navigation
 
 1. **Dictation** — Hold a global shortcut to talk or press it to toggle; also start/stop with the button. Choose an on-device-supported language and Natural, Message, Email, Code, or Automatic mode. Automatic maps common frontmost app identifiers when launched with the global shortcut. Review/edit the local transcript, apply explicit spoken correction cues, restore the raw recognition, expand personal snippets, copy, insert once into a supported focused field, and reload recent local transcripts. Optional nearby vocabulary hints use a bounded cursor slice only after explicit Accessibility opt-in.
-2. **Transforms** — Create an editable preview for polish, concise, professional, bullet, or action-item writing with Apple's on-device Foundation Model on macOS 26+ when available. Deterministic filler removal also works without the model. Applying requires explicit user action; undo restores the prior transcript.
+2. **Transforms** — Create an editable preview for polish, concise, professional, bullet, action-item, or up to 12 user-defined writing styles with Apple's on-device Foundation Model on macOS 26+ when available. Styles can describe tone, format, or translation and are stored on this Mac. Deterministic filler removal also works without the model. Applying requires explicit user action; undo restores the prior transcript.
 3. **Snippets & Vocabulary** — Search, add, edit, and remove personal expansions and local recognition hints.
-4. **Transcribe files** — Import one audio file, choose Apple on-device Speech or an explicitly downloaded WhisperKit model, edit the local transcript, and export TXT, SRT, or WebVTT with timestamps.
-5. **Meeting notes** — Start microphone capture explicitly; stream only to on-device recognition, save a local transcript at stop, and create reviewable on-device summaries and action items. Search/edit/export/delete locally. Capture is microphone-only and does not provide speaker identification.
+4. **Transcribe files** — Import one audio file, choose Apple on-device Speech or an explicitly downloaded WhisperKit model, edit and export TXT/SRT/WebVTT, and search or restore up to 50 local transcript jobs. Save transcript text and timed cues only; never copy the source audio.
+5. **Meeting notes** — Start microphone, system-audio, or combined capture explicitly; stream only to on-device recognition, save a local transcript at stop, and create reviewable on-device summaries and action items. Search/edit/export/delete locally. Audio is transient and HushKey does not provide speaker identification.
 6. **Setup** — Entered only when the user opens the Silent Lab. Motion support, permission/connection status, live sample rate, and a brief next-step guide; detailed plots stay collapsed.
 7. **Train** — Choose normal voice, whisper, or silent mouthing as an experiment condition; select a word; capture, inspect, and remove motion templates.
 8. **Evaluate** — Select a condition and feature set; check study readiness; see leave-one-out results, majority baseline, permutation result, session holdout, and confusion matrix.
@@ -62,9 +62,10 @@ Make ordinary voice and whispered dictation usable locally on a Mac, while keepi
 - **Completed:** add conservative optional filler cleanup, snippet-line validation, Apple on-device audio-file transcription, and downloadable WhisperKit model selection with local storage and TXT/SRT/WebVTT export.
 - **Completed:** add a searchable Snippets & Vocabulary workspace, searchable transcript history, and processed/raw restore actions; package only this app without deleting unrelated Xcode outputs.
 - **Completed:** add review-first text transforms using Apple's on-device Foundation Model when available, deterministic filler removal on older macOS versions, explicit apply, stale-preview protection, and undo; test the offline cleanup and undo paths.
-- **In progress:** add explicit microphone-only meeting notes with local transcript search, editing, export, and review-first on-device summaries/action items. System-audio capture and manual meeting acceptance remain open.
+- **Completed:** add up to 12 named local writing styles with validation, edit/delete, persistent local storage, and preview-first execution through Apple's on-device model. Style instructions and transcripts have no cloud fallback.
+- **Completed (implementation):** add explicit microphone, system-audio, or combined meeting capture with local transcript search, editing, export, and review-first on-device summaries/action items. System audio uses a private Core Audio tap; combined capture adds the selected microphone as a drift-corrected aggregate subdevice. Each macOS permission is requested only after Start meeting. Audio is never saved. Manual source-permission and remote-call acceptance remains open.
 - **Completed:** defer Motion access until the Silent Lab opens; display live state and avoid presenting a failed evidence result as a pass.
-- **Next:** complete manual acceptance of microphone/Speech, normal voice and whisper, global shortcuts, TextEdit and a second-app insertion/undo, history, file engines, and the new meeting-notes capture. Then compare Apple Speech and WhisperKit on consented local sample audio and add optional system-audio capture for calls after reviewing the additional macOS recording permission and source-selection UX.
+- **Next:** complete manual acceptance of microphone/Speech, normal voice and whisper, global shortcuts, TextEdit and a second-app insertion/undo, history, file engines, and all three Meeting Notes sources. Then compare Apple Speech and WhisperKit on consented local sample audio.
 
 ## Completion checks
 
@@ -78,6 +79,7 @@ Make ordinary voice and whispered dictation usable locally on a Mac, while keepi
 - File transcription can run with Apple Speech when available or with an explicitly downloaded local WhisperKit model, and supports editable transcripts plus SRT/WebVTT export.
 - Meeting notes start only by explicit action, retain transcript text locally, never save microphone audio, allow searching/editing/export/deletion, and use only on-device models for generated notes.
 - Text transforms never silently replace a transcript, run without a cloud fallback, and can be undone before insertion or further editing.
+- Custom writing styles are bounded, locally stored, and always produce an editable preview before they can change a transcript.
 - A trained word shows its sample count and can be captured without confusing it with a session recording.
 - Evaluation explains what passes or blocks silent use.
 - The Use screen prioritizes capture and transcript; advanced controls remain available.

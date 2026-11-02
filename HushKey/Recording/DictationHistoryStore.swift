@@ -44,6 +44,21 @@ enum DictationHistoryStore {
         try JSONEncoder().encode(entries).write(to: url, options: .atomic)
     }
 
+    static func upsertingAndSaving(_ entry: DictationHistoryEntry,
+                                   to url: URL,
+                                   existing entries: [DictationHistoryEntry],
+                                   limit: Int = 50) throws -> [DictationHistoryEntry] {
+        var savedEntry = entry
+        var remaining = entries
+        if let existingIndex = remaining.firstIndex(where: { $0.id == entry.id }) {
+            savedEntry.createdAt = remaining[existingIndex].createdAt
+            remaining.remove(at: existingIndex)
+        }
+        let updated = Array(([savedEntry] + remaining).prefix(max(0, limit)))
+        try save(updated, to: url)
+        return updated
+    }
+
     static func delete(at url: URL = url) throws {
         guard fileManager.fileExists(atPath: url.path) else { return }
         try fileManager.removeItem(at: url)

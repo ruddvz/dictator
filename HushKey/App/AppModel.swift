@@ -38,6 +38,12 @@ final class AppModel {
         }
     }
 
+    enum InsertionOutputRoute: Equatable {
+        case dictation
+        case silentPrediction
+        case unavailable
+    }
+
     let motion = HeadphoneMotionService()
     let audio = AudioService()
     let transcriber = MicTranscriber()
@@ -77,6 +83,8 @@ final class AppModel {
     private(set) var experimentSessionID = UUID()
     var dataMessage: String?
     private(set) var dictationHistoryMessage: String?
+    private(set) var fileTranscriptionSessions = FileTranscriptionSessionStore.load()
+    private(set) var fileTranscriptionHistoryMessage: String?
 
     var captureShortcut: CaptureShortcut = CaptureShortcut(
         rawValue: UserDefaults.standard.string(forKey: CaptureShortcut.preferenceKey) ?? "") ?? .default {
@@ -122,7 +130,7 @@ final class AppModel {
     var savesDictationHistory = UserDefaults.standard.object(forKey: "saveDictationHistory") as? Bool ?? true {
         didSet { UserDefaults.standard.set(savesDictationHistory, forKey: "saveDictationHistory") }
     }
-    private(set) var dictationHistory: [DictationHistoryEntry] = DictationHistoryStore.load()
+    private(set) var dictationHistory: [DictationHistoryEntry]
     private(set) var didInsertCurrentDictation = false
     private(set) var rawDictationText = ""
     private(set) var transformUndoOriginalText: String?
@@ -133,9 +141,15 @@ final class AppModel {
     }
     private(set) var activeDictationMode: DictationMode = .natural
     private(set) var activeDictationTarget: String?
+    private(set) var capturedInsertionTargetName: String?
+    private(set) var isInsertingDictation = false
     private(set) var usedNearbyTextHints = false
     private(set) var isFinalizingDictation = false
     @ObservationIgnored private(set) var lastSavedDictationText: String?
+    @ObservationIgnored private let dictationHistoryURL: URL
+    @ObservationIgnored private var dictationHistorySaveTask: Task<Void, Never>?
+    @ObservationIgnored private var currentDictationHistoryEntryID: UUID?
+    @ObservationIgnored private var capturedInsertionTarget: TextInsertionService.InsertionTarget?
 
     // MARK: Decoding
 
@@ -155,14 +169,54 @@ final class AppModel {
     @ObservationIgnored private var dictationShortcutHeld = false
     @ObservationIgnored private var dictationStartGeneration = 0
 
-    init() {
+    init(dictationHistoryURL: URL = DictationHistoryStore.url) {
+        self.dictationHistoryURL = dictationHistoryURL
+        dictationHistory = DictationHistoryStore.load(from: dictationHistoryURL) ?? []
         let captureGate = AudioCaptureGate()
         self.captureGate = captureGate
         meetingNotes = MeetingNotesService(captureGate: captureGate)
         selectedWord = dataset.vocabulary.first
+        fileTranscriber.onSessionUpdate = { [weak self] session in
+            self?.saveFileTranscriptionSession(session)
+        }
+        whisperFileTranscriber.onSessionUpdate = { [weak self] session in
+            self?.saveFileTranscriptionSession(session)
+        }
         insertion.onInsertShortcut = { [weak self] in self?.insertLatestOutput() }
         insertion.onUndoShortcut = { [weak self] in self?.undoLastInsertion() }
         rebuildClassifier()
+    }
+
+    func saveFileTranscriptionSession(_ session: FileTranscriptionSession) {
+        let updated = FileTranscriptionSessionStore.upserting(session, into: fileTranscriptionSessions)
+        do {
+            try FileTranscriptionSessionStore.save(updated)
+            fileTranscriptionSessions = updated
+            fileTranscriptionHistoryMessage = nil
+        } catch {
+            fileTranscriptionHistoryMessage = "Couldn’t save this transcript locally: \(error.localizedDescription)"
+        }
+    }
+
+    func deleteFileTranscriptionSession(_ session: FileTranscriptionSession) {
+        let updated = FileTranscriptionSessionStore.deleting(id: session.id, from: fileTranscriptionSessions)
+        do {
+            try FileTranscriptionSessionStore.save(updated)
+            fileTranscriptionSessions = updated
+            fileTranscriptionHistoryMessage = nil
+        } catch {
+            fileTranscriptionHistoryMessage = "Couldn’t delete this transcript: \(error.localizedDescription)"
+        }
+    }
+
+    func clearFileTranscriptionHistory() {
+        do {
+            try FileTranscriptionSessionStore.deleteAll()
+            fileTranscriptionSessions.removeAll()
+            fileTranscriptionHistoryMessage = nil
+        } catch {
+            fileTranscriptionHistoryMessage = "Couldn’t delete saved transcripts: \(error.localizedDescription)"
+        }
     }
 
     func start() {
@@ -406,6 +460,14 @@ final class AppModel {
     }
 
     func insertLatestPrediction() {
+        guard screen == .use else {
+            insertion.report("Open Silent Use before inserting a trained-word prediction.")
+            return
+        }
+        guard captureGate.owner == nil else {
+            insertion.report("Stop active capture before inserting a trained-word prediction.")
+            return
+        }
         guard let word = decoded.last, word.prediction.accepted else {
             insertion.report("No accepted prediction is ready to insert.")
             return
@@ -418,10 +480,25 @@ final class AppModel {
     }
 
     func insertLatestOutput() {
-        if screen == .dictation || screen == .transforms {
+        guard captureGate.owner != .meeting else {
+            insertion.report("Stop meeting capture before inserting text.")
+            return
+        }
+        switch Self.insertionOutputRoute(for: screen) {
+        case .dictation:
             insertDictationText()
-        } else {
+        case .silentPrediction:
             insertLatestPrediction()
+        case .unavailable:
+            insertion.report("Open Dictation or Silent Use before inserting text.")
+        }
+    }
+
+    static func insertionOutputRoute(for screen: Screen) -> InsertionOutputRoute {
+        switch screen {
+        case .dictation, .transforms: .dictation
+        case .use: .silentPrediction
+        default: .unavailable
         }
     }
 
@@ -429,7 +506,8 @@ final class AppModel {
         if let reason = DictationInsertionGate.blockedReason(
             audioIsRunning: audio.isRunning,
             recognitionIsRunning: transcriber.isRunning,
-            isFinalizing: isFinalizingDictation || transcriber.isFinalizing
+            isFinalizing: isFinalizingDictation || transcriber.isFinalizing,
+            meetingCaptureIsActive: captureGate.owner == .meeting
         ) {
             insertion.report(reason)
             return
@@ -444,6 +522,40 @@ final class AppModel {
             return
         }
         if insertion.insert(text) { didInsertCurrentDictation = true }
+    }
+
+    var canInsertIntoCapturedTarget: Bool {
+        capturedInsertionTarget != nil && insertion.isEnabled && !isInsertingDictation &&
+            !didInsertCurrentDictation && !audio.isRunning && !isFinalizingDictation &&
+            !transcriber.isRunning && !transcriber.isFinalizing && captureGate.owner != .meeting
+    }
+
+    func insertDictationTextIntoCapturedTarget() async {
+        if let reason = DictationInsertionGate.blockedReason(
+            audioIsRunning: audio.isRunning,
+            recognitionIsRunning: transcriber.isRunning,
+            isFinalizing: isFinalizingDictation || transcriber.isFinalizing,
+            meetingCaptureIsActive: captureGate.owner == .meeting
+        ) {
+            insertion.report(reason)
+            return
+        }
+        guard let target = capturedInsertionTarget else {
+            insertion.report("Start dictation with the global shortcut while the target text field is focused to enable safe insertion here.")
+            return
+        }
+        let text = transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else {
+            insertion.report("Dictate something first.")
+            return
+        }
+        guard !didInsertCurrentDictation, !isInsertingDictation else {
+            insertion.report("This transcript was already inserted once.")
+            return
+        }
+        isInsertingDictation = true
+        defer { isInsertingDictation = false }
+        if await insertion.insert(text, into: target) { didInsertCurrentDictation = true }
     }
 
     func undoLastInsertion() {
@@ -488,14 +600,18 @@ final class AppModel {
         if audio.isRunning {
             stopDictation()
         }
+        cancelPendingDictationHistorySave()
         saveCurrentDictation()
         screen = .dictation
+        capturedInsertionTarget = nil
+        capturedInsertionTargetName = nil
         transcriber.clear()
         rawDictationText = ""
         clearLocalTransformUndo()
         didInsertCurrentDictation = false
         insertion.clearUndoRecord()
         lastSavedDictationText = nil
+        currentDictationHistoryEntryID = nil
         await startDictation()
     }
 
@@ -509,8 +625,11 @@ final class AppModel {
 
     func clearDictationHistory() {
         do {
-            try DictationHistoryStore.delete()
+            try DictationHistoryStore.delete(at: dictationHistoryURL)
+            cancelPendingDictationHistorySave()
             dictationHistory.removeAll()
+            currentDictationHistoryEntryID = nil
+            lastSavedDictationText = nil
             dictationHistoryMessage = "Saved transcript history was deleted from this Mac."
         } catch {
             dictationHistoryMessage = "Could not delete transcript history: \(error.localizedDescription)"
@@ -518,39 +637,59 @@ final class AppModel {
         }
         if !audio.isRunning, !isFinalizingDictation, !transcriber.isFinalizing {
             transcriber.clear()
-            lastSavedDictationText = nil
+            capturedInsertionTarget = nil
+            capturedInsertionTargetName = nil
+            rawDictationText = ""
+            clearLocalTransformUndo()
             didInsertCurrentDictation = false
+            insertion.clearUndoRecord()
         }
     }
 
     func restoreDictation(_ entry: DictationHistoryEntry, useRawText: Bool = false) {
         guard !audio.isRunning, !isFinalizingDictation, !transcriber.isFinalizing else { return }
+        cancelPendingDictationHistorySave()
         let restoredText = useRawText ? (entry.rawText ?? entry.text) : entry.text
         transcriber.replaceText(restoredText)
+        capturedInsertionTarget = nil
+        capturedInsertionTargetName = nil
         rawDictationText = entry.rawText ?? entry.text
         clearLocalTransformUndo()
         didInsertCurrentDictation = false
         insertion.clearUndoRecord()
         lastSavedDictationText = restoredText
+        currentDictationHistoryEntryID = nil
         screen = .dictation
     }
 
     func restoreRawTranscript() {
         guard !audio.isRunning, !isFinalizingDictation, !transcriber.isFinalizing,
               !rawDictationText.isEmpty else { return }
-        transcriber.replaceText(rawDictationText)
-        lastSavedDictationText = rawDictationText.trimmingCharacters(in: .whitespacesAndNewlines)
+        editCurrentDictation(rawDictationText)
+    }
+
+    func editCurrentDictation(_ text: String) {
+        guard !audio.isRunning, !isFinalizingDictation, !transcriber.isRunning,
+              !transcriber.isFinalizing, transcriber.text != text else { return }
+        transcriber.replaceText(text)
+        didInsertCurrentDictation = false
+        insertion.clearUndoRecord()
         clearLocalTransformUndo()
+        scheduleCurrentDictationSave()
     }
 
     func clearCurrentDictation() {
         guard !audio.isRunning, !isFinalizingDictation, !transcriber.isFinalizing else { return }
+        cancelPendingDictationHistorySave()
         transcriber.clear()
+        capturedInsertionTarget = nil
+        capturedInsertionTargetName = nil
         rawDictationText = ""
         clearLocalTransformUndo()
         didInsertCurrentDictation = false
         insertion.clearUndoRecord()
         lastSavedDictationText = nil
+        currentDictationHistoryEntryID = nil
     }
 
     func requestNearbyTextAccess() {
@@ -572,6 +711,8 @@ final class AppModel {
         let target = NSWorkspace.shared.frontmostApplication
         let isHushKey = target?.bundleIdentifier == "com.ruddvz.hushkey"
         activeDictationTarget = isHushKey ? nil : target?.localizedName
+        capturedInsertionTarget = isHushKey ? nil : insertion.captureInsertionTarget()
+        capturedInsertionTargetName = capturedInsertionTarget?.applicationName
         activeDictationMode = DictationMode.resolved(dictationMode,
                                                       bundleIdentifier: isHushKey ? nil : target?.bundleIdentifier)
         let nearbyHints = usesNearbyTextHints ? insertion.nearbyContextHints() : []
@@ -592,7 +733,11 @@ final class AppModel {
         case .automatic, .natural: modeHints = []
         }
         let started = await transcriber.start(sink: audio.sink, localeIdentifier: dictationLanguage,
-                                              contextualStrings: Array(Set(dataset.vocabulary + customWords + modeHints + nearbyHints)).prefix(100).map { $0 })
+                                              contextualStrings: DictationContextHints.prioritized(
+                                                customWords: customWords,
+                                                modeHints: modeHints,
+                                                nearbyHints: nearbyHints,
+                                                learnedWords: dataset.vocabulary))
         guard generation == dictationStartGeneration, audio.isRunning else {
             transcriber.stop()
             audio.stop()
@@ -632,16 +777,33 @@ final class AppModel {
         guard DictationHistorySaveGate.shouldSave(text: text, lastSavedText: lastSavedDictationText,
                                                   enabled: savesDictationHistory) else { return }
         let raw = rawDictationText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let entry = DictationHistoryEntry(text: text, rawText: raw.isEmpty || raw == text ? nil : raw)
-        dictationHistory.insert(entry, at: 0)
-        dictationHistory = Array(dictationHistory.prefix(50))
-        lastSavedDictationText = text
+        let entry = DictationHistoryEntry(id: currentDictationHistoryEntryID ?? UUID(),
+                                          text: text,
+                                          rawText: raw.isEmpty || raw == text ? nil : raw)
         do {
-            try DictationHistoryStore.save(dictationHistory)
+            dictationHistory = try DictationHistoryStore.upsertingAndSaving(
+                entry, to: dictationHistoryURL, existing: dictationHistory)
+            currentDictationHistoryEntryID = entry.id
+            lastSavedDictationText = text
             dictationHistoryMessage = nil
         } catch {
             dictationHistoryMessage = "This transcript could not be saved to history: \(error.localizedDescription)"
         }
+    }
+
+    private func scheduleCurrentDictationSave() {
+        cancelPendingDictationHistorySave()
+        dictationHistorySaveTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(500))
+            guard let self, !Task.isCancelled else { return }
+            self.saveCurrentDictation()
+            self.dictationHistorySaveTask = nil
+        }
+    }
+
+    private func cancelPendingDictationHistorySave() {
+        dictationHistorySaveTask?.cancel()
+        dictationHistorySaveTask = nil
     }
 
     private func clearLocalTransformUndo() {

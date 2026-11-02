@@ -43,6 +43,9 @@ private struct ResearchReportsCard: View {
                 Button("Open HushKey competitor notes", systemImage: "list.bullet.rectangle") {
                     openResource("COMPETITOR_RESEARCH", extension: "md")
                 }
+                Button("Open dictation alternatives research", systemImage: "text.magnifyingglass") {
+                    openResource("COMPETITOR_RESEARCH_ADDENDUM_2026-11-01", extension: "md")
+                }
                 Button("Open local speech model notes", systemImage: "waveform") {
                     openResource("LOCAL_MODEL_EVALUATION", extension: "md")
                 }
@@ -190,6 +193,9 @@ private struct TextInsertionSettingsCard: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Text("When enabled, the insertion shortcut adds your reviewed voice transcript, or the latest accepted silent word, to a supported text field in the frontmost app. Password fields are rejected. Explicit insertion does not use the clipboard. Silent Use still needs evidence to unlock.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("For the Dictation screen’s one-click Insert button, start dictation with the global shortcut while the destination field is focused. HushKey remembers that field only in memory and returns to it only if the same app, field, and text selection are still unchanged.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
