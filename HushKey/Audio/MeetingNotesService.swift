@@ -25,7 +25,7 @@ final class MeetingNotesService {
     let systemAudio = SystemAudioService()
     let transcriber = MicTranscriber()
 
-    private(set) var notes: [MeetingNote] = MeetingNotesStore.load()
+    private(set) var notes: [MeetingNote]
     private(set) var isStarting = false
     private(set) var isCapturing = false
     private(set) var isFinalizing = false
@@ -40,10 +40,13 @@ final class MeetingNotesService {
     }
 
     @ObservationIgnored private let captureGate: AudioCaptureGate
+    @ObservationIgnored private let notesURL: URL
     @ObservationIgnored private var generation = 0
 
-    init(captureGate: AudioCaptureGate) {
+    init(captureGate: AudioCaptureGate, notesURL: URL = MeetingNotesStore.url) {
         self.captureGate = captureGate
+        self.notesURL = notesURL
+        self.notes = MeetingNotesStore.load(from: notesURL) ?? []
     }
 
     var activeDuration: TimeInterval {
@@ -174,9 +177,17 @@ final class MeetingNotesService {
     }
 
     func deleteNote(_ id: UUID) {
-        notes.removeAll { $0.id == id }
-        if selectedNoteID == id { selectedNoteID = notes.first?.id }
-        persist()
+        guard notes.contains(where: { $0.id == id }) else { return }
+        let updatedNotes = notes.filter { $0.id != id }
+        let updatedSelection = selectedNoteID == id ? updatedNotes.first?.id : selectedNoteID
+        do {
+            try MeetingNotesStore.save(updatedNotes, to: notesURL)
+            notes = updatedNotes
+            selectedNoteID = updatedSelection
+            message = nil
+        } catch {
+            message = "Meeting note could not be deleted: \(error.localizedDescription)"
+        }
     }
 
     func generateSummary(for id: UUID, with transforms: LocalTransformService) async {
@@ -213,7 +224,7 @@ final class MeetingNotesService {
 
     private func persist() {
         do {
-            try MeetingNotesStore.save(notes)
+            try MeetingNotesStore.save(notes, to: notesURL)
             message = nil
         } catch {
             message = "Meeting note could not be saved: \(error.localizedDescription)"

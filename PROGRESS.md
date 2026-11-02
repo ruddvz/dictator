@@ -174,3 +174,13 @@ In a fresh session, with the user present, verify microphone and Speech prompts,
 ## Next item — manual runtime acceptance
 
 With the user present, verify the packaged app's transcript editing, delayed history save, raw restore, transform preview invalidation, and undo/insertion reset. Then test recent file transcripts, search, restore, and deletion with consented audio, plus the documented voice and meeting capture flows. Recheck the running app path when Computer Use can bind to it; builds and unit tests do not prove live microphone, Accessibility insertion, AirPods, or system-audio behavior.
+
+## Completed — meeting note deletion persistence
+
+- Meeting note deletion now writes the candidate note list before changing the visible list or selection. If storage fails, the note stays visible and the service reports that deletion failed.
+- Injected the notes file URL into the service for isolated storage verification and added a regression test that forces a failed write.
+- xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build test: 41 passed, 0 failed, 0 skipped.
+
+## Next item — manual runtime acceptance
+
+With the user present, verify transcript editing and recovery plus the voice, file, and meeting capture flows in the packaged app. Confirm failed meeting-note deletion leaves the note visible. Builds and unit tests do not prove live microphone, Accessibility insertion, or system-audio behavior.

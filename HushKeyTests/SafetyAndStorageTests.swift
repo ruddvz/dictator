@@ -184,6 +184,28 @@ final class SafetyAndStorageTests: XCTestCase {
         try MeetingNotesStore.delete(at: url)
     }
 
+    @MainActor
+    func testMeetingNoteRemainsVisibleWhenDeleteCannotBePersisted() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "hushkey-meeting-delete-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appending(path: "meeting-notes.json")
+        let note = MeetingNote(title: "Planning", transcript: "Review the draft.")
+        try MeetingNotesStore.save([note], to: url)
+        let service = MeetingNotesService(captureGate: AudioCaptureGate(), notesURL: url)
+        service.select(note.id)
+
+        try FileManager.default.removeItem(at: url)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
+
+        service.deleteNote(note.id)
+
+        XCTAssertEqual(service.notes, [note])
+        XCTAssertEqual(service.selectedNoteID, note.id)
+        XCTAssertTrue(service.message?.contains("could not be deleted") == true)
+    }
+
     func testMeetingTranscriptChunkerKeepsTextInBoundedOrderedChunks() {
         let source = String(repeating: "We agreed to review the local draft. ", count: 20)
         let chunks = LocalTransformService.meetingChunks(from: source, maxCharacters: 64)
