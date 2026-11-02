@@ -42,7 +42,7 @@ final class MicTranscriber {
         self.sink = sink
         sinkID = sink.add { [box] buffer, _ in box.append(buffer) }
         isRunning = true
-        self.contextualStrings = Array(contextualStrings.prefix(100))
+        self.contextualStrings = Array(contextualStrings.prefix(DictationContextHints.maximumCount))
         startTask()
         return true
     }

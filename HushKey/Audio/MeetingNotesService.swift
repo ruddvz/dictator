@@ -74,7 +74,7 @@ final class MeetingNotesService {
         let source = audioSource
         let sink = source == .microphone ? audio.sink : systemAudio.sink
         let speechReady = await transcriber.start(sink: sink, localeIdentifier: localeIdentifier,
-                                                 contextualStrings: Array(contextualStrings.prefix(100)))
+                                                 contextualStrings: Array(contextualStrings.prefix(DictationContextHints.maximumCount)))
         guard startGeneration == generation else {
             transcriber.stop()
             captureGate.release(.meeting)

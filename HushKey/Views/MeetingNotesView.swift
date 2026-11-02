@@ -352,8 +352,9 @@ struct MeetingNotesView: View {
         Task {
             await service.start(
                 localeIdentifier: model.dictationLanguage,
-                contextualStrings: Array(Set(model.dataset.vocabulary +
-                    DictationVocabulary.terms(from: model.dictationTerms))).prefix(100).map { $0 },
+                contextualStrings: DictationContextHints.prioritized(
+                    customWords: DictationVocabulary.terms(from: model.dictationTerms),
+                    learnedWords: model.dataset.vocabulary),
                 dictationIsBusy: model.audio.isRunning || model.isFinalizingDictation ||
                     model.transcriber.isRunning || model.transcriber.isFinalizing)
         }

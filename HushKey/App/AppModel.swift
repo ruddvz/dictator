@@ -686,7 +686,11 @@ final class AppModel {
         case .automatic, .natural: modeHints = []
         }
         let started = await transcriber.start(sink: audio.sink, localeIdentifier: dictationLanguage,
-                                              contextualStrings: Array(Set(dataset.vocabulary + customWords + modeHints + nearbyHints)).prefix(100).map { $0 })
+                                              contextualStrings: DictationContextHints.prioritized(
+                                                customWords: customWords,
+                                                modeHints: modeHints,
+                                                nearbyHints: nearbyHints,
+                                                learnedWords: dataset.vocabulary))
         guard generation == dictationStartGeneration, audio.isRunning else {
             transcriber.stop()
             audio.stop()

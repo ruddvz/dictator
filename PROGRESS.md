@@ -184,3 +184,15 @@ With the user present, verify the packaged app's transcript editing, delayed his
 ## Next item — manual runtime acceptance
 
 With the user present, verify transcript editing and recovery plus the voice, file, and meeting capture flows in the packaged app. Confirm failed meeting-note deletion leaves the note visible. Builds and unit tests do not prove live microphone, Accessibility insertion, or system-audio behavior.
+
+## Completed — stable speech vocabulary hint priority
+
+- Replaced unordered Set-based hint selection with deterministic, case/diacritic-insensitive deduplication and a fixed priority: personal terms, mode hints, enabled nearby-text hints, then Silent Lab vocabulary.
+- Applied the same prioritized list to Dictation and Meeting Notes; the 100-hint cap is centralized and enforced at the Speech boundary.
+- Updated Personalization to explain hint priority and the per-capture limit. Added overflow coverage for stable order, deduplication, and priority when the 100-term limit is reached.
+- xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build test: 42 passed, 0 failed, 0 skipped.
+- Computer Use could not bind to the running packaged app (error -10005), so this change has not been visually checked in the live UI.
+
+## Next item — manual runtime acceptance
+
+With the user present, verify the packaged app's Dictation and Meeting Notes flows, including the hint behavior, and complete the remaining voice, file, and insertion checks in docs/TESTING_PROTOCOL.md. Recheck the running app path when Computer Use can bind; source tests do not prove live microphone, Accessibility insertion, or System Audio Recording behavior.

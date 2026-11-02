@@ -429,6 +429,34 @@ final class SafetyAndStorageTests: XCTestCase {
         XCTAssertEqual(DictationVocabulary.encode([" Maya ", "", "HushKey"]), "Maya\nHushKey")
     }
 
+    func testSpeechContextHintsAreStablePrioritizedAndBounded() {
+        let customWords = ["Café", "cafe"] + (1...94).map { "Custom\($0)" }
+        let modeHints = ["Code", "code", "Email"]
+        let nearbyHints = ["Nearby", "email"]
+        let learnedWords = ["Trained", "Alpha", "Beta"]
+
+        let hints = DictationContextHints.prioritized(
+            customWords: customWords,
+            modeHints: modeHints,
+            nearbyHints: nearbyHints,
+            learnedWords: learnedWords)
+
+        XCTAssertEqual(hints.count, DictationContextHints.maximumCount)
+        XCTAssertEqual(Array(hints.prefix(95)), customWords.filter { $0 != "cafe" })
+        XCTAssertEqual(Array(hints.suffix(5)), ["Code", "Email", "Nearby", "Trained", "Alpha"])
+        XCTAssertFalse(hints.contains("Beta"))
+        XCTAssertEqual(hints, DictationContextHints.prioritized(
+            customWords: customWords,
+            modeHints: modeHints,
+            nearbyHints: nearbyHints,
+            learnedWords: learnedWords))
+        XCTAssertEqual(DictationContextHints.prioritized(
+            customWords: ["one", "two"], limit: 0), [])
+        XCTAssertEqual(DictationContextHints.prioritized(
+            customWords: (1...150).map { "Term\($0)" }, limit: 1_000).count,
+            DictationContextHints.maximumCount)
+    }
+
     @MainActor
     func testLocalFillerTransformRunsWithoutTheLanguageModel() async throws {
         let service = LocalTransformService()
