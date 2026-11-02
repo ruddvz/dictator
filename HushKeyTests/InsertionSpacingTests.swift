@@ -23,4 +23,16 @@ final class InsertionSpacingTests: XCTestCase {
         XCTAssertEqual(TextInsertionService.spacedInsertion("Hi", fieldValue: value, selectedRange: CFRange(location: 0, length: 0)), "Hi")
         XCTAssertEqual(TextInsertionService.spacedInsertion("ok", fieldValue: "Done 👍", selectedRange: CFRange(location: 7, length: 0)), " ok")
     }
+
+    func testDirectInsertionRequiresTheExactExpectedFieldValue() {
+        XCTAssertEqual(
+            TextInsertionService.directInsertionVerification(originalValue: "Hello", expectedValue: "Hello world", observedValue: "Hello world"),
+            .verified)
+        XCTAssertEqual(
+            TextInsertionService.directInsertionVerification(originalValue: "Hello", expectedValue: "Hello world", observedValue: "Hello"),
+            .unchanged)
+        XCTAssertEqual(
+            TextInsertionService.directInsertionVerification(originalValue: "Hello", expectedValue: "Hello world", observedValue: "Hello wor"),
+            .changedUnexpectedly)
+    }
 }

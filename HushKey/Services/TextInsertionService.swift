@@ -4,6 +4,12 @@ import Carbon.HIToolbox
 import CryptoKit
 import Observation
 
+enum DirectInsertionVerification: Equatable {
+    case verified
+    case unchanged
+    case changedUnexpectedly
+}
+
 /// Explicit, opt-in insertion through the Accessibility selected-text attribute.
 /// HushKey never writes to or replaces the clipboard.
 @MainActor @Observable
@@ -42,6 +48,9 @@ final class TextInsertionService {
     }
 
     private(set) var isEnabled = false
+    /// Callers must not retry when an accessibility edit may have changed the field but
+    /// read-back could not confirm the exact result.
+    private(set) var requiresReviewAfterInsertion = false
     @ObservationIgnored private var activationObserver: NSObjectProtocol?
     @ObservationIgnored private var exposedProcesses: Set<pid_t> = []
     /// Paste through the clipboard in apps that refuse direct typing; the clipboard is restored.
@@ -208,6 +217,7 @@ final class TextInsertionService {
 
     @discardableResult
     func insert(_ text: String) -> Bool {
+        requiresReviewAfterInsertion = false
         guard isEnabled else { status = "Enable text insertion first."; return false }
         guard AXIsProcessTrusted() else {
             isEnabled = false
@@ -271,6 +281,7 @@ final class TextInsertionService {
     /// exact field and selection before replacing text. A stale target always fails closed.
     @discardableResult
     func insert(_ text: String, into target: InsertionTarget) async -> Bool {
+        requiresReviewAfterInsertion = false
         guard isEnabled, AXIsProcessTrusted() else {
             isEnabled = false
             status = "Accessibility access is unavailable. Text was not inserted."
@@ -327,6 +338,7 @@ final class TextInsertionService {
     /// somewhere the user has since moved away from.
     @discardableResult
     func insert(_ text: String, ifStillFocused target: InsertionTarget) -> Bool {
+        requiresReviewAfterInsertion = false
         guard isEnabled, AXIsProcessTrusted() else {
             isEnabled = false
             status = "Accessibility access is unavailable. Text was not inserted."
@@ -538,6 +550,14 @@ final class TextInsertionService {
             with: insertedText)
     }
 
+    nonisolated static func directInsertionVerification(originalValue: String,
+                                                        expectedValue: String,
+                                                        observedValue: String) -> DirectInsertionVerification {
+        if observedValue == expectedValue { return .verified }
+        if observedValue == originalValue { return .unchanged }
+        return .changedUnexpectedly
+    }
+
     nonisolated static func selectionContextMatches(originalValue: String, originalRange: CFRange,
                                                    currentValue: String, currentRange: CFRange) -> Bool {
         originalValue == currentValue &&
@@ -595,6 +615,7 @@ final class TextInsertionService {
 
     private func performInsertion(_ text: String, app: NSRunningApplication, element: AXUIElement,
                                   originalValue: String?, selectedRange: CFRange?) -> Bool {
+        requiresReviewAfterInsertion = false
         var focusedPID: pid_t = 0
         var settable = DarwinBoolean(false)
         guard NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier,
@@ -615,6 +636,17 @@ final class TextInsertionService {
             return false
         }
         let text = Self.spacedInsertion(text, fieldValue: currentValue, selectedRange: currentRange)
+        guard let expectedValue = Self.expectedPasteValue(originalValue: currentValue,
+                                                          selectedRange: currentRange,
+                                                          insertedText: text) else {
+            status = "The target text could not be checked. Nothing was inserted."
+            return false
+        }
+        if expectedValue == currentValue {
+            undoRecord = nil
+            status = "The selected text already matches. Nothing needed to change."
+            return true
+        }
         let possibleUndo = Self.makeUndoRecord(
             processIdentifier: app.processIdentifier,
             bundleIdentifier: app.bundleIdentifier,
@@ -626,15 +658,34 @@ final class TextInsertionService {
             status = "The focused app declined safe insertion. Nothing was inserted."
             return false
         }
-        if let possibleUndo,
-           stringAttribute(kAXValueAttribute, of: currentElement).map(Self.fingerprint) == possibleUndo.expectedFingerprint {
-            undoRecord = possibleUndo
-            status = "Inserted once. Press ⌥⇧U now to undo while this field stays focused and unchanged."
-        } else {
+        guard let observedValue = stringAttribute(kAXValueAttribute, of: currentElement) else {
             undoRecord = nil
-            status = "Inserted once into the current text selection. This field does not expose a safe undo record."
+            requiresReviewAfterInsertion = true
+            status = "HushKey sent the text, but could not read it back to confirm. Check the field before retrying to avoid a duplicate."
+            return false
         }
-        return true
+        switch Self.directInsertionVerification(originalValue: currentValue,
+                                                expectedValue: expectedValue,
+                                                observedValue: observedValue) {
+        case .verified:
+            if let possibleUndo, Self.fingerprint(observedValue) == possibleUndo.expectedFingerprint {
+                undoRecord = possibleUndo
+                status = "Inserted and verified in the focused field. Press ⌥⇧U now to undo while it stays focused and unchanged."
+            } else {
+                undoRecord = nil
+                status = "Inserted and verified in the focused field. A safe undo record is unavailable."
+            }
+            return true
+        case .unchanged:
+            undoRecord = nil
+            status = "The focused field did not change. Nothing was inserted."
+            return false
+        case .changedUnexpectedly:
+            undoRecord = nil
+            requiresReviewAfterInsertion = true
+            status = "The focused field changed, but HushKey could not confirm the exact text. Check it before retrying to avoid a duplicate."
+            return false
+        }
     }
 
     private func stringAttribute(_ attribute: String, of element: AXUIElement) -> String? {

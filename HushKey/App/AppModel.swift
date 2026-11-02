@@ -957,6 +957,10 @@ final class AppModel {
     }
 
     func insertDictationText() {
+        Task { await insertDictationTextAsync() }
+    }
+
+    private func insertDictationTextAsync() async {
         guard selectedTextEditTarget == nil else {
             insertion.report("Review the selected-text preview in Transforms before applying it.")
             return
@@ -979,9 +983,46 @@ final class AppModel {
             insertion.report("This transcript was already inserted once.")
             return
         }
+
+        if let target = capturedInsertionTarget {
+            guard let app = dictationTargetApp else {
+                insertion.report("The original app is no longer available. Nothing was inserted.")
+                return
+            }
+            isInsertingDictation = true
+            defer { isInsertingDictation = false }
+            if await insertion.insert(text, into: target) {
+                didInsertCurrentDictation = true
+                dictationNotice = nil
+                return
+            }
+            if insertion.requiresReviewAfterInsertion {
+                dictationNotice = DictationRecovery.pasteUnconfirmed(insertion.status, canPasteAgain: false)
+                return
+            }
+            guard let pasteTarget = capturedPasteTarget,
+                  insertion.focusState(of: target).fieldIsFocused else {
+                dictationNotice = DictationRecovery.insertionFailed(
+                    insertion.status, canPasteAgain: capturedPasteTarget != nil)
+                return
+            }
+            switch await insertion.paste(text, into: app, target: pasteTarget) {
+            case .inserted:
+                didInsertCurrentDictation = true
+                dictationNotice = nil
+            case .unconfirmed:
+                dictationNotice = DictationRecovery.pasteUnconfirmed(insertion.status, canPasteAgain: false)
+            case .unavailable:
+                dictationNotice = DictationRecovery.insertionFailed(insertion.status, canPasteAgain: false)
+            }
+            return
+        }
+
         if insertion.insert(text) {
             didInsertCurrentDictation = true
             dictationNotice = nil
+        } else if insertion.requiresReviewAfterInsertion {
+            dictationNotice = DictationRecovery.pasteUnconfirmed(insertion.status, canPasteAgain: false)
         }
     }
 
@@ -1112,6 +1153,27 @@ final class AppModel {
         if await insertion.insert(text, into: target) {
             didInsertCurrentDictation = true
             dictationNotice = nil
+            return
+        }
+        if insertion.requiresReviewAfterInsertion {
+            dictationNotice = DictationRecovery.pasteUnconfirmed(insertion.status, canPasteAgain: false)
+            return
+        }
+        guard let app = dictationTargetApp,
+              let pasteTarget = capturedPasteTarget,
+              insertion.focusState(of: target).fieldIsFocused else {
+            dictationNotice = DictationRecovery.insertionFailed(
+                insertion.status, canPasteAgain: capturedPasteTarget != nil)
+            return
+        }
+        switch await insertion.paste(text, into: app, target: pasteTarget) {
+        case .inserted:
+            didInsertCurrentDictation = true
+            dictationNotice = nil
+        case .unconfirmed:
+            dictationNotice = DictationRecovery.pasteUnconfirmed(insertion.status, canPasteAgain: false)
+        case .unavailable:
+            dictationNotice = DictationRecovery.insertionFailed(insertion.status, canPasteAgain: false)
         }
     }
 
@@ -1512,7 +1574,7 @@ final class AppModel {
                 await typeFinishedDictation(finished)
             } else if finishesWithoutTyping {
                 showsFinishedTranscript = false
-            } else if !typeIntoFieldFocusedNow(finished) {
+            } else if !(await typeIntoFieldFocusedNow(finished)) {
                 showsFinishedTranscript = true
             }
             completedDictationCount += 1
@@ -1529,6 +1591,10 @@ final class AppModel {
         if let target = capturedInsertionTarget {
             if insertion.insert(text, ifStillFocused: target) {
                 didInsertCurrentDictation = true
+                return
+            }
+            if insertion.requiresReviewAfterInsertion {
+                dictationNotice = DictationRecovery.pasteUnconfirmed(insertion.status, canPasteAgain: false)
                 return
             }
             // The same field is still focused but refused direct typing: paste instead.
@@ -1566,14 +1632,38 @@ final class AppModel {
 
     /// No text field had focus when dictation began. If one has focus now, because the person
     /// clicked into it while talking, type there; otherwise the card stays up with Copy.
-    private func typeIntoFieldFocusedNow(_ text: String) -> Bool {
+    private func typeIntoFieldFocusedNow(_ text: String) async -> Bool {
         guard insertion.isEnabled, !didInsertCurrentDictation, !text.isEmpty,
-              let target = insertion.captureInsertionTarget(),
-              insertion.insert(text, ifStillFocused: target) else { return false }
+              let app = NSWorkspace.shared.frontmostApplication,
+              app.processIdentifier != NSRunningApplication.current.processIdentifier,
+              let target = insertion.captureInsertionTarget() else { return false }
         capturedInsertionTarget = target
         capturedInsertionTargetName = target.applicationName
-        didInsertCurrentDictation = true
-        return true
+        dictationTargetApp = app
+        capturedPasteTarget = insertion.capturePasteTarget(into: app)
+        if insertion.insert(text, ifStillFocused: target) {
+            didInsertCurrentDictation = true
+            return true
+        }
+        if insertion.requiresReviewAfterInsertion {
+            dictationNotice = DictationRecovery.pasteUnconfirmed(insertion.status, canPasteAgain: false)
+            return false
+        }
+        guard let pasteTarget = capturedPasteTarget,
+              insertion.focusState(of: target).fieldIsFocused else {
+            dictationNotice = DictationRecovery.insertionFailed(insertion.status, canPasteAgain: false)
+            return false
+        }
+        switch await insertion.paste(text, into: app, target: pasteTarget) {
+        case .inserted:
+            didInsertCurrentDictation = true
+            return true
+        case .unconfirmed:
+            dictationNotice = DictationRecovery.pasteUnconfirmed(insertion.status, canPasteAgain: false)
+        case .unavailable:
+            dictationNotice = DictationRecovery.insertionFailed(insertion.status, canPasteAgain: false)
+        }
+        return false
     }
 
     /// Runs recognition again over the failed dictation's audio, which was kept in memory.
@@ -1620,11 +1710,17 @@ final class AppModel {
             targetIsFrontmost: focus.appIsFrontmost, targetFieldIsFocused: focus.fieldIsFocused)
         switch decision {
         case .allowed:
-            if let target = capturedInsertionTarget, insertion.insert(text, ifStillFocused: target) {
-                didInsertCurrentDictation = true
-                dictationNotice = nil
-                completedDictationCount += 1
-                return
+            if let target = capturedInsertionTarget {
+                if insertion.insert(text, ifStillFocused: target) {
+                    didInsertCurrentDictation = true
+                    dictationNotice = nil
+                    completedDictationCount += 1
+                    return
+                }
+                if insertion.requiresReviewAfterInsertion {
+                    dictationNotice = DictationRecovery.pasteUnconfirmed(insertion.status, canPasteAgain: false)
+                    return
+                }
             }
             guard let app = dictationTargetApp, let pasteTarget = capturedPasteTarget else {
                 dictationNotice = DictationRecovery.insertionFailed(insertion.status, canPasteAgain: true)
