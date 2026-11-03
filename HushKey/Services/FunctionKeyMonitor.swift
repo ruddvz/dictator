@@ -1,5 +1,6 @@
 import AppKit
 import Carbon.HIToolbox
+import os
 
 /// Turns presses of the fn (Globe) key into dictation gestures:
 /// hold to talk, double-tap to dictate hands-free, tap again to stop.
@@ -115,6 +116,14 @@ final class FunctionKeyMonitor {
             }
         }
 
+        /// The same key in the keyboard's live hardware state.
+        var hardwareFlag: CGEventFlags {
+            switch self {
+            case .function: .maskSecondaryFn
+            case .control: .maskControl
+            }
+        }
+
         /// Modifiers that turn a press into a shortcut. fn is excluded for fn itself because macOS
         /// sets it on arrow and F-key events too.
         var otherModifiers: NSEvent.ModifierFlags {
@@ -140,6 +149,13 @@ final class FunctionKeyMonitor {
     private(set) var gesture = FunctionKeyGesture()
     private var monitors: [Any] = []
     private var holdTimer: DispatchWorkItem?
+    /// A release that arrived while the keyboard still reports the key down, waiting to be
+    /// confirmed by the hardware state or by the next press.
+    private var pendingRelease: DispatchWorkItem?
+    private let log = Logger(subsystem: "com.ruddvz.hushkey", category: "shortcut")
+
+    /// How often an unconfirmed release re-checks the keyboard.
+    static let releaseRecheck: TimeInterval = 0.05
 
     var isInstalled: Bool { !monitors.isEmpty }
 
@@ -168,6 +184,8 @@ final class FunctionKeyMonitor {
         monitors.forEach(NSEvent.removeMonitor)
         monitors.removeAll()
         holdTimer?.cancel()
+        pendingRelease?.cancel()
+        pendingRelease = nil
         gesture = FunctionKeyGesture()
         gesture.supportsHandsFree = key.supportsHandsFree
     }
@@ -187,8 +205,17 @@ final class FunctionKeyMonitor {
         case .flagsChanged where key.keyCodes.contains(event.keyCode):
             let others = event.modifierFlags.intersection(key.otherModifiers)
             if event.modifierFlags.contains(key.flag), others.isEmpty {
+                // A press proves any pending release was real: end that hold first.
+                flushPendingRelease(at: now)
                 action = gesture.fnDown(at: now)
             } else if !event.modifierFlags.contains(key.flag) {
+                guard !keyIsPhysicallyDown else {
+                    // Some events report the key up while it is still held, which used to end
+                    // a dictation mid-sentence. Wait for the keyboard to agree.
+                    log.info("\(String(describing: self.key)) release ignored: key still held")
+                    awaitPhysicalRelease()
+                    return
+                }
                 action = gesture.fnUp(at: now)
             } else {
                 action = gesture.otherKeyDown()
@@ -206,7 +233,37 @@ final class FunctionKeyMonitor {
         perform(action)
     }
 
+    private var keyIsPhysicallyDown: Bool {
+        CGEventSource.flagsState(.hidSystemState).contains(key.hardwareFlag)
+    }
+
+    private func awaitPhysicalRelease() {
+        guard pendingRelease == nil, gesture.isDown else { return }
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, self.pendingRelease != nil else { return }
+            self.pendingRelease = nil
+            if self.keyIsPhysicallyDown { self.awaitPhysicalRelease() }
+            else { self.flushRelease(at: ProcessInfo.processInfo.systemUptime) }
+        }
+        pendingRelease = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.releaseRecheck, execute: work)
+    }
+
+    private func flushPendingRelease(at time: TimeInterval) {
+        guard pendingRelease != nil else { return }
+        flushRelease(at: time)
+    }
+
+    private func flushRelease(at time: TimeInterval) {
+        pendingRelease?.cancel()
+        pendingRelease = nil
+        perform(gesture.fnUp(at: time))
+    }
+
     private func perform(_ action: FunctionKeyGesture.Action) {
+        if action != .none, action != .scheduleHoldStart {
+            log.info("\(String(describing: self.key)) \(String(describing: action))")
+        }
         switch action {
         case .scheduleHoldStart:
             holdTimer?.cancel()

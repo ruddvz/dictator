@@ -44,7 +44,7 @@ struct HushKeyApp: App {
             Toggle("Show dictation pill", isOn: Binding(
                 get: { model.showsFloatingPill },
                 set: { model.showsFloatingPill = $0 }))
-            Toggle("Start and stop sounds", isOn: Binding(
+            Toggle("Dictation sounds", isOn: Binding(
                 get: { model.playsDictationSounds },
                 set: { model.playsDictationSounds = $0 }))
             Divider()

@@ -163,7 +163,7 @@ final class DictationRecoveryTests: XCTestCase {
         XCTAssertEqual(TranscriptCard.state(isCapturing: true, hasTarget: true, transcript: " ",
                                             isCollapsed: false, keepsFinishedText: false), .hidden)
         XCTAssertEqual(TranscriptCard.state(isCapturing: true, hasTarget: true, transcript: "hello",
-                                            isCollapsed: false, keepsFinishedText: false), .live(hint: nil))
+                                            isCollapsed: false, keepsFinishedText: false), .hidden)
         XCTAssertEqual(TranscriptCard.state(isCapturing: true, hasTarget: false, transcript: "hello",
                                             isCollapsed: true, keepsFinishedText: false), .hidden)
     }
@@ -176,6 +176,10 @@ final class DictationRecoveryTests: XCTestCase {
                                             isCollapsed: false, keepsFinishedText: false), .hidden)
         XCTAssertEqual(TranscriptCard.state(isCapturing: false, hasTarget: false, transcript: "",
                                             isCollapsed: false, keepsFinishedText: true), .hidden)
+        // Typing into the field failed: the card comes back so the text can be copied.
+        XCTAssertEqual(TranscriptCard.state(isCapturing: false, hasTarget: true, transcript: "hello",
+                                            isCollapsed: false, keepsFinishedText: true),
+                       .finished(hint: TranscriptCard.notTypedHint))
     }
 
     func testTranscriptTailKeepsTheEndAtAWordBoundary() {

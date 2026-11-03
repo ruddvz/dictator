@@ -57,6 +57,7 @@ final class AppModel {
             case .files: "Files"
             case .personalization: "Vocabulary"
             case .settings: "Settings"
+            case .setup: "Connect"
             default: rawValue
             }
         }
@@ -221,10 +222,13 @@ final class AppModel {
             UserDefaults.standard.set(stored, forKey: "dictationTones")
         }
     }
-    /// A soft system sound when dictation starts listening and when it stops. Off by default.
-    var playsDictationSounds = UserDefaults.standard.bool(forKey: "playDictationSounds") {
-        didSet { UserDefaults.standard.set(playsDictationSounds, forKey: "playDictationSounds") }
+    /// Soft cues instead of on-screen confirmations: the mic opened, the words landed, or the
+    /// dictation needs attention. On by default (a new key, so the old off-by-default start/stop
+    /// setting doesn't silence them).
+    var playsDictationSounds = UserDefaults.standard.object(forKey: "playDictationCues") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(playsDictationSounds, forKey: "playDictationCues") }
     }
+    @ObservationIgnored private let cuePlayer = DictationSoundPlayer()
     var savesDictationHistory = UserDefaults.standard.object(forKey: "saveDictationHistory") as? Bool ?? true {
         didSet { UserDefaults.standard.set(savesDictationHistory, forKey: "saveDictationHistory") }
     }
@@ -261,9 +265,15 @@ final class AppModel {
     private(set) var usedNearbyTextHints = false
     private(set) var isFinalizingDictation = false
     /// The pill's error state for the last dictation, with the recoveries it allows.
-    private(set) var dictationNotice: DictationNotice?
+    private(set) var dictationNotice: DictationNotice? {
+        didSet {
+            if let dictationNotice, !dictationNotice.isNeutral, dictationNotice != oldValue { playDictationCue(.error) }
+        }
+    }
     /// Bumped each time a dictation ends with text, so the pill can flash its done state.
-    private(set) var completedDictationCount = 0
+    private(set) var completedDictationCount = 0 {
+        didSet { if completedDictationCount > oldValue, dictationNotice == nil { playDictationCue(.success) } }
+    }
     private(set) var dictationResultGeneration = 0
     /// Whether the running or last dictation has a text field to type into.
     private(set) var dictationHasTarget = false
@@ -1505,7 +1515,7 @@ final class AppModel {
         clearSelectedTextEdit()
         cancelPendingDictationHistorySave()
         saveCurrentDictation()
-        screen = .dictation
+        // Stay on the current page: fn works from anywhere, and switching here closed open sheets.
         capturedInsertionTarget = nil
         capturedPasteTarget = nil
         capturedInsertionTargetName = nil
@@ -1747,7 +1757,7 @@ final class AppModel {
             return
         }
         lastDictationMicrophoneName = audio.activeDeviceName
-        playDictationSound("Tink")
+        playDictationCue(.start)
         dictationStartedAt = Date()
         lastDictationDuration = nil
         let customWords = profileSettings.vocabulary
@@ -1794,7 +1804,6 @@ final class AppModel {
         else { transcriber.stop() }
         audio.stop()
         stopRetainingAudio(keep: true)
-        playDictationSound("Pop")
         functionKey.reset()
         lastDictationDuration = dictationStartedAt.map { Date().timeIntervalSince($0) }
         dictationStartedAt = nil
@@ -1863,6 +1872,8 @@ final class AppModel {
             insertion.logFocus("finish hasTarget=\(dictationHasTarget)")
             if dictationHasTarget {
                 await typeFinishedDictation(finished)
+                // Typing didn't go through: keep the words on screen with Copy beside the notice.
+                if !didInsertCurrentDictation, dictationNotice != nil { showsFinishedTranscript = true }
             } else if finishesWithoutTyping {
                 showsFinishedTranscript = false
             } else if !(await typeIntoFieldFocusedNow(finished)) {
@@ -2499,10 +2510,9 @@ final class AppModel {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    private func playDictationSound(_ name: String) {
-        guard playsDictationSounds, let sound = NSSound(named: NSSound.Name(name)) else { return }
-        sound.volume = 0.35
-        sound.play()
+    private func playDictationCue(_ cue: DictationCue) {
+        guard playsDictationSounds else { return }
+        cuePlayer.play(cue)
     }
 
 }

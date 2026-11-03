@@ -286,7 +286,7 @@ private struct TakeTile: View {
                         .foregroundStyle(Theme.finishing)
                         .help(issue.message)
                 } else {
-                    Text(String(format: "%.2f s", template.duration))
+                    Text(String(format: "%.2f s · %d samples", template.duration, template.samples.count))
                         .font(.hkMeta.monospacedDigit())
                         .foregroundStyle(Theme.ink2)
                 }

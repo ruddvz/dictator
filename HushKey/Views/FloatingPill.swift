@@ -277,7 +277,7 @@ struct FloatingPillView: View {
                 let token = doneToken
                 showsDone = true
                 Task {
-                    try? await Task.sleep(for: .seconds(1.4))
+                    try? await Task.sleep(for: .seconds(0.8))
                     if token == doneToken { showsDone = false }
                 }
             }
@@ -346,14 +346,13 @@ struct FloatingPillView: View {
             .padding(.vertical, 4)
             .transition(.opacity.combined(with: .scale(scale: 0.9)))
         case .done:
-            HStack(spacing: Theme.s2) {
-                MorphIcon(phase: .done, lineWidth: 2)
-                    .frame(width: 14, height: 14)
-                    .foregroundStyle(Theme.signal)
-                Text(model.didInsertCurrentDictation ? "Typed" : "Ready in HushKey").font(.system(size: 13, weight: .medium))
-            }
-            .padding(.horizontal, Theme.s3)
-            .frame(height: Self.height)
+            // The success cue says it landed; the pill only closes its line into a check.
+            MorphIcon(phase: .done, lineWidth: 2)
+                .frame(width: 14, height: 14)
+                .foregroundStyle(Theme.signal)
+                .padding(.horizontal, Theme.s3)
+                .frame(height: Self.height)
+                .accessibilityLabel(model.didInsertCurrentDictation ? "Typed" : "Ready to copy")
             .transition(.opacity.combined(with: .scale(scale: 0.9)))
         }
     }
@@ -371,9 +370,8 @@ struct FloatingPillView: View {
                 }
                 .transition(.opacity.combined(with: .scale(scale: 0.6)))
             }
-            BreathRibbon(level: model.audio.level,
-                         mode: phase == .listening ? .live : phase == .preparing ? .waiting : .working,
-                         tint: Theme.ink)
+            let ribbonMode: BreathRibbon.Mode = phase == .listening ? .live : phase == .preparing ? .waiting : .working
+            LiveLevel(model.audio) { BreathRibbon(level: $0, mode: ribbonMode, tint: Theme.ink) }
                 .frame(width: 58, height: 18)
                 .padding(.horizontal, showsControls ? 2 : 6)
             if phase == .listening { elapsed }
@@ -426,7 +424,7 @@ struct FloatingPillView: View {
         if text.isEmpty {
             // Nothing said yet: a one-line strip, not an empty card with a placeholder headline.
             HStack(spacing: Theme.s2) {
-                MorphIcon(phase: .listening, level: model.audio.level, lineWidth: 1.6)
+                LiveLevel(model.audio) { MorphIcon(phase: .listening, level: $0, lineWidth: 1.6) }
                     .frame(width: 14, height: 14)
                     .foregroundStyle(Theme.signal)
                 if let shownHint {
@@ -448,7 +446,7 @@ struct FloatingPillView: View {
         } else {
             VStack(alignment: .leading, spacing: Theme.s2) {
                 HStack(spacing: Theme.s2) {
-                    MorphIcon(phase: isFinished ? .done : .listening, level: model.audio.level, lineWidth: 1.6)
+                    LiveLevel(model.audio) { MorphIcon(phase: isFinished ? .done : .listening, level: $0, lineWidth: 1.6) }
                         .frame(width: 14, height: 14)
                         .foregroundStyle(Theme.signal)
                     if let shownHint {
@@ -583,10 +581,10 @@ struct FloatingPillView: View {
     @ViewBuilder
     private var pillMenu: some View {
         microphoneChoices
-        Toggle("Start and stop sounds", isOn: Binding(get: { model.playsDictationSounds },
+        Toggle("Dictation sounds", isOn: Binding(get: { model.playsDictationSounds },
                                                        set: { model.playsDictationSounds = $0 }))
         Divider()
-        Button("Move to the centre") { onCentre() }
+        Button("Move to the center") { onCentre() }
         Button("Meeting notes") { model.openMeetingNotes() }
         Button("Open HushKey") {
             model.screen = .dictation

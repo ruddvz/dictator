@@ -346,19 +346,19 @@ struct SignalPlot: View {
     var showsHeader = true
 
     static let acceleration = [
-        Channel(name: "x", color: .red, value: \.ax),
-        Channel(name: "y", color: .green, value: \.ay),
-        Channel(name: "z", color: .blue, value: \.az),
+        Channel(name: "x", color: Theme.signal, value: \.ax),
+        Channel(name: "y", color: Theme.finishing, value: \.ay),
+        Channel(name: "z", color: Theme.heroMist, value: \.az),
     ]
     static let rotation = [
-        Channel(name: "x", color: .red, value: \.rx),
-        Channel(name: "y", color: .green, value: \.ry),
-        Channel(name: "z", color: .blue, value: \.rz),
+        Channel(name: "x", color: Theme.signal, value: \.rx),
+        Channel(name: "y", color: Theme.finishing, value: \.ry),
+        Channel(name: "z", color: Theme.heroMist, value: \.rz),
     ]
     static let attitude = [
-        Channel(name: "pitch", color: .orange, value: \.pitch),
-        Channel(name: "roll", color: .purple, value: \.roll),
-        Channel(name: "yaw", color: .teal, value: \.yaw),
+        Channel(name: "pitch", color: Theme.signal, value: \.pitch),
+        Channel(name: "roll", color: Theme.finishing, value: \.roll),
+        Channel(name: "yaw", color: Theme.heroMist, value: \.yaw),
     ]
 
     var body: some View {
@@ -402,7 +402,7 @@ struct SignalPlot: View {
                 }
             }
             .frame(height: height)
-            .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 6))
+            .background(Theme.well, in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
         }
     }
 }
@@ -410,12 +410,12 @@ struct SignalPlot: View {
 struct LevelMeter: View {
     var value: Double
     var marker: Double?
-    var tint: Color = .green
+    var tint: Color = Theme.signal
 
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
-                Capsule().fill(.quaternary)
+                Capsule().fill(Theme.hairline)
                 Capsule().fill(tint.gradient)
                     .frame(width: geo.size.width * min(max(value, 0), 1))
                 if let marker {
@@ -513,7 +513,7 @@ struct MotionStatusBadge: View {
 
     private var color: Color {
         switch status {
-        case .streaming: Theme.signal
+        case .streaming: Theme.success
         case .waiting: Theme.finishing
         default: Theme.danger
         }
@@ -648,5 +648,123 @@ struct HeroMetric: View {
                 .font(.hkCaption)
                 .foregroundStyle(Theme.ink2)
         }
+    }
+}
+
+// MARK: Sheets
+
+/// Modal sheet frame shared by the editors: display title, one-line subtitle, close button,
+/// content, then a footer with an optional note, Cancel and the primary action.
+struct EditorSheet<Content: View>: View {
+    var title: String
+    var subtitle: String?
+    var note: String?
+    var primaryTitle: String
+    var canSave = true
+    var width: CGFloat = 520
+    var onSave: () -> Void
+    @ViewBuilder var content: Content
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.s5) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: Theme.s1) {
+                    Text(title).font(.display(26))
+                    if let subtitle {
+                        Text(subtitle).font(.hkCaption).foregroundStyle(Theme.ink2)
+                    }
+                }
+                Spacer()
+                Button("Close", systemImage: "xmark") { dismiss() }
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(IconButtonStyle())
+            }
+            VStack(alignment: .leading, spacing: Theme.s4) { content }
+            HStack(spacing: Theme.s2) {
+                if let note {
+                    Text(note).font(.hkCaption).foregroundStyle(Theme.ink3)
+                }
+                Spacer(minLength: Theme.s4)
+                Button("Cancel") { dismiss() }
+                    .buttonStyle(SecondaryButtonStyle())
+                    .keyboardShortcut(.cancelAction)
+                Button(primaryTitle, action: onSave)
+                    .buttonStyle(PrimaryButtonStyle())
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(!canSave)
+            }
+        }
+        .padding(Theme.s5)
+        .frame(width: width)
+        .background(Theme.sheet)
+    }
+}
+
+/// A labelled field on `well` with a hairline border, matching the Languages search field.
+/// `multiline` grows a vertical text field up to `lineLimit` lines instead of one line.
+struct SheetField: View {
+    var label: String
+    var prompt: String
+    @Binding var text: String
+    var hint: String?
+    var multiline = false
+    var autofocus = false
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.s2) {
+            Text(label).font(.hkRowTitle)
+            Group {
+                if multiline {
+                    TextField(prompt, text: $text, axis: .vertical)
+                        .lineLimit(5...10)
+                } else {
+                    TextField(prompt, text: $text)
+                }
+            }
+            .textFieldStyle(.plain)
+            .font(.hkBody)
+            .focused($focused)
+            .accessibilityLabel(label)
+            .padding(.horizontal, Theme.s3)
+            .padding(.vertical, Theme.s2 + 1)
+            .frame(minHeight: Theme.controlHeight)
+            .background(Theme.well, in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
+                .strokeBorder(focused ? Theme.signal : Theme.hairline, lineWidth: focused ? 1.5 : 1))
+            .animation(Theme.snappy, value: focused)
+            if let hint {
+                Text(hint)
+                    .font(.hkCaption)
+                    .foregroundStyle(Theme.ink2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .onAppear { if autofocus { focused = true } }
+    }
+}
+
+/// Inline validation message under a sheet's fields.
+struct SheetNotice: View {
+    var message: String
+
+    var body: some View {
+        Label(message, systemImage: "exclamationmark.triangle")
+            .font(.hkCallout)
+            .foregroundStyle(Theme.danger)
+            .transition(.opacity)
+    }
+}
+
+extension View {
+    /// Inline `TextEditor` field: no stock text-view background, `sheet` fill and a hairline
+    /// border at the control radius, so it reads the same in light and dark mode.
+    func editorField() -> some View {
+        scrollContentBackground(.hidden)
+            .padding(Theme.s2)
+            .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
+                .strokeBorder(Theme.hairline, lineWidth: 1))
     }
 }

@@ -1,5 +1,23 @@
 # HushKey progress
 
+## Completed: end-to-end UI/UX pass, pill sounds, unbroken fn holds, smoother dictation (2026-11-03)
+
+- **Pill, per the user's live test:**
+  - While a text box is focused, only the pill and its ribbon show; the live transcript card appears only with no text box, or when typing fails (then with Copy and "Couldn’t type it. Copy it instead.") (`TranscriptCard.state`).
+  - "Typed" / "Ready in HushKey" is gone. Three synthesized cues replace it (`DictationCue`, `HushKey/Audio/DictationSounds.swift`): a rising two-note start, a soft bell when the text lands, two falling notes for a non-neutral notice. On by default under a new key (`playDictationCues`); the old stop "Pop" is removed. The pill's done state is now just the check, for 0.8 s.
+- **One fn hold split into several dictations:** logs showed each piece as its own start→finish, ended by an fn "release" while the user says fn was still down. `FunctionKeyMonitor` now confirms every release against `CGEventSource.flagsState(.hidSystemState)`; a release the keyboard disagrees with is held and re-checked every 50 ms, and the next press flushes it. Every gesture is logged under `com.ruddvz.hushkey:shortcut`. Smart spacing between takes already existed (`spacedInsertion`).
+- **Choppiness:** the mic level (~47 updates/s) was read in the bodies of `ContentView`, `DictationView` (with the whole history list) and the pill, so all of them re-rendered per audio buffer. `LiveLevel` (Ambient.swift) confines those reads to the ribbon and icons.
+- **Audit of every page, light and dark (subagent), fixed:**
+  - Starting dictation no longer jumps to Home or closes open sheets.
+  - New `EditorSheet` / `SheetField` / `SheetNotice` and `.editorField()` (Components.swift): the vocabulary/snippet/correction editor and the transform editor drop stock Form/roundedBorder; inline text editors no longer show the stock background.
+  - Meeting notes empty-state icon was a non-existent symbol (now `note.text`; all symbol names verified).
+  - Silent lab plots, level meter and status chip use tokens, not system colours; "Setup" is "Connect" everywhere; Silent Use placeholder matches the first unmet step; capture-mode picker no longer truncates.
+  - Settings: nav pinned while content scrolls; competitor research links only in DEBUG; App profiles heading not doubled; insertion row has a fixed description; Import is secondary.
+  - Transforms use one word ("transform") throughout; Files explains why the engine is locked; Insights bar fills its track, heatmap is sage, "across N dictations"; Language sheet sizes to its results; American spelling; Vocabulary title stays "Vocabulary".
+- **Verified here:** `xcodebuild … test`: 206 tests, 3 skipped, 0 failures (new `DictationCueTests`, updated card tests). Signed `Scripts/package-app.sh` build.
+- **Not verified live yet (needs a person speaking):** the cues' sound and volume, the pill without the card in a focused field, a long fn hold staying one dictation (check `log show --predicate 'subsystem == "com.ruddvz.hushkey"'` for "release ignored"), and whether dictation now feels smooth.
+- **Next:** live check of the above; then the guided tour from `docs/APP_UX_ANALYSIS.md`.
+
 ## Completed: Parakeet as an on-device dictation engine (2026-11-02)
 
 - **Engine choice** (Settings → General → Speech engine): Apple Speech (default, no download) or Parakeet.

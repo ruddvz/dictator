@@ -89,9 +89,9 @@ struct ContentView: View {
 
     private var brand: some View {
         HStack(spacing: Theme.s2) {
-            MorphIcon(phase: model.audio.isRunning ? .listening
-                      : (model.isFinalizingDictation || model.transcriber.isFinalizing) ? .working : .idle,
-                      level: model.audio.level, lineWidth: 2.2)
+            let phase: MorphIcon.Phase = model.audio.isRunning ? .listening
+                : (model.isFinalizingDictation || model.transcriber.isFinalizing) ? .working : .idle
+            LiveLevel(model.audio) { MorphIcon(phase: phase, level: $0, lineWidth: 2.2) }
                 .frame(width: 22, height: 22)
                 .foregroundStyle(model.audio.isRunning ? Theme.listening : Theme.ink)
             Text("HushKey")

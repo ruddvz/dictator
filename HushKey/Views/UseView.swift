@@ -101,7 +101,7 @@ struct UseView: View {
                         detail: model.useCaptureMode == .hold ? "Hold Control, or \(model.captureShortcut.label) here, while you mouth a word."
                             : "Starts on its own when you move.") {
                 MenuPicker(selection: $model.useCaptureMode,
-                           options: CaptureController.Mode.allCases.map { ($0, $0.rawValue) }, width: 160)
+                           options: CaptureController.Mode.allCases.map { ($0, $0.rawValue) })
                     .disabled(!model.isMotionInferenceEnabled)
             }
             GroupRow {

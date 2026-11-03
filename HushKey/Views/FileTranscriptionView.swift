@@ -46,7 +46,8 @@ struct FileTranscriptionView: View {
 
                 SettingsGroup(title: "Engine") {
                     SettingsRow(title: "Speech engine",
-                                detail: workspace.engine == .apple ? "Apple Speech. Nothing to download."
+                                detail: !currentText.isEmpty && !isBusy ? "Clear the transcript to change engine."
+                                    : workspace.engine == .apple ? "Apple Speech. Nothing to download."
                                     : "WhisperKit. Downloads a model once, then runs offline.") {
                         MenuPicker(selection: Binding(get: { workspace.engine },
                                                      set: { workspace.engine = $0 }),
@@ -371,7 +372,7 @@ struct FileTranscriptionView: View {
         workspace.activeSourceName = session.sourceName
         workspace.activeLanguageIdentifier = session.languageIdentifier
         workspace.activeModelVariant = session.modelVariant
-        exportMessage = "Restored saved transcript. The original audio file is not stored by HushKey."
+        exportMessage = "Restored. The audio file itself isn’t kept."
         if session.engine == .apple {
             transcription.restore(session)
         } else {

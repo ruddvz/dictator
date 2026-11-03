@@ -107,7 +107,7 @@ struct DictationView: View {
             Task { await model.toggleDictation() }
         } label: {
             HStack(spacing: Theme.s2) {
-                MorphIcon(phase: morphPhase, level: model.audio.level, lineWidth: 1.8)
+                LiveLevel(model.audio) { MorphIcon(phase: morphPhase, level: $0, lineWidth: 1.8) }
                     .frame(width: 16, height: 16)
                 Text(isFinishing ? "Transcribing"
                      : model.audio.isRunning ? "Stop"
@@ -154,7 +154,7 @@ struct DictationView: View {
     private var composer: some View {
         VStack(alignment: .leading, spacing: Theme.s3) {
             HStack(spacing: Theme.s2) {
-                MorphIcon(phase: morphPhase == .idle ? .done : morphPhase, level: model.audio.level, lineWidth: 2)
+                LiveLevel(model.audio) { MorphIcon(phase: morphPhase == .idle ? .done : morphPhase, level: $0, lineWidth: 2) }
                     .frame(width: 18, height: 18)
                     .foregroundStyle(model.audio.isRunning ? Theme.listening : Theme.ink)
                 Text(model.isSelectedTextEditCapturing ? "Listening for your edit"
@@ -574,7 +574,7 @@ private struct HeroCard: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .frame(minHeight: 200)
         .background {
-            IsolatedHost { HeroBackdrop(level: model.audio.level, mode: ribbonMode, visible: windowVisible) }
+            IsolatedHost { LiveLevel(model.audio) { HeroBackdrop(level: $0, mode: ribbonMode, visible: windowVisible) } }
         }
         .clipShape(RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Theme.r1, style: .continuous)
