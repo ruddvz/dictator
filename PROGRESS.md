@@ -1,5 +1,16 @@
 # HushKey progress
 
+## Completed: idle pill hover redesign (2026-11-03)
+
+- **Problem (user):** hovering the idle pill "looks absolutely horrible". It showed a lone hush glyph next to a grey-filled Meeting notes circle, uneven padding, and a separate "Dictate fn" bubble floating above. The panel also resized mid-animation, so the pill clipped and flickered as it opened and closed.
+- **Now (`FloatingPill.swift`):**
+  - Hover opens the idle capsule into one 28 pt bar: hush glyph, "Dictate", the shortcut as a small sage `PillKey`, a hairline, then a quiet Meeting notes button with no fill until hovered. The "Dictate" bubble is gone; Meeting notes, × and ✓ still get a `PillHint` above (restyled, 24 pt, same `PillKey`).
+  - The capsule clips its contents while it grows, and they fade in after it opens. Idle is 82 % `paper` with a faint shadow, so it reads on light desktops as well as dark ones.
+  - `FloatingPillController.resize` grows the panel at once and shrinks it 0.5 s later, after the closing animation; the view is pinned bottom-centre inside it. That fixes the clip and flicker.
+  - The shadow margin is 8 pt and `PillPlacement.bottomInset` 8, so the pill sits where it did. Its hover top is 46 pt up, under the Silent HUD at 56.
+- **Verified here:** 216 tests, 3 skipped, 0 failures. Packaged and checked live in `dist/HushKey.app` with screen captures: idle, idle → hover → idle frames (no jump or clip), hover on white and black backdrops, the compact dot after 5 s. Clicking the pill started dictation and the × cancelled it while Finder stayed frontmost, and the panel shrank back cleanly. A drag gesture ended and saved its position.
+- **Not checked live (no real mouse available; only warps and background clicks):** the Meeting notes `PillHint` on hovering its button, and the pill actually sliding during a real drag. Both code paths are unchanged apart from styling.
+
 ## Completed: Silent Lab tells head movement from jaw movement; one HushKey at a time (2026-11-03)
 
 - **Problem (user):** a slight head nod was taken as motion. It got saved as a take, and it got matched as a word.

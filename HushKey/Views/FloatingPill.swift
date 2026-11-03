@@ -10,6 +10,8 @@ final class FloatingPillController {
     private var panel: NSPanel?
     private weak var model: AppModel?
     private var contentSize = CGSize(width: 60, height: 14)
+    /// A smaller size waits for the closing animation, so the panel never clips the pill as it shrinks.
+    private var pendingShrink: DispatchWorkItem?
     private var escapeMonitors: [Any] = []
     /// The screen the pill sits on: wherever the pointer was when it appeared or a dictation began.
     private var screen: NSScreen?
@@ -98,6 +100,8 @@ final class FloatingPillController {
                                         DispatchQueue.main.async { self?.resize(to: size) }
                                     })
             .environment(model)
+            // While the panel is still larger than the pill (see `resize`), keep the pill on the bottom edge.
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         let hosting = FirstMouseHostingView(rootView: root)
         // The controller owns the frame, so the pill grows upward from the bottom edge. With no
         // sizing options the hosting view never drives the window size or constraints itself.
@@ -115,12 +119,28 @@ final class FloatingPillController {
     }
 
     private func hide() {
+        pendingShrink?.cancel()
+        pendingShrink = nil
         panel?.orderOut(nil)
         panel = nil
     }
 
+    /// Grows at once, before the opening animation is drawn, and shrinks only once the closing
+    /// animation has settled. Resizing a window mid-animation clips the pill or makes it flicker.
     private func resize(to size: CGSize) {
-        guard size.width > 0, size.height > 0, size != contentSize else { return }
+        guard size.width > 0, size.height > 0 else { return }
+        pendingShrink?.cancel()
+        pendingShrink = nil
+        let grown = CGSize(width: max(size.width, contentSize.width), height: max(size.height, contentSize.height))
+        apply(grown)
+        guard grown != size else { return }
+        let shrink = DispatchWorkItem { [weak self] in self?.apply(size) }
+        pendingShrink = shrink
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: shrink)
+    }
+
+    private func apply(_ size: CGSize) {
+        guard size != contentSize else { return }
         contentSize = size
         place()
     }
@@ -156,7 +176,7 @@ final class FloatingPillController {
 /// Where the pill sits: centred on a remembered fraction of the screen width, 10 pt above the
 /// bottom of the visible frame, and never past either edge.
 enum PillPlacement {
-    static let bottomInset: CGFloat = 10
+    static let bottomInset: CGFloat = 8 // plus the view's 8 pt shadow margin: the pill sits 16 pt up
     static let edgeInset: CGFloat = 8
     private static let key = "pillCenterFraction"
 
@@ -252,7 +272,7 @@ struct FloatingPillView: View {
             }
             pill
         }
-            .padding(6) // room for the shadow inside the transparent panel
+            .padding(8) // room for the shadow inside the transparent panel
             .fixedSize()
             .onGeometryChange(for: CGSize.self) { $0.size } action: { onSize($0) }
             .animation(.spring(response: 0.34, dampingFraction: 0.78), value: phase)
@@ -286,9 +306,12 @@ struct FloatingPillView: View {
     private var pill: some View {
         content
             .foregroundStyle(Theme.ink)
-            .background(Capsule().fill(Theme.paper.opacity(phase == .idle ? 0.55 : 1)))
+            .background(Capsule().fill(Theme.paper.opacity(phase == .idle ? 0.82 : 1)))
+            // The capsule grows around its contents; clipping reveals them instead of letting them spill.
+            .clipShape(Capsule())
             .overlay(Capsule().strokeBorder(stroke, lineWidth: phase == .error && model.dictationNotice?.isNeutral != true ? 1 : 0.5))
-            .shadow(color: .black.opacity(phase == .idle ? 0 : 0.3), radius: 8, y: 3)
+            // A faint shadow at rest lifts the bar off light desktops; the hairline does it on dark ones.
+            .shadow(color: .black.opacity(phase == .idle ? 0.18 : 0.32), radius: phase == .idle ? 3 : 6, y: phase == .idle ? 1 : 2)
             .contentShape(Capsule())
             .onHover { inside in
                 isHovering = inside
@@ -315,26 +338,17 @@ struct FloatingPillView: View {
     private var content: some View {
         switch phase {
         case .idle:
-            Capsule().fill(Theme.signal.opacity(idleIsCompact ? 0.5 : 0.7))
-                .frame(width: idleIsCompact ? 10 : 24, height: 3)
-                .padding(.horizontal, idleIsCompact ? 6 : 11)
-                .padding(.vertical, idleIsCompact ? 4 : 5)
+            Capsule().fill(Theme.signal.opacity(idleIsCompact ? 0.6 : 0.85))
+                .frame(width: idleIsCompact ? 8 : 20, height: 3)
+                .padding(.horizontal, idleIsCompact ? 7 : 12)
+                .padding(.vertical, 5)
                 .animation(Theme.gentle, value: idleIsCompact)
-                .transition(.opacity)
+                .transition(.opacity.animation(.easeOut(duration: 0.12)))
         case .hover:
-            HStack(spacing: 6) {
-                MorphIcon(phase: .idle, lineWidth: 1.8)
-                    .frame(width: 16, height: 16)
-                    .foregroundStyle(Theme.signal)
-                    .padding(.leading, 8)
-                PillIconButton(systemImage: "person.2.wave.2", help: "Open Meeting notes",
-                               onHover: { hoveredControl = $0 ? .notes : nil }) {
-                    model.openMeetingNotes()
-                }
-            }
-            .padding(.horizontal, 4)
-            .frame(height: Self.height)
-            .transition(.opacity.combined(with: .scale(scale: 0.9)))
+            hoverBar
+                // Fade in once the capsule has mostly opened, so nothing is drawn squashed.
+                .transition(.asymmetric(insertion: .opacity.animation(.easeOut(duration: 0.18).delay(0.07)),
+                                        removal: .opacity.animation(.easeOut(duration: 0.1))))
         case .preparing, .listening, .finishing:
             recorder
         case .error:
@@ -358,6 +372,37 @@ struct FloatingPillView: View {
     }
 
     private static let height: CGFloat = 28
+
+    /// The idle bar opened by the pointer: the whole capsule is the dictate button, labelled with
+    /// its key, and a quiet Meeting notes button sits after a hairline. One shape, no tooltip.
+    private var hoverBar: some View {
+        HStack(spacing: 0) {
+            HStack(spacing: 7) {
+                MorphIcon(phase: .idle, lineWidth: 1.6)
+                    .frame(width: 14, height: 14)
+                    .foregroundStyle(Theme.signal)
+                Text("Dictate")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+                PillKey(label: model.dictationShortcut.label)
+            }
+            .padding(.leading, 11)
+            .padding(.trailing, 9)
+            .opacity(hoveredControl == .notes ? 0.55 : 1)
+            .animation(Theme.snappy, value: hoveredControl)
+            Rectangle()
+                .fill(Theme.ink.opacity(0.14))
+                .frame(width: 1, height: 14)
+            PillIconButton(systemImage: "person.2.wave.2", help: "Open Meeting notes", quiet: true, size: 24,
+                           onHover: { hoveredControl = $0 ? .notes : nil }) {
+                model.openMeetingNotes()
+            }
+            .padding(.leading, 4)
+            .padding(.trailing, 5) // the glyph then sits as far from the edge as the hush does
+        }
+        .frame(height: Self.height)
+        .fixedSize()
+    }
 
     /// One capsule from the first press to the typed text: the meter waits, listens, then works,
     /// so the pill never jumps between shapes mid-dictation.
@@ -400,7 +445,6 @@ struct FloatingPillView: View {
         case nil: break
         }
         switch phase {
-        case .hover: return .init(title: "Dictate", shortcut: model.dictationShortcut.label)
         case .preparing:
             if model.audio.isAwaitingPermission || model.transcriber.isAwaitingPermission {
                 return .init(title: "Answer the macOS prompt", shortcut: nil)
@@ -645,21 +689,31 @@ private struct PillHint: View {
             Text(title)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(Theme.ink)
-            if let shortcut {
-                Text(shortcut)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Theme.ink2)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 1)
-                    .background(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(Theme.well))
-            }
+            if let shortcut { PillKey(label: shortcut) }
         }
-        .padding(.horizontal, 9)
-        .padding(.vertical, 5)
+        .padding(.leading, 10)
+        .padding(.trailing, shortcut == nil ? 10 : 4)
+        .frame(height: 24)
         .background(Capsule().fill(Theme.paper))
-        .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 0.5))
-        .shadow(color: .black.opacity(0.3), radius: 6, y: 2)
+        .overlay(Capsule().strokeBorder(Theme.ink.opacity(0.12), lineWidth: 0.5))
+        .shadow(color: .black.opacity(0.28), radius: 5, y: 2)
         .accessibilityHidden(true) // the controls carry their own labels
+    }
+}
+
+/// A shortcut as one small key ("fn", "esc", "⌥⇧D"), in the sage keycap colours.
+private struct PillKey: View {
+    var label: String
+
+    var body: some View {
+        Text(label)
+            .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+            .foregroundStyle(Theme.ink)
+            .padding(.horizontal, 5)
+            .frame(minWidth: 18, minHeight: 16)
+            .background(RoundedRectangle(cornerRadius: 4.5, style: .continuous).fill(Theme.keycap))
+            .overlay(RoundedRectangle(cornerRadius: 4.5, style: .continuous).strokeBorder(Theme.keycapEdge, lineWidth: 0.5))
+            .accessibilityLabel("Shortcut \(label)")
     }
 }
 
@@ -672,6 +726,8 @@ private struct PillIconButton: View {
     var help: String
     var tint: Color = Theme.ink
     var prominent = false
+    /// No fill until hovered, for a secondary control beside the pill's main action.
+    var quiet = false
     var size: CGFloat = 20
     /// Reports hover to the pill, which shows its own hint instead of a slow system tooltip.
     var onHover: ((Bool) -> Void)? = nil
@@ -682,7 +738,7 @@ private struct PillIconButton: View {
         Button(action: action) {
             HStack(spacing: 4) {
                 Image(systemName: systemImage)
-                    .font(.system(size: prominent ? 10 : 9, weight: .bold))
+                    .font(.system(size: quiet ? 11 : prominent ? 10 : 9, weight: quiet ? .semibold : .bold))
                 if let title {
                     Text(title).font(.system(size: 12, weight: .semibold))
                         .lineLimit(1)
@@ -692,7 +748,9 @@ private struct PillIconButton: View {
             .foregroundStyle(prominent ? Theme.paper : tint.opacity(hovering ? 0.95 : 0.7))
             .frame(minWidth: title == nil ? size : 24, minHeight: title == nil ? size : 24)
             .padding(.horizontal, title == nil ? 0 : 9)
-            .background(Capsule().fill(prominent ? Theme.signal.opacity(hovering ? 1 : 0.9) : tint.opacity(hovering ? 0.18 : 0.1)))
+            .background(Capsule().fill(prominent ? Theme.signal.opacity(hovering ? 1 : 0.9)
+                                       : tint.opacity(hovering ? 0.16 : quiet ? 0 : 0.1)))
+            .animation(Theme.snappy, value: hovering)
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
