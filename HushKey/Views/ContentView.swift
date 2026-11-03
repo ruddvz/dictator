@@ -91,9 +91,13 @@ struct ContentView: View {
         HStack(spacing: Theme.s2) {
             let phase: MorphIcon.Phase = model.audio.isRunning ? .listening
                 : (model.isFinalizingDictation || model.transcriber.isFinalizing) ? .working : .idle
-            LiveLevel(model.audio) { MorphIcon(phase: phase, level: $0, lineWidth: 2.2) }
-                .frame(width: 22, height: 22)
-                .foregroundStyle(model.audio.isRunning ? Theme.listening : Theme.ink)
+            // The app icon's keycap: the morph icon cut into a solid tile, as in the menu bar.
+            LiveLevel(model.audio) { MorphIcon(phase: phase, level: $0, lineWidth: 2) }
+                .frame(width: 18, height: 18)
+                .foregroundStyle(Theme.inverseInk)
+                .frame(width: 24, height: 24)
+                .background(model.audio.isRunning ? Theme.listening : Theme.ink,
+                            in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
             Text("HushKey")
                 .font(.system(size: 18, weight: .semibold))
                 .tracking(-0.2)

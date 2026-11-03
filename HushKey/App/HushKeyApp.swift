@@ -22,7 +22,7 @@ struct HushKeyApp: App {
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentMinSize)
 
-        MenuBarExtra("HushKey", image: "HushKeyMenuBar") {
+        MenuBarExtra {
             let meetingBusy = model.meetingNotes.isStarting || model.meetingNotes.isFinalizing
             Button(model.meetingNotes.isCapturing ? "Stop meeting capture" :
                    meetingBusy ? "Meeting capture…" :
@@ -51,6 +51,10 @@ struct HushKeyApp: App {
             Label(model.motion.status.label, systemImage: model.motion.isConnected ? "headphones" : "headphones.slash")
             Text(model.meetingNotes.isCapturing ? "Meeting capture is active · Audio stays on this Mac" : "Local dictation · Silent lab")
                 .font(.caption)
+        } label: {
+            // The keycap glyph; its ribbon opens into a lens while dictating.
+            Image(model.audio.isRunning ? "HushKeyMenuBarLive" : "HushKeyMenuBar")
+                .accessibilityLabel("HushKey")
         }
         .menuBarExtraStyle(.menu)
     }
