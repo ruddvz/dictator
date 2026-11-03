@@ -597,6 +597,21 @@ struct LabProgress: View {
     }
 }
 
+/// Live check that only the jaw moves. AirPods sense the whole head, so a nod looks like a word unless
+/// the head stays still; takes and captures where it moved are refused.
+struct HeadStillnessIndicator: View {
+    var isMoving: Bool
+
+    var body: some View {
+        Label(isMoving ? "Head moving · keep still, move only your jaw" : "Head still",
+              systemImage: isMoving ? "exclamationmark.triangle.fill" : "checkmark.circle")
+            .font(.hkCaption)
+            .foregroundStyle(isMoving ? Theme.finishing : Theme.ink3)
+            .contentTransition(.symbolEffect(.replace))
+            .animation(Theme.snappy, value: isMoving)
+    }
+}
+
 /// Large lab hero: status glyph, title, one line, actions, and optional metrics on the right.
 struct LabHero<Actions: View, Metrics: View>: View {
     var symbol: String

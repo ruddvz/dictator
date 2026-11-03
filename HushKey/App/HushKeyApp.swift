@@ -7,6 +7,22 @@ struct HushKeyApp: App {
     @State private var silentHUD = SilentCaptureHUDController()
     @Environment(\.openWindow) private var openWindow
 
+    init() {
+        Self.handOffToRunningCopy()
+    }
+
+    /// Only one HushKey may run: two would both watch fn and Control, both own the pill, and fight
+    /// over the microphone. A second launch (another build, a copy elsewhere on disk) brings the
+    /// running one forward and quits.
+    private static func handOffToRunningCopy() {
+        guard !AppDataDirectory.isRunningTests, let bundleID = Bundle.main.bundleIdentifier else { return }
+        let current = NSRunningApplication.current
+        guard let running = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+            .first(where: { $0.processIdentifier != current.processIdentifier && !$0.isTerminated }) else { return }
+        running.activate()
+        exit(0)
+    }
+
     var body: some Scene {
         WindowGroup(id: "main") {
             ContentView()

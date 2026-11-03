@@ -38,27 +38,32 @@ struct TemplateClassifier: Sendable {
 
     let featureSet: FeatureSet
     let smoothing: Int
+    let headCutoff: Double?
     private let entries: [(label: String, frames: [[Double]])]
     private let scales: [Double]
 
     var labels: [String] { Array(Set(entries.map(\.label))).sorted() }
 
-    init?(templates: [Template], featureSet: FeatureSet, smoothing: Int = MotionFeatures.defaultSmoothing) {
+    init?(templates: [Template], featureSet: FeatureSet, smoothing: Int = MotionFeatures.defaultSmoothing,
+          headCutoff: Double? = nil) {
         guard !featureSet.isEmpty else { return nil }
         let raw = templates.map {
-            MotionFeatures.frames(MotionFeatures.trim($0.samples), set: featureSet, smoothing: smoothing)
+            MotionFeatures.frames(MotionFeatures.trim($0.samples), set: featureSet, smoothing: smoothing,
+                                  headCutoff: headCutoff)
         }
         guard Set(templates.map(\.label)).count >= 2 else { return nil }
         let scales = MotionFeatures.channelScales(raw)
         self.featureSet = featureSet
         self.smoothing = smoothing
+        self.headCutoff = headCutoff
         self.scales = scales
         self.entries = zip(templates, raw).map { ($0.label, MotionFeatures.scaled($1, by: scales)) }
     }
 
     func rank(_ samples: [MotionSample]) -> [RankedLabel] {
         let query = MotionFeatures.scaled(
-            MotionFeatures.frames(MotionFeatures.trim(samples), set: featureSet, smoothing: smoothing), by: scales)
+            MotionFeatures.frames(MotionFeatures.trim(samples), set: featureSet, smoothing: smoothing,
+                                  headCutoff: headCutoff), by: scales)
         var best: [String: Double] = [:]
         for entry in entries {
             let d = DTW.distance(query, entry.frames)
@@ -100,13 +105,15 @@ struct Evaluation: Sendable {
     var sessionHoldoutSessions: Int
 
     static func run(templates: [Template], featureSet: FeatureSet, permutations: Int = 500,
-                    smoothing: Int = MotionFeatures.defaultSmoothing) -> Evaluation? {
+                    smoothing: Int = MotionFeatures.defaultSmoothing,
+                    headCutoff: Double? = nil) -> Evaluation? {
         let labels = Array(Set(templates.map(\.label))).sorted()
         let counts = Dictionary(grouping: templates, by: \.label).mapValues(\.count)
         guard labels.count >= 2, counts.values.allSatisfy({ $0 >= 2 }), !featureSet.isEmpty else { return nil }
 
         let raw = templates.map {
-            MotionFeatures.frames(MotionFeatures.trim($0.samples), set: featureSet, smoothing: smoothing)
+            MotionFeatures.frames(MotionFeatures.trim($0.samples), set: featureSet, smoothing: smoothing,
+                                  headCutoff: headCutoff)
         }
         let scales = MotionFeatures.channelScales(raw)
         let seqs = raw.map { MotionFeatures.scaled($0, by: scales) }

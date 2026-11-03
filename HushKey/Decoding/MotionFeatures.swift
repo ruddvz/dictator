@@ -44,19 +44,84 @@ enum TakeIssue: Equatable, Sendable {
     }
 }
 
+/// AirPods report the whole head, so jaw movement and head movement arrive mixed in one stream.
+/// They separate by speed and size: on 37 real takes, mouthing a word tilted the head at most 1.3°
+/// with slow (under 1.5 Hz) rotation under 0.08 rad/s, while takes with a nod or turn tilted it
+/// 2–20° with slow rotation of 0.14–0.86 rad/s. So head movement is judged on the slow band and the
+/// total tilt, and any take or capture where the head moved is refused. Filtering the slow band out of
+/// the classifier's features instead was tried and lost accuracy (53 % → 28–41 %): a mouthed word moves
+/// the jaw slowly too. See docs/SILENT_SPEECH_RESEARCH.md.
 enum MotionFeatures {
     static let minTakeSeconds: TimeInterval = 0.3
     static let maxTakeSeconds: TimeInterval = 3
-    /// Mouthing peaks near 0.05–0.2 rad/s at the ear; a deliberate head turn or nod passes 1 rad/s.
+    /// Any spike this fast is a jerk of the head, whatever the band.
     static let maxTakeRotation = 0.6
+    /// Below this frequency motion is the head moving; above it, articulation.
+    static let headBandCutoff = 1.5
+    /// Slow-band rotation above this is a nod or turn. Mouthed words stayed under 0.08 rad/s.
+    static let maxHeadRotation = 0.12
+    /// Total tilt from where the take began. Mouthed words stayed under 1.3°.
+    static let maxHeadTilt = 2.5 * Double.pi / 180
+    /// Sample rate assumed when timestamps can't give one (AirPods stream at about 50 Hz).
+    static let nominalSampleRate = 50.0
 
     static func takeIssue(_ samples: [MotionSample]) -> TakeIssue? {
         guard let first = samples.first, let last = samples.last else { return .tooShort }
         let duration = last.t - first.t
         if duration < minTakeSeconds { return .tooShort }
         if duration > maxTakeSeconds { return .tooLong }
+        return headMoved(samples) ? .headMoved : nil
+    }
+
+    /// True when the head itself moved during these samples, rather than only the jaw.
+    static func headMoved(_ samples: [MotionSample]) -> Bool {
         let peak = samples.map { ($0.rx * $0.rx + $0.ry * $0.ry + $0.rz * $0.rz).squareRoot() }.max() ?? 0
-        return peak > maxTakeRotation ? .headMoved : nil
+        return peak > maxTakeRotation || slowRotationPeak(samples) > maxHeadRotation || tilt(samples) > maxHeadTilt
+    }
+
+    /// Largest slow-band rotation rate (rad/s).
+    static func slowRotationPeak(_ samples: [MotionSample]) -> Double {
+        guard samples.count > 2 else { return 0 }
+        let rate = sampleRate(samples)
+        let channels = [samples.map(\.rx), samples.map(\.ry), samples.map(\.rz)]
+            .map { lowPassed($0, sampleRate: rate, cutoff: headBandCutoff) }
+        return samples.indices.map { i in
+            (channels[0][i] * channels[0][i] + channels[1][i] * channels[1][i] + channels[2][i] * channels[2][i]).squareRoot()
+        }.max() ?? 0
+    }
+
+    /// Largest angle (rad) the head turned away from its orientation at the first sample.
+    static func tilt(_ samples: [MotionSample]) -> Double {
+        guard let first = samples.first else { return 0 }
+        return samples.map { s in
+            // Angle of the relative rotation first⁻¹·s, from the dot product of the two unit quaternions.
+            let dot = abs(first.qw * s.qw + first.qx * s.qx + first.qy * s.qy + first.qz * s.qz)
+            return 2 * acos(min(1, dot))
+        }.max() ?? 0
+    }
+
+    static func sampleRate(_ samples: [MotionSample]) -> Double {
+        guard let first = samples.first, let last = samples.last, last.t > first.t, samples.count > 1 else {
+            return nominalSampleRate
+        }
+        return Double(samples.count - 1) / (last.t - first.t)
+    }
+
+    /// Zero-phase low-pass (one pole, run forward then backward), so nothing shifts in time.
+    static func lowPassed(_ values: [Double], sampleRate: Double, cutoff: Double) -> [Double] {
+        guard let first = values.first, sampleRate > 0 else { return values }
+        let a = exp(-2 * Double.pi * cutoff / sampleRate)
+        var state = first
+        var forward = values.map { value -> Double in
+            state = a * state + (1 - a) * value
+            return state
+        }
+        state = forward[forward.count - 1]
+        for i in forward.indices.reversed() {
+            state = a * state + (1 - a) * forward[i]
+            forward[i] = state
+        }
+        return forward
     }
 
     /// Activity score used for segmentation. Rotation (rad/s) and acceleration (g) live on
@@ -90,8 +155,11 @@ enum MotionFeatures {
     /// docs/SILENT_SPEECH_RESEARCH.md.
     static let defaultSmoothing = 3
 
-    /// Per-frame feature vectors, lightly smoothed and mean-centered per channel (removes posture/heading bias).
-    static func frames(_ samples: [MotionSample], set: FeatureSet, smoothing: Int = defaultSmoothing) -> [[Double]] {
+    /// Per-frame feature vectors: slow motion below `headCutoff` removed (off by default; kept for the
+    /// offline eval), lightly smoothed,
+    /// and mean-centered per channel (removes posture/heading bias).
+    static func frames(_ samples: [MotionSample], set: FeatureSet, smoothing: Int = defaultSmoothing,
+                       headCutoff: Double? = nil) -> [[Double]] {
         guard let origin = samples.first else { return [] }
         var frames = samples.map { s -> [Double] in
             var v: [Double] = []
@@ -103,6 +171,13 @@ enum MotionFeatures {
             return v
         }
         guard let dims = frames.first?.count, dims > 0 else { return frames }
+        if let headCutoff, frames.count > 2 {
+            let rate = sampleRate(samples)
+            for d in 0..<dims {
+                let slow = lowPassed(frames.map { $0[d] }, sampleRate: rate, cutoff: headCutoff)
+                for i in frames.indices { frames[i][d] -= slow[i] }
+            }
+        }
         frames = smoothed(frames, window: smoothing)
         for d in 0..<dims {
             let mean = frames.reduce(0) { $0 + $1[d] } / Double(frames.count)

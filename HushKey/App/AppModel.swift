@@ -365,6 +365,7 @@ final class AppModel {
     @ObservationIgnored private let silentControlKey = FunctionKeyMonitor(key: .control)
     @ObservationIgnored private var silentControlKeyInstalledTrusted = false
     @ObservationIgnored private var silentEvidenceTask: Task<Void, Never>?
+    @ObservationIgnored private var takeIssueCache: [Template.ID: TakeIssue?] = [:]
     @ObservationIgnored private var started = false
     @ObservationIgnored private var motionStarted = false
     /// The dictation key is held down (hold to talk). Observed so the pill can drop its buttons.
@@ -670,8 +671,23 @@ final class AppModel {
         }
     }
 
+    /// Takes that count: in this condition and free of head movement or a bad length.
     func templateCount(for word: String, condition: SessionRecorder.Condition) -> Int {
-        templates(for: word, condition: condition).count
+        templates(for: word, condition: condition).filter { takeIssue(of: $0) == nil }.count
+    }
+
+    /// Why a saved take is unusable, under today's checks. Takes never change, so this is cached.
+    func takeIssue(of template: Template) -> TakeIssue? {
+        if let cached = takeIssueCache[template.id] { return cached }
+        let issue = MotionFeatures.takeIssue(template.samples)
+        takeIssueCache[template.id] = .some(issue)
+        return issue
+    }
+
+    /// Every take the classifier and the evidence checks may use in this condition. Takes where the
+    /// head moved stay on screen, flagged, but never teach the classifier.
+    func usableTemplates(condition: SessionRecorder.Condition) -> [Template] {
+        dataset.templates.filter { ($0.condition ?? .silent) == condition && takeIssue(of: $0) == nil }
     }
 
     func beginNewExperimentSession() {
@@ -703,7 +719,8 @@ final class AppModel {
 
     /// Sessions that hold every word often enough to be held out against the others.
     func completeSessionCount(condition: SessionRecorder.Condition) -> Int {
-        Self.completeSessionCount(templates: dataset.templates, vocabulary: dataset.vocabulary, condition: condition)
+        Self.completeSessionCount(templates: usableTemplates(condition: condition), vocabulary: dataset.vocabulary,
+                                  condition: condition)
     }
 
     nonisolated static func completeSessionCount(templates: [Template], vocabulary: [String],
@@ -719,12 +736,12 @@ final class AppModel {
 
     /// Takes recorded in the current session, in this condition.
     func currentSessionTakeCount(condition: SessionRecorder.Condition) -> Int {
-        dataset.templates.filter { $0.sessionID == experimentSessionID && ($0.condition ?? .silent) == condition }.count
+        usableTemplates(condition: condition).filter { $0.sessionID == experimentSessionID }.count
     }
 
     /// Takes saved before the length and head-movement checks existed that would fail them now.
     func flaggedTakes(for word: String, condition: SessionRecorder.Condition) -> [Template] {
-        templates(for: word, condition: condition).filter { MotionFeatures.takeIssue($0.samples) != nil }
+        templates(for: word, condition: condition).filter { takeIssue(of: $0) != nil }
     }
 
     func removeFlaggedTakes(for word: String, condition: SessionRecorder.Condition) {
@@ -1077,7 +1094,7 @@ final class AppModel {
     }
 
     private func rebuildClassifier() {
-        let silentTemplates = dataset.templates.filter { ($0.condition ?? .silent) == .silent }
+        let silentTemplates = usableTemplates(condition: .silent)
         classifier = TemplateClassifier(templates: silentTemplates, featureSet: featureSet)
         evaluation = nil
         refreshSilentEvidence(silentTemplates)
@@ -1119,7 +1136,7 @@ final class AppModel {
             }.value
             self.evaluation = result
             if self.trainingCondition == .silent, featureSet == self.featureSet,
-               templates == self.dataset.templates.filter({ ($0.condition ?? .silent) == .silent }) {
+               templates == self.usableTemplates(condition: .silent) {
                 self.silentEvidenceTask?.cancel()
                 self.silentEvidence = result
                 self.isCheckingSilentEvidence = false
@@ -1130,7 +1147,7 @@ final class AppModel {
     }
 
     var templatesForSelectedCondition: [Template] {
-        return dataset.templates.filter { ($0.condition ?? .silent) == trainingCondition }
+        usableTemplates(condition: trainingCondition)
     }
 
     // MARK: Decode transcript

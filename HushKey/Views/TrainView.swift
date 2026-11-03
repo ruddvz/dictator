@@ -106,6 +106,9 @@ struct TrainView: View {
                 isEnabled: model.selectedWord != nil && model.motion.status == .streaming,
                 onBegin: model.capture.begin,
                 onEnd: model.capture.end)
+            if model.motion.status == .streaming {
+                HeadStillnessIndicator(isMoving: model.capture.headIsMoving)
+            }
             if let issue = model.lastTakeIssue {
                 Label(issue.message + " It wasn’t saved.", systemImage: "exclamationmark.triangle")
                     .font(.hkCaption)
@@ -150,7 +153,7 @@ struct TrainView: View {
         case .silent where model.selectedWord == TemplateClassifier.restLabel:
             "Hold capture with your mouth closed and still. HushKey learns to ignore this, never types it."
         case .silent:
-            "Mouth it without a sound while you hold capture, or hold Control. Add a word “\(TemplateClassifier.restLabel)” so stray movement is ignored."
+            "Keep your head still and mouth it without a sound while you hold capture or Control. Add a word “\(TemplateClassifier.restLabel)” so stray movement is ignored."
         }
     }
 
@@ -162,7 +165,7 @@ struct TrainView: View {
             VStack(alignment: .leading, spacing: Theme.s3) {
                 HStack(spacing: Theme.s3) {
                     Text("Takes").font(.hkTitle3)
-                    Text("\(takes.count)")
+                    Text(flagged > 0 ? "\(takes.count - flagged) used · \(flagged) not used" : "\(takes.count)")
                         .font(.hkCallout.monospacedDigit())
                         .foregroundStyle(Theme.ink3)
                     Spacer()
@@ -171,7 +174,7 @@ struct TrainView: View {
                             model.removeFlaggedTakes(for: word, condition: model.trainingCondition)
                         }
                         .buttonStyle(SecondaryButtonStyle())
-                        .help("These takes are too short, too long, or include a head turn. They make matching worse.")
+                        .help("These takes are too short, too long, or your head moved. They aren’t used for matching.")
                     }
                 }
                 if takes.isEmpty {
@@ -182,7 +185,7 @@ struct TrainView: View {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: Theme.s3)], spacing: Theme.s3) {
                         ForEach(Array(takes)) { take in
                             TakeTile(template: take, isNew: take.id == model.lastTemplateID,
-                                     issue: MotionFeatures.takeIssue(take.samples)) {
+                                     issue: model.takeIssue(of: take)) {
                                 model.deleteTemplate(take.id)
                             }
                             .transition(.scale(scale: 0.9).combined(with: .opacity))

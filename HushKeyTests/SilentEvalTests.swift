@@ -9,6 +9,7 @@ final class SilentEvalTests: XCTestCase {
         var name: String
         var featureSet: FeatureSet = .all
         var smoothing = MotionFeatures.defaultSmoothing
+        var headCutoff: Double? = nil
         var cleanTakesOnly = false
     }
 
@@ -31,6 +32,10 @@ final class SilentEvalTests: XCTestCase {
             Variant(name: "Now, clean, acceleration only", featureSet: .acceleration, cleanTakesOnly: true),
             Variant(name: "Now, clean, attitude only", featureSet: .attitude, cleanTakesOnly: true),
             Variant(name: "Now, clean, rotation + acceleration", featureSet: [.rotation, .acceleration], cleanTakesOnly: true),
+            Variant(name: "Drift removed (0.3 Hz), clean, all features", headCutoff: 0.3, cleanTakesOnly: true),
+            Variant(name: "Drift removed (0.5 Hz), clean, all features", headCutoff: 0.5, cleanTakesOnly: true),
+            Variant(name: "Head band removed (1.5 Hz), clean, rotation + acceleration",
+                    featureSet: [.rotation, .acceleration], headCutoff: 1.5, cleanTakesOnly: true),
         ]
 
         var lines = [
@@ -51,7 +56,8 @@ final class SilentEvalTests: XCTestCase {
         for variant in variants {
             let templates = variant.cleanTakesOnly ? clean : silent
             guard let result = Evaluation.run(templates: templates, featureSet: variant.featureSet,
-                                              permutations: permutations, smoothing: variant.smoothing) else {
+                                              permutations: permutations, smoothing: variant.smoothing,
+                                              headCutoff: variant.headCutoff) else {
                 lines.append("| \(variant.name) | \(templates.count) | – | – | – | – |")
                 continue
             }
