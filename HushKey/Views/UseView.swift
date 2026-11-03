@@ -45,11 +45,26 @@ struct UseView: View {
     }
 
     private var eligibilityMessage: String {
-        if model.motion.status != .streaming {
-            return "Connect your AirPods first, on the Connect step."
+        let needed = model.takesStillNeeded(condition: .silent)
+        let words = model.dataset.vocabulary.count
+        var training: String?
+        if words < AppModel.minimumWords {
+            let missing = AppModel.minimumWords - words
+            training = "add \(missing) more \(missing == 1 ? "word" : "words") on Train"
+        } else if !needed.isEmpty {
+            let total = needed.reduce(0) { $0 + $1.needed }
+            training = "record \(total) more silent \(total == 1 ? "take" : "takes") ("
+                + needed.prefix(3).map { "\($0.word) \($0.needed)" }.joined(separator: ", ")
+                + (needed.count > 3 ? "…" : "") + ")"
         }
-        if !meetsTemplateProtocol {
-            return "Record 10 silent takes for each of 5 words."
+        if model.motion.status != .streaming {
+            return "Connect your AirPods" + (training.map { ", then \($0)." } ?? ".")
+        }
+        if let training {
+            return training.prefix(1).uppercased() + training.dropFirst() + "."
+        }
+        if model.completeSessionCount(condition: .silent) < 2 {
+            return "Record every word \(AppModel.sessionTakesPerWord)+ times in a second session (Train → New session), so one can be held out."
         }
         guard let result = model.silentEvidence else {
             return model.isCheckingSilentEvidence
@@ -57,7 +72,7 @@ struct UseView: View {
                 : "Run Evaluate. It must beat chance and held-out sessions."
         }
         if result.sessionHoldoutAccuracy == nil {
-            return "Record takes in a second session (Train → New session) so one can be held out."
+            return "Record every word in a second session (Train → New session) so one can be held out."
         }
         if result.pValue >= 0.05 {
             return "The result isn’t clear of chance yet. HushKey won’t guess."
@@ -68,13 +83,10 @@ struct UseView: View {
         return "The evidence is incomplete. Check Evaluate."
     }
 
-    private var meetsTemplateProtocol: Bool {
-        model.dataset.vocabulary.count >= 5 &&
-        model.dataset.vocabulary.allSatisfy { model.templateCount(for: $0, condition: .silent) >= 10 }
-    }
+    private var meetsTemplateProtocol: Bool { model.meetsTemplateProtocol(condition: .silent) }
 
     private var nextActionTitle: String {
-        if model.motion.status != .streaming { return "Open Setup" }
+        if model.motion.status != .streaming { return "Connect AirPods" }
         if !meetsTemplateProtocol { return "Continue training" }
         return "Review evidence"
     }
@@ -89,7 +101,7 @@ struct UseView: View {
                         detail: model.useCaptureMode == .hold ? "Hold Control, or \(model.captureShortcut.label) here, while you mouth a word."
                             : "Starts on its own when you move.") {
                 MenuPicker(selection: $model.useCaptureMode,
-                           options: CaptureController.Mode.allCases.map { ($0, $0.rawValue) }, width: 150)
+                           options: CaptureController.Mode.allCases.map { ($0, $0.rawValue) }, width: 160)
                     .disabled(!model.isMotionInferenceEnabled)
             }
             GroupRow {
@@ -110,7 +122,10 @@ struct UseView: View {
                 }
             }
             SettingsRow(title: "Type into the front app",
-                        detail: "Accepted words go straight into the field you’re in. Rejected ones never do.") {
+                        detail: model.insertion.isEnabled
+                            ? "Accepted words go straight into the field you’re in. Rejected ones never do."
+                            : "Turn on text insertion in Settings first. Until then words stay here.",
+                        detailTint: model.insertion.isEnabled ? Theme.ink2 : Theme.finishing) {
                 Toggle("", isOn: $model.silentTypesIntoFrontApp)
                     .toggleStyle(.switch)
                     .labelsHidden()
@@ -179,7 +194,7 @@ struct UseView: View {
                     .disabled(model.decoded.isEmpty)
             }
             Group {
-                if model.decoded.isEmpty {
+                if !model.decoded.contains(where: { !isRest($0) }) {
                     Text(model.isMotionInferenceEnabled ? "Mouth a trained word…" : "Pass the evidence checks to begin.")
                         .foregroundStyle(Theme.ink3)
                 } else {
@@ -194,8 +209,13 @@ struct UseView: View {
         }
     }
 
+    /// The "nothing" class is how stray movement is ignored; it never belongs in the transcript.
+    private func isRest(_ word: DecodedWord) -> Bool {
+        word.prediction.best?.label == TemplateClassifier.restLabel
+    }
+
     private var decodedText: Text {
-        model.decoded.reduce(Text("")) { text, word in
+        model.decoded.filter { !isRest($0) }.reduce(Text("")) { text, word in
             let piece = Text(word.text + " ")
             return text + (word.prediction.accepted ? piece : piece.foregroundColor(Theme.ink3.opacity(0.6)))
         }

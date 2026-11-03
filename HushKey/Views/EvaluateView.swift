@@ -3,13 +3,18 @@ import SwiftUI
 struct EvaluateView: View {
     @Environment(AppModel.self) private var model
 
-    private var meetsTemplateProtocol: Bool {
-        model.dataset.vocabulary.count >= 5 &&
-        model.dataset.vocabulary.allSatisfy { model.templateCount(for: $0, condition: model.trainingCondition) >= 10 }
+    private var meetsTemplateProtocol: Bool { model.meetsTemplateProtocol(condition: model.trainingCondition) }
+
+    private var completeSessions: Int { model.completeSessionCount(condition: model.trainingCondition) }
+
+    /// This run's result, or for silent takes the background check that also unlocks Silent Use,
+    /// so a result is on screen after a relaunch without running Evaluate again.
+    private var result: Evaluation? {
+        model.evaluation ?? (model.trainingCondition == .silent ? model.silentEvidence : nil)
     }
 
-    private var uniqueSessions: Int {
-        Set(model.templatesForSelectedCondition.map(\.sessionID)).count
+    private var isChecking: Bool {
+        model.isEvaluating || (model.trainingCondition == .silent && model.evaluation == nil && model.isCheckingSilentEvidence)
     }
 
     var body: some View {
@@ -24,12 +29,16 @@ struct EvaluateView: View {
                 }
                 LabProgress()
 
-                if let result = model.evaluation {
+                if let result {
                     EvaluationResultView(result: result)
+                } else if isChecking {
+                    EmptyState(systemImage: "hourglass", title: "Checking your takes…",
+                               message: "Comparing every take with every other, and against chance.")
+                        .card(padding: 0, style: .outlined)
                 } else {
                     EmptyState(systemImage: "chart.bar.xaxis", title: "No result yet",
                                message: meetsTemplateProtocol ? "Pick the motion features below, then evaluate."
-                                   : "Record 10 takes for each of 5 words in this condition first.")
+                                   : "Record \(AppModel.takesPerWord) takes of each of \(AppModel.minimumWords) words in this condition first.")
                         .card(padding: 0, style: .outlined)
                 }
 
@@ -41,26 +50,27 @@ struct EvaluateView: View {
     }
 
     private var readinessCard: some View {
-        SettingsGroup(title: "Evidence checks",
+        SettingsGroup(title: "Before you evaluate",
                       footer: model.trainingCondition == .silent
-                          ? "Silent Use unlocks only when every check passes."
+                          ? "Silent Use unlocks when the result beats chance, including on a session it never trained on."
                           : "Only silent results can unlock Silent Use.") {
-            ReadinessRow(title: "5 or more words",
+            ReadinessRow(title: "\(AppModel.minimumWords) or more words",
                          detail: "\(model.dataset.vocabulary.count) in your list",
-                         complete: model.dataset.vocabulary.count >= 5)
-            ReadinessRow(title: "10 takes per word",
-                         detail: "Fewest: \(minimumWordCount)/10",
+                         complete: model.dataset.vocabulary.count >= AppModel.minimumWords)
+            ReadinessRow(title: "\(AppModel.takesPerWord) takes per word",
+                         detail: takesDetail,
                          complete: meetsTemplateProtocol)
-            ReadinessRow(title: "2 or more sessions",
-                         detail: "\(uniqueSessions) recorded",
-                         complete: uniqueSessions >= 2)
+            ReadinessRow(title: "2 sessions with every word",
+                         detail: "\(completeSessions) of 2 · each needs \(AppModel.sessionTakesPerWord)+ takes of every word",
+                         complete: completeSessions >= 2)
         }
     }
 
-    private var minimumWordCount: Int {
-        model.dataset.vocabulary.map {
-            model.templateCount(for: $0, condition: model.trainingCondition)
-        }.min() ?? 0
+    private var takesDetail: String {
+        let needed = model.takesStillNeeded(condition: model.trainingCondition)
+        guard !needed.isEmpty else { return "Every word is done" }
+        return "Still to record: " + needed.prefix(4).map { "\($0.word) \($0.needed)" }.joined(separator: ", ")
+            + (needed.count > 4 ? "…" : "")
     }
 
     private var evaluationControls: some View {
@@ -78,7 +88,7 @@ struct EvaluateView: View {
                             ? (model.isMotionInferenceEnabled ? "Silent Use is unlocked." : "Silent Use is locked until every check passes.")
                             : "Compares this condition only.",
                         detailTint: model.isMotionInferenceEnabled && model.trainingCondition == .silent ? Theme.success : Theme.ink2) {
-                Button(model.isEvaluating ? "Evaluating…" : "Evaluate") { model.evaluate() }
+                Button(model.isEvaluating ? "Evaluating…" : result == nil ? "Evaluate" : "Evaluate again") { model.evaluate() }
                     .buttonStyle(PrimaryButtonStyle())
                     .disabled(model.isEvaluating || model.featureSet.isEmpty || !meetsTemplateProtocol)
             }
@@ -202,14 +212,7 @@ private struct EvaluationResultView: View {
 
     private var passesPermutation: Bool { result.pValue < 0.05 }
 
-    private var passesAllChecks: Bool {
-        guard result.templateCount >= 50,
-              result.accuracy > result.chance,
-              passesPermutation,
-              let holdout = result.sessionHoldoutAccuracy,
-              let baseline = result.sessionHoldoutChance else { return false }
-        return holdout > baseline
-    }
+    private var passesAllChecks: Bool { AppModel.evidenceUnlocksSilentUse(result) }
 
     private var verdict: String {
         guard result.accuracy > result.chance else {
@@ -220,12 +223,15 @@ private struct EvaluationResultView: View {
         }
         guard let holdout = result.sessionHoldoutAccuracy,
               let baseline = result.sessionHoldoutChance else {
-            return "The permutation check passed, but examples from at least two sessions are needed for a holdout result."
+            return "The permutation check passed. Record every word in a second session so one can be held out."
         }
         guard holdout > baseline else {
             return "The permutation check passed, but held-out sessions did not beat their majority baseline."
         }
-        return "This study beat the majority baseline in cross-validation and held-out sessions."
+        guard result.templateCount >= AppModel.minimumEvidenceTemplates else {
+            return "Promising, but \(AppModel.minimumEvidenceTemplates) or more takes are needed to trust it."
+        }
+        return "Your words are distinguishable, including on sessions held out from training."
     }
 
     private func metric(_ title: String, _ value: String, highlight: Bool = false) -> some View {

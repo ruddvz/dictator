@@ -25,6 +25,23 @@ enum TakeIssue: Equatable, Sendable {
         case .headMoved: "Your head moved during that take. Keep still and mouth only the word."
         }
     }
+
+    /// Fits the capture HUD and a take tile.
+    var shortMessage: String {
+        switch self {
+        case .tooShort: "Too short · hold for the whole word"
+        case .tooLong: "Too long · release after the word"
+        case .headMoved: "Head moved · keep still"
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .tooShort: "Too short"
+        case .tooLong: "Too long"
+        case .headMoved: "Head moved"
+        }
+    }
 }
 
 enum MotionFeatures {

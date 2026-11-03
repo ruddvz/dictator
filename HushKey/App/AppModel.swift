@@ -5,6 +5,14 @@ import Observation
 import os
 import UniformTypeIdentifiers
 
+/// What the last silent capture did, for the small HUD shown while another app is in front.
+struct SilentCaptureFeedback: Equatable {
+    enum Kind: Equatable { case typed, notTyped, unsure, ignored, saved, problem }
+    var id = UUID()
+    var kind: Kind
+    var text: String
+}
+
 struct DecodedWord: Identifiable, Hashable {
     let id = UUID()
     var prediction: Prediction
@@ -85,9 +93,19 @@ final class AppModel {
     // MARK: Training
 
     private(set) var dataset = TemplateStore.load()
-    var selectedWord: String?
-    var featureSet: FeatureSet = .all {
-        didSet { rebuildClassifier() }
+    var selectedWord: String? {
+        didSet {
+            guard selectedWord != oldValue else { return }
+            lastTakeIssue = nil
+            trainingNotice = nil
+        }
+    }
+    var featureSet = FeatureSet(rawValue: UserDefaults.standard.object(forKey: "silentFeatureSet") as? Int
+                                ?? FeatureSet.all.rawValue) {
+        didSet {
+            UserDefaults.standard.set(featureSet.rawValue, forKey: "silentFeatureSet")
+            rebuildClassifier()
+        }
     }
     private(set) var classifier: TemplateClassifier?
     private(set) var evaluation: Evaluation?
@@ -97,6 +115,10 @@ final class AppModel {
     private(set) var isCheckingSilentEvidence = false
     /// Why the latest capture was not saved (Train) or not trusted (Silent Use).
     private(set) var lastTakeIssue: TakeIssue?
+    /// A short note on Train: a word finished and the next one picked, a new session, removed takes.
+    private(set) var trainingNotice: String?
+    /// The latest silent capture's outcome. Each one has a new id, so the HUD can show it again.
+    private(set) var silentFeedback: SilentCaptureFeedback?
     private(set) var isEvaluating = false
     private(set) var lastTemplateID: Template.ID?
     var trainingCondition: SessionRecorder.Condition = .silent {
@@ -303,11 +325,19 @@ final class AppModel {
 
     // MARK: Decoding
 
-    var useCaptureMode: CaptureController.Mode = .hold {
-        didSet { syncCaptureMode() }
+    var useCaptureMode: CaptureController.Mode = UserDefaults.standard.string(forKey: "silentCaptureMode") == "auto"
+        ? .auto : .hold {
+        didSet {
+            UserDefaults.standard.set(useCaptureMode == .auto ? "auto" : "hold", forKey: "silentCaptureMode")
+            syncCaptureMode()
+        }
     }
-    var maxDistance: Double = 1.5
-    var minConfidence: Double = 0.05
+    var maxDistance: Double = UserDefaults.standard.object(forKey: "silentMaxDistance") as? Double ?? 1.5 {
+        didSet { UserDefaults.standard.set(maxDistance, forKey: "silentMaxDistance") }
+    }
+    var minConfidence: Double = UserDefaults.standard.object(forKey: "silentMinConfidence") as? Double ?? 0.05 {
+        didSet { UserDefaults.standard.set(minConfidence, forKey: "silentMinConfidence") }
+    }
     /// Types each accepted Silent Use word into the frontmost app. Rejected matches are never typed.
     var silentTypesIntoFrontApp = UserDefaults.standard.object(forKey: "silentTypesIntoFrontApp") as? Bool ?? true {
         didSet { UserDefaults.standard.set(silentTypesIntoFrontApp, forKey: "silentTypesIntoFrontApp") }
@@ -444,6 +474,7 @@ final class AppModel {
         started = true
         motion.onSample = { [weak self] sample in self?.ingest(sample) }
         capture.onSegment = { [weak self] segment in self?.handleSegment(segment) }
+        capture.onTooShort = { [weak self] in self?.handleTooShortCapture() }
         audio.refreshDevices()
         installKeyMonitor()
         installDictationShortcut()
@@ -506,7 +537,7 @@ final class AppModel {
         case .abortHold:
             capture.cancel() // Control was part of a shortcut such as ⌃C
         case .startHandsFree, .stopHandsFree:
-            silentControlKey.reset() // no hands-free mode for silent capture
+            silentControlKey.reset() // the Control monitor never offers hands-free; keep it that way
         case .none, .scheduleHoldStart, .cancelHoldStart:
             break
         }
@@ -531,13 +562,19 @@ final class AppModel {
             if let word = selectedWord {
                 if let issue = MotionFeatures.takeIssue(segment) {
                     lastTakeIssue = issue
+                    silentFeedback = SilentCaptureFeedback(kind: .problem, text: issue.shortMessage)
                     recorder.logEvent(segment, kind: "train-rejected", label: word, confidence: nil)
                     return
                 }
                 lastTakeIssue = nil
+                trainingNotice = nil
                 addTemplate(Template(label: word, samples: segment,
                                      condition: trainingCondition, sessionID: experimentSessionID))
                 recorder.logEvent(segment, kind: "train", label: word, confidence: nil)
+                let count = templateCount(for: word, condition: trainingCondition)
+                silentFeedback = SilentCaptureFeedback(
+                    kind: .saved, text: "Saved “\(word)” · \(min(count, Self.takesPerWord))/\(Self.takesPerWord)")
+                if count == Self.takesPerWord { advanceTraining(from: word) }
             } else if recorder.isRecording {
                 recorder.logEvent(segment, kind: "segment", label: recorder.prompt, confidence: nil)
             }
@@ -554,7 +591,17 @@ final class AppModel {
             decoded.append(word)
             recorder.logEvent(segment, kind: prediction.accepted ? "decode" : "reject",
                               label: prediction.best?.label ?? "", confidence: prediction.confidence)
-            if prediction.accepted { typeSilentWordIfAllowed(word) }
+            if let issue = lastTakeIssue {
+                silentFeedback = SilentCaptureFeedback(kind: .problem, text: issue.shortMessage)
+            } else if prediction.best?.label == TemplateClassifier.restLabel {
+                silentFeedback = SilentCaptureFeedback(kind: .ignored, text: "Nothing to type")
+            } else if !prediction.accepted {
+                silentFeedback = SilentCaptureFeedback(kind: .unsure, text: "Not sure · nothing typed")
+            } else if typeSilentWordIfAllowed(word) {
+                silentFeedback = SilentCaptureFeedback(kind: .typed, text: word.text)
+            } else {
+                silentFeedback = SilentCaptureFeedback(kind: .notTyped, text: "“\(word.text)” · not typed")
+            }
         case .settings:
             recorder.logEvent(segment, kind: "segment", label: recorder.prompt, confidence: nil)
         case .dictation, .transforms, .files, .meetings, .setup, .evaluate, .personalization, .style, .insights:
@@ -619,7 +666,84 @@ final class AppModel {
 
     func beginNewExperimentSession() {
         experimentSessionID = UUID()
-        dataMessage = "New session started. These takes can be held out from earlier sessions."
+        lastTakeIssue = nil
+        trainingNotice = "New session. Record every word \(Self.sessionTakesPerWord) or more times so it can be tested against the others."
+    }
+
+    // MARK: Training protocol
+
+    nonisolated static let takesPerWord = 10
+    nonisolated static let minimumWords = 5
+    /// Takes of every word a session needs before it can stand as a held-out test.
+    nonisolated static let sessionTakesPerWord = 3
+
+    /// 5 or more words with 10 takes each in this condition: what Evaluate needs.
+    func meetsTemplateProtocol(condition: SessionRecorder.Condition) -> Bool {
+        dataset.vocabulary.count >= Self.minimumWords &&
+            dataset.vocabulary.allSatisfy { templateCount(for: $0, condition: condition) >= Self.takesPerWord }
+    }
+
+    /// Words still short of 10 takes in this condition, with how many each needs, in list order.
+    func takesStillNeeded(condition: SessionRecorder.Condition) -> [(word: String, needed: Int)] {
+        dataset.vocabulary.compactMap { word in
+            let needed = Self.takesPerWord - templateCount(for: word, condition: condition)
+            return needed > 0 ? (word, needed) : nil
+        }
+    }
+
+    /// Sessions that hold every word often enough to be held out against the others.
+    func completeSessionCount(condition: SessionRecorder.Condition) -> Int {
+        Self.completeSessionCount(templates: dataset.templates, vocabulary: dataset.vocabulary, condition: condition)
+    }
+
+    nonisolated static func completeSessionCount(templates: [Template], vocabulary: [String],
+                                                 condition: SessionRecorder.Condition) -> Int {
+        guard !vocabulary.isEmpty else { return 0 }
+        let sessions = Dictionary(grouping: templates.filter { ($0.condition ?? .silent) == condition && $0.sessionID != nil },
+                                  by: { $0.sessionID! })
+        return sessions.values.filter { takes in
+            let counts = Dictionary(grouping: takes, by: \.label).mapValues(\.count)
+            return vocabulary.allSatisfy { counts[$0, default: 0] >= sessionTakesPerWord }
+        }.count
+    }
+
+    /// Takes recorded in the current session, in this condition.
+    func currentSessionTakeCount(condition: SessionRecorder.Condition) -> Int {
+        dataset.templates.filter { $0.sessionID == experimentSessionID && ($0.condition ?? .silent) == condition }.count
+    }
+
+    /// Takes saved before the length and head-movement checks existed that would fail them now.
+    func flaggedTakes(for word: String, condition: SessionRecorder.Condition) -> [Template] {
+        templates(for: word, condition: condition).filter { MotionFeatures.takeIssue($0.samples) != nil }
+    }
+
+    func removeFlaggedTakes(for word: String, condition: SessionRecorder.Condition) {
+        let ids = Set(flaggedTakes(for: word, condition: condition).map(\.id))
+        guard !ids.isEmpty else { return }
+        dataset.templates.removeAll { ids.contains($0.id) }
+        persist()
+        trainingNotice = "Removed \(ids.count) flagged \(ids.count == 1 ? "take" : "takes") of “\(word)”."
+    }
+
+    /// A word just reached 10 takes: move to the next one that still needs takes.
+    private func advanceTraining(from word: String) {
+        let words = dataset.vocabulary
+        guard let index = words.firstIndex(of: word) else { return }
+        let order = words[(index + 1)...] + words[..<index]
+        if let next = order.first(where: { templateCount(for: $0, condition: trainingCondition) < Self.takesPerWord }) {
+            selectedWord = next
+            trainingNotice = "“\(word)” has \(Self.takesPerWord) takes. Next: “\(next)”."
+        } else if dataset.vocabulary.count >= Self.minimumWords {
+            trainingNotice = "Every word has \(Self.takesPerWord) takes. Evaluate next, or record a new session."
+        } else {
+            trainingNotice = "“\(word)” has \(Self.takesPerWord) takes. Add \(Self.minimumWords - words.count) more \(Self.minimumWords - words.count == 1 ? "word" : "words")."
+        }
+    }
+
+    private func handleTooShortCapture() {
+        guard [.train, .use].contains(screen) else { return }
+        lastTakeIssue = .tooShort
+        silentFeedback = SilentCaptureFeedback(kind: .problem, text: TakeIssue.tooShort.shortMessage)
     }
 
     func addWord(_ raw: String) {
@@ -1023,9 +1147,11 @@ final class AppModel {
 
     /// Types an accepted word into the frontmost app when that app is not HushKey. With HushKey in front
     /// the word stays in the transcript and the insert shortcut can place it later.
-    private func typeSilentWordIfAllowed(_ word: DecodedWord) {
-        guard silentTypesIntoFrontApp, insertion.isEnabled, captureGate.owner == nil, !NSApp.isActive else { return }
-        if insertion.insert(word.text) { lastInsertedPredictionID = word.id }
+    private func typeSilentWordIfAllowed(_ word: DecodedWord) -> Bool {
+        guard silentTypesIntoFrontApp, insertion.isEnabled, captureGate.owner == nil, !NSApp.isActive,
+              insertion.insert(word.text) else { return false }
+        lastInsertedPredictionID = word.id
+        return true
     }
 
     func clearDecoded() {

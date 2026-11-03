@@ -6,7 +6,7 @@ import Observation
 @MainActor @Observable
 final class CaptureController {
     enum Mode: String, CaseIterable, Identifiable {
-        case hold = "Hold shortcut"
+        case hold = "Hold key"
         case auto = "Auto-detect"
         var id: String { rawValue }
     }
@@ -30,6 +30,8 @@ final class CaptureController {
     var threshold: Double? { noiseFloor.map { $0 * triggerRatio } }
 
     var onSegment: (([MotionSample]) -> Void)?
+    /// A held capture ended before it held a word, so the user can be told rather than left guessing.
+    var onTooShort: (() -> Void)?
 
     @ObservationIgnored private var isManual = false
     @ObservationIgnored private var buffer: [MotionSample] = []
@@ -110,11 +112,15 @@ final class CaptureController {
 
     private func finish() {
         let segment = buffer
+        let wasManual = isManual
         buffer = []
         isCapturing = false
         isManual = false
         quietSince = nil
-        guard segment.count >= 4, let first = segment.first, let last = segment.last, last.t - first.t >= 0.15 else { return }
+        guard segment.count >= 4, let first = segment.first, let last = segment.last, last.t - first.t >= 0.15 else {
+            if wasManual { onTooShort?() }
+            return
+        }
         onSegment?(segment)
     }
 }

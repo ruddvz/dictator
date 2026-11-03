@@ -3,6 +3,7 @@ import SwiftUI
 struct TrainView: View {
     @Environment(AppModel.self) private var model
     @State private var newWord = ""
+    @State private var wordToDelete: String?
 
     var body: some View {
         ScrollView {
@@ -20,6 +21,15 @@ struct TrainView: View {
                 }
             }
             .pageLayout(maxWidth: Theme.homeWidth)
+        }
+        .confirmationDialog("Delete “\(wordToDelete ?? "")” and its takes?",
+                            isPresented: Binding(get: { wordToDelete != nil }, set: { if !$0 { wordToDelete = nil } })) {
+            Button("Delete", role: .destructive) {
+                if let word = wordToDelete { model.removeWord(word) }
+                wordToDelete = nil
+            }
+        } message: {
+            Text("Every take of this word, in every condition, is removed from this Mac.")
         }
     }
 
@@ -60,11 +70,11 @@ struct TrainView: View {
                     ForEach(model.dataset.vocabulary, id: \.self) { word in
                         WordRow(word: word,
                                 count: model.templateCount(for: word, condition: model.trainingCondition),
-                                isSelected: model.selectedWord == word) {
-                            model.selectedWord = word
-                        }
+                                isSelected: model.selectedWord == word,
+                                action: { model.selectedWord = word },
+                                onDelete: { wordToDelete = word })
                         .contextMenu {
-                            Button("Delete “\(word)” and its takes", role: .destructive) { model.removeWord(word) }
+                            Button("Delete “\(word)” and its takes…", role: .destructive) { wordToDelete = word }
                         }
                     }
                 }
@@ -100,24 +110,35 @@ struct TrainView: View {
                 Label(issue.message + " It wasn’t saved.", systemImage: "exclamationmark.triangle")
                     .font(.hkCaption)
                     .foregroundStyle(Theme.finishing)
+            } else if let notice = model.trainingNotice {
+                Label(notice, systemImage: "checkmark.circle")
+                    .font(.hkCaption)
+                    .foregroundStyle(Theme.signal)
             }
-            HStack(spacing: Theme.s2) {
+            HStack(spacing: Theme.s3) {
                 if model.motion.status != .streaming {
                     Label(model.motion.status.label, systemImage: "headphones")
                         .font(.hkCaption)
                         .foregroundStyle(Theme.finishing)
-                } else {
-                    Label("Session \(model.experimentSessionID.uuidString.prefix(8))", systemImage: "square.stack.3d.up")
-                        .font(.hkCaption.monospaced())
-                        .foregroundStyle(Theme.ink3)
                 }
+                Label(sessionSummary, systemImage: "square.stack.3d.up")
+                    .font(.hkCaption.monospacedDigit())
+                    .foregroundStyle(Theme.ink2)
+                    .help("A session is one sitting. Evaluate holds out each session in turn, so record every word again in a new session for a fair test.")
                 Spacer()
                 Button("New session", systemImage: "plus") { model.beginNewExperimentSession() }
                     .buttonStyle(SecondaryButtonStyle())
+                    .help("Start a separate sitting, for example after taking your AirPods out and back in.")
             }
         }
         .padding(Theme.s6 - 4)
         .background(Theme.signalSoft, in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
+    }
+
+    private var sessionSummary: String {
+        let takes = model.currentSessionTakeCount(condition: model.trainingCondition)
+        let complete = model.completeSessionCount(condition: model.trainingCondition)
+        return "This session: \(takes) \(takes == 1 ? "take" : "takes") · \(complete) complete \(complete == 1 ? "session" : "sessions")"
     }
 
     private var conditionGuidance: String {
@@ -137,13 +158,21 @@ struct TrainView: View {
     private var takes: some View {
         if let word = model.selectedWord {
             let takes = model.templates(for: word, condition: model.trainingCondition).reversed()
+            let flagged = model.flaggedTakes(for: word, condition: model.trainingCondition).count
             VStack(alignment: .leading, spacing: Theme.s3) {
-                HStack {
+                HStack(spacing: Theme.s3) {
                     Text("Takes").font(.hkTitle3)
-                    Spacer()
-                    Text("\(takes.count) \(model.trainingCondition.rawValue.lowercased())")
+                    Text("\(takes.count)")
                         .font(.hkCallout.monospacedDigit())
                         .foregroundStyle(Theme.ink3)
+                    Spacer()
+                    if flagged > 0 {
+                        Button("Remove \(flagged) flagged", systemImage: "trash") {
+                            model.removeFlaggedTakes(for: word, condition: model.trainingCondition)
+                        }
+                        .buttonStyle(SecondaryButtonStyle())
+                        .help("These takes are too short, too long, or include a head turn. They make matching worse.")
+                    }
                 }
                 if takes.isEmpty {
                     EmptyState(systemImage: "waveform.path", title: "No takes yet",
@@ -152,7 +181,8 @@ struct TrainView: View {
                 } else {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: Theme.s3)], spacing: Theme.s3) {
                         ForEach(Array(takes)) { take in
-                            TakeTile(template: take, isNew: take.id == model.lastTemplateID) {
+                            TakeTile(template: take, isNew: take.id == model.lastTemplateID,
+                                     issue: MotionFeatures.takeIssue(take.samples)) {
                                 model.deleteTemplate(take.id)
                             }
                             .transition(.scale(scale: 0.9).combined(with: .opacity))
@@ -179,27 +209,39 @@ private struct WordRow: View {
     var count: Int
     var isSelected: Bool
     var action: () -> Void
+    var onDelete: () -> Void
     @State private var hovering = false
+
+    private let goal = AppModel.takesPerWord
 
     var body: some View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     Text(word).font(.hkBody.weight(isSelected ? .semibold : .regular))
-                    Spacer()
-                    if count >= 10 {
-                        Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.signal)
-                    } else {
-                        Text("\(count)/10")
-                            .font(.hkCaption.monospacedDigit())
-                            .foregroundStyle(Theme.ink2)
+                    if word == TemplateClassifier.restLabel {
+                        Text("ignored")
+                            .font(.hkMeta)
+                            .foregroundStyle(Theme.ink3)
                     }
+                    Spacer()
+                    Group {
+                        if count >= goal {
+                            Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.signal)
+                        } else {
+                            Text("\(count)/\(goal)")
+                                .font(.hkCaption.monospacedDigit())
+                                .foregroundStyle(Theme.ink2)
+                        }
+                    }
+                    .opacity(hovering ? 0 : 1)
                 }
+                .frame(height: 22)
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
                         Capsule().fill(Theme.hairline)
                         Capsule().fill(Theme.signal)
-                            .frame(width: geo.size.width * min(CGFloat(count), 10) / 10)
+                            .frame(width: geo.size.width * min(CGFloat(count), CGFloat(goal)) / CGFloat(goal))
                     }
                 }
                 .frame(height: 3)
@@ -211,6 +253,14 @@ private struct WordRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .overlay(alignment: .topTrailing) {
+            if hovering {
+                Button("Delete “\(word)”", systemImage: "trash", action: onDelete)
+                    .buttonStyle(IconButtonStyle())
+                    .padding(.trailing, Theme.s2)
+                    .padding(.top, 3)
+            }
+        }
         .onHover { hovering = $0 }
         .animation(Theme.gentle, value: count)
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
@@ -220,6 +270,7 @@ private struct WordRow: View {
 private struct TakeTile: View {
     var template: Template
     var isNew: Bool
+    var issue: TakeIssue?
     var onDelete: () -> Void
     @State private var hovering = false
 
@@ -227,10 +278,18 @@ private struct TakeTile: View {
         VStack(alignment: .leading, spacing: 6) {
             SignalPlot(title: "", samples: template.samples, channels: SignalPlot.rotation,
                        minScale: 0.05, height: 44, showsHeader: false)
+                .opacity(issue == nil ? 1 : 0.5)
             HStack {
-                Text(String(format: "%.2f s · %d", template.duration, template.samples.count))
-                    .font(.hkMeta.monospacedDigit())
-                    .foregroundStyle(Theme.ink2)
+                if let issue {
+                    Label(issue.label, systemImage: "exclamationmark.triangle")
+                        .font(.hkMeta)
+                        .foregroundStyle(Theme.finishing)
+                        .help(issue.message)
+                } else {
+                    Text(String(format: "%.2f s", template.duration))
+                        .font(.hkMeta.monospacedDigit())
+                        .foregroundStyle(Theme.ink2)
+                }
                 Spacer()
                 Button("Delete", systemImage: "trash", action: onDelete)
                     .buttonStyle(IconButtonStyle())
@@ -240,7 +299,8 @@ private struct TakeTile: View {
         .padding(Theme.s2 + 2)
         .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
-            .strokeBorder(isNew ? Theme.signal : Theme.hairline, lineWidth: isNew ? 1.5 : 1))
+            .strokeBorder(isNew ? Theme.signal : issue != nil ? Theme.finishing.opacity(0.6) : Theme.hairline,
+                          lineWidth: isNew ? 1.5 : 1))
         .onHover { hovering = $0 }
         .animation(.easeOut(duration: 0.12), value: hovering)
     }

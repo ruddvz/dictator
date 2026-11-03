@@ -4,6 +4,7 @@ import SwiftUI
 struct HushKeyApp: App {
     @State private var model = AppModel()
     @State private var pill = FloatingPillController()
+    @State private var silentHUD = SilentCaptureHUDController()
     @Environment(\.openWindow) private var openWindow
 
     var body: some Scene {
@@ -15,6 +16,7 @@ struct HushKeyApp: App {
                     model.openMainWindow = { openWindow(id: "main") }
                     model.start()
                     pill.attach(to: model)
+                    silentHUD.attach(to: model)
                 }
         }
         .windowStyle(.hiddenTitleBar)

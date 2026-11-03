@@ -513,9 +513,9 @@ struct MotionStatusBadge: View {
 
     private var color: Color {
         switch status {
-        case .streaming: .green
-        case .waiting: .orange
-        default: .red
+        case .streaming: Theme.signal
+        case .waiting: Theme.finishing
+        default: Theme.danger
         }
     }
 }
@@ -536,8 +536,7 @@ struct LabProgress: View {
 
     private var steps: [Step] {
         let connected = model.motion.status == .streaming
-        let trained = model.dataset.vocabulary.count >= 5 &&
-            model.dataset.vocabulary.allSatisfy { model.templateCount(for: $0, condition: .silent) >= 10 }
+        let trained = model.meetsTemplateProtocol(condition: .silent)
         let passed = model.isMotionInferenceEnabled
         return [
             Step(screen: .setup, title: "Connect", done: connected),

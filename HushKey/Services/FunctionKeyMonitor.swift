@@ -14,6 +14,9 @@ struct FunctionKeyGesture {
     /// Two taps closer together than this start hands-free dictation.
     static let doubleTapWindow: TimeInterval = 0.4
 
+    /// fn taps toggle hands-free dictation. Silent capture has no hands-free mode, so a quick
+    /// Control hold simply ends the capture and the take is judged on its own length.
+    var supportsHandsFree = true
     private(set) var isDown = false
     private(set) var isHolding = false
     private(set) var isHandsFree = false
@@ -60,6 +63,7 @@ struct FunctionKeyGesture {
         let wasHolding = isHolding
         isHolding = false
         if interrupted { return wasHolding ? .endHold : .none }
+        guard supportsHandsFree else { return wasHolding ? .endHold : .cancelHoldStart }
         let isTap = time - downAt < Self.tapLimit
         if isTap {
             if let last = lastTapAt, downAt - last < Self.doubleTapWindow {
@@ -119,6 +123,16 @@ final class FunctionKeyMonitor {
             case .control: [.command, .option, .shift, .function]
             }
         }
+
+        var supportsHandsFree: Bool { self == .function }
+
+        /// Control is held for clicks too (⌃-click opens a context menu), so a click cancels its hold.
+        var watchedEvents: NSEvent.EventTypeMask {
+            switch self {
+            case .function: [.flagsChanged, .keyDown]
+            case .control: [.flagsChanged, .keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown]
+            }
+        }
     }
 
     let key: Key
@@ -129,17 +143,20 @@ final class FunctionKeyMonitor {
 
     var isInstalled: Bool { !monitors.isEmpty }
 
-    init(key: Key = .function) { self.key = key }
+    init(key: Key = .function) {
+        self.key = key
+        gesture.supportsHandsFree = key.supportsHandsFree
+    }
 
     func install() {
         guard monitors.isEmpty else { return }
         let handler: (NSEvent) -> Void = { [weak self] event in
             MainActor.assumeIsolated { self?.handle(event) }
         }
-        if let global = NSEvent.addGlobalMonitorForEvents(matching: [.flagsChanged, .keyDown], handler: handler) {
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: key.watchedEvents, handler: handler) {
             monitors.append(global)
         }
-        if let local = NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged, .keyDown], handler: { event in
+        if let local = NSEvent.addLocalMonitorForEvents(matching: key.watchedEvents, handler: { event in
             handler(event)
             return event
         }) {
@@ -152,6 +169,7 @@ final class FunctionKeyMonitor {
         monitors.removeAll()
         holdTimer?.cancel()
         gesture = FunctionKeyGesture()
+        gesture.supportsHandsFree = key.supportsHandsFree
     }
 
     func reset() { gesture.reset() }
@@ -179,6 +197,9 @@ final class FunctionKeyMonitor {
             action = gesture.otherKeyDown() // another modifier joined fn
         case .keyDown where gesture.isDown:
             action = gesture.otherKeyDown()
+        case .leftMouseDown, .rightMouseDown, .otherMouseDown:
+            guard gesture.isDown else { return }
+            action = gesture.otherKeyDown() // ⌃-click is a right-click, not a silent word
         default:
             return
         }

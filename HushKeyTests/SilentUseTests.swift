@@ -99,4 +99,57 @@ final class SilentUseTests: XCTestCase {
         XCTAssertEqual(gesture.holdDelayElapsed(), .startHold)
         XCTAssertEqual(gesture.otherKeyDown(), .abortHold) // ⌃C while held
     }
+
+    /// A quick Control hold used to be read as an fn-style tap and dropped without a word.
+    func testControlGestureEndsQuickHoldsAndNeverGoesHandsFree() {
+        var gesture = FunctionKeyGesture()
+        gesture.supportsHandsFree = false
+        XCTAssertEqual(gesture.fnDown(at: 0), .scheduleHoldStart)
+        XCTAssertEqual(gesture.holdDelayElapsed(), .startHold)
+        XCTAssertEqual(gesture.fnUp(at: 0.2), .endHold)
+        XCTAssertEqual(gesture.fnDown(at: 0.3), .scheduleHoldStart)
+        XCTAssertEqual(gesture.fnUp(at: 0.35), .cancelHoldStart) // released before the hold began
+        XCTAssertFalse(gesture.isHandsFree)
+    }
+
+    @MainActor
+    func testOnlyTheControlMonitorTreatsClicksAsShortcuts() {
+        let control = FunctionKeyMonitor(key: .control).key
+        XCTAssertTrue(control.watchedEvents.contains(.rightMouseDown))
+        XCTAssertTrue(control.watchedEvents.contains(.leftMouseDown))
+        XCTAssertFalse(control.supportsHandsFree)
+        XCTAssertFalse(FunctionKeyMonitor().key.watchedEvents.contains(.leftMouseDown))
+        XCTAssertTrue(FunctionKeyMonitor().key.supportsHandsFree)
+    }
+
+    @MainActor
+    func testTooShortHoldIsReportedButCancelIsNot() {
+        let capture = CaptureController()
+        var tooShort = 0
+        var segments = 0
+        capture.onTooShort = { tooShort += 1 }
+        capture.onSegment = { _ in segments += 1 }
+        capture.begin()
+        for sample in samples(seconds: 0.06) { capture.ingest(sample) }
+        capture.end()
+        XCTAssertEqual(tooShort, 1)
+        capture.begin()
+        capture.cancel()
+        XCTAssertEqual(tooShort, 1)
+        XCTAssertEqual(segments, 0)
+    }
+
+    func testCompleteSessionsNeedEnoughTakesOfEveryWord() {
+        let first = UUID(), second = UUID()
+        func takes(_ word: String, _ count: Int, _ session: UUID?, _ condition: SessionRecorder.Condition = .silent) -> [Template] {
+            (0..<count).map { _ in Template(label: word, samples: [], condition: condition, sessionID: session) }
+        }
+        var templates = takes("yes", 3, first) + takes("no", 3, first)
+        templates += takes("yes", 3, second) + takes("no", 2, second) + takes("no", 5, second, .normal)
+        templates += takes("yes", 9, nil) + takes("no", 9, nil)
+        XCTAssertEqual(AppModel.completeSessionCount(templates: templates, vocabulary: ["yes", "no"], condition: .silent), 1)
+        templates += takes("no", 1, second)
+        XCTAssertEqual(AppModel.completeSessionCount(templates: templates, vocabulary: ["yes", "no"], condition: .silent), 2)
+        XCTAssertEqual(AppModel.completeSessionCount(templates: templates, vocabulary: [], condition: .silent), 0)
+    }
 }
