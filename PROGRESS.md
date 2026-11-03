@@ -1,5 +1,23 @@
 # HushKey progress
 
+## Completed: Silent Lab end-to-end pass (2026-11-03)
+
+- **Bugs fixed:**
+  - ⌃-click (right-click) while on Train or Silent Use counted as a Control hold: it saved a junk take, or on Silent Use could type a word into the app you clicked. A mouse press now cancels the hold (`FunctionKeyMonitor.Key.watchedEvents`).
+  - Control used fn's tap rules, so a hold under 0.3 s was dropped as a "tap", and captures under 0.15 s vanished. Both gave no sign. Control now has no tap or hands-free mode (`FunctionKeyGesture.supportsHandsFree`), and a too-short hold says so (`CaptureController.onTooShort`).
+  - "2 or more sessions" passed with a one-take second session that can never be held out. It now counts sessions with 3+ takes of every word (`AppModel.completeSessionCount`).
+  - Evaluate said "No result yet" after a relaunch, though the background check already had one. It now shows that result, or "Checking your takes…".
+  - The detection thresholds, motion features and capture mode reset on every launch. They are saved now.
+  - The "nothing" rest word appeared in the Silent Use transcript as a faded "nothing". It's hidden.
+- **UX:**
+  - A small dark HUD above the pill shows "Mouth a word…" while Control is held in another app, then what happened: the typed word, "Not sure · nothing typed", "Too short", or "Saved “yes” · 7/10" (`SilentCaptureHUD.swift`). Before this, a capture outside HushKey gave no sign at all.
+  - Train moves to the next unfinished word at 10 takes and says so. It shows "This session: N takes · M complete sessions" and flags takes that fail today's length and head-movement checks (one of yours: a 3.8 s "yes"), with **Remove N flagged**. Deleting a word asks first, and there's a hover delete button.
+  - Silent Use's locked card lists everything left ("Connect your AirPods, then record 14 more silent takes (yes 6, back 3, stop 5)"). "Type into the front app" warns when text insertion is off.
+  - Evaluate lists the takes still to record, and its verdict uses the same rule as the unlock gate.
+- **Verified here:** `xcodebuild … test`: 214 tests, 3 skipped, 0 failures (5 new in `SilentUseTests`). Signed `Scripts/package-app.sh` build. Checked Train, Evaluate and Silent Use in the packaged app.
+- **Not verified live (no AirPods connected):** Control-hold capture, the HUD, typing into another app, motion streaming while HushKey is in the background.
+- **Next:** with AirPods in, remove the flagged take, finish 10 takes of every word, then record every word 3+ times after **New session** and check the HUD in TextEdit.
+
 ## Completed: end-to-end UI/UX pass, pill sounds, unbroken fn holds, smoother dictation (2026-11-03)
 
 - **Pill, per the user's live test:**
