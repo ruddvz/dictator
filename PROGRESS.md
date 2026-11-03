@@ -12,6 +12,7 @@
 - **Tried and rejected:** high-passing the classifier's features to strip head motion (accuracy 53 % → 28–41 %). A mouthed word moves the jaw slowly too.
 - **One HushKey:** a second launch, from any build or copy, brings the running one forward and quits (`HushKeyApp.handOffToRunningCopy`). Checked live: a packaged build and a debug build both quit while another copy ran.
 - **Verified here:** 216 tests, 3 skipped, 0 failures (2 new). `Scripts/silent-eval.sh` report updated. Signed package built.
+- **Seen live in the packaged app:** Train now counts only clean takes (yes 3, no 10+, next 9, back 6, stop 3 of 10), and "Remove 1 flagged" with "3 used · 1 not used" appears on yes.
 - **Not verified live (no AirPods connected):** the thresholds against your real nods. If good takes get refused as "Head moved", raise `MotionFeatures.maxHeadTilt` or `maxHeadRotation`.
 - **Next (user, with AirPods):** on Train, remove the 5 flagged takes. Record until every word is 10/10 with "Head still" showing. Then press **New session** and record each word 3+ times. Try a deliberate nod: it should say "Head moved" and save nothing.
 - A separate session is redesigning the app icon and menu bar icon.
