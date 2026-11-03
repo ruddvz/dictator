@@ -1,5 +1,21 @@
 # HushKey progress
 
+## Completed: Silent Lab tells head movement from jaw movement; one HushKey at a time (2026-11-03)
+
+- **Problem (user):** a slight head nod was taken as motion. It got saved as a take, and it got matched as a word.
+- **Measured on the 37 saved takes:** mouthed words tilt the head 0.3–1.3° with slow rotation under 0.08 rad/s. The 5 takes with a nod or turn reached 2–20° and up to 0.86 rad/s. The old check only caught spikes over 0.6 rad/s. Details: `docs/SILENT_SPEECH_RESEARCH.md` (head vs jaw section).
+- **Fixed (`MotionFeatures.headMoved`):** a take or capture is refused when the head tilts over 2.5°, when slow rotation passes 0.12 rad/s, or on any spike over 0.6 rad/s.
+  - Train won't save such a take, and Silent Use never types it.
+  - Saved takes that fail are flagged. They no longer train the classifier, count toward 10, or count in the evidence. On this data, clean-take accuracy went from 48 % to 53 % (chance 34 %).
+  - Auto-capture follows head motion live: it never starts on a nod, and it drops a capture a nod spoils.
+  - Train, Silent Use and the HUD show "Head moving · keep still" while it happens.
+- **Tried and rejected:** high-passing the classifier's features to strip head motion (accuracy 53 % → 28–41 %). A mouthed word moves the jaw slowly too.
+- **One HushKey:** a second launch, from any build or copy, brings the running one forward and quits (`HushKeyApp.handOffToRunningCopy`). Checked live: a packaged build and a debug build both quit while another copy ran.
+- **Verified here:** 216 tests, 3 skipped, 0 failures (2 new). `Scripts/silent-eval.sh` report updated. Signed package built.
+- **Not verified live (no AirPods connected):** the thresholds against your real nods. If good takes get refused as "Head moved", raise `MotionFeatures.maxHeadTilt` or `maxHeadRotation`.
+- **Next (user, with AirPods):** on Train, remove the 5 flagged takes. Record until every word is 10/10 with "Head still" showing. Then press **New session** and record each word 3+ times. Try a deliberate nod: it should say "Head moved" and save nothing.
+- A separate session is redesigning the app icon and menu bar icon.
+
 ## Completed: Silent Lab end-to-end pass (2026-11-03)
 
 - **Bugs fixed:**
