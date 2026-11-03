@@ -109,7 +109,7 @@ enum DictationContext: String, CaseIterable, Identifiable, Codable {
         case .personal: ["Messages", "WhatsApp", "Telegram", "Signal", "Discord"]
         case .work: ["Slack", "Teams", "Mattermost"]
         case .email: ["Mail", "Outlook", "Spark", "Superhuman", "Mimestream"]
-        case .other: ["Notes", "Docs", "everything else"]
+        case .other: ["Notes", "Docs", "Everything else"]
         }
     }
 

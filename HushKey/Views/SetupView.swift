@@ -10,7 +10,7 @@ struct SetupView: View {
 
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.s5) {
-                PageHeader(eyebrow: "", title: "Silent Lab",
+                PageHeader(eyebrow: "", title: "Connect",
                            subtitle: "Teach HushKey words you mouth with AirPods in. Step one: live motion.")
                 LabProgress()
 

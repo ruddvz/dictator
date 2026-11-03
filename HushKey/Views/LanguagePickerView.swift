@@ -45,7 +45,7 @@ struct LanguagePickerSheet: View {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: Theme.s1) {
                     Text("Language").font(.display(26))
-                    Text("Recognised on this Mac. One language at a time.")
+                    Text("Recognized on this Mac. One language at a time.")
                         .font(.hkCaption).foregroundStyle(Theme.ink2)
                 }
                 Spacer()
@@ -56,23 +56,12 @@ struct LanguagePickerSheet: View {
             }
             searchField
             selectedRow
-            ScrollView {
-                LazyVGrid(columns: columns, alignment: .leading, spacing: Theme.s2) {
-                    ForEach(results) { language in
-                        LanguageTile(language: language, isSelected: language.identifier == choice) {
-                            choice = language.identifier
-                        }
-                    }
-                }
-                .padding(1)
-                if results.isEmpty {
-                    Text("No on-device language matches “\(query)”.")
-                        .font(.hkCallout).foregroundStyle(Theme.ink2)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, Theme.s6)
-                }
+            // Short result lists size the sheet to fit; long ones scroll inside 300 pt.
+            ViewThatFits(in: .vertical) {
+                languageGrid
+                ScrollView { languageGrid }
             }
-            .frame(height: 300)
+            .frame(maxHeight: 300, alignment: .top)
             HStack {
                 Text("Missing a language? Add it in System Settings › Keyboard › Dictation.")
                     .font(.hkCaption).foregroundStyle(Theme.ink3)
@@ -89,6 +78,25 @@ struct LanguagePickerSheet: View {
         .frame(width: 620)
         .background(Theme.sheet)
         .onAppear { searchFocused = true }
+    }
+
+    private var languageGrid: some View {
+        VStack(spacing: 0) {
+            LazyVGrid(columns: columns, alignment: .leading, spacing: Theme.s2) {
+                ForEach(results) { language in
+                    LanguageTile(language: language, isSelected: language.identifier == choice) {
+                        choice = language.identifier
+                    }
+                }
+            }
+            .padding(1)
+            if results.isEmpty {
+                Text("No on-device language matches “\(query)”.")
+                    .font(.hkCallout).foregroundStyle(Theme.ink2)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, Theme.s6)
+            }
+        }
     }
 
     private var searchField: some View {

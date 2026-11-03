@@ -72,8 +72,9 @@ struct InsightsView: View {
         InsightCard {
             Metric(value: ledger.wordsCleaned.formatted(), label: "Words cleaned up")
             Rectangle().fill(Theme.hairline).frame(height: 1)
-            Text("\(ledger.totalDictations.formatted()) dictation\(ledger.totalDictations == 1 ? "" : "s")")
+            Text("across \(ledger.totalDictations.formatted()) dictation\(ledger.totalDictations == 1 ? "" : "s")")
                 .font(.hkBody)
+                .foregroundStyle(Theme.ink2)
             Text("Fillers, spoken corrections and your rules, fixed on this Mac.")
                 .font(.hkCaption)
                 .foregroundStyle(Theme.ink2)
@@ -215,6 +216,7 @@ private struct CategoryBar: View {
             Image(systemName: category.symbol)
                 .frame(width: 20)
                 .foregroundStyle(Theme.ink2)
+            // The bar is a share of its full-width track, so 100 % fills the track.
             GeometryReader { geo in
                 let width = max(44, geo.size.width * share)
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
@@ -226,12 +228,14 @@ private struct CategoryBar: View {
                             .foregroundStyle(Theme.inverseInk)
                     }
             }
-            .frame(width: 180, height: 28)
+            .frame(height: 28)
+            .background(Theme.hairline.opacity(0.5), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
             Text("\(words.formatted()) \(category.rawValue)".uppercased())
                 .font(.hkMeta.weight(.medium))
                 .tracking(0.6)
                 .lineLimit(1)
-            Spacer(minLength: 0)
+                .fixedSize()
+                .frame(minWidth: 120, alignment: .leading)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(category.rawValue): \(words) words, \(Int((share * 100).rounded())) percent")

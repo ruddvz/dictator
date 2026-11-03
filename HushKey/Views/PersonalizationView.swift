@@ -101,7 +101,7 @@ struct PersonalizationView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.s5) {
-                PageHeader(eyebrow: "", title: section.rawValue, subtitle: "") {
+                PageHeader(eyebrow: "", title: "Vocabulary", subtitle: "") {
                     if section == .vocabulary {
                         Button("Import…", systemImage: "square.and.arrow.down") {
                             wordListMessage = model.importVocabularyWordList()
@@ -335,10 +335,8 @@ struct PersonalizationView: View {
             TextEditor(text: $model.dictationSnippets)
                 .font(.hkBody.monospaced())
                 .frame(minHeight: 90)
-                .padding(5)
-                .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: Theme.r3, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
-                .padding(.top, 8)
+                .editorField()
+                .padding(.top, Theme.s2)
             Text("One per line: spoken cue => expanded phrase. Use this editor to repair malformed older entries.")
                 .font(.hkCaption)
                 .foregroundStyle(Theme.ink2)
@@ -362,10 +360,8 @@ struct PersonalizationView: View {
             TextEditor(text: $model.dictationCorrectionRules)
                 .font(.hkBody.monospaced())
                 .frame(minHeight: 90)
-                .padding(5)
-                .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: Theme.r3, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
-                .padding(.top, 8)
+                .editorField()
+                .padding(.top, Theme.s2)
             Text("One per line: recognized phrase => corrected phrase. Matches are case-insensitive and respect whole-word boundaries. Raw recognition remains available to restore.")
                 .font(.hkCaption)
                 .foregroundStyle(Theme.ink2)
@@ -493,51 +489,49 @@ private struct PersonalizationEntryEditor: View {
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                if section != .vocabulary {
-                    Section(section == .corrections ? "Recognized phrase" : "Spoken cue") {
-                        TextField(section == .corrections ? "For example: Hush Key" : "For example: my email", text: $cue)
-                        Text(section == .corrections
-                             ? "Corrects complete word or phrase matches in the recognized transcript."
-                             : "HushKey matches the full cue at the end of a spoken phrase.")
-                            .font(.hkCaption)
-                            .foregroundStyle(Theme.ink2)
-                    }
-                    Section(section == .corrections ? "Use instead" : "Expanded phrase") {
-                        TextField(section == .corrections ? "For example: HushKey" : "Text to insert into the transcript", text: $expansion)
-                    }
-                } else {
-                    Section("Word or phrase") {
-                        TextField("For example: HushKey", text: $term)
-                    }
-                    Text("This stays on this Mac and is provided as an on-device recognition hint.")
-                        .font(.hkCaption)
-                        .foregroundStyle(Theme.ink2)
-                }
-                if let validationMessage {
-                    Label(validationMessage, systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(Theme.finishing)
-                        .font(.hkCallout)
-                }
+        EditorSheet(title: editorTitle, subtitle: editorSubtitle,
+                    note: section == .vocabulary ? "Stays on this Mac." : nil,
+                    primaryTitle: "Save", canSave: canSave, width: 480, onSave: save) {
+            if section == .vocabulary {
+                SheetField(label: "Word or phrase", prompt: "For example: HushKey", text: $term,
+                           hint: "Used as an on-device recognition hint.", autofocus: true)
+            } else {
+                SheetField(label: section == .corrections ? "Recognized phrase" : "Spoken cue",
+                           prompt: section == .corrections ? "For example: Hush Key" : "For example: my email",
+                           text: $cue,
+                           hint: section == .corrections
+                               ? "Replaces whole-word matches in the transcript."
+                               : "Matched when you say it at the end of a phrase.",
+                           autofocus: true)
+                SheetField(label: section == .corrections ? "Use instead" : "Expanded phrase",
+                           prompt: section == .corrections ? "For example: HushKey" : "Text to insert into the transcript",
+                           text: $expansion, multiline: section == .snippets)
             }
-            .formStyle(.grouped)
-            .navigationTitle(editorTitle)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        let message = section == .vocabulary ? onSave(term, nil) : onSave(cue, expansion)
-                        if let message { validationMessage = message }
-                        else { dismiss() }
-                    }
-                    .keyboardShortcut(.defaultAction)
-                }
+            if let validationMessage {
+                SheetNotice(message: validationMessage)
             }
         }
-        .frame(minWidth: 430, minHeight: 300)
+        .animation(Theme.snappy, value: validationMessage)
+    }
+
+    private var canSave: Bool {
+        section == .vocabulary
+            ? !term.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            : !cue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && !expansion.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func save() {
+        let message = section == .vocabulary ? onSave(term, nil) : onSave(cue, expansion)
+        if let message { validationMessage = message } else { dismiss() }
+    }
+
+    private var editorSubtitle: String {
+        switch section {
+        case .snippets: "Say a cue and HushKey types the full text."
+        case .vocabulary: "Names and terms HushKey should spell your way."
+        case .corrections: "Fix a word recognition keeps getting wrong."
+        }
     }
 
     private var editorTitle: String {

@@ -74,7 +74,7 @@ struct UseView: View {
     }
 
     private var nextActionTitle: String {
-        if model.motion.status != .streaming { return "Open Setup" }
+        if model.motion.status != .streaming { return "Connect AirPods" }
         if !meetsTemplateProtocol { return "Continue training" }
         return "Review evidence"
     }
@@ -89,7 +89,7 @@ struct UseView: View {
                         detail: model.useCaptureMode == .hold ? "Hold Control, or \(model.captureShortcut.label) here, while you mouth a word."
                             : "Starts on its own when you move.") {
                 MenuPicker(selection: $model.useCaptureMode,
-                           options: CaptureController.Mode.allCases.map { ($0, $0.rawValue) }, width: 150)
+                           options: CaptureController.Mode.allCases.map { ($0, $0.rawValue) })
                     .disabled(!model.isMotionInferenceEnabled)
             }
             GroupRow {
@@ -180,7 +180,7 @@ struct UseView: View {
             }
             Group {
                 if model.decoded.isEmpty {
-                    Text(model.isMotionInferenceEnabled ? "Mouth a trained word…" : "Pass the evidence checks to begin.")
+                    Text(model.isMotionInferenceEnabled ? "Mouth a trained word…" : eligibilityMessage)
                         .foregroundStyle(Theme.ink3)
                 } else {
                     decodedText.textSelection(.enabled)

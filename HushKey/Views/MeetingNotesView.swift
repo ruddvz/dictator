@@ -74,7 +74,7 @@ struct MeetingNotesView: View {
 
             if hasNoNotesYet {
                 // One empty state, not one per column.
-                EmptyState(systemImage: "waveform.and.text", title: "Your notes stay here",
+                EmptyState(systemImage: "note.text", title: "Your notes stay here",
                            message: "Start a meeting. The transcript, summary and action items appear here, and nothing leaves this Mac.")
                     .frame(maxWidth: .infinity, minHeight: 320)
                     .card(padding: 0, style: .outlined)
@@ -294,7 +294,7 @@ struct MeetingNotesView: View {
         } else if let note = selectedNote {
             noteEditor(note)
         } else {
-            EmptyState(systemImage: searchText.isEmpty ? "waveform.and.text" : "text.magnifyingglass",
+            EmptyState(systemImage: searchText.isEmpty ? "note.text" : "text.magnifyingglass",
                        title: searchText.isEmpty ? "Your notes stay here" : "Pick a note",
                        message: searchText.isEmpty ? "Start a meeting. The transcript, summary and action items appear here."
                            : "Select a matching note, or clear the search.")

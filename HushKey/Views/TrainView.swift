@@ -228,7 +228,7 @@ private struct TakeTile: View {
             SignalPlot(title: "", samples: template.samples, channels: SignalPlot.rotation,
                        minScale: 0.05, height: 44, showsHeader: false)
             HStack {
-                Text(String(format: "%.2f s · %d", template.duration, template.samples.count))
+                Text(String(format: "%.2f s · %d samples", template.duration, template.samples.count))
                     .font(.hkMeta.monospacedDigit())
                     .foregroundStyle(Theme.ink2)
                 Spacer()

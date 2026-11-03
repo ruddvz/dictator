@@ -254,16 +254,18 @@ enum TranscriptCard {
     }
 
     static let noTargetHint = "No text box selected. Talk, then copy."
+    static let notTypedHint = "Couldn’t type it. Copy it instead."
 
+    /// With a text box to type into, the words go there and only the pill shows. The card is
+    /// for when there's nowhere to type, or typing failed and the text needs copying.
     static func state(isCapturing: Bool, hasTarget: Bool, transcript: String,
                       isCollapsed: Bool, keepsFinishedText: Bool) -> State {
         let hasText = !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        let hint = hasTarget ? nil : noTargetHint
         if isCapturing {
-            guard !isCollapsed, !hasTarget || hasText else { return .hidden }
-            return .live(hint: hint)
+            guard !isCollapsed, !hasTarget else { return .hidden }
+            return .live(hint: noTargetHint)
         }
-        return keepsFinishedText && hasText ? .finished(hint: hint) : .hidden
+        return keepsFinishedText && hasText ? .finished(hint: hasTarget ? notTypedHint : noTargetHint) : .hidden
     }
 
     /// The end of a growing transcript, cut at a word boundary, so the card shows the last

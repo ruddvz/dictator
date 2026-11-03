@@ -481,7 +481,7 @@ struct ActivityHeatmap: View {
                         RoundedRectangle(cornerRadius: 2, style: .continuous)
                             .fill(day > today ? Color.clear
                                   : count == 0 ? Theme.hairline
-                                  : Theme.ink.opacity(0.3 + 0.7 * Double(count) / Double(maxCount)))
+                                  : Theme.signal.opacity(0.3 + 0.7 * Double(count) / Double(maxCount)))
                             .frame(width: 10, height: 10)
                             .help(day > today ? "" : "\(day.formatted(date: .abbreviated, time: .omitted)): \(count) dictation\(count == 1 ? "" : "s")")
                     }

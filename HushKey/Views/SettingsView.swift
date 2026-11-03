@@ -26,13 +26,15 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Theme.s5) {
-                PageHeader(eyebrow: "", title: "Settings", subtitle: "")
+        // The title and section nav stay put; only the section's content scrolls, so the nav is
+        // always in reach on long sections such as General.
+        VStack(alignment: .leading, spacing: Theme.s5) {
+            PageHeader(eyebrow: "", title: "Settings", subtitle: "")
 
-                HStack(alignment: .top, spacing: Theme.s6) {
-                    SettingsNav(section: $section)
-                        .frame(width: 176)
+            HStack(alignment: .top, spacing: Theme.s6) {
+                SettingsNav(section: $section)
+                    .frame(width: 176)
+                ScrollView {
                     VStack(alignment: .leading, spacing: Theme.s6) {
                         switch section {
                         case .general: GeneralSettings()
@@ -42,13 +44,19 @@ struct SettingsView: View {
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.bottom, Theme.s6)
                     .id(section)
                     .transition(.opacity.combined(with: .offset(y: 6)))
                 }
-                .animation(Theme.snappy, value: section)
+                .scrollIndicators(.automatic)
             }
-            .pageLayout()
+            .animation(Theme.snappy, value: section)
         }
+        .frame(maxWidth: Theme.pageWidth, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: Theme.homeWidth, alignment: .leading)
+        .padding(.horizontal, Theme.s7 - 8)
+        .padding(.top, Theme.s7)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 }
 
@@ -124,12 +132,12 @@ private struct GeneralSettings: View {
                 }
             }
             if !model.dictationShortcut.usesFunctionKey {
-                SettingsRow(title: "Shortcut behaviour", detail: "Hold to talk, or press once to start and again to stop.") {
+                SettingsRow(title: "Shortcut behavior", detail: "Hold to talk, or press once to start and again to stop.") {
                     MenuPicker(selection: $model.dictationCaptureBehavior,
                                options: DictationCaptureBehavior.allCases.map { ($0, $0.rawValue) })
                 }
             }
-            SettingsRow(title: "Language", detail: "Recognised on this Mac. Nothing is sent online.") {
+            SettingsRow(title: "Language", detail: "Recognized on this Mac. Nothing is sent online.") {
                 LanguageButton(selection: $model.dictationLanguage)
             }
             DictationEngineRows()
@@ -142,8 +150,8 @@ private struct GeneralSettings: View {
             SettingsRow(title: "Dictation bar", detail: "The small bar at the bottom of your screen.") {
                 RowToggle(isOn: $model.showsFloatingPill, label: "Show the dictation bar")
             }
-            SettingsRow(title: "Start and stop sounds", detail: "A soft click when the mic opens and when it closes.") {
-                RowToggle(isOn: $model.playsDictationSounds, label: "Play start and stop sounds")
+            SettingsRow(title: "Sounds", detail: "A soft cue when the mic opens, when text lands, and when something fails.") {
+                RowToggle(isOn: $model.playsDictationSounds, label: "Play dictation sounds")
             }
         }
 
@@ -214,7 +222,7 @@ private struct InsertionSettings: View {
 
         SettingsGroup(title: "Typing into other apps",
                       footer: "Password fields are always skipped. HushKey only types into the field you started in.") {
-            SettingsRow(title: "Type where your cursor is", detail: insertion.status) {
+            SettingsRow(title: "Type where your cursor is", detail: "Dictation goes straight into the text box you’re in.") {
                 RowToggle(isOn: enabled, label: "Type into the focused field")
             }
             SettingsRow(title: "Insert shortcut", detail: "Types the last transcript or silent word again.") {
@@ -281,7 +289,7 @@ private struct DataSettings: View {
                     Button("Import…") {
                         confirmPersonalBackupImport = model.selectPersonalDataBackup()
                     }
-                    .buttonStyle(PrimaryButtonStyle())
+                    .buttonStyle(SecondaryButtonStyle())
                 }
             }
         }
@@ -351,12 +359,19 @@ private struct AboutSettings: View {
         ("Argmax MIT license", "On-device speech model runtime.", "ARGMAX-MIT-LICENSE", "txt"),
         ("Third-party notices", "Bundled model notices.", "ARGMAX-NOTICES", "txt"),
     ]
-    private let research: [(title: String, detail: String, name: String, ext: String)] = [
-        ("Wispr Flow vs TypeWhisper", "The supplied comparison report.", "Wispr_Flow_vs_TypeWhisper_Research_Report_2026-11-01", "pdf"),
-        ("Competitor notes", "What other dictation apps do.", "COMPETITOR_RESEARCH", "md"),
-        ("Dictation alternatives", "Follow-up research.", "COMPETITOR_RESEARCH_ADDENDUM_2026-11-01", "md"),
-        ("Local speech models", "Accuracy and speed on this Mac.", "LOCAL_MODEL_EVALUATION", "md"),
-    ]
+    /// Internal competitor research shows only in debug builds; people using HushKey see the
+    /// model evaluation, which explains the engine choice.
+    private var research: [(title: String, detail: String, name: String, ext: String)] {
+        var items = [("Local speech models", "Accuracy and speed on this Mac.", "LOCAL_MODEL_EVALUATION", "md")]
+        #if DEBUG
+        items += [
+            ("Wispr Flow vs TypeWhisper", "The supplied comparison report.", "Wispr_Flow_vs_TypeWhisper_Research_Report_2026-11-01", "pdf"),
+            ("Competitor notes", "What other dictation apps do.", "COMPETITOR_RESEARCH", "md"),
+            ("Dictation alternatives", "Follow-up research.", "COMPETITOR_RESEARCH_ADDENDUM_2026-11-01", "md"),
+        ]
+        #endif
+        return items
+    }
 
     var body: some View {
         SettingsGroup(title: "HushKey") {
@@ -455,12 +470,11 @@ private struct DictationAppProfilesEditor: View {
     ]
 
     var body: some View {
-        Text("App profiles · \(model.dictationAppProfiles.count) of \(HushKeyPersonalDataBackup.maximumAppProfiles)")
-            .font(.hkCallout.weight(.semibold))
-            .foregroundStyle(Theme.ink)
-        Text("Automatic mode preferences stay local and can travel in a personal data backup.")
-            .font(.hkCaption)
-            .foregroundStyle(Theme.ink2)
+        GroupRow {
+            Text("\(model.dictationAppProfiles.count) of \(HushKeyPersonalDataBackup.maximumAppProfiles) profiles · included in personal data backups")
+                .font(.hkCaption)
+                .foregroundStyle(Theme.ink2)
+        }
         ForEach(model.dictationAppProfiles) { profile in
             SettingsRow(title: profile.appName, detail: "\(profile.mode.rawValue) · \(profile.bundleIdentifier)") {
                 HStack(spacing: 2) {
@@ -530,10 +544,7 @@ private struct DictationAppProfilesEditor: View {
                         TextEditor(text: $snippets)
                             .font(.hkBody.monospaced())
                             .frame(minHeight: 70, maxHeight: 110)
-                            .padding(5)
-                            .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
-                            .overlay(RoundedRectangle(cornerRadius: Theme.r3, style: .continuous)
-                                .strokeBorder(Theme.hairline, lineWidth: 1))
+                            .editorField()
                         Text("One per line: spoken cue => expanded phrase. An empty list disables global snippets for this app.")
                             .font(.hkCaption)
                             .foregroundStyle(Theme.ink2)
@@ -544,10 +555,7 @@ private struct DictationAppProfilesEditor: View {
                         TextEditor(text: $correctionRules)
                             .font(.hkBody.monospaced())
                             .frame(minHeight: 70, maxHeight: 110)
-                            .padding(5)
-                            .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
-                            .overlay(RoundedRectangle(cornerRadius: Theme.r3, style: .continuous)
-                                .strokeBorder(Theme.hairline, lineWidth: 1))
+                            .editorField()
                         Text("One per line: recognized phrase => corrected phrase. The global correction switch remains the master control.")
                             .font(.hkCaption)
                             .foregroundStyle(Theme.ink2)

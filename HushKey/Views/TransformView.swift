@@ -50,7 +50,7 @@ struct TransformView: View {
             VStack(alignment: .leading, spacing: Theme.s6) {
                 PageHeader(eyebrow: "", title: "Transforms",
                            subtitle: "Rewrite a transcript or selected text on this Mac. You always see the result first.") {
-                    Button("New style", systemImage: "plus") {
+                    Button("New transform", systemImage: "plus") {
                         styleEditorRequest = WritingStyleEditorRequest(preset: nil)
                     }
                     .buttonStyle(PrimaryButtonStyle())
@@ -80,16 +80,16 @@ struct TransformView: View {
                 saveStyle(name: name, instructions: instructions, editing: request.preset)
             }
         }
-        .confirmationDialog("Delete this writing style?", isPresented: Binding(
+        .confirmationDialog("Delete this transform?", isPresented: Binding(
             get: { stylePendingDeletion != nil }, set: { if !$0 { stylePendingDeletion = nil } }),
             titleVisibility: .visible) {
-            Button("Delete style", role: .destructive) {
+            Button("Delete transform", role: .destructive) {
                 if let stylePendingDeletion { deleteStyle(stylePendingDeletion) }
                 stylePendingDeletion = nil
             }
             Button("Cancel", role: .cancel) { stylePendingDeletion = nil }
         } message: {
-            Text("This removes the style from this Mac. It does not change any transcripts.")
+            Text("This removes the transform from this Mac. It does not change any transcripts.")
         }
         .onChange(of: currentText) { oldText, newText in
             guard oldText != newText else { return }
@@ -155,9 +155,7 @@ struct TransformView: View {
                                 .font(.hkBody)
                                 .frame(minHeight: 75, maxHeight: 120)
                                 .disabled(model.isFinalizingSelectedTextEdit || model.isGeneratingSelectedTextEdit || model.isApplyingSelectedTextEdit)
-                                .padding(4)
-                                .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: Theme.r3, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
+                                .editorField()
                         }
                     }
 
@@ -196,9 +194,7 @@ struct TransformView: View {
                                 .font(.hkBody)
                                 .frame(minHeight: 90, maxHeight: 180)
                                 .disabled(model.isApplyingSelectedTextEdit || model.selectedTextEditApplied)
-                                .padding(4)
-                                .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: Theme.r3, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
+                                .editorField()
                         }
                     }
 
@@ -293,7 +289,7 @@ struct TransformView: View {
             HStack {
                 Text("Choose a transform").font(.hkTitle3)
                 Spacer()
-                Text("\(model.writingStylePresets.count)/\(WritingStylePreset.maximumCount) styles")
+                Text("\(model.writingStylePresets.count) of \(WritingStylePreset.maximumCount) custom")
                     .font(.hkMeta.monospacedDigit())
                     .foregroundStyle(Theme.ink3)
             }
@@ -312,17 +308,17 @@ struct TransformView: View {
                 }
                 ForEach(model.writingStylePresets) { style in
                     TransformCard(symbol: "textformat", title: style.name, detail: style.instructions,
-                                  badge: "Your style", isSelected: selectedStyleID == style.id) {
+                                  badge: "Custom", isSelected: selectedStyleID == style.id) {
                         selectedStyleID = style.id
                         selectedStyleCameFromProfile = false
                         clearPreview()
                     }
                     .disabled(model.localTransformService.isTransforming)
                     .contextMenu {
-                        Button("Edit style", systemImage: "pencil") {
+                        Button("Edit transform", systemImage: "pencil") {
                             styleEditorRequest = WritingStyleEditorRequest(preset: style)
                         }
-                        Button("Delete style", systemImage: "trash", role: .destructive) {
+                        Button("Delete transform", systemImage: "trash", role: .destructive) {
                             stylePendingDeletion = style
                         }
                     }
@@ -354,7 +350,7 @@ struct TransformView: View {
                 }
             }
             if !model.writingStylePresets.isEmpty {
-                Text("Right-click a style to edit or delete it.")
+                Text("Right-click a custom transform to edit or delete it.")
                     .font(.hkCaption)
                     .foregroundStyle(Theme.ink3)
             }
@@ -501,9 +497,9 @@ struct TransformView: View {
         let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !model.writingStylePresets.contains(where: {
             $0.id != editing?.id && $0.name.compare(cleanName, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
-        }) else { return "A style with that name already exists." }
+        }) else { return "A transform with that name already exists." }
         guard editing != nil || model.writingStylePresets.count < WritingStylePreset.maximumCount else {
-            return "You can save up to \(WritingStylePreset.maximumCount) writing styles."
+            return "You can save up to \(WritingStylePreset.maximumCount) custom transforms."
         }
 
         var updated = model.writingStylePresets
@@ -518,7 +514,7 @@ struct TransformView: View {
             clearPreview()
             return nil
         } catch {
-            return "Couldn’t save this style: \(error.localizedDescription)"
+            return "Couldn’t save this transform: \(error.localizedDescription)"
         }
     }
 
@@ -533,8 +529,8 @@ struct TransformView: View {
             }
             clearPreview()
         } catch {
-            errorTitle = "Couldn’t delete style"
-            errorMessage = "Couldn’t delete this style: \(error.localizedDescription)"
+            errorTitle = "Couldn’t delete transform"
+            errorMessage = "Couldn’t delete this transform: \(error.localizedDescription)"
         }
     }
 }
@@ -544,49 +540,42 @@ private struct WritingStylePresetEditor: View {
     @State private var name: String
     @State private var instructions: String
     @State private var validationMessage: String?
+    private let isNew: Bool
     let onSave: (String, String) -> String?
 
     init(preset: WritingStylePreset?, onSave: @escaping (String, String) -> String?) {
+        isNew = preset == nil
         _name = State(initialValue: preset?.name ?? "")
         _instructions = State(initialValue: preset?.instructions ?? "")
         self.onSave = onSave
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text(name.isEmpty ? "New writing style" : "Edit writing style")
-                .font(.hkTitle2.weight(.semibold))
-            TextField("Name, for example: Warm and concise", text: $name)
-                .textFieldStyle(.roundedBorder)
-                .accessibilityLabel("Writing style name")
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Instruction").font(.hkHeadline)
-                TextEditor(text: $instructions)
-                    .frame(minHeight: 120)
-                    .overlay(RoundedRectangle(cornerRadius: 7).stroke(.quaternary, lineWidth: 1))
-                    .accessibilityLabel("Writing style instruction")
-                Text("Describe the tone or format. Example: Translate into French, keep product names unchanged, and return only the translation.")
-                    .font(.hkCaption)
-                    .foregroundStyle(Theme.ink2)
-            }
+        EditorSheet(title: isNew ? "New transform" : "Edit transform",
+                    subtitle: "Rewrites text on this Mac with your instruction.",
+                    note: "Name up to 32 characters, instruction up to 500.",
+                    primaryTitle: isNew ? "Create" : "Save", canSave: canSave, width: 540, onSave: save) {
+            SheetField(label: "Name", prompt: "For example: Warm and concise", text: $name, autofocus: isNew)
+            SheetField(label: "Instruction",
+                       prompt: "Describe the tone or format",
+                       text: $instructions,
+                       hint: "For example: Translate into French and keep product names unchanged.",
+                       multiline: true)
             if let validationMessage {
-                Text(validationMessage).font(.hkCaption).foregroundStyle(Theme.finishing)
-            }
-            HStack {
-                Text("Up to 32 characters for the name and 500 for the instruction.")
-                    .font(.hkCaption)
-                    .foregroundStyle(Theme.ink2)
-                Spacer()
-                Button("Cancel", role: .cancel) { dismiss() }
-                Button("Save style") {
-                    validationMessage = onSave(name, instructions)
-                    if validationMessage == nil { dismiss() }
-                }
-                .buttonStyle(PrimaryButtonStyle())
+                SheetNotice(message: validationMessage)
             }
         }
-        .padding(22)
-        .frame(width: 540)
+        .animation(Theme.snappy, value: validationMessage)
+    }
+
+    private var canSave: Bool {
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !instructions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func save() {
+        validationMessage = onSave(name, instructions)
+        if validationMessage == nil { dismiss() }
     }
 }
 

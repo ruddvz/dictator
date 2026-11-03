@@ -491,3 +491,20 @@ private struct WindowVisibilityReader: NSViewRepresentable {
         deinit { observers.forEach(NotificationCenter.default.removeObserver) }
     }
 }
+
+// MARK: - Live level
+
+/// Reads the mic level inside its own body, so only this small view redraws with the voice
+/// (about 47 times a second) and not the page, window or pill around it. Takes the
+/// `AudioService` directly so it also works inside an `IsolatedHost`, which has no environment.
+struct LiveLevel<Content: View>: View {
+    let audio: AudioService
+    @ViewBuilder var content: (Float) -> Content
+
+    init(_ audio: AudioService, @ViewBuilder content: @escaping (Float) -> Content) {
+        self.audio = audio
+        self.content = content
+    }
+
+    var body: some View { content(audio.level) }
+}
