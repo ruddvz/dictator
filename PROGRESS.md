@@ -2,7 +2,7 @@
 
 ## Completed: everything on `main` (2026-11-04)
 
-- Merged ruddvz/hushkey#4 (`b13e376`); `~/Projects/HushKey` now works on `main`, and the merged feature branches and worktrees are deleted. `AGENTS.md` and `docs/HANDOFF_AGENT_AUDIT.md` say to work on `main`.
+- Merged ruddvz/hushkey#4 (`b13e376`); `~/Projects/HushKey` now works on `main`. Every other branch is fully merged into `main`; deleting them is waiting on the user's go-ahead. `AGENTS.md` and `docs/HANDOFF_AGENT_AUDIT.md` say to work on `main`.
 - An earlier agent's uncommitted pill fix (`PillResizeGeneration`: a newer layout cancels a pending delayed shrink, and hiding the pill cancels it too; with tests) is folded in alongside the fixed minimum panel size.
 
 ## Completed: smooth fn start, typing restored, Flow-style notices and title strip (2026-11-04)
