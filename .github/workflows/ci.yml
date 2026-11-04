@@ -1,0 +1,17 @@
+name: macOS build and tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        run: xcodegen generate
+      - name: Build and test
+        run: xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath build CODE_SIGNING_ALLOWED=NO test

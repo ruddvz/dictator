@@ -1,0 +1,17 @@
+{
+  "clips": [
+    { "id": "h01-plain", "reference": "Remind me to water the plants after lunch",
+      "checks": { "Natural": { "contains": ["water the plants", "after lunch"] } } },
+    { "id": "h02-code-tokens", "reference": "const api underscore key equals process dot env dot key",
+      "checks": { "Code": { "contains": ["api_key", "process.env.key"], "absent": ["underscore", "dot"] } } },
+    { "id": "h03-message-line", "reference": "Running late new line start without me",
+      "checks": { "Message": { "contains": ["\n"], "absent": ["new line"] } } },
+    { "id": "h04-correction", "reference": "Book a table for four, actually five",
+      "checks": { "Natural": { "contains": ["five"], "absent": ["four", "actually"] } } },
+    { "id": "h05-snippet", "reference": "Add my home address to the form",
+      "snippets": "my home address => 1 Infinite Loop",
+      "checks": { "Natural": { "contains": ["1 Infinite Loop"] } } },
+    { "id": "h06-email-structure", "reference": "Hello Maria new paragraph the invoice is attached new line best regards",
+      "checks": { "Email": { "contains": ["\n\n", "\n"], "absent": ["new paragraph", "new line"] } } }
+  ]
+}

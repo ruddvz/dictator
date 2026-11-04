@@ -1,0 +1,44 @@
+import AppKit
+
+/// Everything on a pasteboard at one moment, so a paste can borrow the clipboard and give it back.
+/// Idea credited to amirrsyed/hushkey (MIT): paste at the cursor, then restore the clipboard.
+struct ClipboardSnapshot {
+    let items: [[NSPasteboard.PasteboardType: Data]]
+
+    /// Tells clipboard managers to skip HushKey's temporary contents (nspasteboard.org convention).
+    static let transientTypes = [NSPasteboard.PasteboardType("org.nspasteboard.TransientType"),
+                                 NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType")]
+
+    init(_ pasteboard: NSPasteboard) {
+        items = (pasteboard.pasteboardItems ?? []).map { item in
+            Dictionary(item.types.compactMap { type in item.data(forType: type).map { (type, $0) } },
+                       uniquingKeysWith: { first, _ in first })
+        }
+    }
+
+    /// Puts `text` on the pasteboard, marked transient, and returns the change count it produced.
+    @discardableResult
+    static func placeTransient(_ text: String, on pasteboard: NSPasteboard) -> Int {
+        let item = NSPasteboardItem()
+        item.setString(text, forType: .string)
+        transientTypes.forEach { item.setData(Data(), forType: $0) }
+        pasteboard.clearContents()
+        pasteboard.writeObjects([item])
+        return pasteboard.changeCount
+    }
+
+    /// Restores the snapshot only if nothing has written to the pasteboard since `expected`,
+    /// so a copy the user makes in the meantime is never overwritten.
+    @discardableResult
+    func restore(to pasteboard: NSPasteboard, ifChangeCountIs expected: Int) -> Bool {
+        guard pasteboard.changeCount == expected else { return false }
+        pasteboard.clearContents()
+        let restored = items.map { values -> NSPasteboardItem in
+            let item = NSPasteboardItem()
+            for (type, data) in values { item.setData(data, forType: type) }
+            return item
+        }
+        if !restored.isEmpty { pasteboard.writeObjects(restored) }
+        return true
+    }
+}

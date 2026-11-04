@@ -1,0 +1,51 @@
+{
+  "cases": [
+    { "id": "h-code-env", "category": "code", "mode": "Code",
+      "input": "const api underscore key equals process dot env dot key", "expected": "const api_key = process.env.key",
+      "knownGap": true, "note": "Spoken \"dot\" keeps the following space." },
+    { "id": "h-code-braces", "category": "code", "mode": "Code",
+      "input": "open brace close brace", "expected": "{}" },
+    { "id": "h-code-index", "category": "code", "mode": "Code",
+      "input": "items open bracket zero close bracket", "expected": "items[0]",
+      "knownGap": true, "note": "No space removal before brackets and no spoken-number conversion." },
+    { "id": "h-code-double-equals", "category": "code", "mode": "Code",
+      "input": "if x equals equals y", "expected": "if x == y",
+      "knownGap": true, "note": "Repeated operators stay separated by spaces." },
+    { "id": "h-code-flag", "category": "code", "mode": "Code",
+      "input": "run dash dash verbose", "expected": "run --verbose",
+      "knownGap": true, "note": "Repeated dashes stay separated by spaces." },
+    { "id": "h-natural-keeps-arrow", "category": "code", "mode": "Natural",
+      "input": "The arrow points left.", "expected": "The arrow points left." },
+
+    { "id": "h-email-signoff", "category": "line-breaks", "mode": "Email",
+      "input": "Best regards new line Rudra", "expected": "Best regards\nRudra" },
+    { "id": "h-message-double-line", "category": "line-breaks", "mode": "Message",
+      "input": "ok new line new line done", "expected": "ok\n\ndone" },
+    { "id": "h-message-literal-phrase", "category": "line-breaks", "mode": "Message",
+      "input": "I need a new line of credit.", "expected": "I need a new line of credit.",
+      "knownGap": true, "note": "\"new line\" is replaced even inside an ordinary phrase." },
+    { "id": "h-natural-ignores-commands", "category": "line-breaks", "mode": "Natural",
+      "input": "Start a new paragraph here.", "expected": "Start a new paragraph here." },
+
+    { "id": "h-correction-for", "category": "corrections", "mode": "Natural",
+      "input": "Book a table for four, actually five.", "expected": "Book a table for five." },
+    { "id": "h-correction-named", "category": "corrections", "mode": "Natural",
+      "input": "Open the file named draft, I mean final.", "expected": "Open the file named final." },
+    { "id": "h-correction-at", "category": "corrections", "mode": "Natural",
+      "input": "Call me at five, no six.", "expected": "Call me at six." },
+    { "id": "h-correction-sentence-start", "category": "corrections", "mode": "Natural",
+      "input": "Yes, actually it works.", "expected": "Yes, actually it works." },
+
+    { "id": "h-snippet-address", "category": "snippets", "mode": "Natural",
+      "input": "Add my home address.", "expected": "Add 1 Infinite Loop.",
+      "snippets": "my home address => 1 Infinite Loop" },
+    { "id": "h-snippet-longest-cue", "category": "snippets", "mode": "Natural",
+      "input": "Send my work email.", "expected": "Send work@example.com.",
+      "snippets": "my email => me@example.com\nmy work email => work@example.com" },
+
+    { "id": "h-filler-variants", "category": "fillers", "mode": "Natural",
+      "input": "Umm I'll be there, erm, soon.", "expected": "I'll be there soon.", "cleanupFillers": true },
+    { "id": "h-filler-code", "category": "fillers", "mode": "Code",
+      "input": "uh return value", "expected": "return value", "cleanupFillers": true }
+  ]
+}
