@@ -120,7 +120,21 @@ final class AudioService {
 
     @ObservationIgnored let sink = AudioSink()
     @ObservationIgnored private let levelMailbox = AudioLevelMailbox()
-    @ObservationIgnored private var engine: AVAudioEngine?
+    @ObservationIgnored private var engine: EngineBox?
+    /// Building, starting and stopping AVAudioEngine can take 100–400 ms (more with Bluetooth).
+    /// Doing it here, off the main thread, keeps the pill animating smoothly at the key press.
+    nonisolated private static let engineQueue = DispatchQueue(label: "com.ruddvz.hushkey.audio-engine", qos: .userInteractive)
+
+    /// Carries the engine between the main actor and `engineQueue`; it is only touched on that queue.
+    private final class EngineBox: @unchecked Sendable {
+        let engine: AVAudioEngine
+        init(_ engine: AVAudioEngine) { self.engine = engine }
+    }
+
+    private enum EngineStart: @unchecked Sendable {
+        case started(EngineBox)
+        case failed(String)
+    }
     @ObservationIgnored private var permissionTask: Task<LocalPermissionOutcome, Never>?
     @ObservationIgnored private var permissionRequestID: UUID?
     @ObservationIgnored private var startGeneration = 0
@@ -168,26 +182,7 @@ final class AudioService {
         }
 
         let engineStart = ProcessInfo.processInfo.systemUptime
-        let engine = AVAudioEngine()
-        let input = engine.inputNode
         let deviceID = selectedDeviceID ?? AudioDevices.defaultInputID()
-        if let selectedDeviceID, let unit = input.audioUnit {
-            var id = selectedDeviceID
-            let status = AudioUnitSetProperty(
-                unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0,
-                &id, UInt32(MemoryLayout<AudioDeviceID>.size))
-            if status != noErr {
-                error = "Couldn't switch input device (\(status))."
-                return
-            }
-        }
-
-        let format = input.outputFormat(forBus: 0)
-        guard format.sampleRate > 0, format.channelCount > 0 else {
-            error = "Input device has no usable format."
-            return
-        }
-
         let mailbox = levelMailbox
         sink.setLevelHandler { [weak self, mailbox] level in
             guard mailbox.offer(level) else { return }
@@ -198,20 +193,21 @@ final class AudioService {
                 self.peakLevel = max(self.peakLevel, update.peak)
             }
         }
-        input.installTap(onBus: 0, bufferSize: 1024, format: format, block: Self.tapBlock(for: sink))
-
-        do {
-            engine.prepare()
-            try engine.start()
-        } catch {
-            input.removeTap(onBus: 0)
-            self.error = error.localizedDescription
+        let result = await Self.buildAndStart(selectedDevice: selectedDeviceID, sink: sink)
+        guard case .started(let box) = result else {
+            if case .failed(let message) = result, generation == startGeneration { error = message }
+            sink.setLevelHandler(nil)
+            return
+        }
+        // Stopped or restarted while the engine was starting: shut this one down again.
+        guard generation == startGeneration else {
+            Self.engineQueue.async { Self.shutDown(box) }
             return
         }
 
-        self.engine = engine
+        self.engine = box
         Logger(subsystem: "com.ruddvz.hushkey", category: "start").notice(
-            "audio engine build+start \(String(format: "%.0f", (ProcessInfo.processInfo.systemUptime - engineStart) * 1000), privacy: .public)ms")
+            "audio engine build+start \(String(format: "%.0f", (ProcessInfo.processInfo.systemUptime - engineStart) * 1000), privacy: .public)ms (off main)")
         activeDeviceName = deviceID.flatMap(AudioDevices.name(of:))
         isRunning = true
     }
@@ -226,14 +222,54 @@ final class AudioService {
         isAwaitingPermission = false
         isStarting = false
         if let engine {
-            engine.inputNode.removeTap(onBus: 0)
-            engine.stop()
             self.engine = nil
+            // Off the main thread, like the start, so the pill's closing animation doesn't hitch.
+            Self.engineQueue.async { Self.shutDown(engine) }
         }
         sink.setLevelHandler(nil)
         isRunning = false
         level = 0
         activeDeviceName = nil
+    }
+
+    /// Builds the engine, points it at the chosen input, installs the tap and starts it, all on
+    /// `engineQueue`. Returns a readable error instead of throwing across the queue hop.
+    nonisolated private static func buildAndStart(selectedDevice: AudioDeviceID?, sink: AudioSink) async -> EngineStart {
+        await withCheckedContinuation { continuation in
+            engineQueue.async {
+                let engine = AVAudioEngine()
+                let input = engine.inputNode
+                if let selectedDevice, let unit = input.audioUnit {
+                    var id = selectedDevice
+                    let status = AudioUnitSetProperty(
+                        unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0,
+                        &id, UInt32(MemoryLayout<AudioDeviceID>.size))
+                    if status != noErr {
+                        continuation.resume(returning: .failed("Couldn't switch input device (\(status))."))
+                        return
+                    }
+                }
+                let format = input.outputFormat(forBus: 0)
+                guard format.sampleRate > 0, format.channelCount > 0 else {
+                    continuation.resume(returning: .failed("Input device has no usable format."))
+                    return
+                }
+                input.installTap(onBus: 0, bufferSize: 1024, format: format, block: tapBlock(for: sink))
+                do {
+                    engine.prepare()
+                    try engine.start()
+                    continuation.resume(returning: .started(EngineBox(engine)))
+                } catch {
+                    input.removeTap(onBus: 0)
+                    continuation.resume(returning: .failed(error.localizedDescription))
+                }
+            }
+        }
+    }
+
+    nonisolated private static func shutDown(_ box: EngineBox) {
+        box.engine.inputNode.removeTap(onBus: 0)
+        box.engine.stop()
     }
 
     // Built outside main-actor isolation: the tap runs on the audio render thread.

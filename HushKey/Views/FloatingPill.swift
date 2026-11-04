@@ -132,8 +132,14 @@ final class FloatingPillController {
 
     /// Grows at once, before the opening animation is drawn, and shrinks only once the closing
     /// animation has settled. Resizing a window mid-animation clips the pill or makes it flicker.
-    private func resize(to size: CGSize) {
-        guard size.width > 0, size.height > 0 else { return }
+    private func resize(to measured: CGSize) {
+        guard measured.width > 0, measured.height > 0 else { return }
+        // Never smaller than the recording pill plus its hint, so idle → hover → recording happens
+        // inside one window frame. Resizing the window as the pill opened showed the old pill
+        // up and to the left for a frame before the new one drew. The extra area is transparent,
+        // so clicks there pass through to the app underneath.
+        let size = CGSize(width: max(measured.width, Self.minimumPanelSize.width),
+                          height: max(measured.height, Self.minimumPanelSize.height))
         resizeGeneration &+= 1
         let generation = resizeGeneration
         pendingShrink?.cancel()
@@ -149,6 +155,10 @@ final class FloatingPillController {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: shrink)
     }
 
+    /// Fits the recording capsule with × and ✓, the elapsed timer, the hover row with Meeting
+    /// notes, and a one-line hint above, plus the 8 pt shadow margin on every side.
+    static let minimumPanelSize = CGSize(width: 220, height: 84)
+
     private func apply(_ size: CGSize) {
         guard size != contentSize else { return }
         contentSize = size
@@ -160,7 +170,10 @@ final class FloatingPillController {
         let origin = PillPlacement.origin(size: contentSize, in: screen.visibleFrame, centerFraction: centerFraction)
         let frame = CGRect(origin: origin, size: contentSize)
         guard panel.frame != frame else { return }
-        panel.setFrame(frame, display: false)
+        // Lay out and redraw in the same pass as the move, so the old contents never show at the
+        // new frame's corner.
+        panel.setFrame(frame, display: true)
+        panel.contentView?.layoutSubtreeIfNeeded()
     }
 
     private func moveToCentre() {
@@ -241,6 +254,10 @@ struct FloatingPillView: View {
     @State private var showsDone = false
     @State private var doneToken = 0
     @State private var copied = false
+    /// The start is taking longer than a blink: only then name the wait and sweep the ribbon.
+    /// A normal start (about 0.3 s) goes straight from the resting line to the live ribbon.
+    @State private var isSlowStart = false
+    static let slowStartDelay: Duration = .milliseconds(600)
 
     private enum Phase { case idle, hover, preparing, listening, finishing, error, done }
     private enum PillControl { case dictate, cancel, finish, notes }
@@ -292,6 +309,12 @@ struct FloatingPillView: View {
                     transaction.disablesAnimations = true
                     transaction.animation = nil
                 }
+            }
+            .task(id: phase == .preparing) {
+                isSlowStart = false
+                guard phase == .preparing else { return }
+                try? await Task.sleep(for: Self.slowStartDelay)
+                if !Task.isCancelled, phase == .preparing { isSlowStart = true }
             }
             .onChange(of: model.audio.isRunning) { _, running in
                 if running { copied = false }
@@ -440,7 +463,11 @@ struct FloatingPillView: View {
                 .transition(.opacity.combined(with: .scale(scale: 0.6)))
             }
             // The same breath ribbon as the hub, the hero and the app icon: one wave everywhere.
-            let ribbonMode: BreathRibbon.Mode = phase == .listening ? .live : phase == .preparing ? .waiting : .working
+            let ribbonMode: BreathRibbon.Mode = switch phase {
+            case .listening: .live
+            case .preparing: isSlowStart ? .waiting : .rest
+            default: .working
+            }
             LiveLevel(model.audio) { BreathRibbon(level: $0, mode: ribbonMode, tint: Theme.ink) }
                 .frame(width: Self.ribbonSize.width, height: Self.ribbonSize.height)
                 .padding(.horizontal, showsControls ? 2 : 6)
@@ -478,6 +505,7 @@ struct FloatingPillView: View {
             if model.audio.isAwaitingPermission || model.transcriber.isAwaitingPermission {
                 return .init(title: "Answer the macOS prompt", shortcut: nil)
             }
+            guard isSlowStart else { return nil }
             return .init(title: model.audio.isStarting ? "Waiting for microphone" : "Preparing locally", shortcut: nil)
         default: return nil
         }

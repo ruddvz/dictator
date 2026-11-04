@@ -2089,8 +2089,6 @@ final class AppModel {
         activeDictationUsesSmartCleanup = polishesWithAppleIntelligence && profileSettings.cleansFillers &&
             profileSettings.mode != .code
         timing.mark("profile")
-        smartCleanupSession = usesSmartCleanup ? DictationSmartCleanup.prepare() : nil
-        timing.mark("smartCleanup")
         captureDictationProfileName = profileSettings.appName
         captureDictationWritingStylePresetID = profileSettings.writingStylePresetID
         let nearbyHints = usesNearbyTextHints ? insertion.nearbyContextHints() : []
@@ -2144,6 +2142,9 @@ final class AppModel {
         playDictationCue(.start)
         muteOutputForDictation()
         timing.mark("cueAndMute")
+        // Only needed when the dictation finishes, so it waits until the microphone is open.
+        smartCleanupSession = usesSmartCleanup ? DictationSmartCleanup.prepare() : nil
+        timing.mark("smartCleanup")
         dictationStartedAt = Date()
         lastDictationDuration = nil
         let customWords = profileSettings.vocabulary
