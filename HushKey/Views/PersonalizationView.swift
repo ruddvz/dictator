@@ -103,19 +103,19 @@ struct PersonalizationView: View {
             VStack(alignment: .leading, spacing: Theme.s5) {
                 PageHeader(eyebrow: "", title: "Vocabulary", subtitle: "") {
                     if section == .vocabulary {
-                        Button("Import…", systemImage: "square.and.arrow.down") {
+                        Button("Import…", icon: .download) {
                             wordListMessage = model.importVocabularyWordList()
                         }
                         .buttonStyle(SecondaryButtonStyle())
                         .help("Add words from a text or CSV file, one per line or separated by commas")
-                        Button("Export…", systemImage: "square.and.arrow.up") {
+                        Button("Export…", icon: .share) {
                             wordListMessage = model.exportVocabularyWordList()
                         }
                         .buttonStyle(SecondaryButtonStyle())
                         .disabled(vocabulary.isEmpty)
                         .help("Save your vocabulary as a text file, one word per line")
                     }
-                    Button(section.addTitle, systemImage: "plus") {
+                    Button(section.addTitle, icon: .plus) {
                         editor = PersonalizationEditorRequest(section: section, snippet: nil, term: nil)
                     }
                     .buttonStyle(PrimaryButtonStyle())
@@ -190,7 +190,7 @@ struct PersonalizationView: View {
                     .onExitCommand { query = ""; searching = false }
                     .transition(.opacity.combined(with: .move(edge: .trailing)))
             }
-            Button(searching ? "Close search" : "Search", systemImage: searching ? "xmark" : "magnifyingglass") {
+            Button(searching ? "Close search" : "Search", icon: searching ? .close : .search) {
                 withAnimation(Theme.snappy) {
                     if searching { query = "" }
                     searching.toggle()
@@ -258,7 +258,7 @@ struct PersonalizationView: View {
                     ListRow {
                         HStack(spacing: Theme.s2) {
                             Text(entry.cue).font(.hkBody.weight(.medium))
-                            Image(systemName: "arrow.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.ink3)
+                            Glyph(.arrowRight).hushIconSize(15).foregroundStyle(Theme.ink3)
                             Text(entry.expansion).font(.hkBody).foregroundStyle(Theme.ink2).lineLimit(1)
                         }
                     } actions: {
@@ -304,7 +304,7 @@ struct PersonalizationView: View {
                     ListRow {
                         HStack(spacing: Theme.s2) {
                             Text(rule.cue).font(.hkBody).foregroundStyle(Theme.ink2).strikethrough(color: Theme.ink3)
-                            Image(systemName: "arrow.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.ink3)
+                            Glyph(.arrowRight).hushIconSize(15).foregroundStyle(Theme.ink3)
                             Text(rule.expansion).font(.hkBody.weight(.medium)).lineLimit(1)
                         }
                     } actions: {
@@ -319,12 +319,12 @@ struct PersonalizationView: View {
     }
 
     private func listEmpty(_ title: String, _ message: String) -> some View {
-        EmptyState(systemImage: query.isEmpty ? section.symbol : "magnifyingglass", title: title, message: message)
+        EmptyState(icon: query.isEmpty ? HushIcon(symbol: section.symbol) ?? .vocabulary : .search, title: title, message: message)
             .card(padding: 0, style: .outlined)
     }
 
     private func rowAction(_ title: String, _ symbol: String, perform: @escaping () -> Void) -> some View {
-        Button(title, systemImage: symbol, action: perform)
+        Button(title, icon: HushIcon(symbol: symbol) ?? .more, action: perform)
             .buttonStyle(IconButtonStyle())
             .help(title)
     }
@@ -344,7 +344,7 @@ struct PersonalizationView: View {
             Label(validation.invalidLines.isEmpty
                   ? "\(validation.validCount) ready"
                   : "\(validation.validCount) ready · check line\(validation.invalidLines.count == 1 ? "" : "s") \(validation.invalidLines.map(String.init).joined(separator: ", "))",
-                  systemImage: validation.invalidLines.isEmpty ? "checkmark.circle" : "exclamationmark.circle")
+                  icon: validation.invalidLines.isEmpty ? .checkCircle : .warning)
                 .font(.hkCaption)
                 .foregroundStyle(validation.invalidLines.isEmpty ? Theme.ink2 : Theme.danger)
         }
@@ -369,7 +369,7 @@ struct PersonalizationView: View {
             Label(validation.invalidLines.isEmpty
                   ? "\(validation.validCount) ready"
                   : "\(validation.validCount) ready · check line\(validation.invalidLines.count == 1 ? "" : "s") \(validation.invalidLines.map(String.init).joined(separator: ", "))",
-                  systemImage: validation.invalidLines.isEmpty ? "checkmark.circle" : "exclamationmark.circle")
+                  icon: validation.invalidLines.isEmpty ? .checkCircle : .warning)
                 .font(.hkCaption)
                 .foregroundStyle(validation.invalidLines.isEmpty ? Theme.ink2 : Theme.finishing)
         }

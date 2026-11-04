@@ -57,7 +57,7 @@ struct MeetingNotesView: View {
 
             if let message = service.message {
                 VStack(alignment: .leading, spacing: Theme.s2) {
-                    Label(message, systemImage: "exclamationmark.circle")
+                    Label(message, icon: .warning)
                         .font(.hkCallout)
                         .foregroundStyle(Theme.finishing)
                         .fixedSize(horizontal: false, vertical: true)
@@ -74,7 +74,7 @@ struct MeetingNotesView: View {
 
             if hasNoNotesYet {
                 // One empty state, not one per column.
-                EmptyState(systemImage: "note.text", title: "Your notes stay here",
+                EmptyState(icon: .document, title: "Your notes stay here",
                            message: "Start a meeting. The transcript, summary and action items appear here, and nothing leaves this Mac.")
                     .frame(maxWidth: .infinity, minHeight: 320)
                     .card(padding: 0, style: .outlined)
@@ -158,8 +158,8 @@ struct MeetingNotesView: View {
     private var captureControls: some View {
         @Bindable var meeting = service
         return HStack(spacing: Theme.s4) {
-            Image(systemName: service.isCapturing ? "waveform" : "person.2.wave.2")
-                .font(.system(size: 22, weight: .medium))
+            Glyph(service.isCapturing ? .waveform : .meetings)
+                .hushIconSize(28)
                 .foregroundStyle(service.isCapturing ? Theme.listening : Theme.signal)
                 .symbolEffect(.variableColor.iterative, isActive: service.isCapturing)
                 .frame(width: 52, height: 52)
@@ -191,21 +191,21 @@ struct MeetingNotesView: View {
             }
             Spacer(minLength: Theme.s4)
             if service.isCapturing {
-                Button("Stop and save", systemImage: "stop.fill") { service.stop() }
+                Button("Stop and save", icon: .stop) { service.stop() }
                     .buttonStyle(PrimaryButtonStyle(tint: Theme.ink))
             } else if service.isFinalizing {
                 ProgressView().controlSize(.small)
             } else if service.isStarting {
                 HStack(spacing: Theme.s2) {
                     ProgressView().controlSize(.small)
-                    Button("Cancel", systemImage: "xmark") { service.cancelStarting() }
+                    Button("Cancel", icon: .close) { service.cancelStarting() }
                         .buttonStyle(SecondaryButtonStyle())
                 }
             } else {
                 MenuPicker(selection: $meeting.audioSource,
                            options: MeetingAudioSource.allCases.map { ($0, $0.rawValue) },
                            width: 170)
-                Button("Start", systemImage: "record.circle", action: startMeeting)
+                Button("Start", icon: .record, action: startMeeting)
                     .buttonStyle(PrimaryButtonStyle())
                     .disabled(model.captureGate.owner != nil || service.hasPendingDraftRecovery)
                     .help(service.hasPendingDraftRecovery
@@ -221,7 +221,7 @@ struct MeetingNotesView: View {
 
     private func interruptedDraftCard(_ draft: MeetingNotesDraft) -> some View {
         VStack(alignment: .leading, spacing: Theme.s3) {
-            Label("Recovered unfinished meeting", systemImage: "arrow.uturn.backward.circle")
+            Label("Recovered unfinished meeting", icon: .undo)
                 .font(.hkTitle3)
             Text("Partial transcript from \(draft.audioSource.rawValue.lowercased()) · started \(draft.startedAt.formatted(date: .abbreviated, time: .shortened)) · \(durationLabel(draft.duration)). Audio was not saved.")
                 .font(.hkCallout)
@@ -236,9 +236,9 @@ struct MeetingNotesView: View {
                 .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
             HStack {
                 Spacer()
-                Button("Discard…", systemImage: "trash") { confirmDiscardRecoveredDraft = true }
+                Button("Discard…", icon: .trash) { confirmDiscardRecoveredDraft = true }
                     .buttonStyle(SecondaryButtonStyle())
-                Button("Save recovered transcript", systemImage: "square.and.arrow.down") {
+                Button("Save recovered transcript", icon: .download) {
                     service.recoverInterruptedMeetingDraft()
                 }
                 .buttonStyle(PrimaryButtonStyle())
@@ -255,7 +255,7 @@ struct MeetingNotesView: View {
     private var notesList: some View {
         VStack(alignment: .leading, spacing: Theme.s3) {
             HStack(spacing: Theme.s2) {
-                Image(systemName: "magnifyingglass").foregroundStyle(Theme.ink3)
+                Glyph(.search).foregroundStyle(Theme.ink3)
                 TextField("Search notes", text: $searchText)
                     .textFieldStyle(.plain)
                     .accessibilityLabel("Search meeting notes")
@@ -268,7 +268,7 @@ struct MeetingNotesView: View {
                 .strokeBorder(Theme.hairline, lineWidth: 1))
 
             if filteredNotes.isEmpty {
-                EmptyState(systemImage: searchText.isEmpty ? "text.badge.plus" : "magnifyingglass",
+                EmptyState(icon: searchText.isEmpty ? .document : .search,
                            title: searchText.isEmpty ? "No notes yet" : "No matches",
                            message: searchText.isEmpty ? "Your meetings land here." : "Try another word.")
                     .card(padding: 0, style: .outlined)
@@ -294,7 +294,7 @@ struct MeetingNotesView: View {
         } else if let note = selectedNote {
             noteEditor(note)
         } else {
-            EmptyState(systemImage: searchText.isEmpty ? "note.text" : "text.magnifyingglass",
+            EmptyState(icon: searchText.isEmpty ? .document : .search,
                        title: searchText.isEmpty ? "Your notes stay here" : "Pick a note",
                        message: searchText.isEmpty ? "Start a meeting. The transcript, summary and action items appear here."
                            : "Select a matching note, or clear the search.")
@@ -348,7 +348,7 @@ struct MeetingNotesView: View {
                             pendingDeleteID = note.id
                         }
                     } label: {
-                        Image(systemName: "ellipsis")
+                        Glyph(.more)
                     }
                     .menuStyle(.button)
                     .buttonStyle(IconButtonStyle())
@@ -358,14 +358,14 @@ struct MeetingNotesView: View {
                 }
 
                 if !model.localTransformService.modelIsAvailable {
-                    Label(model.localTransformService.availabilityMessage, systemImage: "info.circle")
+                    Label(model.localTransformService.availabilityMessage, icon: .info)
                         .font(.hkCaption)
                         .foregroundStyle(Theme.ink2)
                 }
 
                 noteSection("Summary", text: binding(for: note, keyPath: \.summary), minHeight: 90,
                             empty: "A few lines on what was decided.") {
-                    Button("Draft", systemImage: "sparkles") {
+                    Button("Draft", icon: .sparkle) {
                         Task { await service.generateSummary(for: note.id, with: model.localTransformService) }
                     }
                     .buttonStyle(SecondaryButtonStyle())
@@ -373,7 +373,7 @@ struct MeetingNotesView: View {
                 }
                 noteSection("Action items", text: binding(for: note, keyPath: \.actionItems), minHeight: 70,
                             empty: "Who does what, next.") {
-                    Button("Extract", systemImage: "checklist") {
+                    Button("Extract", icon: .list) {
                         Task { await service.generateActionItems(for: note.id, with: model.localTransformService) }
                     }
                     .buttonStyle(SecondaryButtonStyle())
@@ -450,7 +450,7 @@ struct MeetingNotesView: View {
 
     private var privacyNote: some View {
         Label("Transcribed on this Mac. Partial text is checkpointed for recovery; audio is never saved.",
-              systemImage: "lock.shield")
+              icon: .shield)
             .font(.hkCaption)
             .foregroundStyle(Theme.ink2)
             .fixedSize(horizontal: false, vertical: true)

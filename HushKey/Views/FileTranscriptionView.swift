@@ -36,7 +36,7 @@ struct FileTranscriptionView: View {
                            subtitle: "Turn a recording into text and subtitles, on this Mac.") {
                     // The source card offers "Choose file…" until a file is picked.
                     if workspace.selectedURL != nil {
-                        Button("Choose another…", systemImage: "folder") { chooseFile() }
+                        Button("Choose another…", icon: .folder) { chooseFile() }
                             .buttonStyle(SecondaryButtonStyle())
                             .disabled(isBusy)
                     }
@@ -150,8 +150,8 @@ struct FileTranscriptionView: View {
         @Bindable var whisper = model.whisperFileTranscriber
         let sourceName = workspace.selectedURL?.lastPathComponent ?? workspace.activeSourceName
         return HStack(spacing: Theme.s4) {
-            Image(systemName: sourceName == nil ? "waveform.badge.plus" : "waveform")
-                .font(.system(size: 22, weight: .medium))
+            Glyph(sourceName == nil ? .waveform : .waveform)
+                .hushIconSize(28)
                 .foregroundStyle(Theme.signal)
                 .frame(width: 52, height: 52)
                 .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
@@ -162,7 +162,7 @@ struct FileTranscriptionView: View {
                     .truncationMode(.middle)
                 Group {
                     if let error = currentError {
-                        Label(error, systemImage: "exclamationmark.triangle.fill")
+                        Label(error, icon: .warning)
                             .foregroundStyle(Theme.danger)
                     } else if let status = currentStatus {
                         Text(status).foregroundStyle(Theme.ink2)
@@ -188,7 +188,7 @@ struct FileTranscriptionView: View {
                     .buttonStyle(PrimaryButtonStyle())
             } else {
                 Button(action: startTranscription) {
-                    Label(isBusy ? "Working…" : "Transcribe", systemImage: isBusy ? "hourglass" : "waveform")
+                    Label(isBusy ? "Working…" : "Transcribe", icon: isBusy ? .clock : .waveform)
                 }
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(workspace.selectedURL == nil || isBusy ||
@@ -232,7 +232,7 @@ struct FileTranscriptionView: View {
                         .buttonStyle(SecondaryButtonStyle())
                         .disabled(currentCues.isEmpty)
                         .help("Export WebVTT subtitles")
-                    Button("Save text…", systemImage: "square.and.arrow.down") { save(content: currentText, fileExtension: "txt", type: .plainText) }
+                    Button("Save text…", icon: .download) { save(content: currentText, fileExtension: "txt", type: .plainText) }
                         .buttonStyle(PrimaryButtonStyle())
                 }
                 .padding(.horizontal, Theme.s4)
@@ -251,7 +251,7 @@ struct FileTranscriptionView: View {
                 Spacer()
                 if !historySessions.isEmpty {
                     HStack(spacing: Theme.s2) {
-                        Image(systemName: "magnifyingglass").foregroundStyle(Theme.ink3)
+                        Glyph(.search).foregroundStyle(Theme.ink3)
                         TextField("Search", text: $historySearch)
                             .textFieldStyle(.plain)
                             .frame(width: 160)
@@ -268,7 +268,7 @@ struct FileTranscriptionView: View {
                         Button(!model.fileTranscriptionHistoryArchiveUnreadable ? "Delete all…" : "Remove unreadable archive…",
                                role: .destructive) { confirmClearHistory = true }
                     } label: {
-                        Image(systemName: "ellipsis")
+                        Glyph(.more)
                     }
                     .menuStyle(.button)
                     .buttonStyle(IconButtonStyle())
@@ -278,11 +278,11 @@ struct FileTranscriptionView: View {
                 }
             }
             if let message = model.fileTranscriptionHistoryMessage {
-                Label(message, systemImage: "exclamationmark.triangle")
+                Label(message, icon: .warning)
                     .font(.hkCaption).foregroundStyle(Theme.finishing)
             }
             if filteredSessions.isEmpty {
-                EmptyState(systemImage: historySearch.isEmpty ? "clock" : "magnifyingglass",
+                EmptyState(icon: historySearch.isEmpty ? .clock : .search,
                            title: historySearch.isEmpty ? "No file transcripts yet" : "No matches",
                            message: historySearch.isEmpty ? "Finished transcripts stay here, on this Mac."
                                : "Search by file name or words in the transcript.")
@@ -308,7 +308,7 @@ struct FileTranscriptionView: View {
                             .buttonStyle(.plain)
                             .help("Open this transcript")
                         } actions: {
-                            Button("Delete \(session.sourceName)", systemImage: "trash") { delete(session) }
+                            Button("Delete \(session.sourceName)", icon: .trash) { delete(session) }
                                 .buttonStyle(IconButtonStyle())
                                 .help("Delete")
                         }

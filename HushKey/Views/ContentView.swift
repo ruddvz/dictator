@@ -2,23 +2,37 @@ import AVFoundation
 import Speech
 import SwiftUI
 
+/// The hub: a paper window with the sidebar on the left, a toolbar strip level with the window
+/// controls, and the current page on a raised sheet.
 struct ContentView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(AppearancePreference.storageKey) private var appearance: AppearancePreference = .light
+    @AppStorage("sidebarCollapsed") private var collapsed = false
+    /// The page shown before the current one, so a page switch can rise from the side it came from.
+    @State private var previousScreen: AppModel.Screen = .dictation
+    @Namespace private var selectionSpace
 
     static let labScreens: [AppModel.Screen] = [.setup, .train, .evaluate, .use]
     private static let mainScreens: [AppModel.Screen] = [.dictation, .insights, .style, .transforms, .files, .meetings, .personalization]
+    private static let navigationOrder: [AppModel.Screen] = mainScreens + labScreens + [.settings]
 
     var body: some View {
         HStack(spacing: 0) {
             sidebar
-                .frame(width: Theme.sidebarWidth)
+                .frame(width: collapsed ? Theme.sidebarCollapsedWidth : Theme.sidebarWidth)
+                .clipped()
             page
                 .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: Theme.r1, style: .continuous)
                     .strokeBorder(Theme.hairline, lineWidth: 1))
                 .shadow(color: .black.opacity(0.04), radius: 8, y: 2)
-                .padding([.top, .trailing, .bottom], Theme.s2)
+                .padding([.trailing, .bottom], Theme.s2)
+        }
+        .padding(.top, Theme.toolbarHeight)
+        .overlay(alignment: .top) {
+            HubToolbar(collapsed: $collapsed)
+                .frame(height: Theme.toolbarHeight - Theme.s2)
         }
         .background(Theme.paper)
         .ignoresSafeArea()
@@ -27,6 +41,8 @@ struct ContentView: View {
         .groupBoxStyle(CardGroupBoxStyle())
         .tint(Theme.ink)
         .preferredColorScheme(appearance.colorScheme)
+        .animation(Theme.snappy, value: collapsed)
+        .onChange(of: model.screen) { old, _ in previousScreen = old }
     }
 
     // MARK: Sidebar
@@ -37,40 +53,17 @@ struct ContentView: View {
 
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 0) {
-            brand
-                .padding(.top, 40) // clears the window controls
-                .padding(.horizontal, Theme.s4)
-                .padding(.bottom, Theme.s4)
+            BrandLockup(collapsed: collapsed, live: model.audio.isRunning)
+                .padding(.top, Theme.s2)
+                .padding(.horizontal, Theme.s3)
+                .padding(.bottom, Theme.s5 - 4)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.s1) {
-                    ForEach(Self.mainScreens) { SidebarRow(screen: $0) }
-                    Button {
-                        withAnimation(Theme.snappy) { showsLab.toggle() }
-                    } label: {
-                        HStack(spacing: Theme.s1) {
-                            SectionLabel(title: "Silent lab")
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 8, weight: .bold))
-                                .foregroundStyle(Theme.ink3)
-                                .rotationEffect(.degrees(labIsOpen ? 90 : 0))
-                            Spacer()
-                            if model.motion.isConnected {
-                                Circle().fill(Theme.success).frame(width: 6, height: 6)
-                                    .help(model.motion.status.label)
-                            }
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, Theme.s3 - 2)
-                    .padding(.top, Theme.s5)
-                    .padding(.bottom, 2)
-                    .help(labIsOpen ? "Hide the Silent lab" : "Show the Silent lab: AirPods gestures and silent words")
-                    .accessibilityLabel("Silent lab")
-                    .accessibilityValue(labIsOpen ? "Expanded" : "Collapsed")
+                    ForEach(Self.mainScreens) { row($0) }
+                    labHeader
                     if labIsOpen {
-                        ForEach(Self.labScreens) { SidebarRow(screen: $0) }
+                        ForEach(Self.labScreens) { row($0) }
                             .transition(.opacity.combined(with: .move(edge: .top)))
                     }
                 }
@@ -79,31 +72,74 @@ struct ContentView: View {
             .scrollIndicators(.never)
 
             VStack(alignment: .leading, spacing: Theme.s1) {
-                SetupChecklist()
-                    .padding(.bottom, Theme.s2)
-                SidebarRow(screen: .settings)
+                if !collapsed {
+                    SetupChecklist()
+                        .padding(.bottom, Theme.s2)
+                        .transition(.opacity)
+                }
+                row(.settings)
             }
             .padding([.horizontal, .bottom], Theme.s3)
         }
     }
 
-    private var brand: some View {
-        HStack(spacing: Theme.s2) {
-            // The app icon's sage ribbon; it opens into a lens while dictating, as in the menu bar.
-            Image(model.audio.isRunning ? "HushKeyMenuBarLive" : "HushKeyMenuBar")
-                .resizable()
-                .frame(width: 26, height: 26)
-                .foregroundStyle(Theme.signal)
-            Text("HushKey")
-                .font(.system(size: 18, weight: .semibold))
-                .tracking(-0.2)
+    private func row(_ screen: AppModel.Screen) -> some View {
+        SidebarRow(screen: screen, collapsed: collapsed, selection: selectionSpace)
+    }
+
+    @ViewBuilder
+    private var labHeader: some View {
+        if collapsed {
+            // Icons only: a short hairline stands in for the section title.
+            Button {
+                withAnimation(Theme.snappy) { showsLab.toggle() }
+            } label: {
+                Rectangle().fill(Theme.hairline)
+                    .frame(width: 20, height: 1)
+                    .frame(maxWidth: .infinity, minHeight: 24)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.vertical, Theme.s1)
+            .help(labIsOpen ? "Hide the Silent lab" : "Show the Silent lab")
+        } else {
+            Button {
+                withAnimation(Theme.snappy) { showsLab.toggle() }
+            } label: {
+                HStack(spacing: Theme.s1) {
+                    SectionLabel(title: "Silent lab")
+                    Glyph(.chevronRight, size: 11)
+                        .foregroundStyle(Theme.ink3)
+                        .rotationEffect(.degrees(labIsOpen ? 90 : 0))
+                    Spacer()
+                    if model.motion.isConnected {
+                        Circle().fill(Theme.success).frame(width: 6, height: 6)
+                            .help(model.motion.status.label)
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, Theme.s3 - 2)
+            .padding(.top, Theme.s5)
+            .padding(.bottom, 2)
+            .help(labIsOpen ? "Hide the Silent lab" : "Show the Silent lab: AirPods gestures and silent words")
+            .accessibilityLabel("Silent lab")
+            .accessibilityValue(labIsOpen ? "Expanded" : "Collapsed")
         }
-        .frame(maxWidth: .infinity)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("HushKey")
     }
 
     // MARK: Page
+
+    /// Moving down the sidebar, the next page rises from below; moving up, it settles from above.
+    private var pageTransition: AnyTransition {
+        guard !reduceMotion else { return .opacity }
+        let from = Self.navigationOrder.firstIndex(of: previousScreen) ?? 0
+        let to = Self.navigationOrder.firstIndex(of: model.screen) ?? 0
+        let rise: CGFloat = to >= from ? 14 : -14
+        return .asymmetric(insertion: .opacity.combined(with: .offset(y: rise)),
+                           removal: .opacity.animation(.easeOut(duration: 0.1)))
+    }
 
     private var page: some View {
         ZStack(alignment: .topTrailing) {
@@ -124,7 +160,7 @@ struct ContentView: View {
                 }
             }
             .id(model.screen)
-            .transition(.asymmetric(insertion: .opacity.combined(with: .offset(y: 8)), removal: .opacity))
+            .transition(pageTransition)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
             if Self.labScreens.contains(model.screen) {
@@ -138,6 +174,56 @@ struct ContentView: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
         .animation(Theme.snappy, value: model.screen)
+    }
+}
+
+extension AppModel.Screen {
+    /// The page's glyph in the sidebar and wherever the page is named.
+    var icon: HushIcon {
+        switch self {
+        case .dictation: .dictation
+        case .transforms: .transforms
+        case .files: .files
+        case .meetings: .meetings
+        case .setup: .connect
+        case .train: .train
+        case .evaluate: .evaluate
+        case .use: .silent
+        case .personalization: .vocabulary
+        case .style: .style
+        case .insights: .insights
+        case .settings: .settings
+        }
+    }
+}
+
+/// HushKey's mark and wordmark, left-aligned on the sidebar icons. The mark is the app icon's
+/// sage ribbon and opens into a lens while dictating; collapsed, only the mark stays.
+private struct BrandLockup: View {
+    var collapsed: Bool
+    var live: Bool
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Image(live ? "HushKeyMenuBarLive" : "HushKeyMenuBar")
+                .resizable()
+                .frame(width: 28, height: 28)
+                .foregroundStyle(Theme.signal)
+                .contentTransition(.opacity)
+                .animation(Theme.gentle, value: live)
+            if !collapsed {
+                Text("HushKey")
+                    .font(.system(size: 20, weight: .bold))
+                    .tracking(-0.6)
+                    .fixedSize()
+                    .transition(.opacity.combined(with: .offset(x: -6)))
+            }
+        }
+        .padding(.leading, collapsed ? 0 : 5)
+        .frame(maxWidth: .infinity, alignment: collapsed ? .center : .leading)
+        .frame(height: 32)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("HushKey")
     }
 }
 
@@ -157,37 +243,59 @@ enum AppearancePreference: String, CaseIterable, Identifiable {
     }
 }
 
-/// Sidebar navigation row: soft fill when selected, icon bounces on selection.
+/// Sidebar navigation row. The selection fill slides from row to row, the selected glyph fills
+/// in sage and makes its gesture once, hovering plays the gesture, and collapsed rows keep only
+/// the glyph (with the title as a tooltip).
 private struct SidebarRow: View {
     @Environment(AppModel.self) private var model
     var screen: AppModel.Screen
+    var collapsed: Bool
+    var selection: Namespace.ID
     @State private var hovering = false
 
     private var isSelected: Bool { model.screen == screen }
 
     var body: some View {
         Button {
-            model.screen = screen
+            withAnimation(Theme.snappy) { model.screen = screen }
         } label: {
             HStack(spacing: Theme.s3) {
-                Image(systemName: screen.symbol)
-                    .font(.system(size: 16, weight: .regular))
-                    .frame(width: 20)
-                    .symbolEffect(.bounce, value: isSelected)
-                Text(screen.sidebarTitle)
-                    .font(.system(size: 15, weight: isSelected ? .semibold : .regular))
-                Spacer(minLength: 0)
+                Glyph(screen.icon, size: 19)
+                    .foregroundStyle(isSelected ? Theme.ink : hovering ? Theme.ink : Theme.ink2)
+                    .frame(width: 22)
+                if !collapsed {
+                    Text(screen.sidebarTitle)
+                        .font(.system(size: 15.5, weight: isSelected ? .medium : .regular))
+                        .foregroundStyle(Theme.ink)
+                        .lineLimit(1)
+                        .fixedSize()
+                        .transition(.opacity)
+                    Spacer(minLength: 0)
+                }
             }
-            .foregroundStyle(Theme.ink)
-            .padding(.horizontal, Theme.s3 - 2)
+            .hushIconHover(hovering)
+            .hushIconActive(isSelected)
+            .padding(.horizontal, collapsed ? 0 : Theme.s3 - 2)
+            .frame(maxWidth: .infinity, alignment: collapsed ? .center : .leading)
             .frame(height: Theme.sidebarRow)
-            .background(isSelected ? Theme.selection : hovering ? Theme.hover : .clear,
-                        in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
+            .background {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: Theme.r3, style: .continuous)
+                        .fill(Theme.selection)
+                        .matchedGeometryEffect(id: "selection", in: selection)
+                } else if hovering {
+                    RoundedRectangle(cornerRadius: Theme.r3, style: .continuous)
+                        .fill(Theme.hover)
+                        .transition(.opacity)
+                }
+            }
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressStyle())
         .onHover { hovering = $0 }
         .animation(.easeOut(duration: 0.12), value: hovering)
+        .help(collapsed ? screen.sidebarTitle : "")
+        .accessibilityLabel(screen.sidebarTitle)
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
         .accessibilityIdentifier("sidebar.\(screen.id)")
     }
@@ -229,18 +337,18 @@ private struct SetupChecklist: View {
                         Text("\(completed) of \(steps.count)")
                             .font(.system(size: 12, weight: .medium).monospacedDigit())
                             .foregroundStyle(Theme.ink3)
+                            .contentTransition(.numericText(value: Double(completed)))
                     }
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
                             Capsule().fill(Theme.hairline)
-                            Capsule().fill(Theme.ink)
+                            Capsule().fill(Theme.signal)
                                 .frame(width: geo.size.width * CGFloat(completed) / CGFloat(steps.count))
                         }
                     }
                     .frame(height: 3)
-                    .animation(Theme.gentle, value: completed)
                     ForEach(steps) { step in
-                        Button {
+                        ChecklistStep(title: step.title, isDone: step.isDone) {
                             if let permission = step.permission {
                                 request(permission)
                                 return
@@ -248,23 +356,8 @@ private struct SetupChecklist: View {
                             if let section = step.settingsSection {
                                 UserDefaults.standard.set(section.rawValue, forKey: "settingsSection")
                             }
-                            model.screen = step.opens
-                        } label: {
-                            HStack(spacing: Theme.s2) {
-                                Image(systemName: step.isDone ? "checkmark.circle.fill" : "circle")
-                                    .font(.system(size: 14))
-                                    .foregroundStyle(step.isDone ? Theme.ink : Theme.ink3)
-                                    .contentTransition(.symbolEffect(.replace))
-                                Text(step.title)
-                                    .font(.system(size: 13))
-                                    .foregroundStyle(step.isDone ? Theme.ink3 : Theme.ink)
-                                    .strikethrough(step.isDone, color: Theme.ink3)
-                                Spacer(minLength: 0)
-                            }
-                            .contentShape(Rectangle())
+                            withAnimation(Theme.snappy) { model.screen = step.opens }
                         }
-                        .buttonStyle(.plain)
-                        .disabled(step.isDone)
                     }
                 }
                 .padding(Theme.s3)
@@ -298,5 +391,58 @@ private struct SetupChecklist: View {
     private func refresh() {
         microphoneGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
         speechGranted = SFSpeechRecognizer.authorizationStatus() == .authorized
+    }
+}
+
+/// One checklist step: an open ring that fills with a drawn check when done.
+private struct ChecklistStep: View {
+    var title: String
+    var isDone: Bool
+    var perform: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: perform) {
+            HStack(spacing: Theme.s2) {
+                ZStack {
+                    Circle()
+                        .strokeBorder(isDone ? Theme.signal : hovering ? Theme.ink2 : Theme.ink3, lineWidth: 1.3)
+                    Circle().fill(Theme.signal).scaleEffect(isDone ? 1 : 0.2).opacity(isDone ? 1 : 0)
+                    CheckStroke()
+                        .trim(from: 0, to: isDone ? 1 : 0)
+                        .stroke(Theme.inverseInk, style: StrokeStyle(lineWidth: 1.6, lineCap: .round, lineJoin: .round))
+                        .padding(3.5)
+                }
+                .frame(width: 15, height: 15)
+                Text(title)
+                    .font(.system(size: 13))
+                    .foregroundStyle(isDone ? Theme.ink3 : Theme.ink)
+                    .strikethrough(isDone, color: Theme.ink3)
+                Spacer(minLength: 0)
+                if !isDone {
+                    Glyph(.chevronRight, size: 11)
+                        .foregroundStyle(Theme.ink3)
+                        .opacity(hovering ? 1 : 0)
+                        .offset(x: hovering ? 0 : -4)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(isDone)
+        .onHover { hovering = $0 }
+        .animation(Theme.snappy, value: hovering)
+        .animation(Theme.gentle, value: isDone)
+    }
+}
+
+/// The check inside a done checklist ring, drawn on with `trim`.
+private struct CheckStroke: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.midY + rect.height * 0.05))
+        path.addLine(to: CGPoint(x: rect.minX + rect.width * 0.38, y: rect.maxY - rect.height * 0.12))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + rect.height * 0.12))
+        return path
     }
 }

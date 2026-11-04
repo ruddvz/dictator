@@ -10,7 +10,7 @@ struct UseView: View {
                 PageHeader(eyebrow: "", title: "Silent Use",
                            subtitle: "Hold Control in any app and mouth a trained word. Unsure matches are shown faded, never typed.") {
                     if model.insertion.isEnabled {
-                        StatusChip(title: "Types with \(model.insertion.shortcut.label)", systemImage: "checkmark.shield",
+                        StatusChip(title: "Types with \(model.insertion.shortcut.label)", icon: .shield,
                                    tint: Theme.signal)
                     }
                 }
@@ -18,7 +18,7 @@ struct UseView: View {
                 if !model.isMotionInferenceEnabled {
                     LabHero(symbol: "lock.shield", tint: Theme.finishing, title: "Silent Use is locked",
                             message: eligibilityMessage) {
-                        Button(nextActionTitle, systemImage: "arrow.right") {
+                        Button(nextActionTitle, icon: .arrowRight) {
                             if model.motion.status != .streaming {
                                 model.screen = .setup
                             } else if !meetsTemplateProtocol {
@@ -119,7 +119,7 @@ struct UseView: View {
                 } else if model.isMotionInferenceEnabled && model.motion.status == .streaming {
                     autoControls
                 } else {
-                    Label("Auto capture unlocks with the evidence and a live motion stream.", systemImage: "lock.shield")
+                    Label("Auto capture unlocks with the evidence and a live motion stream.", icon: .shield)
                         .font(.hkCallout)
                         .foregroundStyle(Theme.ink2)
                 }
@@ -246,7 +246,7 @@ struct UseView: View {
                         .font(.hkCaption)
                         .foregroundStyle(Theme.ink2)
                     if let issue = model.lastTakeIssue {
-                        Label(issue.message, systemImage: "exclamationmark.triangle")
+                        Label(issue.message, icon: .warning)
                             .font(.hkCaption)
                             .foregroundStyle(Theme.finishing)
                     }

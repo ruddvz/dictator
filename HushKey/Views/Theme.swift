@@ -24,6 +24,8 @@ enum Theme {
     static let pageWidth: CGFloat = 800
     static let homeWidth: CGFloat = 1040     // Wispr's home: 770 column + 24 gap + 248 stats
     static let sidebarWidth: CGFloat = 216
+    static let sidebarCollapsedWidth: CGFloat = 68
+    static let toolbarHeight: CGFloat = 36   // window-control strip above the sheet
     static let sidebarRow: CGFloat = 36
     static let controlHeight: CGFloat = 36
     static let controlRadius: CGFloat = 10
@@ -62,6 +64,8 @@ enum Theme {
     // Motion
     static let snappy = Animation.spring(response: 0.32, dampingFraction: 0.82)
     static let gentle = Animation.spring(response: 0.5, dampingFraction: 0.86)
+    /// Gap between items that enter one after another (sections, rows, heatmap columns).
+    static let stagger: Double = 0.05
 
     private static func dynamic(light: UInt32, dark: UInt32) -> Color {
         Color(nsColor: NSColor(name: nil) { appearance in
@@ -91,6 +95,32 @@ extension Font {
     /// Rounded display face for page titles, hero copy, and big numbers.
     static func display(_ size: CGFloat, weight: Font.Weight = .semibold) -> Font {
         .system(size: size, weight: weight, design: .rounded)
+    }
+}
+
+// MARK: - Motion
+
+/// Content that rises 10 pt and fades in when it first appears, `order` steps after the rest.
+/// Reduce Motion keeps the fade and drops the rise.
+struct Reveal: ViewModifier {
+    var order: Int
+    var distance: CGFloat = 10
+    @State private var shown = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(shown ? 1 : 0)
+            .offset(y: shown || reduceMotion ? 0 : distance)
+            .onAppear {
+                withAnimation(Theme.gentle.delay(Double(order) * Theme.stagger)) { shown = true }
+            }
+    }
+}
+
+extension View {
+    func reveal(_ order: Int = 0, distance: CGFloat = 10) -> some View {
+        modifier(Reveal(order: order, distance: distance))
     }
 }
 
@@ -131,6 +161,8 @@ struct PrimaryButtonStyle: ButtonStyle {
         configuration.label
             .font(.hkControl)
             .foregroundStyle(foreground)
+            .hushIconSize(16)
+            .hushIconHover(hovering && isEnabled)
             .padding(.horizontal, Theme.s4)
             .frame(height: Theme.controlHeight)
             .background(tint.opacity(isEnabled ? (hovering ? 0.88 : 1) : 0.35),
@@ -153,6 +185,8 @@ struct SecondaryButtonStyle: ButtonStyle {
         configuration.label
             .font(.hkControl)
             .foregroundStyle(Theme.ink.opacity(isEnabled ? 1 : 0.4))
+            .hushIconSize(16)
+            .hushIconHover(hovering && isEnabled)
             .padding(.horizontal, Theme.s4)
             .frame(minWidth: minWidth)
             .frame(height: Theme.controlHeight)
@@ -175,6 +209,8 @@ struct DestructiveButtonStyle: ButtonStyle {
         configuration.label
             .font(.hkControl)
             .foregroundStyle(Theme.danger.opacity(isEnabled ? 1 : 0.4))
+            .hushIconSize(16)
+            .hushIconHover(hovering && isEnabled)
             .padding(.horizontal, Theme.s4)
             .frame(height: Theme.controlHeight)
             .background(hovering && isEnabled ? Theme.danger.opacity(0.12) : Theme.hover,
@@ -195,11 +231,26 @@ struct IconButtonStyle: ButtonStyle {
             .labelStyle(.iconOnly)
             .font(.system(size: 15, weight: .medium))
             .foregroundStyle(hovering ? Theme.ink : Theme.ink2)
+            .hushIconSize(17)
+            .hushIconHover(hovering)
             .frame(width: 30, height: 30)
             .background(hovering ? Theme.hover : .clear, in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
             .contentShape(Rectangle())
+            .scaleEffect(configuration.isPressed ? 0.9 : 1)
             .onHover { hovering = $0 }
-            .opacity(configuration.isPressed ? 0.6 : 1)
+            .animation(.easeOut(duration: 0.12), value: hovering)
+            .animation(Theme.snappy, value: configuration.isPressed)
+    }
+}
+
+/// A row or card that gives a little under the pointer when pressed.
+struct PressStyle: ButtonStyle {
+    var scale: CGFloat = 0.98
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? scale : 1)
+            .animation(Theme.snappy, value: configuration.isPressed)
     }
 }
 
@@ -421,11 +472,12 @@ struct AnimatableVector: VectorArithmetic {
 /// Small rounded chip for status and context such as the active writing mode.
 struct StatusChip: View {
     var title: String
-    var systemImage: String
+    var icon: HushIcon
     var tint: Color = Theme.ink2
 
     var body: some View {
-        Label(title, systemImage: systemImage)
+        Label(title, icon: icon)
+            .hushIconSize(14)
             .font(.system(size: 13, weight: .medium))
             .foregroundStyle(tint)
             .padding(.horizontal, Theme.s2 + 2)
@@ -489,6 +541,7 @@ struct ActivityHeatmap: View {
                             .help(day > today ? "" : "\(day.formatted(date: .abbreviated, time: .omitted)): \(count) dictation\(count == 1 ? "" : "s")")
                     }
                 }
+                .reveal(column / 2, distance: 4) // the weeks fill in left to right
             }
         }
         .accessibilityElement(children: .ignore)

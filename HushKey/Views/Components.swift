@@ -1,10 +1,12 @@
 import SwiftUI
 
 struct PageHeader<Actions: View>: View {
+    @Environment(AppModel.self) private var model
     var eyebrow: String
     var title: String
     var subtitle: String
     @ViewBuilder var actions: Actions
+    @State private var hoveringMark = false
 
     var body: some View {
         HStack(alignment: .center, spacing: Theme.s4) {
@@ -13,10 +15,19 @@ struct PageHeader<Actions: View>: View {
                 if eyebrow.hasPrefix("Step") {
                     SectionLabel(title: eyebrow)
                 }
-                Text(title)
-                    .font(.hkTitle1)
-                    .tracking(-0.3)
-                    .accessibilityIdentifier("page.header")
+                HStack(spacing: Theme.s3) {
+                    // The page's glyph, as in the sidebar, filled in sage.
+                    Glyph(model.screen.icon, size: 22, active: true, hovering: hoveringMark)
+                        .foregroundStyle(Theme.signal)
+                        .frame(width: 38, height: 38)
+                        .background(Theme.signalSoft, in: RoundedRectangle(cornerRadius: Theme.r2 - 2, style: .continuous))
+                        .onHover { hoveringMark = $0 }
+                        .reveal(0, distance: 4)
+                    Text(title)
+                        .font(.hkTitle1)
+                        .tracking(-0.3)
+                        .accessibilityIdentifier("page.header")
+                }
                 if !subtitle.isEmpty {
                     Text(subtitle)
                         .font(.hkCallout)
@@ -30,6 +41,7 @@ struct PageHeader<Actions: View>: View {
             HStack(spacing: Theme.s2) { actions }
         }
         .padding(.bottom, Theme.s2)
+        .reveal(0)
     }
 }
 
@@ -98,6 +110,7 @@ struct SettingsGroup<Content: View>: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .reveal(1)
     }
 }
 
@@ -168,6 +181,7 @@ struct ListGroup<Content: View>: View {
             .clipShape(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
                 .strokeBorder(Theme.hairline, lineWidth: 1))
+            .reveal(1)
     }
 }
 
@@ -183,7 +197,7 @@ struct ListRow<Leading: View, Actions: View>: View {
             Spacer(minLength: Theme.s2)
             HStack(spacing: 2) { actions }
                 .opacity(hovering ? 1 : 0)
-                .offset(x: hovering ? 0 : 6)
+                .offset(x: hovering ? 0 : 8)
         }
         .padding(.horizontal, Theme.s4)
         .padding(.vertical, Theme.s3)
@@ -222,8 +236,8 @@ struct MenuPicker<Value: Hashable>: View {
                 Text(options.first(where: { $0.value == selection })?.title ?? "Choose")
                     .lineLimit(1)
                 Spacer(minLength: 0)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 11, weight: .semibold))
+                Glyph(.chevronDown)
+                    .hushIconSize(14)
                     .foregroundStyle(Theme.ink2)
             }
             .font(.system(size: 15))
@@ -296,18 +310,21 @@ struct UnderlineTabs<Value: Hashable>: View {
 
 /// Centered empty state: a soft glyph, one line of title, one line of help.
 struct EmptyState<Action: View>: View {
-    var systemImage: String
+    var icon: HushIcon
     var title: String
     var message: String
     @ViewBuilder var action: Action
+    @State private var shown = false
 
     var body: some View {
         VStack(spacing: Theme.s2) {
-            Image(systemName: systemImage)
-                .font(.system(size: 22, weight: .medium))
+            Glyph(icon, size: 24, active: true)
                 .foregroundStyle(Theme.signal)
-                .frame(width: 48, height: 48)
+                .frame(width: 52, height: 52)
                 .background(Theme.signalSoft, in: Circle())
+                .overlay(Circle().strokeBorder(Theme.signal.opacity(shown ? 0 : 0.3), lineWidth: 1)
+                    .scaleEffect(shown ? 1.5 : 1))
+                .scaleEffect(shown ? 1 : 0.85)
                 .padding(.bottom, Theme.s1)
             Text(title).font(.hkHeadline)
             Text(message)
@@ -319,12 +336,14 @@ struct EmptyState<Action: View>: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, Theme.s6 + 8)
+        .reveal()
+        .onAppear { withAnimation(.easeOut(duration: 0.9).delay(0.1)) { shown = true } }
     }
 }
 
 extension EmptyState where Action == EmptyView {
-    init(systemImage: String, title: String, message: String) {
-        self.init(systemImage: systemImage, title: title, message: message) { EmptyView() }
+    init(icon: HushIcon, title: String, message: String) {
+        self.init(icon: icon, title: title, message: message) { EmptyView() }
     }
 }
 
@@ -371,7 +390,7 @@ struct SignalPlot: View {
                 HStack(spacing: 10) {
                     Text(title).font(.hkCaption.weight(.semibold))
                     ForEach(channels, id: \.name) { channel in
-                        Label(channel.name, systemImage: "circle.fill")
+                        Label(channel.name, icon: .record)
                             .labelStyle(.titleAndIcon)
                             .font(.hkMeta)
                             .foregroundStyle(channel.color)
@@ -443,8 +462,8 @@ struct HoldToCaptureButton: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            Image(systemName: isCapturing ? "record.circle.fill" : "hand.tap")
-                .font(.system(size: 30, weight: .medium))
+            Glyph(isCapturing ? .record : .record)
+                .hushIconSize(38)
                 .symbolEffect(.pulse, isActive: isCapturing)
             Text(isCapturing ? "Capturing…" : title)
                 .font(.hkHeadline)
@@ -495,7 +514,7 @@ struct MotionStatusBadge: View {
             Text(status == .streaming ? "Motion · \(Int(rate.rounded())) Hz" : status.label)
                 .font(.hkCallout.monospacedDigit())
         } icon: {
-            Image(systemName: symbol)
+            SymbolGlyph(symbol, size: 16)
                 .foregroundStyle(color)
         }
         .help("Processed headphone-motion status")
@@ -558,8 +577,8 @@ struct LabProgress: View {
                             Circle()
                                 .fill(step.done ? Theme.signal : current ? Theme.ink : Theme.well)
                             if step.done {
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 10, weight: .bold))
+                                Glyph(.check)
+                                    .hushIconSize(12)
                                     .foregroundStyle(Theme.inverseInk)
                             } else {
                                 Text("\(index + 1)")
@@ -604,7 +623,7 @@ struct HeadStillnessIndicator: View {
 
     var body: some View {
         Label(isMoving ? "Head moving · keep still, move only your jaw" : "Head still",
-              systemImage: isMoving ? "exclamationmark.triangle.fill" : "checkmark.circle")
+              icon: isMoving ? .warning : .checkCircle)
             .font(.hkCaption)
             .foregroundStyle(isMoving ? Theme.finishing : Theme.ink3)
             .contentTransition(.symbolEffect(.replace))
@@ -623,10 +642,9 @@ struct LabHero<Actions: View, Metrics: View>: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: Theme.s5) {
-            Image(systemName: symbol)
-                .font(.system(size: 26, weight: .medium))
+            SymbolGlyph(symbol, size: 30)
                 .foregroundStyle(tint)
-                .contentTransition(.symbolEffect(.replace))
+                .hushIconActive(true)
                 .frame(width: 60, height: 60)
                 .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
             VStack(alignment: .leading, spacing: 6) {
@@ -691,7 +709,7 @@ struct EditorSheet<Content: View>: View {
                     }
                 }
                 Spacer()
-                Button("Close", systemImage: "xmark") { dismiss() }
+                Button("Close", icon: .close) { dismiss() }
                     .labelStyle(.iconOnly)
                     .buttonStyle(IconButtonStyle())
             }
@@ -765,7 +783,7 @@ struct SheetNotice: View {
     var message: String
 
     var body: some View {
-        Label(message, systemImage: "exclamationmark.triangle")
+        Label(message, icon: .warning)
             .font(.hkCallout)
             .foregroundStyle(Theme.danger)
             .transition(.opacity)

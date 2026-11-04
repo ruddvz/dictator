@@ -23,7 +23,7 @@ struct StyleView: View {
                         }
                     }
                 }
-                Label("Code mode is never restyled, and snippets keep the text you wrote.", systemImage: "info.circle")
+                Label("Code mode is never restyled, and snippets keep the text you wrote.", icon: .info)
                     .font(.hkCaption)
                     .foregroundStyle(Theme.ink2)
             }
@@ -33,7 +33,7 @@ struct StyleView: View {
 
     private var appsRow: some View {
         HStack(spacing: Theme.s2) {
-            Image(systemName: context.symbol)
+            SymbolGlyph(context.symbol, size: 17)
                 .foregroundStyle(Theme.signal)
             Text("Applies in")
                 .font(.hkCallout)
@@ -65,7 +65,7 @@ private struct ToneCard: View {
                 HStack {
                     Text(tone.rawValue).font(.hkHeadline).foregroundStyle(Theme.ink)
                     Spacer()
-                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    Glyph(isSelected ? .checkCircle : .record)
                         .foregroundStyle(isSelected ? Theme.signal : Theme.ink3)
                         .contentTransition(.symbolEffect(.replace))
                 }

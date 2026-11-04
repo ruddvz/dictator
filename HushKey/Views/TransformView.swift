@@ -50,7 +50,7 @@ struct TransformView: View {
             VStack(alignment: .leading, spacing: Theme.s6) {
                 PageHeader(eyebrow: "", title: "Transforms",
                            subtitle: "Rewrite a transcript or selected text on this Mac. You always see the result first.") {
-                    Button("New transform", systemImage: "plus") {
+                    Button("New transform", icon: .plus) {
                         styleEditorRequest = WritingStyleEditorRequest(preset: nil)
                     }
                     .buttonStyle(PrimaryButtonStyle())
@@ -63,7 +63,7 @@ struct TransformView: View {
                 if model.canUndoLocalTransform { undoCard }
                 selectedTextEditCard
 
-                Label("Runs on Apple’s on-device model. No cloud fallback.", systemImage: "lock.shield")
+                Label("Runs on Apple’s on-device model. No cloud fallback.", icon: .shield)
                     .font(.hkCaption)
                     .foregroundStyle(Theme.ink3)
             }
@@ -120,10 +120,10 @@ struct TransformView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Group {
                     HStack {
-                        Label("Selection from \(model.selectedTextEditTargetName ?? "another app")", systemImage: "text.cursor")
+                        Label("Selection from \(model.selectedTextEditTargetName ?? "another app")", icon: .cursor)
                             .font(.hkCallout.weight(.semibold))
                         Spacer()
-                        Button(model.selectedTextEditApplied ? "Done" : "Discard", systemImage: "xmark") {
+                        Button(model.selectedTextEditApplied ? "Done" : "Discard", icon: .close) {
                             model.clearSelectedTextEdit()
                         }
                             .disabled(model.isSelectedTextEditCapturing || model.isFinalizingSelectedTextEdit || model.isApplyingSelectedTextEdit)
@@ -164,19 +164,19 @@ struct TransformView: View {
                             Task { await model.previewSelectedTextEdit() }
                         } label: {
                             Label(model.isGeneratingSelectedTextEdit ? "Creating preview…" : "Preview edit",
-                                  systemImage: model.isGeneratingSelectedTextEdit ? "hourglass" : "sparkles")
+                                  icon: model.isGeneratingSelectedTextEdit ? .clock : .sparkle)
                         }
                         .buttonStyle(PrimaryButtonStyle())
                         .disabled(!model.canPreviewSelectedTextEdit)
 
                         if !model.selectedTextEditDraft.isEmpty {
                             if model.selectedTextEditApplied {
-                                Label("Applied once · undo with ⌥⇧U in the target field", systemImage: "checkmark.circle")
+                                Label("Applied once · undo with ⌥⇧U in the target field", icon: .checkCircle)
                                     .font(.hkCaption)
                                     .foregroundStyle(Theme.ink2)
                             } else {
                                 Button("Apply to \(model.selectedTextEditTargetName ?? "original app")",
-                                       systemImage: "text.insert") {
+                                       icon: .insert) {
                                     Task { await model.applySelectedTextEdit() }
                                 }
                                 .buttonStyle(SecondaryButtonStyle())
@@ -199,7 +199,7 @@ struct TransformView: View {
                     }
 
                     if let status = model.selectedTextEditStatus {
-                        Label(status, systemImage: model.selectedTextEditApplied ? "checkmark.circle" : "info.circle")
+                        Label(status, icon: model.selectedTextEditApplied ? .checkCircle : .info)
                             .font(.hkCaption)
                             .foregroundStyle(Theme.ink2)
                             .fixedSize(horizontal: false, vertical: true)
@@ -207,7 +207,7 @@ struct TransformView: View {
                 }
 
                 if !model.localTransformService.modelIsAvailable {
-                    Label(model.localTransformService.availabilityMessage, systemImage: "info.circle")
+                    Label(model.localTransformService.availabilityMessage, icon: .info)
                         .font(.hkCaption)
                         .foregroundStyle(Theme.ink2)
                         .fixedSize(horizontal: false, vertical: true)
@@ -231,7 +231,7 @@ struct TransformView: View {
                 }
             }
             if currentText.isEmpty {
-                EmptyState(systemImage: "text.alignleft", title: "Nothing to transform yet",
+                EmptyState(icon: .list, title: "Nothing to transform yet",
                            message: "Dictate something, or pick a dictation from history to edit it again.") {
                     Button("Go to Dictation") { model.screen = .dictation }
                         .buttonStyle(SecondaryButtonStyle())
@@ -264,7 +264,7 @@ struct TransformView: View {
                             Task { await createPreview() }
                         } label: {
                             Label(model.localTransformService.isTransforming ? "Working…" : "Preview",
-                                  systemImage: model.localTransformService.isTransforming ? "hourglass" : "sparkles")
+                                  icon: model.localTransformService.isTransforming ? .clock : .sparkle)
                         }
                         .buttonStyle(PrimaryButtonStyle())
                         .disabled(!canGenerate)
@@ -328,8 +328,8 @@ struct TransformView: View {
                         styleEditorRequest = WritingStyleEditorRequest(preset: nil)
                     } label: {
                         VStack(alignment: .leading, spacing: Theme.s2) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 14, weight: .semibold))
+                            Glyph(.plus)
+                                .hushIconSize(18)
                                 .frame(width: 28, height: 28)
                                 .background(Theme.well, in: Circle())
                             Spacer(minLength: Theme.s2)
@@ -376,22 +376,22 @@ struct TransformView: View {
                 RowDivider()
                 HStack(spacing: Theme.s2) {
                     if sourceSnapshot != currentText {
-                        Label("Your text changed. Preview again.", systemImage: "exclamationmark.triangle")
+                        Label("Your text changed. Preview again.", icon: .warning)
                             .font(.hkCaption)
                             .foregroundStyle(Theme.finishing)
                     } else if normalizedDraft == normalizedSourceSnapshot {
-                        Label("Same as your text.", systemImage: "checkmark.circle")
+                        Label("Same as your text.", icon: .checkCircle)
                             .font(.hkCaption)
                             .foregroundStyle(Theme.ink2)
                     }
                     Spacer()
-                    Button("Copy", systemImage: "doc.on.doc") {
+                    Button("Copy", icon: .copy) {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(draft, forType: .string)
                         statusMessage = "Preview copied."
                     }
                     .buttonStyle(SecondaryButtonStyle())
-                    Button("Use this", systemImage: "checkmark") {
+                    Button("Use this", icon: .check) {
                         guard model.applyLocalTransform(draft, basedOn: sourceSnapshot) else {
                             statusMessage = currentText == sourceSnapshot
                                 ? "The transcript could not be updated. Try again."
@@ -420,7 +420,7 @@ struct TransformView: View {
     private var undoCard: some View {
         SettingsGroup {
             SettingsRow(title: "Undo the last transform", detail: "Puts your previous text back.") {
-                Button("Undo", systemImage: "arrow.uturn.backward") {
+                Button("Undo", icon: .undo) {
                     model.undoLocalTransform()
                     draft = ""
                     sourceSnapshot = ""
@@ -593,8 +593,9 @@ private struct TransformCard: View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: Theme.s2) {
                 HStack {
-                    Image(systemName: symbol)
-                        .font(.system(size: 14, weight: .semibold))
+                    SymbolGlyph(symbol, size: 17)
+                        .hushIconActive(isSelected)
+                        .hushIconHover(hovering)
                         .foregroundStyle(isSelected ? Theme.signal : Theme.ink2)
                         .frame(width: 28, height: 28)
                         .background(isSelected ? Theme.sheet : Theme.well,

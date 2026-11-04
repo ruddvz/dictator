@@ -117,8 +117,7 @@ struct SilentCaptureHUDView: View {
 
     var body: some View {
         HStack(spacing: Theme.s2) {
-            Image(systemName: symbol)
-                .font(.system(size: 13, weight: .semibold))
+            SymbolGlyph(symbol, size: 16)
                 .foregroundStyle(tint)
                 .symbolEffect(.pulse, isActive: isCapturing)
             Text(text)

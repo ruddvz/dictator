@@ -21,14 +21,14 @@ struct InsightsView: View {
                         .foregroundStyle(Theme.ink2)
                 }
                 HStack(alignment: .top, spacing: Theme.s4) {
-                    speedCard
-                    cleanupCard
-                    wordsCard
+                    speedCard.reveal(1)
+                    cleanupCard.reveal(2)
+                    wordsCard.reveal(3)
                 }
                 .fixedSize(horizontal: false, vertical: true)
                 HStack(alignment: .top, spacing: Theme.s4) {
-                    categoriesCard
-                    streakCard
+                    categoriesCard.reveal(4)
+                    streakCard.reveal(5)
                 }
                 .fixedSize(horizontal: false, vertical: true)
                 Button("Reset insights…") { confirmReset = true }
@@ -89,7 +89,7 @@ struct InsightsView: View {
                 Spacer(minLength: Theme.s2)
                 if let change = ledger.monthChange() {
                     Label(change.formatted(.percent.precision(.fractionLength(0))) + " this month",
-                          systemImage: change >= 0 ? "arrow.up.right" : "arrow.down.right")
+                          icon: change >= 0 ? .arrowUpRight : .arrowUpRight)
                         .font(.hkMeta.weight(.medium))
                         .foregroundStyle(Theme.signal)
                         .padding(.horizontal, Theme.s2)
@@ -181,16 +181,19 @@ private struct Metric: View {
 }
 
 /// A half-circle gauge: hairline track, sage progress.
+/// Typing-pace gauge; the sage arc sweeps up to the pace when the page opens.
 private struct PaceArc: View {
     var progress: Double
+    @State private var shown = 0.0
 
     var body: some View {
         ZStack {
             HalfCircle().stroke(Theme.hairline, style: StrokeStyle(lineWidth: 12, lineCap: .round))
-            HalfCircle().trim(from: 0, to: progress)
+            HalfCircle().trim(from: 0, to: shown)
                 .stroke(Theme.signal, style: StrokeStyle(lineWidth: 12, lineCap: .round))
         }
-        .animation(Theme.gentle, value: progress)
+        .onAppear { withAnimation(.spring(response: 1.1, dampingFraction: 0.85).delay(0.2)) { shown = progress } }
+        .onChange(of: progress) { _, new in withAnimation(Theme.gentle) { shown = new } }
         .accessibilityHidden(true)
     }
 
@@ -210,10 +213,11 @@ private struct CategoryBar: View {
     var words: Int
     var share: Double
     var emphasis: Double
+    @State private var grown = false
 
     var body: some View {
         HStack(spacing: Theme.s3) {
-            Image(systemName: category.symbol)
+            SymbolGlyph(category.symbol, size: 18)
                 .frame(width: 20)
                 .foregroundStyle(Theme.ink2)
             // The bar is a share of its full-width track, so 100 % fills the track.
@@ -221,7 +225,7 @@ private struct CategoryBar: View {
                 let width = max(44, geo.size.width * share)
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .fill(Theme.signal.opacity(emphasis))
-                    .frame(width: width)
+                    .frame(width: grown ? width : 44)
                     .overlay {
                         Text(share.formatted(.percent.precision(.fractionLength(0))))
                             .font(.hkMeta.weight(.semibold))
@@ -230,6 +234,7 @@ private struct CategoryBar: View {
             }
             .frame(height: 28)
             .background(Theme.hairline.opacity(0.5), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .onAppear { withAnimation(.spring(response: 0.9, dampingFraction: 0.86).delay(0.25)) { grown = true } }
             Text("\(words.formatted()) \(category.rawValue)".uppercased())
                 .font(.hkMeta.weight(.medium))
                 .tracking(0.6)

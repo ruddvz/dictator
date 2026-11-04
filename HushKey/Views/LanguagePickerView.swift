@@ -9,7 +9,7 @@ struct LanguageButton: View {
         Button {
             choosing = true
         } label: {
-            Label(DictationLanguage.named(selection).name, systemImage: "globe")
+            Label(DictationLanguage.named(selection).name, icon: .globe)
                 .lineLimit(1)
         }
         .buttonStyle(SecondaryButtonStyle())
@@ -49,7 +49,7 @@ struct LanguagePickerSheet: View {
                         .font(.hkCaption).foregroundStyle(Theme.ink2)
                 }
                 Spacer()
-                Button("Close", systemImage: "xmark") { dismiss() }
+                Button("Close", icon: .close) { dismiss() }
                     .labelStyle(.iconOnly)
                     .buttonStyle(IconButtonStyle())
                     .keyboardShortcut(.cancelAction)
@@ -101,13 +101,13 @@ struct LanguagePickerSheet: View {
 
     private var searchField: some View {
         HStack(spacing: Theme.s2) {
-            Image(systemName: "magnifyingglass").foregroundStyle(Theme.ink3)
+            Glyph(.search).foregroundStyle(Theme.ink3)
             TextField("Search languages", text: $query)
                 .textFieldStyle(.plain)
                 .focused($searchFocused)
                 .accessibilityLabel("Search languages")
             if !query.isEmpty {
-                Button("Clear search", systemImage: "xmark.circle.fill") { query = "" }
+                Button("Clear search", icon: .close) { query = "" }
                     .labelStyle(.iconOnly)
                     .buttonStyle(.plain)
                     .foregroundStyle(Theme.ink3)
@@ -124,7 +124,7 @@ struct LanguagePickerSheet: View {
         let language = DictationLanguage.named(choice)
         return HStack(spacing: Theme.s2) {
             Text("SELECTED").font(.hkMeta.weight(.medium)).tracking(0.8).foregroundStyle(Theme.ink2)
-            Label(language.name, systemImage: "checkmark")
+            Label(language.name, icon: .check)
                 .font(.hkCaption.weight(.medium))
                 .foregroundStyle(Theme.signal)
                 .padding(.horizontal, Theme.s2)
@@ -161,7 +161,7 @@ private struct LanguageTile: View {
                 .lineLimit(1)
                 Spacer(minLength: 0)
                 if isSelected {
-                    Image(systemName: "checkmark").foregroundStyle(Theme.signal)
+                    Glyph(.check).foregroundStyle(Theme.signal)
                 }
             }
             .padding(.horizontal, Theme.s3)

@@ -1,3 +1,4 @@
+import AVFoundation
 import SwiftUI
 
 struct DictationView: View {
@@ -5,14 +6,15 @@ struct DictationView: View {
     @State private var confirmClearHistory = false
     @State private var historySearch = ""
     @State private var searching = false
+    @State private var reader = HistoryReader()
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.s5) {
-                header
+                header.reveal(0)
                 HStack(alignment: .top, spacing: Theme.s4) {
-                    HeroCard()
-                    statsCard.frame(width: 248)
+                    HeroCard().reveal(1)
+                    statsCard.frame(width: 248).reveal(2)
                 }
                 .fixedSize(horizontal: false, vertical: true)
                 if showsComposer {
@@ -20,11 +22,12 @@ struct DictationView: View {
                         .transition(.asymmetric(insertion: .opacity.combined(with: .move(edge: .top)),
                                                 removal: .opacity))
                 }
-                historySection
+                historySection.reveal(3)
             }
             .pageLayout(maxWidth: Theme.homeWidth)
             .animation(Theme.gentle, value: showsComposer)
         }
+        .onDisappear { reader.stop() }
         .scrollIndicators(.automatic)
         .confirmationDialog(!model.dictationHistoryArchiveUnreadable
                             ? "Delete all recent dictations?" : "Remove unreadable dictation archive?",
@@ -47,23 +50,24 @@ struct DictationView: View {
     private var header: some View {
         HStack(alignment: .center, spacing: Theme.s4) {
             VStack(alignment: .leading, spacing: Theme.s2) {
-                HStack(alignment: .center, spacing: Theme.s2) {
-                    Text("Hey \(firstName), \(holds ? "hold" : "press")")
-                    KeycapShortcut(label: model.dictationShortcut.label, size: 17)
-                    Text(holds ? "and just talk" : "to dictate")
+                Text("\(greeting), \(firstName)")
+                    .font(.hkTitle1)
+                    .tracking(-0.3)
+                    .accessibilityIdentifier("page.header")
+                HStack(alignment: .center, spacing: 6) {
+                    Text(holds ? "Hold" : "Press")
+                    KeycapShortcut(label: model.dictationShortcut.label, size: 12)
+                    Text(model.dictationShortcut.usesFunctionKey
+                         ? "in any app and just talk. Double-tap for hands-free."
+                         : holds ? "in any app and just talk. Let go to finish."
+                         : "in any app to start, and again to finish.")
                 }
-                .font(.hkTitle1)
-                .tracking(-0.3)
+                .font(.hkCallout)
+                .foregroundStyle(Theme.ink2)
                 .accessibilityElement(children: .combine)
-                Text(model.dictationShortcut.usesFunctionKey
-                     ? "Works in any app. Double-tap for hands-free. A whisper is enough."
-                     : holds ? "Works in any app. Let go to finish. A whisper is enough."
-                     : "Works in any app. Press again to finish. A whisper is enough.")
-                    .font(.hkCallout)
-                    .foregroundStyle(Theme.ink2)
                 if let problem {
                     HStack(spacing: Theme.s2) {
-                        Label(problem, systemImage: "exclamationmark.triangle.fill")
+                        Label(problem, icon: .warning)
                             .font(.hkCallout.weight(.medium))
                             .foregroundStyle(Theme.finishing)
                             .fixedSize(horizontal: false, vertical: true)
@@ -75,10 +79,22 @@ struct DictationView: View {
                             .controlSize(.small)
                         }
                     }
+                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
+            .animation(Theme.gentle, value: problem)
             Spacer(minLength: Theme.s4)
             recordButton
+        }
+    }
+
+    /// Good morning / afternoon / evening, by the clock on this Mac.
+    private var greeting: String {
+        switch Calendar.current.component(.hour, from: Date()) {
+        case 5..<12: "Good morning"
+        case 12..<17: "Good afternoon"
+        case 17..<22: "Good evening"
+        default: "Hey"
         }
     }
 
@@ -165,12 +181,12 @@ struct DictationView: View {
                     .font(.system(size: 15, weight: .semibold))
                 modeMenu
                 if !model.rawDictationText.isEmpty, let target = model.activeDictationTarget {
-                    StatusChip(title: target, systemImage: "macwindow")
+                    StatusChip(title: target, icon: .window)
                         .help("Dictated from \(target) · \(contextHintSummary)")
                 }
                 Spacer(minLength: Theme.s2)
                 if hasText, !isBusy {
-                    Button("Clear", systemImage: "xmark") { model.clearCurrentDictation() }
+                    Button("Clear", icon: .close) { model.clearCurrentDictation() }
                         .buttonStyle(IconButtonStyle())
                         .help("Clear the current transcript")
                 }
@@ -179,15 +195,15 @@ struct DictationView: View {
             transcriptEditor
 
             HStack(spacing: Theme.s2) {
-                Button("Insert", systemImage: "text.insert") { model.insertDictationText() }
+                Button("Insert", icon: .insert) { model.insertDictationText() }
                     .buttonStyle(PrimaryButtonStyle())
                     .disabled(!model.insertion.isEnabled || isBusy || !hasText)
                     .help(model.insertion.isEnabled ? "Insert into the app you dictated from" : "Turn on insertion in Settings")
-                Button("Copy", systemImage: "doc.on.doc") { model.copyDictationText() }
+                Button("Copy", icon: .copy) { model.copyDictationText() }
                     .buttonStyle(SecondaryButtonStyle())
                     .disabled(isBusy || !hasText)
                 if !isBusy, !model.rawDictationText.isEmpty, model.rawDictationText != model.transcriber.text {
-                    Button("Original", systemImage: "arrow.uturn.backward") { model.restoreRawTranscript() }
+                    Button("Original", icon: .undo) { model.restoreRawTranscript() }
                         .buttonStyle(SecondaryButtonStyle())
                         .help("Restore the unprocessed on-device recognition")
                 }
@@ -217,7 +233,7 @@ struct DictationView: View {
             }
             .pickerStyle(.inline)
         } label: {
-            Label(model.dictationMode.rawValue, systemImage: model.dictationMode.symbol)
+            Label { Text(model.dictationMode.rawValue) } icon: { SymbolGlyph(model.dictationMode.symbol, size: 14) }
                 .font(.system(size: 13, weight: .medium))
         }
         .menuStyle(.borderlessButton)
@@ -256,24 +272,35 @@ struct DictationView: View {
 
     // MARK: Stats
 
-    /// Lifetime numbers from the same ledger as Insights, so the two always agree.
+    /// Lifetime numbers from the same ledger as Insights, so the two always agree. They count
+    /// up from zero the first time Home appears, and roll digit by digit when a dictation lands.
     private var statsCard: some View {
         let ledger = model.usageLedger
         let streak = ledger.currentStreak()
+        let today = ledger.days[UsageLedger.key(for: Date())]?.words ?? 0
         return Button {
-            model.screen = .insights
+            withAnimation(Theme.snappy) { model.screen = .insights }
         } label: {
-            VStack(alignment: .leading, spacing: Theme.s4) {
-                statRow(value: ledger.totalWords.formatted(), label: ledger.totalWords == 1 ? "word dictated" : "words dictated")
-                statRow(value: ledger.wordsPerMinute.map { "\($0)" } ?? "–", label: "words per minute")
-                statRow(value: "\(streak)", label: "day streak")
+            VStack(alignment: .leading, spacing: Theme.s3 + 2) {
+                VStack(alignment: .leading, spacing: 2) {
+                    statRow(value: ledger.totalWords, label: ledger.totalWords == 1 ? "word dictated" : "words dictated", order: 0)
+                    if today > 0 {
+                        Text("+\(today.formatted()) today")
+                            .font(.hkMeta.weight(.semibold))
+                            .foregroundStyle(Theme.signal)
+                            .contentTransition(.numericText(value: Double(today)))
+                            .transition(.opacity)
+                    }
+                }
+                statRow(value: ledger.wordsPerMinute, label: "words per minute", order: 1)
+                statRow(value: streak, label: "day streak", order: 2)
                 Rectangle().fill(Theme.hairline).frame(height: 1)
                 VStack(alignment: .leading, spacing: Theme.s2) {
                     HStack {
                         SectionLabel(title: "Last 12 weeks")
                         Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 10, weight: .semibold))
+                        Glyph(.arrowUpRight)
+                            .hushIconSize(12)
                             .foregroundStyle(Theme.ink3)
                     }
                     ActivityHeatmap(counts: ledger.dailyCounts())
@@ -288,13 +315,10 @@ struct DictationView: View {
         .accessibilityHint("Opens Insights")
     }
 
-    private func statRow(value: String, label: String) -> some View {
+    private func statRow(value: Int?, label: String, order: Int) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: Theme.s2) {
-            Text(value)
+            CountingNumber(value: value, delay: 0.15 + Double(order) * 0.08)
                 .font(.display(28))
-                .monospacedDigit()
-                .contentTransition(.numericText())
-                .animation(Theme.gentle, value: value)
             Text(label)
                 .font(.hkCallout)
                 .foregroundStyle(Theme.ink2)
@@ -312,7 +336,7 @@ struct DictationView: View {
                     if searching || !historySearch.isEmpty {
                         searchField.transition(.opacity.combined(with: .move(edge: .trailing)))
                     } else {
-                        Button("Search", systemImage: "magnifyingglass") { searching = true }
+                        Button("Search", icon: .search) { searching = true }
                             .buttonStyle(IconButtonStyle())
                             .help("Search history")
                     }
@@ -322,7 +346,7 @@ struct DictationView: View {
                         Button(!model.dictationHistoryArchiveUnreadable ? "Delete all history…" : "Remove unreadable archive…",
                                role: .destructive) { confirmClearHistory = true }
                     } label: {
-                        Image(systemName: "ellipsis")
+                        Glyph(.more)
                     }
                     .menuStyle(.button)
                     .buttonStyle(IconButtonStyle())
@@ -366,7 +390,7 @@ struct DictationView: View {
                                 if index > 0 {
                                     Rectangle().fill(Theme.hairline).frame(height: 1)
                                 }
-                                HistoryRow(entry: entry, isLocked: isBusy)
+                                HistoryRow(entry: entry, isLocked: isBusy, reader: reader)
                                     .transition(.opacity.combined(with: .move(edge: .top)))
                             }
                         }
@@ -403,7 +427,7 @@ struct DictationView: View {
 
     private var searchField: some View {
         HStack(spacing: Theme.s2) {
-            Image(systemName: "magnifyingglass").foregroundStyle(Theme.ink3)
+            Glyph(.search).foregroundStyle(Theme.ink3)
             TextField("Search history", text: $historySearch)
                 .textFieldStyle(.plain)
                 .frame(width: 180)
@@ -412,7 +436,7 @@ struct DictationView: View {
                     historySearch = ""
                     searching = false
                 }
-            Button("Close search", systemImage: "xmark.circle.fill") {
+            Button("Close search", icon: .close) {
                 historySearch = ""
                 searching = false
             }
@@ -556,7 +580,7 @@ private struct HeroCard: View {
             .transition(.opacity)
 
             if step.dismissable {
-                Button("Dismiss", systemImage: "xmark") {
+                Button("Dismiss", icon: .close) {
                     withAnimation(Theme.gentle) {
                         dismissedRaw = (dismissedRaw.isEmpty ? "" : dismissedRaw + ",") + step.id
                     }
@@ -609,19 +633,25 @@ private struct HeroBackdrop: View {
     }
 }
 
-/// One saved dictation: time column, text, and actions that appear on hover.
+/// One saved dictation: time column, text, and Wispr-style hover actions (read aloud, copy,
+/// edit again, more). The actions slide in one after another; Copy turns into a check.
 private struct HistoryRow: View {
     @Environment(AppModel.self) private var model
     var entry: DictationHistoryEntry
     var isLocked: Bool
+    var reader: HistoryReader
 
     @State private var isHovering = false
+    @State private var copied = false
+
+    private var isReading: Bool { reader.speakingID == entry.id }
+    private var showsActions: Bool { isHovering || isReading || copied }
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: Theme.s4) {
+        HStack(alignment: .center, spacing: Theme.s4) {
             Text(entry.createdAt.formatted(date: .omitted, time: .shortened))
                 .font(.system(size: 14).monospacedDigit())
-                .foregroundStyle(Theme.ink2)
+                .foregroundStyle(isHovering ? Theme.ink : Theme.ink2)
                 .frame(width: 82, alignment: .leading)
             Text(entry.text)
                 .font(.hkBody)
@@ -629,22 +659,27 @@ private struct HistoryRow: View {
                 .lineLimit(3)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .textSelection(.enabled)
-            HStack(spacing: 0) {
-                action("Copy", "doc.on.doc") { model.copyDictation(entry) }
-                action("Edit again", "square.and.pencil") { model.restoreDictation(entry) }
-                    .disabled(isLocked)
-                if entry.rawText != nil {
-                    action("Restore original recognition", "arrow.uturn.backward") {
-                        model.restoreDictation(entry, useRawText: true)
+            HStack(spacing: 2) {
+                action(isReading ? "Stop reading" : "Read aloud", isReading ? .stop : .play, order: 0) {
+                    reader.toggle(entry)
+                }
+                action(copied ? "Copied" : "Copy", copied ? .check : .copy, order: 1) {
+                    model.copyDictation(entry)
+                    withAnimation(Theme.snappy) { copied = true }
+                    Task {
+                        try? await Task.sleep(for: .seconds(1.4))
+                        withAnimation(Theme.snappy) { copied = false }
                     }
+                }
+                .foregroundStyle(copied ? Theme.signal : Theme.ink2)
+                action("Edit again", .edit, order: 2) { model.restoreDictation(entry) }
                     .disabled(isLocked)
-                }
-                action("Delete", "trash") {
-                    withAnimation(Theme.gentle) { model.deleteDictation(entry) }
-                }
+                moreMenu
+                    .opacity(showsActions ? 1 : 0)
+                    .offset(x: showsActions ? 0 : 8)
+                    .animation(Theme.snappy.delay(showsActions ? 3 * 0.03 : 0), value: showsActions)
             }
-            .opacity(isHovering ? 1 : 0)
-            .offset(x: isHovering ? 0 : 6)
+            .frame(width: 128, alignment: .trailing)
         }
         .padding(.horizontal, Theme.s4)
         .padding(.vertical, 15)
@@ -653,6 +688,7 @@ private struct HistoryRow: View {
         .contentShape(Rectangle())
         .onHover { hovering in withAnimation(.easeOut(duration: 0.14)) { isHovering = hovering } }
         .contextMenu {
+            Button(isReading ? "Stop reading" : "Read aloud") { reader.toggle(entry) }
             Button("Copy") { model.copyDictation(entry) }
             Button("Edit again") { model.restoreDictation(entry) }.disabled(isLocked)
             if entry.rawText != nil {
@@ -664,10 +700,104 @@ private struct HistoryRow: View {
         .accessibilityElement(children: .contain)
     }
 
-    private func action(_ title: String, _ symbol: String, perform: @escaping () -> Void) -> some View {
-        Button(title, systemImage: symbol, action: perform)
+    private var moreMenu: some View {
+        Menu {
+            if let raw = entry.rawText {
+                Button("Restore original recognition", systemImage: "arrow.uturn.backward") {
+                    model.restoreDictation(entry, useRawText: true)
+                }
+                .disabled(isLocked)
+                Button("Copy original recognition", systemImage: "doc.on.clipboard") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(raw, forType: .string)
+                }
+            }
+            Button("Add a word to Vocabulary", systemImage: "character.book.closed") {
+                withAnimation(Theme.snappy) { model.screen = .personalization }
+            }
+            if let duration = entry.duration {
+                Divider()
+                Text("\(entry.wordCount) words · \(Int(duration.rounded())) s")
+            }
+            Divider()
+            Button("Delete", systemImage: "trash", role: .destructive) {
+                reader.stop(entry)
+                withAnimation(Theme.gentle) { model.deleteDictation(entry) }
+            }
+        } label: {
+            Glyph(.more)
+        }
+        .menuStyle(.button)
+        .buttonStyle(IconButtonStyle())
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("More")
+    }
+
+    private func action(_ title: String, _ icon: HushIcon, order: Int, perform: @escaping () -> Void) -> some View {
+        Button(title, icon: icon, action: perform)
             .buttonStyle(IconButtonStyle())
+            .contentTransition(.symbolEffect(.replace))
             .help(title)
+            .opacity(showsActions ? 1 : 0)
+            .offset(x: showsActions ? 0 : 8)
+            .animation(Theme.snappy.delay(showsActions ? Double(order) * 0.03 : 0), value: showsActions)
+    }
+}
+
+/// Reads one saved dictation aloud with the system voice, so you can hear what was typed.
+/// HushKey keeps no audio of past dictations, so this is the "play" Wispr offers.
+@Observable
+final class HistoryReader: NSObject, AVSpeechSynthesizerDelegate {
+    private(set) var speakingID: UUID?
+    @ObservationIgnored private lazy var synthesizer: AVSpeechSynthesizer = {
+        let synthesizer = AVSpeechSynthesizer()
+        synthesizer.delegate = self
+        return synthesizer
+    }()
+
+    func toggle(_ entry: DictationHistoryEntry) {
+        if speakingID == entry.id { stop(); return }
+        synthesizer.stopSpeaking(at: .immediate)
+        speakingID = entry.id
+        synthesizer.speak(AVSpeechUtterance(string: entry.text))
+    }
+
+    func stop(_ entry: DictationHistoryEntry? = nil) {
+        guard entry == nil || entry?.id == speakingID else { return }
+        if speakingID != nil { synthesizer.stopSpeaking(at: .immediate) }
+        speakingID = nil
+    }
+
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        DispatchQueue.main.async { self.speakingID = nil }
+    }
+
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+        DispatchQueue.main.async { if !synthesizer.isSpeaking { self.speakingID = nil } }
+    }
+}
+
+/// A whole number that counts up from zero when it first appears, then rolls to new values.
+private struct CountingNumber: View {
+    var value: Int?
+    var delay: Double = 0
+    @State private var shown: Int = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Text(value == nil ? "–" : shown.formatted())
+            .monospacedDigit()
+            .contentTransition(.numericText(value: Double(shown)))
+            .onAppear {
+                guard let value else { return }
+                if reduceMotion { shown = value; return }
+                withAnimation(.spring(response: 0.9, dampingFraction: 0.9).delay(delay)) { shown = value }
+            }
+            .onChange(of: value) { _, new in
+                withAnimation(Theme.gentle) { shown = new ?? 0 }
+            }
+            .accessibilityLabel(value.map { "\($0)" } ?? "none")
     }
 }
 
@@ -693,13 +823,13 @@ private struct CancelledDictationRow: View {
                     .foregroundStyle(Theme.ink3)
             }
             Spacer(minLength: Theme.s2)
-            Button("Recover", systemImage: "arrow.uturn.backward") {
+            Button("Recover", icon: .undo) {
                 Task { await model.recoverCancelledDictation() }
             }
             .buttonStyle(SecondaryButtonStyle())
             .disabled(isLocked)
             .help("Transcribe it on this Mac and add it to History")
-            Button("Discard", systemImage: "xmark") { withAnimation(Theme.snappy) { model.discardCancelledDictation() } }
+            Button("Discard", icon: .close) { withAnimation(Theme.snappy) { model.discardCancelledDictation() } }
                 .buttonStyle(IconButtonStyle())
                 .help("Forget this recording")
         }

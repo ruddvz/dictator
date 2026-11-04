@@ -32,11 +32,11 @@ struct EvaluateView: View {
                 if let result {
                     EvaluationResultView(result: result)
                 } else if isChecking {
-                    EmptyState(systemImage: "hourglass", title: "Checking your takes…",
+                    EmptyState(icon: .clock, title: "Checking your takes…",
                                message: "Comparing every take with every other, and against chance.")
                         .card(padding: 0, style: .outlined)
                 } else {
-                    EmptyState(systemImage: "chart.bar.xaxis", title: "No result yet",
+                    EmptyState(icon: .evaluate, title: "No result yet",
                                message: meetsTemplateProtocol ? "Pick the motion features below, then evaluate."
                                    : "Record \(AppModel.takesPerWord) takes of each of \(AppModel.minimumWords) words in this condition first.")
                         .card(padding: 0, style: .outlined)
@@ -103,8 +103,8 @@ private struct ReadinessRow: View {
 
     var body: some View {
         SettingsRow(title: title, detail: detail) {
-            Image(systemName: complete ? "checkmark.circle.fill" : "circle.dashed")
-                .font(.system(size: 20))
+            Glyph(complete ? .checkCircle : .record)
+                .hushIconSize(25)
                 .foregroundStyle(complete ? Theme.signal : Theme.ink3)
                 .accessibilityLabel(complete ? "Done" : "Not yet")
         }
@@ -124,7 +124,7 @@ private struct FeatureToggle: View {
             if on { model.featureSet.remove(option) } else { model.featureSet.insert(option) }
         } label: {
             HStack(spacing: 5) {
-                if on { Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)) }
+                if on { Glyph(.check).hushIconSize(12) }
                 Text(title)
             }
             .font(.system(size: 13, weight: .medium))
@@ -147,8 +147,8 @@ private struct EvaluationResultView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.s4) {
                 HStack(spacing: Theme.s3) {
-                    Image(systemName: passesAllChecks ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
-                        .font(.system(size: 22))
+                    Glyph(passesAllChecks ? .checkCircle : .warning)
+                        .hushIconSize(28)
                         .foregroundStyle(passesAllChecks ? Theme.signal : Theme.finishing)
                     Text(verdict)
                         .font(.hkRowTitle)
@@ -169,7 +169,7 @@ private struct EvaluationResultView: View {
                             .foregroundStyle(Theme.ink2)
                     }
                 } else {
-                    Label("Session holdout needs examples from at least two distinct sessions.", systemImage: "info.circle")
+                    Label("Session holdout needs examples from at least two distinct sessions.", icon: .info)
                         .font(.hkCaption)
                         .foregroundStyle(Theme.ink2)
                 }

@@ -48,7 +48,7 @@ struct TrainView: View {
                     .textFieldStyle(.plain)
                     .font(.hkBody)
                     .onSubmit(addWord)
-                Button("Add", systemImage: "plus", action: addWord)
+                Button("Add", icon: .plus, action: addWord)
                     .buttonStyle(IconButtonStyle())
                     .accessibilityLabel("Add word to vocabulary")
                     .disabled(newWord.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -110,26 +110,26 @@ struct TrainView: View {
                 HeadStillnessIndicator(isMoving: model.capture.headIsMoving)
             }
             if let issue = model.lastTakeIssue {
-                Label(issue.message + " It wasn’t saved.", systemImage: "exclamationmark.triangle")
+                Label(issue.message + " It wasn’t saved.", icon: .warning)
                     .font(.hkCaption)
                     .foregroundStyle(Theme.finishing)
             } else if let notice = model.trainingNotice {
-                Label(notice, systemImage: "checkmark.circle")
+                Label(notice, icon: .checkCircle)
                     .font(.hkCaption)
                     .foregroundStyle(Theme.signal)
             }
             HStack(spacing: Theme.s3) {
                 if model.motion.status != .streaming {
-                    Label(model.motion.status.label, systemImage: "headphones")
+                    Label(model.motion.status.label, icon: .connect)
                         .font(.hkCaption)
                         .foregroundStyle(Theme.finishing)
                 }
-                Label(sessionSummary, systemImage: "square.stack.3d.up")
+                Label(sessionSummary, icon: .train)
                     .font(.hkCaption.monospacedDigit())
                     .foregroundStyle(Theme.ink2)
                     .help("A session is one sitting. Evaluate holds out each session in turn, so record every word again in a new session for a fair test.")
                 Spacer()
-                Button("New session", systemImage: "plus") { model.beginNewExperimentSession() }
+                Button("New session", icon: .plus) { model.beginNewExperimentSession() }
                     .buttonStyle(SecondaryButtonStyle())
                     .help("Start a separate sitting, for example after taking your AirPods out and back in.")
             }
@@ -170,7 +170,7 @@ struct TrainView: View {
                         .foregroundStyle(Theme.ink3)
                     Spacer()
                     if flagged > 0 {
-                        Button("Remove \(flagged) flagged", systemImage: "trash") {
+                        Button("Remove \(flagged) flagged", icon: .trash) {
                             model.removeFlaggedTakes(for: word, condition: model.trainingCondition)
                         }
                         .buttonStyle(SecondaryButtonStyle())
@@ -178,7 +178,7 @@ struct TrainView: View {
                     }
                 }
                 if takes.isEmpty {
-                    EmptyState(systemImage: "waveform.path", title: "No takes yet",
+                    EmptyState(icon: .waveform, title: "No takes yet",
                                message: "Hold capture and mouth “\(word)”. Each take appears here.")
                         .card(padding: 0, style: .outlined)
                 } else {
@@ -195,7 +195,7 @@ struct TrainView: View {
                 }
             }
         } else {
-            EmptyState(systemImage: "plus.circle", title: "Start with a word",
+            EmptyState(icon: .plus, title: "Start with a word",
                        message: "Add a short word on the left, then pick it to record takes.")
                 .card(padding: 0, style: .outlined)
         }
@@ -230,7 +230,7 @@ private struct WordRow: View {
                     Spacer()
                     Group {
                         if count >= goal {
-                            Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.signal)
+                            Glyph(.checkCircle).foregroundStyle(Theme.signal)
                         } else {
                             Text("\(count)/\(goal)")
                                 .font(.hkCaption.monospacedDigit())
@@ -258,7 +258,7 @@ private struct WordRow: View {
         .buttonStyle(.plain)
         .overlay(alignment: .topTrailing) {
             if hovering {
-                Button("Delete “\(word)”", systemImage: "trash", action: onDelete)
+                Button("Delete “\(word)”", icon: .trash, action: onDelete)
                     .buttonStyle(IconButtonStyle())
                     .padding(.trailing, Theme.s2)
                     .padding(.top, 3)
@@ -284,7 +284,7 @@ private struct TakeTile: View {
                 .opacity(issue == nil ? 1 : 0.5)
             HStack {
                 if let issue {
-                    Label(issue.label, systemImage: "exclamationmark.triangle")
+                    Label(issue.label, icon: .warning)
                         .font(.hkMeta)
                         .foregroundStyle(Theme.finishing)
                         .help(issue.message)
@@ -294,7 +294,7 @@ private struct TakeTile: View {
                         .foregroundStyle(Theme.ink2)
                 }
                 Spacer()
-                Button("Delete", systemImage: "trash", action: onDelete)
+                Button("Delete", icon: .trash, action: onDelete)
                     .buttonStyle(IconButtonStyle())
                     .opacity(hovering ? 1 : 0)
             }

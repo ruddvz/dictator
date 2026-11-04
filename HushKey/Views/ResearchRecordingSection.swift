@@ -48,7 +48,7 @@ struct ResearchRecordingSection: View {
                             : recorder.start(audio: model.audio, includeMicrophoneAudio: includesMicrophoneAudio)
                     } label: {
                         Label(recorder.isRecording ? "Stop" : "Start",
-                              systemImage: recorder.isRecording ? "stop.fill" : "record.circle")
+                              icon: recorder.isRecording ? .stop : .record)
                     }
                     .buttonStyle(PrimaryButtonStyle(tint: recorder.isRecording ? Theme.danger : Theme.signal))
                     .disabled(!recorder.isRecording && model.motion.status != .streaming)

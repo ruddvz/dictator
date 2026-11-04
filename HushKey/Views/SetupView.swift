@@ -96,26 +96,26 @@ struct SetupView: View {
     private var primaryActionButton: some View {
         switch model.motion.status {
         case .streaming:
-            Button("Continue to Train", systemImage: "arrow.right") {
+            Button("Continue to Train", icon: .arrowRight) {
                 model.screen = .train
             }
                 .buttonStyle(PrimaryButtonStyle())
         case .denied:
-            Button("Open Motion Settings", systemImage: "lock.open") {
+            Button("Open Motion Settings", icon: .lock) {
                 openSystemSettings("x-apple.systempreferences:com.apple.preference.security?Privacy_Motion")
             }
                 .buttonStyle(SecondaryButtonStyle())
         case .waiting:
-            Button("Bluetooth Settings", systemImage: "dot.radiowaves.left.and.right") {
+            Button("Bluetooth Settings", icon: .waveform) {
                 openSystemSettings("x-apple.systempreferences:com.apple.BluetoothSettings")
             }
             .buttonStyle(PrimaryButtonStyle())
-            Button("Sound Settings", systemImage: "speaker.wave.2") {
+            Button("Sound Settings", icon: .speaker) {
                 openSystemSettings("x-apple.systempreferences:com.apple.Sound-Settings.extension")
             }
             .buttonStyle(SecondaryButtonStyle())
         case .unsupported, .error:
-            Button("Open Sound Settings", systemImage: "speaker.wave.2") {
+            Button("Open Sound Settings", icon: .speaker) {
                 openSystemSettings("x-apple.systempreferences:com.apple.Sound-Settings.extension")
             }
             .buttonStyle(SecondaryButtonStyle())

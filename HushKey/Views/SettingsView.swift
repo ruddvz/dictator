@@ -15,12 +15,12 @@ struct SettingsView: View {
         case about = "About"
         var id: String { rawValue }
 
-        var symbol: String {
+        var icon: HushIcon {
             switch self {
-            case .general: "slider.horizontal.3"
-            case .insertion: "character.cursor.ibeam"
-            case .data: "lock.shield"
-            case .about: "info.circle"
+            case .general: .settings
+            case .insertion: .cursor
+            case .data: .shield
+            case .about: .info
             }
         }
     }
@@ -63,31 +63,41 @@ struct SettingsView: View {
 private struct SettingsNav: View {
     @Binding var section: SettingsView.Section
     @State private var hovered: SettingsView.Section?
+    @Namespace private var selection
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(SettingsView.Section.allCases) { item in
                 let selected = item == section
                 Button {
-                    section = item
+                    withAnimation(Theme.snappy) { section = item }
                 } label: {
                     HStack(spacing: Theme.s3) {
-                        Image(systemName: item.symbol)
-                            .font(.system(size: 15, weight: .medium))
-                            .frame(width: 18)
-                            .foregroundStyle(selected ? Theme.ink : Theme.ink2)
+                        Glyph(item.icon, size: 18)
+                            .frame(width: 20)
+                            .foregroundStyle(selected || hovered == item ? Theme.ink : Theme.ink2)
+                            .hushIconActive(selected)
+                            .hushIconHover(hovered == item)
                         Text(item.rawValue)
-                            .font(.system(size: 15, weight: selected ? .semibold : .regular))
+                            .font(.system(size: 15, weight: selected ? .medium : .regular))
                             .foregroundStyle(Theme.ink)
                         Spacer(minLength: 0)
                     }
                     .padding(.horizontal, Theme.s3 - 2)
                     .frame(height: Theme.sidebarRow)
-                    .background(selected ? Theme.selection : (hovered == item ? Theme.hover : .clear),
-                                in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
+                    .background {
+                        if selected {
+                            RoundedRectangle(cornerRadius: Theme.r3, style: .continuous)
+                                .fill(Theme.selection)
+                                .matchedGeometryEffect(id: "selection", in: selection)
+                        } else if hovered == item {
+                            RoundedRectangle(cornerRadius: Theme.r3, style: .continuous)
+                                .fill(Theme.hover)
+                        }
+                    }
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressStyle())
                 .onHover { hovered = $0 ? item : (hovered == item ? nil : hovered) }
             }
         }
@@ -352,8 +362,8 @@ private struct DataSettings: View {
 private struct PrivacyPromise: View {
     var body: some View {
         HStack(spacing: Theme.s4) {
-            Image(systemName: "lock.shield.fill")
-                .font(.system(size: 22, weight: .medium))
+            Glyph(.shield)
+                .hushIconSize(28)
                 .foregroundStyle(Theme.signal)
                 .frame(width: 48, height: 48)
                 .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
@@ -501,10 +511,10 @@ private struct DictationAppProfilesEditor: View {
         ForEach(model.dictationAppProfiles) { profile in
             SettingsRow(title: profile.appName, detail: "\(profile.mode.rawValue) · \(profile.bundleIdentifier)") {
                 HStack(spacing: 2) {
-                    Button("Edit", systemImage: "pencil") { load(profile) }
+                    Button("Edit", icon: .edit) { load(profile) }
                         .buttonStyle(IconButtonStyle())
                         .help("Edit \(profile.appName) profile")
-                    Button("Delete", systemImage: "trash") {
+                    Button("Delete", icon: .trash) {
                         model.deleteDictationAppProfile(bundleIdentifier: profile.bundleIdentifier)
                         if editingIdentifier == profile.id { resetForm() }
                     }
@@ -521,7 +531,7 @@ private struct DictationAppProfilesEditor: View {
                         Button(app.name) { appName = app.name; bundleIdentifier = app.bundleIdentifier }
                     }
                 } label: {
-                    Label("Common apps", systemImage: "square.grid.2x2")
+                    Label("Common apps", icon: .grid)
                         .labelStyle(.titleAndIcon)
                 }
                 .menuStyle(.button)
@@ -544,7 +554,7 @@ private struct DictationAppProfilesEditor: View {
                                 Button(language.name) { languageIdentifier = language.identifier }
                             }
                         } label: {
-                            Label(languageTitle, systemImage: "globe")
+                            Label(languageTitle, icon: .globe)
                         }
                         .menuStyle(.button)
                         .buttonStyle(SecondaryButtonStyle())
@@ -557,7 +567,7 @@ private struct DictationAppProfilesEditor: View {
                             Button(preset.name) { writingStylePresetID = preset.id }
                         }
                     } label: {
-                        Label(writingStyleTitle, systemImage: "textformat")
+                        Label(writingStyleTitle, icon: .style)
                     }
                     .menuStyle(.button)
                     .buttonStyle(SecondaryButtonStyle())
