@@ -141,11 +141,14 @@ func drawAppIcon(_ context: CGContext, side: CGFloat) {
     context.restoreGState()
 }
 
-/// Template glyph: the ribbon alone, on an 18 pt canvas. While dictating it opens into a fuller lens.
+/// Template glyph: the app icon's ribbon at the same proportions (624 × 320), 17 pt wide on an
+/// 18 pt canvas. While dictating it opens into a fuller lens.
 func drawMenuBarMark(_ context: CGContext, live: Bool) {
+    let height: CGFloat = 17 * 320 / 624
+    let rect = CGRect(x: 0.5, y: 9 - height / 2, width: 17, height: height)
     context.setFillColor(hex(0x000000))
-    context.addPath(ribbon(in: CGRect(x: 0.5, y: 2.5, width: 17, height: 13),
-                           amplitude: live ? 0.14 : 0.23, thickness: live ? 0.36 : 0.28, taper: live ? 1 : 1.1))
+    context.addPath(live ? ribbon(in: rect, amplitude: 0.16, thickness: 0.38, taper: 1)
+                         : ribbon(in: rect))
     context.fillPath()
 }
 

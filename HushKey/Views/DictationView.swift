@@ -108,7 +108,7 @@ struct DictationView: View {
         } label: {
             HStack(spacing: Theme.s2) {
                 LiveLevel(model.audio) { MorphIcon(phase: morphPhase, level: $0, lineWidth: 1.8) }
-                    .frame(width: 16, height: 16)
+                    .frame(width: 20, height: 20)
                 Text(isFinishing ? "Transcribing"
                      : model.audio.isRunning ? "Stop"
                      : model.isStartingDictation || model.isStartingSelectedTextEdit ? "Cancel"

@@ -329,9 +329,12 @@ struct MorphIcon: View {
             let point: (Double, Double)
             switch phase {
             case .idle:
-                // Out along the hush and back over itself, so listening can open it into a lens.
+                // The app icon's ribbon: out along its top edge and back along its bottom, a hair
+                // apart, so the stroke tapers like the icon and listening can open it into a lens.
                 let u = t <= 0.5 ? 2 * t : 2 - 2 * t
-                point = (0.14 + 0.72 * u, 0.5 + 0.07 * sin(2 * .pi * u))
+                let side = t <= 0.5 ? -1.0 : 1.0
+                let half = 0.035 * pow(sin(.pi * u), 1.3)
+                point = (0.1 + 0.8 * u, 0.5 - 0.09 * sin(2 * .pi * u) + side * half)
             case .listening:
                 // `BreathRibbon` as an outline: along the top edge, back along the bottom.
                 let u = t <= 0.5 ? 2 * t : 2 - 2 * t

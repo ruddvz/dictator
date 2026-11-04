@@ -53,6 +53,7 @@
 - App icon: the breath ribbon in sage on a fog squircle (`sheet` → `selection`), lit from the upper left with a soft sheen and a sage shadow. A fuller ribbon is drawn for 16 and 32 px. A white top lip and a faint bottom line keep the light icon outlined on a light Dock. Drawn by `Scripts/generate-app-icon.swift` (run by `package-app.sh`); no third-party artwork.
 - Menu bar: the ribbon alone as a template glyph (17 × 13 pt in an 18 pt canvas), replacing the thin outline that read as an edge by the notch. While dictating it switches to `HushKeyMenuBarLive`, a fuller lens.
 - Sidebar brand row: the same ribbon in `signal` beside "HushKey", centred in the sidebar; it switches to the lens while dictating.
+- One wave everywhere: the menu bar and sidebar glyph use the app icon's ribbon at its exact proportions (624 × 320, same S, thickness and taper), and `MorphIcon`'s resting hush now traces that ribbon (rising first, tapered) instead of a shorter flat line. The Dictate button's icon grew from 16 to 20 pt so its wave reads at the same length.
 - Explored and dropped with the user: keycap with ribbon, a key with meter-bar bitting (read as a password manager), a "shh" finger, an "h" monogram, and calm-face marks. The user chose the sage ribbon on fog.
 - Tests: 216 run, 3 skipped, 0 failed. Release package built and checked in the real menu bar (dark), the sidebar, and the compiled `AppIcon.icns`.
 
