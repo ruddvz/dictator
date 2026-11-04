@@ -33,9 +33,10 @@ struct ContentView: View {
         .padding(.top, Theme.toolbarHeight)
         .overlay(alignment: .top) {
             HubToolbar(collapsed: $collapsed, showsShortcuts: $showsShortcuts)
-                .frame(height: Theme.toolbarHeight - Theme.s2)
+                .frame(height: Theme.titlebarHeight)
         }
         .background(Theme.paper)
+        .background(TrafficLightInset(height: Theme.titlebarHeight))
         .ignoresSafeArea()
         .foregroundStyle(Theme.ink)
         .font(.hkBody)

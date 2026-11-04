@@ -1,5 +1,15 @@
 # HushKey progress
 
+## Completed: smooth fn start, typing restored, Flow-style notices and title strip (2026-11-04)
+
+- **fn start glitch.** Measured fn → listening at 280–710 ms, with the audio engine build/start (116–391 ms), cue, mute and Apple Intelligence prewarm on the main thread, while the pill's panel resized and briefly drew the old pill up and to the left. Now: the panel keeps a fixed minimum size (220 × 84, transparent) so idle → hover → recording never resizes it; the engine starts and stops on a serial queue; cues play on their own queue; the prewarm runs after the mic opens; "Waiting for microphone" and the sweeping ribbon appear only after 600 ms. Each start step is logged: `/usr/bin/log show --predicate 'subsystem == "com.ruddvz.hushkey" && category == "start"' --last 10m`.
+- **Typing restored.** The audit's Parakeet review gate required a 0.45 peak; real speech peaked at 0.41–0.43 at 95–100 % confidence, so most dictations went to the copy card. The floor is now `SpeechEnvelope.gate` (0.06); confidence below 0.35 still goes to review.
+- **Notices like Flow's.** Errors are a dark card above the resting pill: icon and title, a round ×, detail, capsule actions at the bottom right (filled primary, outlined secondary). The × of the cancelled notice (5 s) and of the finished copy card (8 s) is a draining ring that closes the card; hovering the card holds it. Errors that keep audio for Retry, Paste again or a permission fix never close themselves, because dismissing drops the retry audio.
+- **Title strip like Flow's.** `Theme.toolbarHeight` 46, `titlebarHeight` 42; traffic lights moved to centre 21 pt down (`TrafficLightInset`); sidebar toggle 99 pt in; theme / bell / profile 36 pt apart, 22 pt from the edge. Measured from a capture: within 1 pt of Flow.
+- **Menu bar first.** Dock icon only while the hub is open; Settings → System → "Always show in Dock" keeps the old behaviour.
+- Research on TypeWhisper, FreeFlow, OpenWhispr, VoiceInk and Flow: `docs/research/INSTANT_START_AND_MENU_BAR.md`.
+- **Verified:** 317 tests, 3 skipped, 0 failures; packaged; the user confirmed the fn start works; title strip measured from a window capture. **Not verified by eye:** the notice card and countdown ring (needs an error or a no-text-box dictation), the Dock icon leaving when the window closes, light mode of the title strip.
+
 ## Completed: 60-second first run (2026-11-04)
 
 - **What:** a five-step sheet over the hub (`Views/OnboardingView.swift`, logic in `Onboarding/OnboardingFlow.swift`), per row 6 of `docs/WISPR_FLOW_FULL_AUDIT.md`. No account.

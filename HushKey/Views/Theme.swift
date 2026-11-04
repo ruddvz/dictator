@@ -25,7 +25,8 @@ enum Theme {
     static let homeWidth: CGFloat = 1040     // Wispr's home: 770 column + 24 gap + 248 stats
     static let sidebarWidth: CGFloat = 216
     static let sidebarCollapsedWidth: CGFloat = 68
-    static let toolbarHeight: CGFloat = 36   // window-control strip above the sheet
+    static let toolbarHeight: CGFloat = 46   // window-control strip above the sheet (Flow: sheet ~46 pt down)
+    static let titlebarHeight: CGFloat = 42  // traffic lights and toolbar icons centre 21 pt down, as in Flow
     static let sidebarRow: CGFloat = 36
     static let controlHeight: CGFloat = 36
     static let controlRadius: CGFloat = 10

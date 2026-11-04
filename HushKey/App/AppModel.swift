@@ -2881,7 +2881,8 @@ final class AppModel {
         let token = cancelNoticeToken
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(5))
-            guard let self, token == cancelNoticeToken, dictationNotice?.kind == .cancelled else { return }
+            // With the pill on screen its countdown ring closes the notice, and waits while hovered.
+            guard let self, !showsFloatingPill, token == cancelNoticeToken, dictationNotice?.kind == .cancelled else { return }
             dismissDictationNotice()
         }
     }
