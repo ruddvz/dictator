@@ -29,6 +29,11 @@ struct HushKeyApp: App {
         }
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentMinSize)
+        .commands {
+            CommandGroup(after: .help) {
+                Button("HushKey Setup Tour…") { appDelegate.model.openOnboarding() }
+            }
+        }
 
         MenuBarExtra {
             HushKeyMenu(model: appDelegate.model)

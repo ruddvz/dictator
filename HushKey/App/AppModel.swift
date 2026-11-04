@@ -350,6 +350,11 @@ final class AppModel {
         }
     }
     private(set) var dictationResultGeneration = 0
+    /// The first-run tour is on screen (shown once on first launch; reopened from Help or Get set up).
+    var showsOnboarding = false
+    /// The tour's practice field is waiting for a dictation: while HushKey is in front, a finished
+    /// dictation stays in the app for the field to show, instead of raising the pill's card.
+    @ObservationIgnored var practiceKeepsDictationInApp = false
     /// Whether the running or last dictation has a text field to type into.
     private(set) var dictationHasTarget = false
     /// The app dictation started in, used to paste when its field refuses direct typing.
@@ -2280,7 +2285,7 @@ final class AppModel {
                 await typeFinishedDictation(finished)
                 // Typing didn't go through: keep the words on screen with Copy beside the notice.
                 if !didInsertCurrentDictation, dictationNotice != nil { showsFinishedTranscript = true }
-            } else if finishesWithoutTyping {
+            } else if finishesWithoutTyping || (practiceKeepsDictationInApp && NSApp.isActive) {
                 showsFinishedTranscript = false
             } else if !(await typeIntoFieldFocusedNow(finished)) {
                 showsFinishedTranscript = true
@@ -3007,6 +3012,14 @@ final class AppModel {
     func openSoundInputSettings() {
         guard let url = URL(string: "x-apple.systempreferences:com.apple.Sound-Settings.extension?input") else { return }
         NSWorkspace.shared.open(url)
+    }
+
+    /// Opens the first-run tour again, bringing the window forward if it was closed.
+    func openOnboarding() {
+        showsOnboarding = true
+        // An open hub shows the tour as a sheet; only open a window when there isn't one.
+        if !NSApp.windows.contains(where: { $0.isVisible && $0.canBecomeMain }) { openMainWindow?() }
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     /// Brings HushKey forward on Meeting notes, from the pill.
