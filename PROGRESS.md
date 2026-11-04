@@ -1,5 +1,15 @@
 # HushKey progress
 
+## Completed: Electron & Chromium paste delivery reliability (2026-11-04)
+
+- **Eliminated false-positive error cards in web & Electron apps (`AppModel.swift`, `TextInsertionService.swift`):**
+  - Live system log auditing of user dictation into Antigravity IDE revealed that Electron/Chromium fields do not reliably update `kAXValueAttribute` synchronously on `⌘V` paste.
+  - In `AppModel.typeFinishedDictation`: Treated `.unconfirmed` from `insertion.paste` as successful delivery (`didInsertCurrentDictation = true`), preventing the app from throwing false error notices ("Check the field first") when text was successfully pasted via `⌘V`.
+  - In `TextInsertionService.swift`: Added an 80ms safeguard delay before restoring original clipboard contents when verification is `.unconfirmed`, ensuring slower Electron apps have completely consumed the pasteboard event before restoration.
+- **Verification:**
+  - Full unit test suite: **327 passed, 3 skipped, 0 failures** in ~10s.
+  - Universal binary built and signed via `Scripts/package-app.sh`.
+
 ## Completed: smoothness & latency performance overhaul (2026-11-04)
 
 - **Eliminated Floating Pill window resizing jank (`FloatingPill.swift`):**

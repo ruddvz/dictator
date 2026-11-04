@@ -2372,35 +2372,28 @@ final class AppModel {
                 didInsertCurrentDictation = true
                 return
             }
-            if insertion.requiresReviewAfterInsertion {
-                dictationNotice = DictationRecovery.pasteUnconfirmed(insertion.status, canPasteAgain: false)
-                return
-            }
             // The same field is still focused but refused direct typing: paste instead.
             // If focus moved, never paste somewhere else; offer Paste again.
             if insertion.focusState(of: target).fieldIsFocused,
                let app = dictationTargetApp, let pasteTarget = capturedPasteTarget {
                 switch await insertion.paste(text, into: app, target: pasteTarget) {
-                case .inserted:
+                case .inserted, .unconfirmed:
                     didInsertCurrentDictation = true
-                    return
-                case .unconfirmed:
-                    dictationNotice = DictationRecovery.pasteUnconfirmed(
-                        insertion.status, canPasteAgain: capturedPasteTarget != nil)
                     return
                 case .unavailable:
                     break
                 }
             }
+            if insertion.requiresReviewAfterInsertion {
+                didInsertCurrentDictation = true
+                return
+            }
             dictationNotice = DictationRecovery.insertionFailed(
                 insertion.status, canPasteAgain: capturedInsertionTarget != nil || capturedPasteTarget != nil)
         } else if let app = dictationTargetApp, let pasteTarget = capturedPasteTarget {
             switch await insertion.paste(text, into: app, target: pasteTarget) {
-            case .inserted:
+            case .inserted, .unconfirmed:
                 didInsertCurrentDictation = true
-            case .unconfirmed:
-                dictationNotice = DictationRecovery.pasteUnconfirmed(
-                    insertion.status, canPasteAgain: capturedPasteTarget != nil)
             case .unavailable:
                 showsFinishedTranscript = true
             }

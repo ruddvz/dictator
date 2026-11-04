@@ -435,6 +435,9 @@ final class TextInsertionService {
             originalValue: target.fieldValue, expectedValue: expectedValue) {
             self.pasteObservation(target: target, in: app)
         }
+        if verification != .confirmed {
+            try? await Task.sleep(for: .milliseconds(80))
+        }
         let restored = saved.restore(to: pasteboard, ifChangeCountIs: ours)
         guard verification == .confirmed else {
             logPasteMismatch(verification, target: target, expectedValue: expectedValue, insertedText: text, in: app)
