@@ -205,32 +205,38 @@ struct MicCheck: Equatable, Sendable {
 }
 
 /// The dictation shortcut as keycaps, and which of them are held right now.
-struct ShortcutKeycaps: Equatable, Sendable {
-    struct Cap: Equatable, Identifiable, Sendable {
+struct ShortcutKeycaps: Equatable {
+    struct Cap: Equatable, Identifiable {
         var id: String { glyph }
         var glyph: String
-        /// The modifier this cap stands for; nil for the final, ordinary key.
+        /// The modifier this cap stands for; nil for the final key or mouse button.
         var modifier: NSEvent.ModifierFlags.RawValue?
     }
 
     let shortcut: DictationShortcut
     let caps: [Cap]
+    /// The key the last cap stands for; nil for fn and mouse buttons, which have no key code
+    /// to watch (a mouse button lights only while the model reports it held).
+    let keyCode: UInt16?
 
     init(_ shortcut: DictationShortcut) {
         self.shortcut = shortcut
-        caps = KeycapShortcut.keys(in: shortcut.label).map { glyph in
-            Cap(glyph: glyph, modifier: Self.modifier(for: glyph)?.rawValue)
-        }
-    }
-
-    static func modifier(for glyph: String) -> NSEvent.ModifierFlags? {
-        switch glyph {
-        case "fn": .function
-        case "⌥": .option
-        case "⇧": .shift
-        case "⌃": .control
-        case "⌘": .command
-        default: nil
+        let combo = shortcut.combo
+        switch combo.trigger {
+        case .functionKey:
+            caps = [Cap(glyph: "fn", modifier: NSEvent.ModifierFlags.function.rawValue)]
+            keyCode = nil
+        case .mouse:
+            caps = [Cap(glyph: combo.label, modifier: nil)]
+            keyCode = nil
+        case .key(let code):
+            // One cap per modifier in macOS order (⌃⌥⇧⌘), then the key itself, kept whole ("F5", "Space").
+            let order: [(KeyCombo.Modifiers, NSEvent.ModifierFlags, String)] = [
+                (.control, .control, "⌃"), (.option, .option, "⌥"), (.shift, .shift, "⇧"), (.command, .command, "⌘"),
+            ]
+            caps = order.filter { combo.modifiers.contains($0.0) }.map { Cap(glyph: $0.2, modifier: $0.1.rawValue) }
+                + [Cap(glyph: KeyCombo.keyName(for: code), modifier: nil)]
+            keyCode = UInt16(truncatingIfNeeded: code)
         }
     }
 

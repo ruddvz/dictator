@@ -446,7 +446,7 @@ private struct ShortcutStep: View {
                 }
             }
             .padding(.top, Theme.s4)
-            Text("You can change it later in Settings → Dictation.")
+            Text("You can change it later in Settings → Shortcuts.")
                 .font(.hkCaption).foregroundStyle(Theme.ink3)
                 .padding(.top, Theme.s2)
         }
@@ -469,12 +469,12 @@ private struct ShortcutStep: View {
     /// Watches keys only while this window is in front; nothing is recorded or kept.
     private func install(_ keycaps: ShortcutKeycaps) {
         uninstall()
-        let keyCode = UInt16(truncatingIfNeeded: keycaps.shortcut.keyCode)
+        let keyCode = keycaps.keyCode
         var keyDown = false
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged, .keyDown, .keyUp]) { event in
             switch event.type {
-            case .keyDown where event.keyCode == keyCode: keyDown = true
-            case .keyUp where event.keyCode == keyCode: keyDown = false
+            case .keyDown where keyCode != nil && event.keyCode == keyCode: keyDown = true
+            case .keyUp where keyCode != nil && event.keyCode == keyCode: keyDown = false
             default: break
             }
             let now = keycaps.lit(flags: event.modifierFlags, keyDown: keyDown)
@@ -513,7 +513,8 @@ private struct LiveKeycap: View {
             }
         }
         .foregroundStyle(lit ? Theme.inverseInk : Theme.ink)
-        .frame(width: glyph.count > 1 || glyph == "↩" ? 96 : 72, height: 72)
+        .frame(minWidth: glyph.count > 1 || glyph == "↩" ? 96 : 72, minHeight: 72)
+        .padding(.horizontal, glyph.count > 2 ? Theme.s3 : 0)
         .background {
             ZStack {
                 shape.fill(lit ? Theme.signal : Theme.keycapEdge).offset(y: lit ? 1 : 4)

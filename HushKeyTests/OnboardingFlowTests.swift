@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import XCTest
 @testable import HushKey
 
@@ -162,7 +163,7 @@ final class OnboardingFlowTests: XCTestCase {
     }
 
     func testChordLightsEachCapAndCompletesOnlyWithAllHeld() {
-        let caps = ShortcutKeycaps(.optionShiftD)
+        let caps = ShortcutKeycaps(DictationShortcut(KeyCombo(.key(UInt32(kVK_ANSI_D)), modifiers: [.option, .shift])))
         XCTAssertEqual(caps.caps.map(\.glyph), ["⌥", "⇧", "D"])
         let optionOnly = caps.lit(flags: .option, keyDown: false)
         XCTAssertEqual(optionOnly, ["⌥"])
@@ -172,7 +173,23 @@ final class OnboardingFlowTests: XCTestCase {
         let all = caps.lit(flags: [.option, .shift], keyDown: true)
         XCTAssertEqual(all, ["⌥", "⇧", "D"])
         XCTAssertTrue(caps.isComplete(all))
-        XCTAssertEqual(ShortcutKeycaps(.controlShiftD).lit(flags: [.option, .shift], keyDown: true), ["⇧", "D"])
+        let controlShiftD = ShortcutKeycaps(DictationShortcut(KeyCombo(.key(UInt32(kVK_ANSI_D)), modifiers: [.control, .shift])))
+        XCTAssertEqual(controlShiftD.lit(flags: [.option, .shift], keyDown: true), ["⇧", "D"])
+    }
+
+    func testRecordedKeysStayWholeAndMouseButtonsHaveNoKeyCode() {
+        let f5 = ShortcutKeycaps(DictationShortcut(KeyCombo(.key(UInt32(kVK_F5)), modifiers: [.command])))
+        XCTAssertEqual(f5.caps.count, 2)
+        XCTAssertEqual(f5.caps.first?.glyph, "⌘")
+        XCTAssertEqual(f5.caps.last?.glyph, KeyCombo.keyName(for: UInt32(kVK_F5)))
+        XCTAssertEqual(f5.keyCode, UInt16(kVK_F5))
+        XCTAssertNil(ShortcutKeycaps(.fn).keyCode)
+        if let mouse = KeyCombo(mouseButton: 3) {
+            let caps = ShortcutKeycaps(DictationShortcut(mouse))
+            XCTAssertEqual(caps.caps.count, 1)
+            XCTAssertNil(caps.keyCode, "A mouse button must never light on a key with code 0")
+            XCTAssertEqual(caps.lit(flags: [], keyDown: false), [])
+        }
     }
 
     // MARK: Practice and whisper
