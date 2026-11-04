@@ -81,20 +81,24 @@ final class HushKeyAppDelegate: NSObject, NSApplicationDelegate {
     /// Tracks whether the hub window is open, so the Dock icon can follow it (menu bar first).
     private func observeHubWindows() {
         let center = NotificationCenter.default
-        for name in [NSWindow.didBecomeKeyNotification, NSWindow.didDeminiaturizeNotification] {
+        for name in [NSWindow.didBecomeKeyNotification, NSWindow.didBecomeMainNotification, NSWindow.didDeminiaturizeNotification] {
             center.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
-                guard (note.object as? NSWindow)?.canBecomeMain == true else { return }
+                guard let window = note.object as? NSWindow else { return }
+                guard window.sheetParent == nil else { return }
+                guard window.canBecomeMain else { return }
                 MainActor.assumeIsolated { self?.model.isHubWindowOpen = true }
             }
         }
         // After a close or minimise, look again once AppKit has updated its window list.
         for name in [NSWindow.willCloseNotification, NSWindow.didMiniaturizeNotification] {
             center.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
-                guard let closing = note.object as? NSWindow, closing.canBecomeMain else { return }
+                guard let closing = note.object as? NSWindow else { return }
+                guard closing.sheetParent == nil else { return }
+                guard closing.canBecomeMain else { return }
                 DispatchQueue.main.async {
                     MainActor.assumeIsolated {
                         self?.model.isHubWindowOpen = NSApp.windows.contains {
-                            $0 !== closing && $0.isVisible && !$0.isMiniaturized && $0.canBecomeMain
+                            $0 !== closing && $0.sheetParent == nil && $0.isVisible && !$0.isMiniaturized && $0.canBecomeMain
                         }
                     }
                 }
@@ -120,15 +124,26 @@ private struct MenuBarLabel: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        // The breath ribbon; it opens into a fuller lens while dictating.
-        Image(model.audio.isRunning ? "HushKeyMenuBarLive" : "HushKeyMenuBar")
-            .accessibilityLabel("HushKey")
-            .task {
-                model.openMainWindow = {
-                    openWindow(id: "main")
-                    NSApp.activate(ignoringOtherApps: true)
-                }
+        HStack(spacing: 3) {
+            Image(model.audio.isRunning ? "HushKeyMenuBarLive" : "HushKeyMenuBar")
+            if model.audio.isRunning {
+                Circle()
+                    .fill(Theme.signal)
+                    .frame(width: 5, height: 5)
+            } else if model.isFinalizingDictation || model.transcriber.isFinalizing {
+                Circle()
+                    .fill(Theme.finishing)
+                    .frame(width: 5, height: 5)
             }
+        }
+        .accessibilityLabel("HushKey")
+        .task {
+            model.openMainWindow = {
+                model.isHubWindowOpen = true
+                openWindow(id: "main")
+                NSApp.activate(ignoringOtherApps: true)
+            }
+        }
     }
 }
 
@@ -136,12 +151,23 @@ private struct HushKeyMenu: View {
     @Bindable var model: AppModel
 
     var body: some View {
+        let isTranscribing = model.isFinalizingDictation || model.transcriber.isFinalizing
         let meetingBusy = model.meetingNotes.isStarting || model.meetingNotes.isFinalizing
+        let lastText = model.transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // 1. Status line first
+        Text(statusLine)
+            .font(.caption)
+
+        Divider()
+
+        // 2. Start / Stop
         Button(model.meetingNotes.isCapturing ? "Stop meeting capture" :
                meetingBusy ? "Meeting capture…" :
                model.isFinalizingSelectedTextEdit ? "Finishing voice edit…" :
                model.isSelectedTextEditCapturing ? "Stop voice edit" :
                model.isStartingSelectedTextEdit ? "Cancel voice edit start" :
+               isTranscribing ? "Finishing dictation…" :
                model.audio.isRunning ? "Stop dictation" : "Start dictation") {
             if model.meetingNotes.isCapturing {
                 model.meetingNotes.stop()
@@ -149,39 +175,143 @@ private struct HushKeyMenu: View {
                 Task { await model.toggleDictation() }
             }
         }
-        .disabled(meetingBusy)
-        Button("Paste last transcript") {
-            Task { await model.pasteLastDictationAgain() }
-        }
-        .disabled(model.transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        .disabled(meetingBusy || isTranscribing)
+
         Divider()
-        Button("Open HushKey") {
-            model.screen = .dictation
-            model.openMainWindow?()
-        }
-        Button("Settings…") {
-            model.screen = .settings
-            model.openMainWindow?()
-        }
-        .keyboardShortcut(",")
-        Divider()
-        Picker("Microphone", selection: Binding(get: { model.audio.selectedDeviceID },
-                                                set: { model.audio.selectedDeviceID = $0 })) {
-            Text("System default").tag(AudioDeviceID?.none)
-            ForEach(model.audio.devices) { device in
-                Text(device.name).tag(Optional(device.id))
+
+        // 3. Submenus: Microphone, Language, Engine
+        Menu("Microphone") {
+            Picker("Microphone", selection: Binding(get: { model.audio.selectedDeviceID },
+                                                    set: { model.audio.selectedDeviceID = $0 })) {
+                Text("System default").tag(AudioDeviceID?.none)
+                ForEach(model.audio.devices) { device in
+                    Text(device.name).tag(Optional(device.id))
+                }
             }
+            .pickerStyle(.inline)
         }
         .disabled(model.audio.isRunning || model.audio.isStarting)
+
+        Menu("Language") {
+            Picker("Language", selection: $model.dictationLanguage) {
+                Text("English (US)").tag("en-US")
+                Text("English (UK)").tag("en-GB")
+                Text("Spanish").tag("es-ES")
+                Text("French").tag("fr-FR")
+                Text("German").tag("de-DE")
+                Text("Italian").tag("it-IT")
+                Text("Portuguese").tag("pt-BR")
+                Text("Japanese").tag("ja-JP")
+                Text("Chinese").tag("zh-CN")
+            }
+            .pickerStyle(.inline)
+            Divider()
+            Button("More languages…") {
+                model.screen = .settings
+                UserDefaults.standard.set(SettingsView.Section.general.rawValue, forKey: "settingsSection")
+                model.openMainWindow?()
+                NSApp.activate(ignoringOtherApps: true)
+            }
+        }
+
+        Menu("Engine") {
+            Picker("Engine", selection: $model.dictationEngine) {
+                Text("Apple Speech (On-device)").tag(DictationEngine.appleSpeech)
+                if model.parakeet.isDownloaded {
+                    Text("Parakeet v2 (Local Core ML)").tag(DictationEngine.parakeet)
+                }
+            }
+            .pickerStyle(.inline)
+            if !model.parakeet.isDownloaded {
+                Divider()
+                Button("Download Parakeet in Settings…") {
+                    model.screen = .settings
+                    UserDefaults.standard.set(SettingsView.Section.general.rawValue, forKey: "settingsSection")
+                    model.openMainWindow?()
+                    NSApp.activate(ignoringOtherApps: true)
+                }
+            }
+        }
+
+        Divider()
+
+        // 4. History, Transcribe file, Recovery, Last transcription
+        Button("History…") {
+            model.screen = .dictation
+            model.openMainWindow?()
+            NSApp.activate(ignoringOtherApps: true)
+        }
+
+        Button("Transcribe audio file…") {
+            model.screen = .files
+            model.openMainWindow?()
+            NSApp.activate(ignoringOtherApps: true)
+        }
+
+        if model.canRecoverLastRecording {
+            Button("Recover last recording") {
+                Task { await model.recoverLastRecording() }
+            }
+        }
+
+        Menu("Last transcription") {
+            Button("Copy to clipboard") {
+                model.copyLastTranscript()
+            }
+            .disabled(lastText.isEmpty)
+
+            Button("Paste into active field") {
+                Task { await model.pasteLastDictationAgain() }
+            }
+            .disabled(lastText.isEmpty)
+        }
+
+        Divider()
+
+        // 5. Global controls
+        Toggle("Pause global shortcuts", isOn: $model.isShortcutsPaused)
         Toggle("Show dictation bar", isOn: $model.showsFloatingPill)
         Toggle("Dictation sounds", isOn: $model.playsDictationSounds)
         Toggle("Mute audio while dictating", isOn: $model.mutesAudioWhileDictating)
+
         Divider()
-        Label(model.motion.status.label, systemImage: model.motion.isConnected ? "headphones" : "headphones.slash")
-        Text(model.meetingNotes.isCapturing ? "Meeting capture is active · Audio stays on this Mac" : "Local dictation · Silent lab")
-            .font(.caption)
+
+        // 6. Hub navigation & Quit
+        Button("Open HushKey") {
+            model.screen = .dictation
+            model.openMainWindow?()
+            NSApp.activate(ignoringOtherApps: true)
+        }
+
+        Button("Settings…") {
+            model.screen = .settings
+            model.openMainWindow?()
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        .keyboardShortcut(",")
+
         Divider()
+
         Button("Quit HushKey") { NSApp.terminate(nil) }
             .keyboardShortcut("q")
+    }
+
+    private var statusLine: String {
+        if model.audio.isRunning {
+            return model.meetingNotes.isCapturing ? "Meeting capture is active" : "Listening…"
+        }
+        if model.isFinalizingDictation || model.transcriber.isFinalizing {
+            return "Transcribing…"
+        }
+        if model.isStartingDictation || model.audio.isStarting {
+            return "Opening microphone…"
+        }
+        if model.isShortcutsPaused {
+            return "Shortcuts paused"
+        }
+        if model.dictationShortcutNeedsAttention {
+            return model.dictationShortcutStatus
+        }
+        return "HushKey · Ready"
     }
 }

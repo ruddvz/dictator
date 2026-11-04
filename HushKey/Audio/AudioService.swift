@@ -157,11 +157,17 @@ final class AudioService {
 
         let requestID = UUID()
         permissionRequestID = requestID
-        isAwaitingPermission = AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined
-        let request = Task { await LocalPermissionAccess.microphone() }
-        permissionTask = request
-        let permission = await request.value
-        isAwaitingPermission = false
+        let currentStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+        let permission: LocalPermissionOutcome
+        if currentStatus == .authorized {
+            permission = .authorized
+        } else {
+            isAwaitingPermission = currentStatus == .notDetermined
+            let request = Task { await LocalPermissionAccess.microphone() }
+            permissionTask = request
+            permission = await request.value
+            isAwaitingPermission = false
+        }
         guard generation == startGeneration, permissionRequestID == requestID else { return }
         permissionRequestID = nil
         permissionTask = nil
@@ -232,11 +238,17 @@ final class AudioService {
         activeDeviceName = nil
     }
 
+    nonisolated(unsafe) private static var activeEngine: EngineBox?
+
     /// Builds the engine, points it at the chosen input, installs the tap and starts it, all on
     /// `engineQueue`. Returns a readable error instead of throwing across the queue hop.
     nonisolated private static func buildAndStart(selectedDevice: AudioDeviceID?, sink: AudioSink) async -> EngineStart {
         await withCheckedContinuation { continuation in
             engineQueue.async {
+                if let old = activeEngine {
+                    shutDown(old)
+                    activeEngine = nil
+                }
                 let engine = AVAudioEngine()
                 let input = engine.inputNode
                 if let selectedDevice, let unit = input.audioUnit {
@@ -258,7 +270,9 @@ final class AudioService {
                 do {
                     engine.prepare()
                     try engine.start()
-                    continuation.resume(returning: .started(EngineBox(engine)))
+                    let box = EngineBox(engine)
+                    activeEngine = box
+                    continuation.resume(returning: .started(box))
                 } catch {
                     input.removeTap(onBus: 0)
                     continuation.resume(returning: .failed(error.localizedDescription))
@@ -270,6 +284,9 @@ final class AudioService {
     nonisolated private static func shutDown(_ box: EngineBox) {
         box.engine.inputNode.removeTap(onBus: 0)
         box.engine.stop()
+        if activeEngine === box {
+            activeEngine = nil
+        }
     }
 
     // Built outside main-actor isolation: the tap runs on the audio render thread.

@@ -43,6 +43,10 @@ enum LocalJSONArchive {
         protectingExistingAs existingType: Existing.Type,
         to url: URL
     ) throws {
+        let directory = url.deletingLastPathComponent()
+        if !fileManager.fileExists(atPath: directory.path) {
+            try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
         switch load(existingType, from: url) {
         case .missing, .loaded:
             break
@@ -60,6 +64,10 @@ enum LocalJSONArchive {
         preservingExistingAs existingType: Existing.Type,
         to url: URL
     ) throws {
+        let directory = url.deletingLastPathComponent()
+        if !fileManager.fileExists(atPath: directory.path) {
+            try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
         if fileManager.fileExists(atPath: url.path) {
             _ = load(existingType, from: url)
         }

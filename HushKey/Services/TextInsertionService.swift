@@ -117,6 +117,11 @@ final class TextInsertionService {
               processIdentifier == app.processIdentifier else { return [] }
         let role = stringAttribute(kAXRoleAttribute, of: focused) ?? ""
         let subrole = stringAttribute(kAXSubroleAttribute, of: focused) ?? ""
+        var isPassword: CFTypeRef?
+        if AXUIElementCopyAttributeValue(focused, "AXIsPassword" as CFString, &isPassword) == .success,
+           let isPassword = isPassword as? Bool, isPassword {
+            return []
+        }
         guard Self.isSupportedTextTarget(role: role, subrole: subrole),
               let selectedRange = selectedTextRange(of: focused), selectedRange.location >= 0,
               let value = stringAttribute(kAXValueAttribute, of: focused) else { return [] }
@@ -148,6 +153,11 @@ final class TextInsertionService {
               focusedPID == app.processIdentifier else { return nil }
         let role = stringAttribute(kAXRoleAttribute, of: focused) ?? ""
         let subrole = stringAttribute(kAXSubroleAttribute, of: focused) ?? ""
+        var isPassword: CFTypeRef?
+        if AXUIElementCopyAttributeValue(focused, "AXIsPassword" as CFString, &isPassword) == .success,
+           let isPassword = isPassword as? Bool, isPassword {
+            return nil
+        }
         guard Self.isSupportedTextTarget(role: role, subrole: subrole),
               let fieldValue = stringAttribute(kAXValueAttribute, of: focused),
               fieldValue.utf16.count <= 20_000,
@@ -566,12 +576,15 @@ final class TextInsertionService {
         return true
     }
 
-    static func isSupportedTextTarget(role: String, subrole: String) -> Bool {
+    nonisolated static func isSupportedTextTarget(role: String, subrole: String) -> Bool {
         guard subrole != (kAXSecureTextFieldSubrole as String) else { return false }
+        guard !role.localizedCaseInsensitiveContains("secure"),
+              !subrole.localizedCaseInsensitiveContains("secure"),
+              !subrole.localizedCaseInsensitiveContains("password") else { return false }
         return [kAXTextFieldRole as String, kAXTextAreaRole as String, kAXComboBoxRole as String].contains(role)
     }
 
-    static func isSupportedPasteTarget(role: String, subrole: String) -> Bool {
+    nonisolated static func isSupportedPasteTarget(role: String, subrole: String) -> Bool {
         isSupportedTextTarget(role: role, subrole: subrole)
     }
 

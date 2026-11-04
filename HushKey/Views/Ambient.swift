@@ -470,14 +470,25 @@ private struct WindowVisibilityReader: NSViewRepresentable {
             if let window {
                 let names: [Notification.Name] = [NSWindow.didChangeOcclusionStateNotification,
                                                    NSWindow.didMiniaturizeNotification,
-                                                   NSWindow.didDeminiaturizeNotification]
+                                                   NSWindow.didDeminiaturizeNotification,
+                                                   NSWindow.willCloseNotification]
                 observers = names.map { name in
-                    NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
-                        self?.report()
+                    NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { [weak self] note in
+                        if note.name == NSWindow.willCloseNotification {
+                            self?.reportClosed()
+                        } else {
+                            self?.report()
+                        }
                     }
                 }
             }
             report()
+        }
+
+        private func reportClosed() {
+            guard lastReported != false else { return }
+            lastReported = false
+            DispatchQueue.main.async { [onChange] in onChange(false) }
         }
 
         private func report() {

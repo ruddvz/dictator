@@ -29,6 +29,9 @@ final class FloatingPillController {
     /// makes sure only the most recent geometry measurement is allowed to resize the panel.
     private var resizeGeneration = PillResizeGeneration()
     private var escapeMonitors: [Any] = []
+    private var screenObserver: Any?
+    private weak var interactiveHosting: PillInteractiveHosting?
+    private var lastMeasuredSize: CGSize = .zero
     /// The screen the pill sits on: wherever the pointer was when it appeared or a dictation began.
     private var screen: NSScreen?
     private var wasCapturing = false
@@ -36,6 +39,12 @@ final class FloatingPillController {
     private var dragStart: (mouseX: CGFloat, centerX: CGFloat)?
     /// Where along the bottom edge the pill sits, 0…1 of the screen width; remembered.
     private var centerFraction = PillPlacement.storedFraction
+
+    deinit {
+        if let screenObserver {
+            NotificationCenter.default.removeObserver(screenObserver)
+        }
+    }
 
     func attach(to model: AppModel) {
         guard self.model == nil else { return }
@@ -123,12 +132,22 @@ final class FloatingPillController {
         // sizing options the hosting view never drives the window size or constraints itself.
         hosting.sizingOptions = []
         hosting.autoresizingMask = [.width, .height]
-        let container = NSView(frame: CGRect(origin: .zero, size: contentSize))
-        hosting.frame = container.bounds
-        container.addSubview(hosting)
-        panel.contentView = container
+        hosting.frame = CGRect(origin: .zero, size: contentSize)
+        panel.contentView = hosting
+        interactiveHosting = hosting
         self.panel = panel
         screen = PillPlacement.screenUnderPointer()
+        if screenObserver == nil {
+            screenObserver = NotificationCenter.default.addObserver(
+                forName: NSApplication.didChangeScreenParametersNotification,
+                object: nil, queue: .main) { [weak self] _ in
+                    guard let self else { return }
+                    if let current = self.screen, !NSScreen.screens.contains(current) {
+                        self.screen = PillPlacement.screenUnderPointer()
+                    }
+                    self.place()
+                }
+        }
         resize(to: hosting.fittingSize)
         place()
         panel.orderFrontRegardless()
@@ -138,14 +157,20 @@ final class FloatingPillController {
         _ = resizeGeneration.next()
         pendingShrink?.cancel()
         pendingShrink = nil
+        if let screenObserver {
+            NotificationCenter.default.removeObserver(screenObserver)
+            self.screenObserver = nil
+        }
         panel?.orderOut(nil)
         panel = nil
+        interactiveHosting = nil
     }
 
     /// Grows at once, before the opening animation is drawn, and shrinks only once the closing
     /// animation has settled. Resizing a window mid-animation clips the pill or makes it flicker.
     private func resize(to measured: CGSize) {
         guard measured.width > 0, measured.height > 0 else { return }
+        lastMeasuredSize = measured
         // Never smaller than the recording pill plus its hint, so idle → hover → recording happens
         // inside one window frame. Resizing the window as the pill opened showed the old pill
         // up and to the left for a frame before the new one drew. The extra area is transparent,
@@ -157,14 +182,24 @@ final class FloatingPillController {
         pendingShrink = nil
         let grown = CGSize(width: max(size.width, contentSize.width), height: max(size.height, contentSize.height))
         apply(grown)
+        updateActiveContentRect(measured: measured, panelSize: grown)
         guard grown != size else { return }
         let shrink = DispatchWorkItem { [weak self] in
             guard let self, self.resizeGeneration.matches(generation) else { return }
             self.apply(size)
+            self.updateActiveContentRect(measured: measured, panelSize: size)
             self.pendingShrink = nil
         }
         pendingShrink = shrink
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: shrink)
+    }
+
+    private func updateActiveContentRect(measured: CGSize, panelSize: CGSize) {
+        let width = min(measured.width, panelSize.width)
+        let height = min(measured.height, panelSize.height)
+        let originX = (panelSize.width - width) / 2
+        let originY: CGFloat = 0
+        interactiveHosting?.activeContentRect = CGRect(x: originX, y: originY, width: width, height: height)
     }
 
     /// Fits the recording capsule with × and ✓, the elapsed timer, the hover row with Meeting
@@ -246,8 +281,19 @@ enum PillPlacement {
     }
 }
 
-private final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
+protocol PillInteractiveHosting: AnyObject {
+    var activeContentRect: CGRect { get set }
+}
+
+final class FirstMouseHostingView<Content: View>: NSHostingView<Content>, PillInteractiveHosting {
+    var activeContentRect: CGRect = .zero
+
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        guard activeContentRect.isEmpty || activeContentRect.contains(point) else { return nil }
+        return super.hitTest(point) ?? (activeContentRect.contains(point) ? self : nil)
+    }
 }
 
 struct FloatingPillView: View {

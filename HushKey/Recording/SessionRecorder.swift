@@ -115,7 +115,7 @@ final class SessionRecorder {
             "note": "Motion t and audioStartOffsetSeconds are relative to startUptime (seconds since boot).",
         ]
         if let data = try? JSONSerialization.data(withJSONObject: meta, options: [.prettyPrinted, .sortedKeys]) {
-            try? data.write(to: directory.appending(path: "meta.json"))
+            try? data.write(to: directory.appending(path: "meta.json"), options: .atomic)
         }
         lastSessionURL = directory
         self.directory = nil

@@ -1,5 +1,24 @@
 # HushKey progress
 
+## Completed: audit bug hunt, architectural hardening and menu bar first (2026-11-04)
+
+- **Audit & bug hunt fixes (`docs/AUDIT_2026-11-04.md`):**
+  - **Pill transparent click passthrough:** `FloatingPill.swift` `FirstMouseHostingView.hitTest(_:)` and `PillInteractiveHosting` ensure mouse events outside active content bounds return `nil`, so clicks in transparent regions above the idle pill pass through to underlying applications. Tested in `PillHitTestTests`.
+  - **Dictation generation races:** added strict checkpoints in `AppModel.startDictation()` after `audio.start()`, `speechPreparation`, and `speechStart` so superseded starts abort immediately without stopping new audio sessions or clearing `captureGate`.
+  - **Audio engine restart race:** serialized `AudioService` engine instances with `activeEngine` tracking on `engineQueue`, ensuring clean shutdown before new engines initialize. Added fast-path authorization status check.
+  - **Start latency optimization:** moved `DictationSmartCleanup.prepare()` off the critical start path into a background `@MainActor` task, eliminating a 22 ms main-thread stall.
+  - **Fast fn release:** fixed `stopWhileStarting()` to set `stopsWhenStarted = true` whenever audio is starting or running, preventing lost utterances on fast key taps.
+  - **Dock policy flicker:** guarded window close/miniaturize observers in `HushKeyApp.swift` with `sheetParent == nil` and observed `didBecomeMainNotification`, ensuring sheet dismissals never flap activation policy.
+  - **Secure field protection:** `TextInsertionService.swift` rejects any target with "secure" or "password" in role/subrole, and respects `AXIsPassword`. Tested in `InsertionSecureFieldTests`.
+  - **Idle CPU:** `Ambient.swift` now listens for window close notifications to immediately pause CoreAnimation layers.
+  - **Multi-display & Dock:** observed `didChangeScreenParametersNotification` in `FloatingPillController` to dynamically validate screens and reposition the pill.
+  - **JSON crash safety:** `LocalJSONArchive.swift` automatically creates intermediate directories before atomic write; `SessionRecorder.swift` uses `.atomic` for metadata.
+  - **Termination save flush:** `prepareForTermination()` flushes pending debounced history saves synchronously to disk.
+  - **Menu bar elevation:** expanded menu bar menu with real-time status line, Microphone / Language / Engine submenus, History, Transcribe audio file, Recover last recording, Copy last transcript, Pause global shortcuts toggle, and live sage/slate glyph indicators.
+- **Test suite:** 326 passed, 3 skipped, 0 failures (+9 new tests).
+- **Packaged & verified:** `dist/HushKey.app` built and signed; running live at PID 24300.
+
+
 ## Completed: everything on `main` (2026-11-04)
 
 - Merged ruddvz/hushkey#4 (`b13e376`); `~/Projects/HushKey` now works on `main`. Every other branch (local and on GitHub) and every worktree has been deleted after checking each was fully merged. `AGENTS.md` and `docs/HANDOFF_AGENT_AUDIT.md` say to work on `main`.

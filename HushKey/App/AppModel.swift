@@ -2111,19 +2111,26 @@ final class AppModel {
             ? transcriber.prepare(localeIdentifier: activeDictationLanguageIdentifier) : false
         await audio.start()
         timing.mark("micOpen")
-        if audio.isRunning, generation == dictationStartGeneration {
+        guard generation == dictationStartGeneration else {
+            timing.report("superseded")
+            return
+        }
+        if audio.isRunning {
             if showsApplePreview { transcriber.beginBuffering(sink: audio.sink) }
             retainedAudioSinkID = audio.sink.add { [retainedAudio] buffer, _ in retainedAudio.append(buffer) }
         }
         let speechReady = await speechPreparation
         timing.mark("speechPrepare")
-        guard generation == dictationStartGeneration, speechReady || usesParakeet, audio.isRunning else {
+        guard generation == dictationStartGeneration else {
+            timing.report("superseded")
+            return
+        }
+        guard speechReady || usesParakeet, audio.isRunning else {
             timing.report("failed")
             transcriber.stop()
             audio.stop()
             stopRetainingAudio(keep: false)
             captureGate.release(.dictation)
-            guard generation == dictationStartGeneration else { return }
             if !speechReady {
                 dictationNotice = SFSpeechRecognizer.authorizationStatus() != .authorized
                     ? DictationRecovery.permissionNeeded(.speechRecognition)
@@ -2142,8 +2149,13 @@ final class AppModel {
         playDictationCue(.start)
         muteOutputForDictation()
         timing.mark("cueAndMute")
-        // Only needed when the dictation finishes, so it waits until the microphone is open.
-        smartCleanupSession = usesSmartCleanup ? DictationSmartCleanup.prepare() : nil
+        // Only needed when the dictation finishes, so prewarm asynchronously off the critical start path.
+        if usesSmartCleanup {
+            Task { @MainActor [weak self] in
+                guard let self, self.dictationStartGeneration == generation else { return }
+                self.smartCleanupSession = DictationSmartCleanup.prepare()
+            }
+        }
         timing.mark("smartCleanup")
         dictationStartedAt = Date()
         lastDictationDuration = nil
@@ -2158,7 +2170,11 @@ final class AppModel {
             : false
         timing.mark("speechStart")
         timing.report(started ? "ok" : "noPreview")
-        guard generation == dictationStartGeneration, audio.isRunning else {
+        guard generation == dictationStartGeneration else {
+            timing.report("superseded")
+            return
+        }
+        guard audio.isRunning else {
             transcriber.stop()
             restoreOutputAfterDictation()
             audio.stop()
@@ -2538,9 +2554,13 @@ final class AppModel {
         }
     }
 
-    private func cancelPendingDictationHistorySave() {
+    private func cancelPendingDictationHistorySave(flush: Bool = false) {
+        let task = dictationHistorySaveTask
         dictationHistorySaveTask?.cancel()
         dictationHistorySaveTask = nil
+        if flush, task != nil {
+            saveCurrentDictation()
+        }
     }
 
     private func clearLocalTransformUndo() {
@@ -2640,6 +2660,34 @@ final class AppModel {
         installSelectedTextEditShortcut()
         installPasteLastShortcut()
         insertion.resumeShortcuts()
+    }
+
+    var isShortcutsPaused: Bool {
+        get { shortcutsSuspended }
+        set {
+            if newValue { suspendShortcuts() }
+            else { resumeShortcuts() }
+        }
+    }
+
+    var canRecoverLastRecording: Bool {
+        (!cancelledDictationAudio.isEmpty && cancelledDictation != nil) ||
+        (dictationNotice?.canRetry == true && retainedAudio.isUsable)
+    }
+
+    func recoverLastRecording() async {
+        if cancelledDictation != nil, !cancelledDictationAudio.isEmpty {
+            await recoverCancelledDictation()
+        } else if dictationNotice?.canRetry == true, retainedAudio.isUsable {
+            await retryDictation()
+        }
+    }
+
+    func copyLastTranscript() {
+        let text = transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
     }
 
     /// Deletes saved transcripts older than the retention setting, on this Mac only.
@@ -2791,10 +2839,10 @@ final class AppModel {
         else if audio.isRunning { stopDictation() }
     }
 
-    /// Finish pressed before recognition was ready. If the microphone is already open the person
-    /// may have spoken, so finish as soon as the start completes; otherwise nothing was heard.
+    /// Finish pressed before recognition was ready. If the microphone is already open or starting,
+    /// the person may have spoken, so finish as soon as the start completes; otherwise nothing was heard.
     private func stopWhileStarting() {
-        if audio.isRunning { stopsWhenStarted = true }
+        if audio.isRunning || audio.isStarting { stopsWhenStarted = true }
         else { cancelDictation() }
     }
 
@@ -3096,8 +3144,9 @@ final class AppModel {
         #endif
     }
 
-    /// Quitting mid-dictation must not leave the Mac muted.
+    /// Quitting mid-dictation must not leave the Mac muted or drop a pending history save.
     func prepareForTermination() {
+        cancelPendingDictationHistorySave(flush: true)
         cancelDictation(offersUndo: false)
         if isSelectedTextEditCapturing { stopSelectedTextEditCapture() }
         capture.cancel()
