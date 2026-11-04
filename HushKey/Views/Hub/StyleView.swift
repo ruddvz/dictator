@@ -84,6 +84,11 @@ struct StyleView: View {
                                 hasAI: DictationSmartCleanup.isAvailable,
                                 onSelect: { setCleanupLevel(level) }
                             )
+                            // Polished needs Apple Intelligence; without it the card can't be chosen.
+                            .disabled(level == .polished && !DictationSmartCleanup.isAvailable)
+                            .opacity(level == .polished && !DictationSmartCleanup.isAvailable ? 0.5 : 1)
+                            .help(level == .polished && !DictationSmartCleanup.isAvailable
+                                  ? "Needs Apple Intelligence, which isn't available on this Mac" : "")
                         }
                     }
 

@@ -52,6 +52,9 @@ final class TextInsertionService {
     /// Callers must not retry when an accessibility edit may have changed the field but
     /// read-back could not confirm the exact result.
     private(set) var requiresReviewAfterInsertion = false
+    /// Whether the last delivery was read back from the field. False after a paste HushKey
+    /// couldn't confirm, so the pill says "Pasted" rather than claiming "Typed".
+    private(set) var lastDeliveryVerified = true
     @ObservationIgnored private var activationObserver: NSObjectProtocol?
     @ObservationIgnored private var exposedProcesses: Set<pid_t> = []
     /// Paste through the clipboard in apps that refuse direct typing; the clipboard is restored.
@@ -229,6 +232,7 @@ final class TextInsertionService {
     @discardableResult
     func insert(_ text: String) -> Bool {
         requiresReviewAfterInsertion = false
+        lastDeliveryVerified = true
         guard isEnabled else { status = "Enable text insertion first."; return false }
         guard AXIsProcessTrusted() else {
             isEnabled = false
@@ -293,6 +297,7 @@ final class TextInsertionService {
     @discardableResult
     func insert(_ text: String, into target: InsertionTarget) async -> Bool {
         requiresReviewAfterInsertion = false
+        lastDeliveryVerified = true
         guard isEnabled, AXIsProcessTrusted() else {
             isEnabled = false
             status = "Accessibility access is unavailable. Text was not inserted."
@@ -350,6 +355,7 @@ final class TextInsertionService {
     @discardableResult
     func insert(_ text: String, ifStillFocused target: InsertionTarget) -> Bool {
         requiresReviewAfterInsertion = false
+        lastDeliveryVerified = true
         guard isEnabled, AXIsProcessTrusted() else {
             isEnabled = false
             status = "Accessibility access is unavailable. Text was not inserted."
@@ -378,7 +384,7 @@ final class TextInsertionService {
         guard isEnabled, allowsPasteFallback, AXIsProcessTrusted(), !app.isTerminated,
               NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier else { return nil }
         exposeWebContent(of: app)
-        guard let focused = focusedElement() else { return nil }
+        guard let focused = focusedElement(), !isPasswordElement(focused) else { return nil }
         var pid: pid_t = 0
         guard AXUIElementGetPid(focused, &pid) == .success, pid == app.processIdentifier else { return nil }
         let role = stringAttribute(kAXRoleAttribute, of: focused) ?? ""
@@ -419,6 +425,7 @@ final class TextInsertionService {
         let hasEditableAncestor = AXUIElementCopyAttributeValue(
             focused, "AXEditableAncestor" as CFString, &ancestor) == .success && ancestor != nil
         guard AXUIElementGetPid(focused, &pid) == .success, pid == app.processIdentifier,
+              !isPasswordElement(focused),
               Self.allowsUnverifiedPaste(role: stringAttribute(kAXRoleAttribute, of: focused) ?? "",
                                          subrole: stringAttribute(kAXSubroleAttribute, of: focused) ?? "",
                                          selectedTextSettable: selectedTextSettable,
@@ -441,6 +448,7 @@ final class TextInsertionService {
         let restored = saved.restore(to: pasteboard, ifChangeCountIs: ours)
         let clipboard = restored ? "Your clipboard was put back." : "The clipboard changed meanwhile, so it was left as is."
         status = "Pasted into \(name). \(clipboard)"
+        lastDeliveryVerified = false
         return true
     }
 
@@ -507,6 +515,7 @@ final class TextInsertionService {
             status = verification == .targetChanged
                 ? "Paste was sent to \(name), but focus or field contents changed before confirmation. Check the field before retrying; a retry could duplicate text. \(clipboard)"
                 : "Paste was sent to \(name), but HushKey could not verify the exact field contents. Check the field before retrying; a retry could duplicate text. \(clipboard)"
+            lastDeliveryVerified = false
             return .unconfirmed
         }
         if let possibleUndo = Self.makeUndoRecord(processIdentifier: target.processIdentifier,
@@ -521,6 +530,7 @@ final class TextInsertionService {
         }
         let clipboard = restored ? "Your clipboard was put back." : "The clipboard changed meanwhile, so it was left as is."
         status = "Pasted into \(name) and verified in the same text field. \(clipboard)"
+        lastDeliveryVerified = true
         return .inserted
     }
 
@@ -760,6 +770,13 @@ final class TextInsertionService {
         log.notice("\(line, privacy: .public) status=\(self.status, privacy: .public)")
     }
 
+    /// Web password fields can report a plain text role with AXIsPassword set.
+    private func isPasswordElement(_ element: AXUIElement) -> Bool {
+        var value: CFTypeRef?
+        return AXUIElementCopyAttributeValue(element, "AXIsPassword" as CFString, &value) == .success
+            && (value as? Bool) == true
+    }
+
     private func focusedElement() -> AXUIElement? {
         let systemWide = AXUIElementCreateSystemWide()
         var focusedValue: CFTypeRef?
@@ -771,6 +788,7 @@ final class TextInsertionService {
     private func performInsertion(_ text: String, app: NSRunningApplication, element: AXUIElement,
                                   originalValue: String?, selectedRange: CFRange?) -> Bool {
         requiresReviewAfterInsertion = false
+        lastDeliveryVerified = true
         var focusedPID: pid_t = 0
         var settable = DarwinBoolean(false)
         guard NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier,
@@ -816,6 +834,7 @@ final class TextInsertionService {
         guard let observedValue = stringAttribute(kAXValueAttribute, of: currentElement) else {
             undoRecord = nil
             requiresReviewAfterInsertion = true
+            lastDeliveryVerified = false
             status = "HushKey sent the text, but could not read it back to confirm. Check the field before retrying to avoid a duplicate."
             return false
         }
@@ -838,6 +857,7 @@ final class TextInsertionService {
         case .changedUnexpectedly:
             undoRecord = nil
             requiresReviewAfterInsertion = true
+            lastDeliveryVerified = false
             status = "The focused field changed, but HushKey could not confirm the exact text. Check it before retrying to avoid a duplicate."
             return false
         }

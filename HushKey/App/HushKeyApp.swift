@@ -194,15 +194,10 @@ private struct HushKeyMenu: View {
 
         Menu("Language") {
             Picker("Language", selection: $model.dictationLanguage) {
-                Text("English (US)").tag("en-US")
-                Text("English (UK)").tag("en-GB")
-                Text("Spanish").tag("es-ES")
-                Text("French").tag("fr-FR")
-                Text("German").tag("de-DE")
-                Text("Italian").tag("it-IT")
-                Text("Portuguese").tag("pt-BR")
-                Text("Japanese").tag("ja-JP")
-                Text("Chinese").tag("zh-CN")
+                // The same on-device list as Settings, so any saved language shows as selected.
+                ForEach(DictationLanguage.onDevice) { language in
+                    Text(language.name).tag(language.identifier)
+                }
             }
             .pickerStyle(.inline)
             Divider()
@@ -256,7 +251,7 @@ private struct HushKeyMenu: View {
 
         Menu("Last transcription") {
             Button("Copy to clipboard") {
-                model.copyLastTranscript()
+                model.copyDictationText()
             }
             .disabled(lastText.isEmpty)
 

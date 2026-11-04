@@ -1,5 +1,17 @@
 # HushKey progress
 
+## Completed: review of Antigravity's 2026-11-04 commits (9ee7d66..51ce92d) and fixes
+
+- **Honest pill:** unverified deliveries (unconfirmed paste, unverified ⌘V, AX edit needing review) now show "Pasted into <App>"; "Typed" only when HushKey read the words back (`TextInsertionService.lastDeliveryVerified`).
+- **Pause global shortcuts:** its own `shortcutsPausedByUser` flag, so finishing a shortcut recording in Settings no longer silently resumes them, and the menu toggle stays in sync.
+- **Hide for 1 hour:** turning the bar on or off by hand cancels the pending unhide, so a permanent hide isn't undone an hour later.
+- **Menu bar Language:** uses `DictationLanguage.onDevice` (same list as Settings) instead of 9 hard-coded locales.
+- **Style:** Polished is dimmed and disabled without Apple Intelligence, instead of silently snapping back to Clean.
+- **Password guard:** `AXIsPassword` is now checked in `capturePasteTarget` and `pasteDirectly` too.
+- Removed duplicate `copyLastTranscript` (menu uses `copyDictationText`); corrected the misleading "off-main" comment on the mic start.
+- **Left as is (needs a product call):** smart cleanup (Apple Intelligence polish) default flipped from on to off in 53a6de2.
+- **Verification:** 332 tests passed, 3 skipped; packaged and launched. Menu, Style and pill context menu checked live; dictation itself not checked (needs the mic).
+
 ## Completed: Typed confirmation and tick-free Copied (2026-11-04)
 
 - **Typed pill (`FloatingPill.swift`, `AppModel.swift`):** now reads "Typed into <App>" (app name in `ink2`, cut at 18 characters, HushKey never named). The working wave morphs into the tick, then the words slide in. Stays 1.6 s; width fits the text. Reduce Motion skips the morph.

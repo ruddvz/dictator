@@ -519,7 +519,8 @@ struct FloatingPillView: View {
             recorder
         case .done:
             // Only shown when the words went in: the card above is the feedback otherwise.
-            TypedConfirmation(appName: Self.shownAppName(model.typedIntoAppName))
+            TypedConfirmation(verb: model.insertion.lastDeliveryVerified ? "Typed" : "Pasted",
+                              appName: Self.shownAppName(model.typedIntoAppName))
                 .frame(height: Self.height)
                 .transition(.opacity.combined(with: .scale(scale: 0.92)))
         }
@@ -535,7 +536,8 @@ struct FloatingPillView: View {
     private var doneWidth: CGFloat {
         let bold = NSFont.systemFont(ofSize: 12, weight: .semibold)
         let regular = NSFont.systemFont(ofSize: 12, weight: .medium)
-        var width = 12 + 14 + 5 + ("Typed" as NSString).size(withAttributes: [.font: bold]).width + 12
+        let verb = model.insertion.lastDeliveryVerified ? "Typed" : "Pasted"
+        var width = 12 + 14 + 5 + (verb as NSString).size(withAttributes: [.font: bold]).width + 12
         if let app = Self.shownAppName(model.typedIntoAppName) {
             width += 4 + ("into \(app)" as NSString).size(withAttributes: [.font: regular]).width
         }
@@ -1017,9 +1019,11 @@ struct CountdownCloseButton: View {
     }
 }
 
-/// "✓ Typed into Notes": the working wave folds into the tick, then the words fade in after it.
+/// "✓ Typed into Notes" (or "Pasted" when unverified): the working wave folds into the tick, then the words fade in after it.
 private struct TypedConfirmation: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// "Typed" when HushKey read the words back from the field, "Pasted" when it couldn't check.
+    let verb: String
     let appName: String?
     @State private var icon: MorphIcon.Phase = .working
     @State private var showsText = false
@@ -1030,7 +1034,7 @@ private struct TypedConfirmation: View {
                 .frame(width: 14, height: 14)
                 .foregroundStyle(Theme.signal)
             HStack(spacing: 4) {
-                Text("Typed")
+                Text(verb)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Theme.ink)
                 if let appName {
@@ -1051,6 +1055,6 @@ private struct TypedConfirmation: View {
             withAnimation(.easeOut(duration: 0.22).delay(0.12)) { showsText = true }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(appName.map { "Typed into \($0)" } ?? "Typed")
+        .accessibilityLabel(appName.map { "\(verb) into \($0)" } ?? verb)
     }
 }

@@ -253,21 +253,34 @@ final class AppModel {
         activeDictationUsesSmartCleanup
     }
     var showsFloatingPill = UserDefaults.standard.object(forKey: "showFloatingPill") as? Bool ?? true {
-        didSet { UserDefaults.standard.set(showsFloatingPill, forKey: "showFloatingPill") }
+        didSet {
+            UserDefaults.standard.set(showsFloatingPill, forKey: "showFloatingPill")
+            // Turned on or off by hand: that choice wins over a pending "Hide for 1 hour".
+            if !isApplyingTemporaryPillHide, pillHiddenUntil != nil {
+                pillUnhideTask?.cancel()
+                pillUnhideTask = nil
+                pillHiddenUntil = nil
+            }
+        }
     }
+    @ObservationIgnored private var isApplyingTemporaryPillHide = false
     @ObservationIgnored private var pillUnhideTask: Task<Void, Never>?
     private(set) var pillHiddenUntil: Date?
 
     /// Hides the floating pill temporarily, then brings it back after `duration` (e.g. 1 hour).
     func hideFloatingPill(for duration: TimeInterval) {
         pillUnhideTask?.cancel()
-        showsFloatingPill = false
         let until = Date().addingTimeInterval(duration)
+        isApplyingTemporaryPillHide = true
+        showsFloatingPill = false
+        isApplyingTemporaryPillHide = false
         pillHiddenUntil = until
         pillUnhideTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(duration))
             guard let self, !Task.isCancelled, self.pillHiddenUntil == until else { return }
+            self.isApplyingTemporaryPillHide = true
             self.showsFloatingPill = true
+            self.isApplyingTemporaryPillHide = false
             self.pillHiddenUntil = nil
         }
     }
@@ -2090,7 +2103,8 @@ final class AppModel {
         activeDictationTarget = isHushKey ? nil : target?.localizedName
         timing.mark("reset")
 
-        // Concurrently open the microphone off-main while resolving frontmost app focus and profiles on-main
+        // Started here, awaited below. The engine itself starts on AudioService's queue; this
+        // MainActor call runs once the main actor next suspends.
         async let audioStartup: Void = audio.start()
 
         capturedInsertionTarget = isHushKey ? nil : insertion.captureInsertionTarget()
@@ -2702,7 +2716,8 @@ final class AppModel {
     }
 
     func resumeShortcuts() {
-        guard shortcutsSuspended else { return }
+        // The recorder finishing must not undo "Pause global shortcuts" from the menu.
+        guard shortcutsSuspended, !shortcutsPausedByUser else { return }
         shortcutsSuspended = false
         guard started else { return }
         installDictationShortcut()
@@ -2711,11 +2726,15 @@ final class AppModel {
         insertion.resumeShortcuts()
     }
 
+    /// "Pause global shortcuts" in the menu: separate from the recorder's brief suspension.
+    private(set) var shortcutsPausedByUser = false
+
     var isShortcutsPaused: Bool {
-        get { shortcutsSuspended }
+        get { shortcutsPausedByUser }
         set {
-            if newValue { suspendShortcuts() }
-            else { resumeShortcuts() }
+            guard newValue != shortcutsPausedByUser else { return }
+            shortcutsPausedByUser = newValue
+            if newValue { suspendShortcuts() } else { resumeShortcuts() }
         }
     }
 
@@ -2730,13 +2749,6 @@ final class AppModel {
         } else if dictationNotice?.canRetry == true, retainedAudio.isUsable {
             await retryDictation()
         }
-    }
-
-    func copyLastTranscript() {
-        let text = transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
     }
 
     /// Deletes saved transcripts older than the retention setting, on this Mac only.
