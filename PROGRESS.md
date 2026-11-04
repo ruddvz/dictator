@@ -1,5 +1,10 @@
 # HushKey progress
 
+## Completed: everything on `main` (2026-11-04)
+
+- Merged ruddvz/hushkey#4 (`b13e376`); `~/Projects/HushKey` now works on `main`, and the merged feature branches and worktrees are deleted. `AGENTS.md` and `docs/HANDOFF_AGENT_AUDIT.md` say to work on `main`.
+- An earlier agent's uncommitted pill fix (`PillResizeGeneration`: a newer layout cancels a pending delayed shrink, and hiding the pill cancels it too; with tests) is folded in alongside the fixed minimum panel size.
+
 ## Completed: smooth fn start, typing restored, Flow-style notices and title strip (2026-11-04)
 
 - **fn start glitch.** Measured fn → listening at 280–710 ms, with the audio engine build/start (116–391 ms), cue, mute and Apple Intelligence prewarm on the main thread, while the pill's panel resized and briefly drew the old pill up and to the left. Now: the panel keeps a fixed minimum size (220 × 84, transparent) so idle → hover → recording never resizes it; the engine starts and stops on a serial queue; cues play on their own queue; the prewarm runs after the mic opens; "Waiting for microphone" and the sweeping ribbon appear only after 600 ms. Each start step is logged: `/usr/bin/log show --predicate 'subsystem == "com.ruddvz.hushkey" && category == "start"' --last 10m`.

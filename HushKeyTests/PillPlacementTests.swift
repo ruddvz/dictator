@@ -46,3 +46,22 @@ final class AudioDeviceFilterTests: XCTestCase {
         XCTAssertTrue(AudioDevices.isUserFacing("MacBook Pro Microphone"))
     }
 }
+
+final class PillResizeGenerationTests: XCTestCase {
+    func testNewGeometryInvalidatesOlderDelayedShrinks() {
+        var generation = PillResizeGeneration()
+        let firstHover = generation.next()
+        let leave = generation.next()
+
+        XCTAssertFalse(generation.matches(firstHover))
+        XCTAssertTrue(generation.matches(leave))
+    }
+
+    func testHidingPillInvalidatesPendingResize() {
+        var generation = PillResizeGeneration()
+        let pendingShrink = generation.next()
+        _ = generation.next() // hide() invalidates queued geometry callbacks
+
+        XCTAssertFalse(generation.matches(pendingShrink))
+    }
+}

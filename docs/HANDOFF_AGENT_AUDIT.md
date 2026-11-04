@@ -8,10 +8,9 @@ You are taking over quality work on **HushKey**, a local-first macOS dictation a
 
 ## 1. Repo, branch and rules (read first)
 
-- Repo: `~/Projects/HushKey` (GitHub `ruddvz/hushkey`, private). Work on **`feature/flow-style-ui`**. `main` already has everything up to PR ruddvz/hushkey#3. Open a new PR into `main` when you have a batch.
+- Repo: `~/Projects/HushKey` (GitHub `ruddvz/hushkey`, private). Work on **`main`** (everything is merged there; there are no feature branches). Push small commits straight to `main`.
 - Read `AGENTS.md`, `CLAUDE.md`, `PROGRESS.md` (newest entries first) and `docs/DESIGN_SYSTEM.md` before touching code.
 - Before starting: `git pull --ff-only`. If another agent may be editing, work in a worktree: `git worktree add ../HushKey-<task> -b <you>/<task>`. Never use bare `git stash`. Commit small, focused changes with clear messages. Record what you did and what's next at the top of `PROGRESS.md`.
-- The main checkout may hold an older agent's uncommitted edits to `HushKey/Views/FloatingPill.swift` and `HushKeyTests/PillPlacementTests.swift` (a `PillResizeGeneration` struct). They predate the current pill code. Port the idea if it's still useful; otherwise discard them, but tell the user first.
 - GitHub Actions is deliberately broken (billing). Ignore the red `build-test` check, and verify on this Mac instead.
 - **Licences:** never copy GPL code (TypeWhisper, VoiceInk, FluidVoice, MacParakeet). MIT code (FreeFlow, OpenWhispr, OpenTypeless, amirrsyed/hushkey) may be adapted with attribution in `NOTICE.md`. Wispr Flow is closed: match behaviour and measurements, not assets or copy.
 - **Product rules:**
@@ -107,7 +106,7 @@ Reference docs: `docs/DESIGN_SYSTEM.md` (tokens, measured Flow layout), `docs/WI
    - Before/after screenshots at 1× for UI changes.
    - What was verified live versus by tests only.
 
-   Update `PROGRESS.md`, commit, push to `feature/flow-style-ui`, and open a PR into `main` with a summary.
+   Update `PROGRESS.md`, commit, and push to `main`. Summarise the changes for the user.
 
 ## 6. Definition of done
 

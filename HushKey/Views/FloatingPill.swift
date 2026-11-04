@@ -4,6 +4,18 @@ import CoreAudio
 import SwiftUI
 import os
 
+/// Invalidates delayed panel shrinks when a newer animated layout arrives.
+struct PillResizeGeneration {
+    private var value: UInt64 = 0
+
+    mutating func next() -> UInt64 {
+        value &+= 1
+        return value
+    }
+
+    func matches(_ token: UInt64) -> Bool { value == token }
+}
+
 /// Always-on-top dictation indicator at the bottom of the screen. It is a non-activating panel,
 /// so clicking it never steals focus from the app that will receive the dictated text.
 @MainActor
@@ -15,7 +27,7 @@ final class FloatingPillController {
     private var pendingShrink: DispatchWorkItem?
     /// Canceled DispatchWorkItems can still run after they have been enqueued. This generation
     /// makes sure only the most recent geometry measurement is allowed to resize the panel.
-    private var resizeGeneration = 0
+    private var resizeGeneration = PillResizeGeneration()
     private var escapeMonitors: [Any] = []
     /// The screen the pill sits on: wherever the pointer was when it appeared or a dictation began.
     private var screen: NSScreen?
@@ -123,7 +135,7 @@ final class FloatingPillController {
     }
 
     private func hide() {
-        resizeGeneration &+= 1
+        _ = resizeGeneration.next()
         pendingShrink?.cancel()
         pendingShrink = nil
         panel?.orderOut(nil)
@@ -140,16 +152,16 @@ final class FloatingPillController {
         // so clicks there pass through to the app underneath.
         let size = CGSize(width: max(measured.width, Self.minimumPanelSize.width),
                           height: max(measured.height, Self.minimumPanelSize.height))
-        resizeGeneration &+= 1
-        let generation = resizeGeneration
+        let generation = resizeGeneration.next()
         pendingShrink?.cancel()
         pendingShrink = nil
         let grown = CGSize(width: max(size.width, contentSize.width), height: max(size.height, contentSize.height))
         apply(grown)
         guard grown != size else { return }
         let shrink = DispatchWorkItem { [weak self] in
-            guard let self, self.resizeGeneration == generation else { return }
+            guard let self, self.resizeGeneration.matches(generation) else { return }
             self.apply(size)
+            self.pendingShrink = nil
         }
         pendingShrink = shrink
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: shrink)
