@@ -1,5 +1,18 @@
 # HushKey progress
 
+## Completed: History rows to the audit spec (2026-11-04)
+
+- **Hover pill** on each History row: Copy (icon morphs to a check, "Copied"), Edit again, and ⋯. The ⋯ menu (also the right-click menu) has **Undo cleanup / Redo cleanup** (in place: the entry shows the raw recognition and remembers the cleaned text), **Paste again** (latest dictation only, only into its original field: HushKey brings that app forward, then the existing Paste-again gate checks focus), **Re-transcribe with Parakeet / Apple Speech** (only when the entry's audio is still held), Read aloud, Copy original recognition, Transform, Add a word, and Delete.
+- **Delete with Undo:** delete is saved straight away and the entry is kept in memory for 6 s behind a "Dictation deleted · Undo" bar; Undo writes it back at its old position (clamped, limit kept, no duplicates) and re-links the open transcript if it hasn't changed.
+- **States:** menu items that can't run show the reason as a greyed title: "Cannot retry while dictating", "Audio no longer available" (audio was held this session, then dropped), "Download Parakeet in Settings to re-transcribe", "Allow Speech Recognition to re-transcribe", "Cannot paste while dictating", "Already pasted once", "Text insertion is off". Entries from earlier sessions have no audio, so Re-transcribe is hidden for them.
+- **Expand on click:** a long row opens with a spring (response 0.36, damping 0.86) or instantly under Reduce Motion; once open its text is selectable. "Show more / less" stays as a button and an accessibility action.
+- **Meta line** under each entry: app · duration · words (for example "Slack · 12 s · 34 words"). New optional `appName` and `cleanedText` fields on `DictationHistoryEntry`; older history decodes unchanged; edits keep the original app; backups validate the new fields' sizes.
+- **Audio:** the latest dictation's recording now stays in memory (never on disk) until the next dictation starts, history or session audio is deleted, or HushKey quits. README privacy copy updated. Re-transcribing never types into another app and isn't counted again in Insights.
+- New `DictationHistoryActions.swift` (pure gates and undo logic); AppModel changes are additive (one block of History actions plus small hooks in `finishDictation`, `startDictation`, recover, clear and delete).
+- **Verified here:** `xcodebuild … test`: 245 passed, 3 skipped, 0 failed (11 new tests in `DictationHistoryActionsTests`: delete/undo, expiry, clear, undo cleanup, meta line, old-JSON decode, upsert keeps app, retranscribe and paste-again states). `Scripts/package-app.sh` built `dist/HushKey.app`.
+- **Not verified:** not checked by eye. Three other sessions kept launching their own HushKey builds (only one can run), so this build was never on screen. Check in the packaged app: pill fade/slide and Copy→check, click-to-expand spring (and Reduce Motion), the meta line, Delete → Undo bar, Undo/Redo cleanup, and Re-transcribe and Paste again on a fresh dictation (needs the mic and Parakeet downloaded).
+- **Next:** word diff for Undo cleanup; local audio retention setting (Off / 24 h / 7 d / 30 d) with ▶ play, so older entries can be re-transcribed too.
+
 ## Completed: local voice profile and time saved (2026-11-04)
 
 - **`VoiceProfile` (`HushKey/Recording/VoiceProfile.swift`)**, a pure type read from the usage ledger and the saved history on this Mac (audit row 4):

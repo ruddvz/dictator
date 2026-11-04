@@ -401,6 +401,11 @@ struct DictationView: View {
                     .textSelection(.enabled)
             }
 
+            if let deleted = model.deletedDictation {
+                DeletedDictationBar(deleted: deleted)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+
             if let cancelled = model.cancelledDictation {
                 CancelledDictationRow(cancelled: cancelled, isLocked: isBusy)
                     .transition(.opacity.combined(with: .move(edge: .top)))
@@ -667,8 +672,9 @@ private struct HeroBackdrop: View {
     }
 }
 
-/// One saved dictation: time column, text, and Wispr-style hover actions (read aloud, copy,
-/// edit again, more). The actions slide in one after another; Copy turns into a check.
+/// One saved dictation: time column, text with a meta line (app · duration · words), and
+/// Wispr-style hover actions in a floating pill: Copy (turns into a check), Edit again, and ⋯.
+/// A long row opens in place when clicked.
 private struct HistoryRow: View {
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -681,46 +687,24 @@ private struct HistoryRow: View {
     @State private var expanded = false
 
     private var isReading: Bool { reader.speakingID == entry.id }
+    private var isRetranscribing: Bool { model.retranscribingDictationID == entry.id }
     private var showsActions: Bool { isHovering || isReading || copied }
-    /// Long dictations show three lines; the adjacent control opens the rest.
+    /// Long dictations show three lines; a click opens the rest.
     private var isLong: Bool { entry.text.count > 220 || entry.text.filter(\.isNewline).count > 2 }
+    /// The row opens with a firm spring; with Reduce Motion it just changes.
+    private var expandAnimation: Animation? {
+        reduceMotion ? nil : .spring(response: 0.36, dampingFraction: 0.86)
+    }
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: Theme.s4) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(entry.createdAt.formatted(date: .omitted, time: .shortened))
-                    .font(.system(size: 14).monospacedDigit())
-                    .foregroundStyle(isHovering ? Theme.ink : Theme.ink2)
-                // Words and seconds, for the row you're looking at.
-                Text(meta)
-                    .font(.hkMeta.monospacedDigit())
-                    .foregroundStyle(Theme.ink3)
-                    .opacity(isHovering || expanded ? 1 : 0)
-            }
-            .frame(width: 82, alignment: .leading)
-            VStack(alignment: .leading, spacing: Theme.s1) {
-                Text(entry.text)
-                    .font(.hkBody)
-                    .lineSpacing(3)
-                    .lineLimit(expanded ? nil : 3)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .textSelection(.enabled)
-                if isLong {
-                    Button {
-                        withAnimation(reduceMotion ? nil : Theme.gentle) { expanded.toggle() }
-                    } label: {
-                        HStack(spacing: 3) {
-                            Text(expanded ? "Show less" : "Show more")
-                            Glyph(.chevronDown, size: 12)
-                                .rotationEffect(.degrees(expanded ? 180 : 0))
-                        }
-                    }
-                    .font(.hkMeta.weight(.medium))
-                    .foregroundStyle(Theme.ink2)
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(expanded ? "Show less text" : "Show full text")
-                    .accessibilityHint(expanded ? "Collapses this dictation" : "Expands this dictation")
-                }
+            Text(entry.createdAt.formatted(date: .omitted, time: .shortened))
+                .font(.system(size: 14).monospacedDigit())
+                .foregroundStyle(isHovering ? Theme.ink : Theme.ink2)
+                .frame(width: 82, alignment: .leading)
+            VStack(alignment: .leading, spacing: 6) {
+                entryText
+                metaLine
             }
         }
         .padding(.horizontal, Theme.s4)
@@ -729,40 +713,64 @@ private struct HistoryRow: View {
         .background(isHovering ? Theme.well : .clear)
         .overlay(alignment: .topTrailing) { actionPill.padding(Theme.s2) }
         .contentShape(Rectangle())
+        .onTapGesture { if isLong { toggleExpanded() } }
         .onHover { hovering in withAnimation(.easeOut(duration: 0.12)) { isHovering = hovering } }
-        .contextMenu {
-            Button(isReading ? "Stop reading" : "Read aloud") { reader.toggle(entry) }
-            Button("Copy") { model.copyDictation(entry) }
-            Button("Edit again") { model.restoreDictation(entry) }.disabled(isLocked)
-            Button("Transform…", systemImage: "wand.and.stars") {
-                model.restoreDictation(entry)
-                model.screen = .transforms
-            }
-            .disabled(isLocked)
-            if entry.rawText != nil {
-                Button("Restore original recognition") { model.restoreDictation(entry, useRawText: true) }.disabled(isLocked)
-            }
-            Divider()
-            Button("Delete", role: .destructive) { model.deleteDictation(entry) }
-        }
+        .contextMenu { menuItems }
         .accessibilityElement(children: .contain)
+        .accessibilityAction(named: expanded ? "Show less" : "Show full text") { if isLong { toggleExpanded() } }
     }
 
-    private var meta: String {
-        let words = "\(entry.wordCount) w"
-        guard let duration = entry.duration else { return words }
-        let seconds = Int(duration.rounded())
-        return words + " · " + (seconds < 60 ? "\(seconds) s" : "\(seconds / 60):\(String(format: "%02d", seconds % 60))")
+    @ViewBuilder
+    private var entryText: some View {
+        let text = Text(entry.text)
+            .font(.hkBody)
+            .lineSpacing(3)
+            .lineLimit(isLong && !expanded ? 3 : nil)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
+        // A collapsed long row takes the click to open; once open its text can be selected.
+        if isLong && !expanded { text } else { text.textSelection(.enabled) }
     }
 
-    /// Wispr-style floating actions: a small capsule over the row's top right that fades and
-    /// slides in on hover, each button a beat after the one before.
+    private var metaLine: some View {
+        HStack(spacing: Theme.s2) {
+            Text(entry.metaLine)
+                .font(.hkMeta.monospacedDigit())
+                .foregroundStyle(Theme.ink3)
+            if entry.cleanedText != nil {
+                Text("Original recognition")
+                    .font(.hkMeta.weight(.medium))
+                    .foregroundStyle(Theme.ink2)
+            }
+            if isRetranscribing {
+                ProgressView().controlSize(.mini)
+                Text("Re-transcribing…").font(.hkMeta).foregroundStyle(Theme.ink2)
+            }
+            if isLong {
+                Button(action: toggleExpanded) {
+                    HStack(spacing: 3) {
+                        Text(expanded ? "Show less" : "Show more")
+                        Glyph(.chevronDown, size: 12)
+                            .rotationEffect(.degrees(expanded ? 180 : 0))
+                    }
+                }
+                .font(.hkMeta.weight(.medium))
+                .foregroundStyle(Theme.ink2)
+                .buttonStyle(.plain)
+                .accessibilityLabel(expanded ? "Show less text" : "Show full text")
+            }
+        }
+    }
+
+    private func toggleExpanded() {
+        withAnimation(expandAnimation) { expanded.toggle() }
+    }
+
+    /// The floating capsule over the row's top right. It fades and slides in on hover, each
+    /// button a beat after the one before.
     private var actionPill: some View {
         HStack(spacing: 0) {
-            action(isReading ? "Stop reading" : "Read aloud", isReading ? .stop : .play, order: 0) {
-                reader.toggle(entry)
-            }
-            action(copied ? "Copied" : "Copy", copied ? .check : .copy, order: 1) {
+            action(copied ? "Copied" : "Copy", copied ? .check : .copy, order: 0) {
                 model.copyDictation(entry)
                 withAnimation(Theme.snappy) { copied = true }
                 Task {
@@ -771,11 +779,16 @@ private struct HistoryRow: View {
                 }
             }
             .foregroundStyle(copied ? Theme.signal : Theme.ink2)
-            action("Edit again", .edit, order: 2) { model.restoreDictation(entry) }
+            action("Edit again", .edit, order: 1) { model.restoreDictation(entry) }
                 .disabled(isLocked)
-            moreMenu
+            Menu { menuItems } label: { Glyph(.more) }
+                .menuStyle(.button)
+                .buttonStyle(IconButtonStyle())
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .help("More")
                 .opacity(showsActions ? 1 : 0)
-                .animation(Theme.snappy.delay(showsActions ? 3 * 0.03 : 0), value: showsActions)
+                .animation(Theme.snappy.delay(showsActions ? 2 * 0.03 : 0), value: showsActions)
         }
         .padding(2)
         .background(Theme.sheet, in: Capsule())
@@ -787,39 +800,58 @@ private struct HistoryRow: View {
         .allowsHitTesting(showsActions)
     }
 
-    private var moreMenu: some View {
-        Menu {
-            if let raw = entry.rawText {
-                Button("Restore original recognition", systemImage: "arrow.uturn.backward") {
-                    model.restoreDictation(entry, useRawText: true)
-                }
+    /// The ⋯ menu, also the right-click menu.
+    @ViewBuilder
+    private var menuItems: some View {
+        if entry.cleanedText != nil {
+            Button("Redo cleanup", systemImage: "arrow.uturn.forward") { model.toggleCleanup(entry) }
                 .disabled(isLocked)
-                Button("Copy original recognition", systemImage: "doc.on.clipboard") {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(raw, forType: .string)
-                }
-            }
-            Button("Add a word to Vocabulary", systemImage: "character.book.closed") {
-                withAnimation(Theme.snappy) { model.screen = .personalization }
-            }
-            Button("Transform this dictation", systemImage: "wand.and.stars") {
-                model.restoreDictation(entry)
-                model.screen = .transforms
-            }
-            .disabled(isLocked)
-            Divider()
-            Button("Delete", systemImage: "trash", role: .destructive) {
-                reader.stop(entry)
-                withAnimation(Theme.gentle) { model.deleteDictation(entry) }
-            }
-        } label: {
-            Glyph(.more)
+        } else if entry.undoingCleanup() != nil {
+            Button("Undo cleanup", systemImage: "arrow.uturn.backward") { model.toggleCleanup(entry) }
+                .disabled(isLocked)
         }
-        .menuStyle(.button)
-        .buttonStyle(IconButtonStyle())
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .help("More")
+        stateButton("Paste again", systemImage: "text.insert", state: model.pasteAgainState(for: entry)) {
+            Task { await model.pasteDictationAgain(entry) }
+        }
+        stateButton("Re-transcribe with \(model.retranscribeEngine(for: entry)?.title ?? "the other engine")",
+                    systemImage: "waveform", state: model.retranscribeState(for: entry)) {
+            Task { await model.retranscribeDictation(entry) }
+        }
+        Divider()
+        Button(isReading ? "Stop reading" : "Read aloud", systemImage: isReading ? "stop.fill" : "speaker.wave.2") {
+            reader.toggle(entry)
+        }
+        if let raw = entry.rawText, raw != entry.text {
+            Button("Copy original recognition", systemImage: "doc.on.clipboard") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(raw, forType: .string)
+            }
+        }
+        Button("Transform this dictation", systemImage: "wand.and.stars") {
+            model.restoreDictation(entry)
+            model.screen = .transforms
+        }
+        .disabled(isLocked)
+        Button("Add a word to Vocabulary", systemImage: "character.book.closed") {
+            withAnimation(Theme.snappy) { model.screen = .personalization }
+        }
+        Divider()
+        Button("Delete", systemImage: "trash", role: .destructive) {
+            reader.stop(entry)
+            withAnimation(reduceMotion ? nil : Theme.gentle) { model.deleteDictation(entry) }
+        }
+        .disabled(isRetranscribing)
+    }
+
+    /// A menu item that is left out, runs, or shows why it can't run as its greyed-out title.
+    @ViewBuilder
+    private func stateButton(_ title: String, systemImage: String, state: DictationHistoryActionState,
+                             perform: @escaping () -> Void) -> some View {
+        switch state {
+        case .hidden: EmptyView()
+        case .available: Button(title, systemImage: systemImage, action: perform)
+        case .unavailable(let reason): Button(reason, systemImage: systemImage) {}.disabled(true)
+        }
     }
 
     private func action(_ title: String, _ icon: HushIcon, order: Int, perform: @escaping () -> Void) -> some View {
@@ -833,8 +865,41 @@ private struct HistoryRow: View {
     }
 }
 
+/// "Dictation deleted · Undo", shown for a few seconds after a History delete.
+private struct DeletedDictationBar: View {
+    @Environment(AppModel.self) private var model
+    var deleted: DeletedDictation
+
+    var body: some View {
+        HStack(spacing: Theme.s2) {
+            Glyph(.trash, size: 14).foregroundStyle(Theme.ink3)
+            Text("Dictation deleted")
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.ink2)
+            Spacer()
+            Button("Undo") { withAnimation(Theme.gentle) { model.undoDeleteDictation() } }
+                .buttonStyle(.plain)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Theme.signal)
+                .help("Put this dictation back")
+        }
+        .padding(.horizontal, Theme.s4)
+        .padding(.vertical, 10)
+        .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
+            .strokeBorder(Theme.hairline, lineWidth: 1))
+        .task(id: deleted.entry.id) {
+            try? await Task.sleep(for: .seconds(DeletedDictation.undoSeconds))
+            guard !Task.isCancelled else { return }
+            withAnimation(Theme.gentle) { model.expireDeletedDictation(deleted.entry.id) }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Dictation deleted")
+    }
+}
+
 /// Reads one saved dictation aloud with the system voice, so you can hear what was typed.
-/// HushKey keeps no audio of past dictations, so this is the "play" Wispr offers.
+/// HushKey keeps no audio of past dictations on disk, so this is the "play" Wispr offers.
 @Observable
 final class HistoryReader: NSObject, AVSpeechSynthesizerDelegate {
     private(set) var speakingID: UUID?

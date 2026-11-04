@@ -7,14 +7,20 @@ struct DictationHistoryEntry: Codable, Identifiable, Equatable {
     var rawText: String?
     /// Seconds the microphone was live for this dictation; absent for restored or older entries.
     var duration: TimeInterval?
+    /// The app the dictation was spoken into; absent when it started in HushKey or for older entries.
+    var appName: String?
+    /// Set while "Undo cleanup" shows the original recognition, so the cleanup can be redone.
+    var cleanedText: String?
 
     init(id: UUID = UUID(), createdAt: Date = Date(), text: String, rawText: String? = nil,
-         duration: TimeInterval? = nil) {
+         duration: TimeInterval? = nil, appName: String? = nil, cleanedText: String? = nil) {
         self.id = id
         self.createdAt = createdAt
         self.text = text
         self.rawText = rawText
         self.duration = duration
+        self.appName = appName
+        self.cleanedText = cleanedText
     }
 
     var wordCount: Int {
@@ -103,6 +109,8 @@ enum DictationHistoryStore {
         var remaining = entries
         if let existingIndex = remaining.firstIndex(where: { $0.id == entry.id }) {
             savedEntry.createdAt = remaining[existingIndex].createdAt
+            // An edit made after the target app was forgotten still belongs to that app.
+            if savedEntry.appName == nil { savedEntry.appName = remaining[existingIndex].appName }
             remaining.remove(at: existingIndex)
         }
         let updated = Array(([savedEntry] + remaining).prefix(max(0, limit)))
