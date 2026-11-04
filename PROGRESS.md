@@ -1,5 +1,13 @@
 # HushKey progress
 
+## Completed: Typed confirmation and tick-free Copied (2026-11-04)
+
+- **Typed pill (`FloatingPill.swift`, `AppModel.swift`):** now reads "Typed into <App>" (app name in `ink2`, cut at 18 characters, HushKey never named). The working wave morphs into the tick, then the words slide in. Stays 1.6 s; width fits the text. Reduce Motion skips the morph.
+- **No false "Copied" pill:** the done pill shows only when the words were typed. When they weren't, the transcript card is the feedback (nothing is on the clipboard until Copy is pressed).
+- **Copy button:** after pressing it reads "Copied" with no tick.
+- **Verification:** 327 tests passed, 3 skipped; packaged and launched `dist/HushKey.app`. Not yet checked live with a real dictation (needs the mic).
+- **Open concern (from 51ce92d):** `pasteDirectly` sends ⌘V to whatever app is frontmost with no text-field check, then restores the clipboard after 100 ms. With no text box focused the words vanish while the pill says "Typed", and a slow Electron app could paste the old clipboard. The "No text box selected" card is now effectively unreachable.
+
 ## Completed: seamless pill morphing, definitive Typed feedback & robust insertion (2026-11-04)
 
 - **Failsafe active-app paste pipeline (`TextInsertionService.swift`, `AppModel.swift`):**

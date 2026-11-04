@@ -398,9 +398,11 @@ struct FloatingPillView: View {
             .onChange(of: model.completedDictationCount) {
                 doneToken += 1
                 let token = doneToken
+                // The pill confirms typing only; nothing was copied when the card is up instead.
+                guard model.didInsertCurrentDictation else { showsDone = false; return }
                 showsDone = true
                 Task {
-                    try? await Task.sleep(for: .seconds(1.2))
+                    try? await Task.sleep(for: .seconds(1.6))
                     if token == doneToken { showsDone = false }
                 }
             }
@@ -454,7 +456,7 @@ struct FloatingPillView: View {
             let width: CGFloat = showsControls ? 134 : 76
             return CGSize(width: width, height: Self.height)
         case .done:
-            return CGSize(width: 88, height: Self.height)
+            return CGSize(width: doneWidth, height: Self.height)
         }
     }
 
@@ -516,19 +518,28 @@ struct FloatingPillView: View {
         case .preparing, .listening, .finishing:
             recorder
         case .done:
-            HStack(spacing: 5) {
-                MorphIcon(phase: .done, lineWidth: 2)
-                    .frame(width: 14, height: 14)
-                    .foregroundStyle(Theme.signal)
-                Text(model.didInsertCurrentDictation ? "Typed" : "Copied")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Theme.ink)
-            }
-            .padding(.horizontal, 10)
-            .frame(height: Self.height)
-            .accessibilityLabel(model.didInsertCurrentDictation ? "Typed" : "Ready to copy")
-            .transition(.opacity.combined(with: .scale(scale: 0.92)))
+            // Only shown when the words went in: the card above is the feedback otherwise.
+            TypedConfirmation(appName: Self.shownAppName(model.typedIntoAppName))
+                .frame(height: Self.height)
+                .transition(.opacity.combined(with: .scale(scale: 0.92)))
         }
+    }
+
+    /// App names are cut to fit the pill; HushKey itself is never named.
+    private static func shownAppName(_ name: String?) -> String? {
+        guard let name = name?.trimmingCharacters(in: .whitespaces), !name.isEmpty, name != "HushKey" else { return nil }
+        return name.count > 18 ? String(name.prefix(17)) + "…" : name
+    }
+
+    /// Width of the Typed confirmation: tick, "Typed", "into <App>", and the side padding.
+    private var doneWidth: CGFloat {
+        let bold = NSFont.systemFont(ofSize: 12, weight: .semibold)
+        let regular = NSFont.systemFont(ofSize: 12, weight: .medium)
+        var width = 12 + 14 + 5 + ("Typed" as NSString).size(withAttributes: [.font: bold]).width + 12
+        if let app = Self.shownAppName(model.typedIntoAppName) {
+            width += 4 + ("into \(app)" as NSString).size(withAttributes: [.font: regular]).width
+        }
+        return ceil(width)
     }
 
     private static let height: CGFloat = 26
@@ -657,8 +668,11 @@ struct FloatingPillView: View {
                     model.copyDictationText()
                     copied = true
                 } label: {
-                    Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
-                        .contentTransition(.symbolEffect(.replace))
+                    if copied {
+                        Text("Copied")
+                    } else {
+                        Label("Copy", systemImage: "doc.on.doc")
+                    }
                 }
                 .buttonStyle(PrimaryButtonStyle(tint: Theme.signal, foreground: Theme.paper))
                 .keyboardShortcut("c", modifiers: .command)
@@ -1000,5 +1014,43 @@ struct CountdownCloseButton: View {
         .accessibilityLabel(help)
         // Leaving the card starts the count again from full, so a glance never loses the card.
         .onChange(of: paused) { _, isPaused in if !isPaused { startedAt = Date() } }
+    }
+}
+
+/// "✓ Typed into Notes": the working wave folds into the tick, then the words fade in after it.
+private struct TypedConfirmation: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let appName: String?
+    @State private var icon: MorphIcon.Phase = .working
+    @State private var showsText = false
+
+    var body: some View {
+        HStack(spacing: 5) {
+            MorphIcon(phase: icon, lineWidth: 2)
+                .frame(width: 14, height: 14)
+                .foregroundStyle(Theme.signal)
+            HStack(spacing: 4) {
+                Text("Typed")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+                if let appName {
+                    Text("into \(appName)")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Theme.ink2)
+                }
+            }
+            .lineLimit(1)
+            .fixedSize()
+            .opacity(showsText ? 1 : 0)
+            .offset(x: showsText ? 0 : -4)
+        }
+        .padding(.horizontal, 12)
+        .onAppear {
+            guard !reduceMotion else { icon = .done; showsText = true; return }
+            icon = .done
+            withAnimation(.easeOut(duration: 0.22).delay(0.12)) { showsText = true }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(appName.map { "Typed into \($0)" } ?? "Typed")
     }
 }

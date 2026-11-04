@@ -325,7 +325,16 @@ final class AppModel {
         }
     }
     private(set) var dictationHistory: [DictationHistoryEntry]
-    private(set) var didInsertCurrentDictation = false
+    private(set) var didInsertCurrentDictation = false {
+        didSet {
+            // Name the app the words went into, for the pill's "Typed into …" confirmation.
+            guard didInsertCurrentDictation != oldValue else { return }
+            typedIntoAppName = didInsertCurrentDictation
+                ? (dictationTargetApp?.localizedName ?? capturedInsertionTargetName) : nil
+        }
+    }
+    /// The app the current dictation was typed into, once it has been.
+    private(set) var typedIntoAppName: String?
     private(set) var didCompleteFirstDictation = UserDefaults.standard.bool(forKey: "completedFirstDictation")
     private(set) var rawDictationText = ""
     private(set) var transformUndoOriginalText: String?
