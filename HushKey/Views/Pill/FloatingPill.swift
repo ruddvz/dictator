@@ -141,11 +141,13 @@ final class FloatingPillController {
             screenObserver = NotificationCenter.default.addObserver(
                 forName: NSApplication.didChangeScreenParametersNotification,
                 object: nil, queue: .main) { [weak self] _ in
-                    guard let self else { return }
-                    if let current = self.screen, !NSScreen.screens.contains(current) {
-                        self.screen = PillPlacement.screenUnderPointer()
+                    MainActor.assumeIsolated {
+                        guard let self else { return }
+                        if let current = self.screen, !NSScreen.screens.contains(current) {
+                            self.screen = PillPlacement.screenUnderPointer()
+                        }
+                        self.place()
                     }
-                    self.place()
                 }
         }
         resize(to: hosting.fittingSize)
@@ -601,13 +603,17 @@ struct FloatingPillView: View {
                     model.dismissFinishedTranscript()
                 }
             }
-            Text(TranscriptCard.tail(model.transcriber.text))
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(Theme.ink)
-                .lineLimit(3)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .fixedSize(horizontal: false, vertical: true)
-                .contentTransition(.opacity)
+            ScrollView(.vertical, showsIndicators: false) {
+                Text(model.transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines))
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Theme.ink)
+                    .lineSpacing(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+            }
+            .frame(maxHeight: 110)
+            .contentTransition(.opacity)
             HStack(spacing: Theme.s2) {
                 if !model.insertion.isEnabled {
                     Button("Type for me next time") {
