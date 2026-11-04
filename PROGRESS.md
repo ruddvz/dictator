@@ -1,5 +1,15 @@
 # HushKey progress
 
+## Completed: optional live typing while you speak (2026-11-04)
+
+- **Settings → Typing into other apps → Type as you speak** (`typesWhileSpeaking`, off by default). Apple Speech partials feed `LivePhraseFinalizer` (`HushKey/TextProcessing/LivePhraseFinalizer.swift`): a phrase is final after a 1 s pause, once its words are unchanged for 0.8 s with 2 newer words held back, or past 14 unsettled words (rule from dimastatz/whisper-flow, MIT; see `NOTICE.md`). Only final phrases are typed, through `insert(_:ifStillFocused:)` with read-back; typed text is never rewritten. A full stop Speech adds to a typed word later is appended, not retyped.
+- **Cleanup** runs per phrase (fillers, corrections, snippets, tone; casual tone drops the full stop only at the end; spoken "new line" survives phrase edges). Apple Intelligence polish is skipped when live typing delivered text. At finish only the untyped tail is typed, so nothing doubles; Paste again stays off.
+- **Fallback:** no live typing with Parakeet, Code mode, Electron apps, or when no readable AX field was captured at start; the dictation is typed at the end as before. If a live insert is refused or unconfirmed, typing stops and the card shows the full text.
+- **Tests:** `LivePhraseFinalizerTests` (14). Full suite: 347 tests, 4 skipped, 0 failures.
+- **Checked live** with a rehearsal build (`HUSHKEY_SWIFT_FLAGS="-D LIVE_TYPING_REHEARSAL" Scripts/package-app.sh`, launch args `-liveTypingRehearsalApp <bundle id> -liveTypingRehearsal "words | pause"`), which feeds scripted partials through the real live-typing and AX insertion path (no mic): TextEdit typed phrase by phrase while "speaking" (sampled mid-run); Notes typed live (`eligible`, finished `active`); VS Code (Electron) and an unfocused Notes window fell back with no live typing (`noReadableField`). **Not checked:** a real spoken dictation through the mic (AirPods were the only input), and the `.electron` gate on an Electron field that exposes a readable text area.
+- **dist/HushKey.app is currently the rehearsal build**; rerun `Scripts/package-app.sh` for a normal one.
+- **Next:** SpeechAnalyzer (macOS 26) volatile/final results, or FluidAudio 0.18.2's `StreamingNemotronAsrManager` / `StreamingAsrManager` (present in the checkout), could feed the same finalizer so Parakeet users get live typing too.
+
 ## Completed: pill pixel pass, one voice for copy, top visual fixes (2026-11-04)
 
 - Pill: `Metrics` grid (28/20/4/8), concentric matched controls, neutral disabled ✓, Meeting notes button in the pill's material, quieter hint, no hover jump, timer slot, springy Typed check.

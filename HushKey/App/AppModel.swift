@@ -235,6 +235,10 @@ final class AppModel {
     var usesNearbyTextHints = UserDefaults.standard.object(forKey: "useNearbyTextHints") as? Bool ?? false {
         didSet { UserDefaults.standard.set(usesNearbyTextHints, forKey: "useNearbyTextHints") }
     }
+    /// Types each settled phrase while you speak, in fields HushKey can read back. Off by default.
+    var typesWhileSpeaking = UserDefaults.standard.bool(forKey: "typesWhileSpeaking") {
+        didSet { UserDefaults.standard.set(typesWhileSpeaking, forKey: "typesWhileSpeaking") }
+    }
     var appliesSpokenCorrections = UserDefaults.standard.object(forKey: "applySpokenCorrections") as? Bool ?? true {
         didSet { UserDefaults.standard.set(appliesSpokenCorrections, forKey: "applySpokenCorrections") }
     }
@@ -455,6 +459,10 @@ final class AppModel {
     @ObservationIgnored private var dictationHistorySaveTask: Task<Void, Never>?
     @ObservationIgnored private var currentDictationHistoryEntryID: UUID?
     @ObservationIgnored private var capturedInsertionTarget: TextInsertionService.InsertionTarget?
+    /// The current dictation's live typing, when `typesWhileSpeaking` applies to its field.
+    @ObservationIgnored private var liveTyping: LiveTypingSession?
+    @ObservationIgnored private var liveTypingTimer: Task<Void, Never>?
+    @ObservationIgnored private let liveTypingLog = Logger(subsystem: "com.ruddvz.hushkey", category: "liveTyping")
     @ObservationIgnored private var capturedPasteTarget: TextInsertionService.PasteTarget?
     @ObservationIgnored private var selectedTextEditTarget: TextInsertionService.InsertionTarget?
     @ObservationIgnored private let selectedEditTranscriber = MicTranscriber()
@@ -651,6 +659,10 @@ final class AppModel {
         }
         capture.onSegment = { [weak self] segment in self?.handleSegment(segment) }
         capture.onTooShort = { [weak self] in self?.handleTooShortCapture() }
+        transcriber.onTextChange = { [weak self] text in self?.liveTranscriptChanged(text) }
+        #if LIVE_TYPING_REHEARSAL
+        rehearseLiveTypingIfRequested()
+        #endif
         audio.refreshDevices()
         installKeyMonitor()
         installDictationShortcut()
@@ -2234,6 +2246,7 @@ final class AppModel {
             captureGate.release(.dictation)
             return
         }
+        if started { beginLiveTyping(usesParakeet: usesParakeet) }
         if !started, usesParakeet {
             // No live preview; Parakeet still gets the whole recording on release.
             transcriber.stop()
@@ -2260,6 +2273,9 @@ final class AppModel {
         restoreOutputAfterDictation()
         dictationStartGeneration += 1
         isFinalizingDictation = true
+        // The rest is typed once, at the end, from the final transcript.
+        liveTypingTimer?.cancel()
+        liveTypingTimer = nil
         if transcriber.isRunning { transcriber.beginFinalization() }
         else { transcriber.stop() }
         audio.stop()
@@ -2321,20 +2337,23 @@ final class AppModel {
         lastRecognitionUsedParakeet = false
         let isRetranscribing = retranscribingDictationID != nil
         rawDictationText = rawText
+        // Phrases already typed live stay as typed; only what's left is cleaned up and typed now.
+        let live = isRetranscribing ? nil : finishLiveTyping(rawText: rawText)
         var source = rawText
-        if usesSmartCleanup {
+        if usesSmartCleanup, live == nil {
             // The rules first (they own spoken corrections), then the on-device model for what's left.
             let ruled = DictationLocalCleanup.removeFillers(
                 from: activeDictationAppliesSpokenCorrections ? DictationBacktrack.apply(to: rawText) : rawText)
             if let polished = await DictationSmartCleanup.clean(ruled, session: smartCleanupSession) { source = polished }
         }
         smartCleanupSession = nil
-        let processed = DictationTranscriptProcessor.process(source, mode: activeDictationMode,
-                                                              snippets: activeDictationSnippets,
-                                                              applyCorrections: activeDictationAppliesSpokenCorrections,
-                                                              cleanupFillers: activeDictationCleansFillers,
-                                                              correctionRules: activeDictationCorrectionRules,
-                                                              tone: activeDictationTone)
+        let processed = live?.text ?? DictationTranscriptProcessor.process(
+            source, mode: activeDictationMode,
+            snippets: activeDictationSnippets,
+            applyCorrections: activeDictationAppliesSpokenCorrections,
+            cleanupFillers: activeDictationCleansFillers,
+            correctionRules: activeDictationCorrectionRules,
+            tone: activeDictationTone)
         transcriber.replaceText(processed)
         if !processed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             activeDictationProfileName = captureDictationProfileName
@@ -2353,6 +2372,17 @@ final class AppModel {
             dictationHistoryMessage = finished.isEmpty
                 ? "\(recognizedBy.title) heard no words in this recording. The entry is unchanged."
                 : "Re-transcribed with \(recognizedBy.title)."
+        } else if let live {
+            // Typed live: nothing is typed again, and Paste again stays off so nothing doubles.
+            retainedAudio.reset()
+            didInsertCurrentDictation = true
+            if live.state != .active {
+                showsFinishedTranscript = true
+                if live.state == .stopped {
+                    insertion.report("Typing stopped when the field lost focus. The rest is on the card.")
+                }
+            }
+            insertion.logFocus("live finish state=\(live.state) card=\(showsFinishedTranscript)")
         } else if activeParakeetNeedsReview && !finished.isEmpty {
             dictationNotice = DictationRecovery.reviewBeforeInsertion(
                 confidence: lastParakeetConfidence, peakLevel: lastParakeetPeakLevel ?? audio.peakLevel)
@@ -2446,6 +2476,166 @@ final class AppModel {
         } else {
             showsFinishedTranscript = true
         }
+    }
+
+    // MARK: - Live typing
+
+    /// Starts typing settled phrases as they're heard, if the setting is on and the field allows it.
+    /// Otherwise the dictation is typed at the end, as before.
+    private func beginLiveTyping(usesParakeet: Bool) {
+        endLiveTyping()
+        let eligibility = LiveTypingEligibility.decide(
+            enabled: typesWhileSpeaking,
+            hasReadableField: insertion.isEnabled && capturedInsertionTarget != nil,
+            isElectron: LiveTypingEligibility.isElectron(dictationTargetApp),
+            usesParakeet: usesParakeet, mode: activeDictationMode)
+        if typesWhileSpeaking {
+            liveTypingLog.notice("live typing: \(String(describing: eligibility), privacy: .public)")
+        }
+        guard eligibility == .eligible else { return }
+        liveTyping = LiveTypingSession()
+        // A pause sends no new words, so the pause rule needs a clock of its own.
+        liveTypingTimer = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(200))
+                guard let self, !Task.isCancelled else { return }
+                self.advanceLiveTyping()
+            }
+        }
+    }
+
+    private func endLiveTyping() {
+        liveTypingTimer?.cancel()
+        liveTypingTimer = nil
+        liveTyping = nil
+    }
+
+    private func liveTranscriptChanged(_ text: String) {
+        guard var session = liveTyping, session.state == .active, liveTypingIsListening else { return }
+        if let phrase = session.finalizer.update(transcript: text, at: session.elapsed()) {
+            deliverLivePhrase(phrase, isLast: false, session: &session)
+        }
+        liveTyping = session
+    }
+
+    private func advanceLiveTyping() {
+        guard var session = liveTyping, session.state == .active, liveTypingIsListening else { return }
+        if let phrase = session.finalizer.advance(to: session.elapsed()) {
+            deliverLivePhrase(phrase, isLast: false, session: &session)
+        }
+        liveTyping = session
+    }
+
+    /// Partials count only while the microphone is open; the rest is typed once at the end.
+    private var liveTypingIsListening: Bool {
+        #if LIVE_TYPING_REHEARSAL
+        if isRehearsingLiveTyping { return true }
+        #endif
+        return audio.isRunning
+    }
+
+    #if LIVE_TYPING_REHEARSAL
+    /// Developer check of live typing without a microphone, compiled only with
+    /// `HUSHKEY_SWIFT_FLAGS="-D LIVE_TYPING_REHEARSAL" Scripts/package-app.sh`. Launch with
+    /// `--args -liveTypingRehearsalApp <bundle id> -liveTypingRehearsal "words | more words"`: after 4 s,
+    /// if that app is in front, it feeds the words one at a time, as Speech partials, into its focused field; "|" is a 1.5 s pause. The end
+    /// works like a finished dictation, including the end-of-dictation insert when live typing is off.
+    @ObservationIgnored private var isRehearsingLiveTyping = false
+
+    private func rehearseLiveTypingIfRequested() {
+        guard let script = UserDefaults.standard.string(forKey: "liveTypingRehearsal") else { return }
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(4))
+            // Only into the app named with -liveTypingRehearsalApp <bundle id>, never whatever is in front.
+            guard let self, let app = NSWorkspace.shared.frontmostApplication,
+                  app.bundleIdentifier == UserDefaults.standard.string(forKey: "liveTypingRehearsalApp") else {
+                self?.liveTypingLog.notice("rehearsal skipped: wrong app in front")
+                return
+            }
+            insertion.logFocus("rehearsal start")
+            capturedInsertionTarget = insertion.captureInsertionTarget()
+            capturedPasteTarget = insertion.capturePasteTarget(into: app)
+            dictationTargetApp = app
+            capturedInsertionTargetName = capturedInsertionTarget?.applicationName
+            dictationHasTarget = capturedInsertionTarget != nil || capturedPasteTarget != nil
+            activeDictationMode = .natural
+            activeDictationTone = .formal
+            activeDictationCleansFillers = cleansDictationFillers
+            activeDictationAppliesSpokenCorrections = appliesSpokenCorrections
+            isRehearsingLiveTyping = true
+            beginLiveTyping(usesParakeet: false)
+            liveTypingLog.notice("rehearsal in \(app.localizedName ?? "?", privacy: .public): live=\(self.liveTyping != nil)")
+            var heard = ""
+            for token in script.split(separator: " ") {
+                if token == "|" {
+                    try? await Task.sleep(for: .seconds(1.5))
+                    continue
+                }
+                heard = heard.isEmpty ? String(token) : heard + " " + token
+                liveTranscriptChanged(heard)
+                try? await Task.sleep(for: .milliseconds(300))
+            }
+            isRehearsingLiveTyping = false
+            if let live = finishLiveTyping(rawText: heard) {
+                liveTypingLog.notice("rehearsal live: \(String(describing: live.state), privacy: .public) \(live.text, privacy: .public)")
+            } else {
+                let text = DictationTranscriptProcessor.process(heard, mode: .natural, snippets: "",
+                                                                cleanupFillers: cleansDictationFillers)
+                // The same choice finishDictation makes.
+                if dictationHasTarget { await typeFinishedDictation(text) }
+                else { _ = await typeIntoFieldFocusedNow(text) }
+                liveTypingLog.notice("rehearsal end insert: inserted=\(self.didInsertCurrentDictation) \(text, privacy: .public)")
+            }
+        }
+    }
+    #endif
+
+    /// Ends live typing for a finished dictation and types what's left. Nil when nothing reached
+    /// the field, so the dictation is typed the usual way and nothing is doubled.
+    private func finishLiveTyping(rawText: String) -> LiveTypingSession? {
+        guard var session = liveTyping else { return nil }
+        endLiveTyping()
+        guard session.hasDelivered else { return nil }
+        let tail = session.finalizer.finish(transcript: rawText)
+        deliverLivePhrase(tail, isLast: true, session: &session)
+        liveTypingLog.notice("live typing finished: \(String(describing: session.state), privacy: .public)")
+        return session
+    }
+
+    /// Cleans up one phrase and types it, only into the field dictation started in, and only while
+    /// that field still has focus and reads back what was typed. Any failure stops live typing.
+    private func deliverLivePhrase(_ phrase: LivePhraseFinalizer.Phrase, isLast: Bool,
+                                   session: inout LiveTypingSession) {
+        let text = processedLivePhrase(phrase, isLast: isLast)
+        guard !text.isEmpty else { return }
+        guard session.state == .active, let target = capturedInsertionTarget,
+              insertion.insert(text, ifStillFocused: target) else {
+            if session.state == .active {
+                session.state = insertion.requiresReviewAfterInsertion ? .uncertain : .stopped
+                let state = String(describing: session.state)
+                liveTypingLog.notice("live typing stopped: \(state, privacy: .public)")
+            }
+            session.recordUntyped(text)
+            return
+        }
+        session.recordTyped(text)
+    }
+
+    /// The same cleanup as a finished dictation, applied to one phrase. Casual tone drops a closing
+    /// full stop only at the very end.
+    private func processedLivePhrase(_ phrase: LivePhraseFinalizer.Phrase, isLast: Bool) -> String {
+        var punctuation = phrase.leadingPunctuation
+        if activeDictationTone == .veryCasual { punctuation = punctuation.replacingOccurrences(of: ".", with: "") }
+        guard !phrase.words.isEmpty else { return punctuation }
+        let tone: DictationTone = isLast || activeDictationTone != .casual ? activeDictationTone : .formal
+        let processed = DictationTranscriptProcessor.process(
+            phrase.words, mode: activeDictationMode, snippets: activeDictationSnippets,
+            applyCorrections: activeDictationAppliesSpokenCorrections,
+            cleanupFillers: activeDictationCleansFillers,
+            correctionRules: activeDictationCorrectionRules, tone: tone)
+        let text = LiveTypingSession.keepingLineBreaks(of: phrase.words, mode: activeDictationMode, in: processed)
+        guard !punctuation.isEmpty, !text.isEmpty else { return punctuation + text }
+        return punctuation + (text.first?.isWhitespace == true ? "" : " ") + text
     }
 
     /// No text field had focus when dictation began. If one has focus now, because the person
@@ -2963,6 +3153,8 @@ final class AppModel {
         dictationStartGeneration += 1
         functionKey.reset()
         restoreOutputAfterDictation()
+        // Phrases already typed stay in the field; nothing more is typed.
+        endLiveTyping()
         guard wasStarting || wasListening else { return }
         transcriber.cancelPendingAuthorization()
         audio.stop()

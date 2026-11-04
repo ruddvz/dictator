@@ -19,7 +19,12 @@ cleanup() {
   if [[ -n "$backup_dir" && -d "$backup_dir" ]]; then rm -rf "$backup_dir"; fi
 }
 trap cleanup EXIT
-xcodebuild -project HushKey.xcodeproj -scheme HushKey -configuration Release -derivedDataPath "$derived_data" CODE_SIGNING_ALLOWED=NO build
+# HUSHKEY_SWIFT_FLAGS adds compile conditions for a developer build, e.g. "-D LIVE_TYPING_REHEARSAL".
+extra_build_settings=()
+if [[ -n "${HUSHKEY_SWIFT_FLAGS:-}" ]]; then
+  extra_build_settings+=("OTHER_SWIFT_FLAGS=\$(inherited) $HUSHKEY_SWIFT_FLAGS")
+fi
+xcodebuild -project HushKey.xcodeproj -scheme HushKey -configuration Release -derivedDataPath "$derived_data" CODE_SIGNING_ALLOWED=NO build ${extra_build_settings[@]+"${extra_build_settings[@]}"}
 app_path="$derived_data/Build/Products/Release/HushKey.app"
 mkdir -p "$project_root/dist"
 stage_dir="$(mktemp -d "$project_root/dist/.HushKey-stage.XXXXXX")"

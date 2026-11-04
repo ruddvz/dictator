@@ -348,6 +348,7 @@ private struct InsertionSettings: View {
     @AppStorage("settingsSection") private var section: SettingsView.Section = .insertion
 
     var body: some View {
+        @Bindable var model = model
         @Bindable var insertion = model.insertion
         let enabled = Binding(get: { insertion.isEnabled },
                               set: { $0 ? insertion.enable() : insertion.disable() })
@@ -359,6 +360,12 @@ private struct InsertionSettings: View {
             }
             SettingsRow(title: "Paste when typing is blocked", detail: "Verifies the exact text field; restores the clipboard when safe.") {
                 RowToggle(isOn: $insertion.allowsPasteFallback, label: "Paste fallback")
+            }
+            .disabled(!insertion.isEnabled)
+            .opacity(insertion.isEnabled ? 1 : 0.5)
+            SettingsRow(title: "Type as you speak",
+                        detail: "Each phrase goes in once it settles, in fields HushKey can read back, like TextEdit and Notes. Elsewhere, and with Parakeet or Code mode, text arrives at the end. Typed phrases aren’t changed later, so cleanup works phrase by phrase.") {
+                RowToggle(isOn: $model.typesWhileSpeaking, label: "Type as you speak")
             }
             .disabled(!insertion.isEnabled)
             .opacity(insertion.isEnabled ? 1 : 0.5)
