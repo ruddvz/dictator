@@ -1,5 +1,31 @@
 # HushKey progress
 
+## Completed: codebase domain restructuring & pill transcript scroll preview (2026-11-04)
+
+- **Domain-driven architectural reorganization (`6b33bef`):**
+  - Grouped `HushKey/Views/` into domain subfolders:
+    - `Views/Hub/`: `ContentView.swift`, `DictationView.swift`, `InsightsView.swift`, `SettingsView.swift`, `StyleView.swift`, `PersonalizationView.swift`, `TransformView.swift`, `MeetingNotesView.swift`, `FileTranscriptionView.swift`.
+    - `Views/Pill/`: `FloatingPill.swift`.
+    - `Views/Components/`: `Components.swift`, `HubToolbar.swift`, `TrafficLightInset.swift`, `HushIcons.swift`, `Ambient.swift`, `LanguagePickerView.swift`, `ShortcutRecorder.swift`, `DictationEngineSettings.swift`.
+    - `Views/Lab/`: `SetupView.swift`, `TrainView.swift`, `EvaluateView.swift`, `UseView.swift`, `SilentCaptureHUD.swift`, `ResearchRecordingSection.swift`.
+    - `Views/Onboarding/`: `OnboardingView.swift`.
+    - `Views/Theme/`: `Theme.swift`.
+  - Reorganized speech recognition and NLP modules:
+    - `HushKey/Speech/`: `ParakeetDictationEngine.swift`, `MicTranscriber.swift`, `LocalFileTranscriber.swift`, `WhisperKitFileTranscriber.swift`, `TranscriptStitcher.swift`, `MeetingNotesService.swift`.
+    - `HushKey/TextProcessing/`: `DictationCleanup.swift`, `DictationCustomization.swift`, `DictationTone.swift`, `DictationVocabularySnapper.swift`, `LocalTransformService.swift`, `LocalPermissionAccess.swift`.
+    - `HushKey/Shortcuts/`: `KeyCombo.swift`, `CaptureShortcut.swift`, `DictationShortcut.swift`, `InsertionShortcut.swift`, `SelectedTextEditShortcut.swift`, `FunctionKeyMonitor.swift`, `MouseButtonMonitor.swift`, `GlobalHotKeyRegistration.swift`.
+  - Split multi-concern test file `PillPlacementTests.swift` into dedicated files:
+    - `HushKeyTests/InsertionSecureFieldTests.swift`
+    - `HushKeyTests/AudioDeviceFilterTests.swift`
+- **Pill UX & transcript card refinement (`4f0fff7`):**
+  - In `FloatingPill.swift`, replaced `TranscriptCard.tail()` with a vertical scrollable text preview (`ScrollView(.vertical, showsIndicators: false)`) displaying the full finished transcript from the beginning (selectable, max height 110 pt), removing confusing leading truncation ellipses.
+  - Wrapped screen parameter notification observer in `MainActor.assumeIsolated` for clean Swift 6 concurrency compliance with zero compiler warnings.
+- **Verification & release packaging:**
+  - `xcodegen generate` cleanly detects all recursive directories.
+  - Full unit test suite: **326 passed, 3 skipped, 0 failures** in ~12 seconds.
+  - Universal binary built and code-signed via `Scripts/package-app.sh`.
+  - Running live at PID 28801.
+
 ## Completed: audit bug hunt, architectural hardening and menu bar first (2026-11-04)
 
 - **Audit & bug hunt fixes (`docs/AUDIT_2026-11-04.md`):**
