@@ -1,11 +1,18 @@
 # HushKey progress
 
+## Completed: floating pill hover reliability (2026-11-04)
+
+- Removed microphone-device enumeration from the pill hover handler, so hover only changes view state and cannot block the entrance animation on a CoreAudio query.
+- Guarded delayed panel shrinks with a resize generation. A canceled callback from an older hover/leave sequence cannot resize the panel after a newer state or after the pill is hidden.
+- Added regression tests for stale resize invalidation. The test target compiles successfully; it was not launched because the packaged app process was left running to preserve the current user session. The earlier full suite passed 233 tests with 3 skipped before these two regression tests were added.
+- Rebuilt and signature-verified the packaged app at `dist/HushKey.app`. The currently running process still has the previous binary loaded; relaunch HushKey to use this build. Repeated live hover verification remains open.
+
 ## Completed: one wave again, and PR consolidation (2026-11-04)
 
 - **Wave regression fixed.** The Flow-style bar pass (`d9e4662`) had replaced the pill's `BreathRibbon` with `PillMeter` dot bars, so the pill was the only surface not showing HushKey's wave. The pill meter is the 58 × 18 `ink` ribbon again (live, waiting and working modes unchanged); `PillMeter` is removed and `docs/PILL_UX_ANALYSIS.md` records the reversal.
 - The audit session's uncommitted work (Silent Use gating, Parakeet review-before-insert, capture/storage fixes, 30 Hz meter mailbox) was tested and committed as `b40708e`.
 - **Verified here:** 233 tests, 3 skipped, 0 failures; packaged with `Scripts/package-app.sh`. **Not verified by eye:** screen access was declined, so the recording ribbon was not seen live. Check it by clicking the pill: a tapered ribbon between × and ✓, no row of bars.
-- **PRs:** ruddvz/hushkey#1 and ruddvz/hushkey#2 have no commits outside ruddvz/hushkey#3, so they can be closed as superseded. ruddvz/hushkey#3 is mergeable into `main` (the red check is the known billing block). Closing and merging need the user's go-ahead.
+- **PRs:** closed ruddvz/hushkey#1 and ruddvz/hushkey#2 as superseded (no commits outside #3) and merged ruddvz/hushkey#3 into `main` as `702811f`. Work continues on `feature/flow-style-ui`; open a new PR into `main` for the next batch.
 - **Next, one session each, in this order:** (1) live acceptance matrix with the user: spoken dictation into TextEdit, Notes, Safari and Slack; mic unplug; VoiceOver pass; (2) History rows: hover pill with Copy → check, ⋯ menu (Paste again, Re-transcribe, Delete with Undo), meta line; (3) Settings split (Dictation · Shortcuts · Cleanup · System · Appearance) and a shortcut recorder; (4) Home voice profile and time saved; (5) first-run onboarding with a practice field and whisper test. Source: `docs/WISPR_FLOW_FULL_AUDIT.md`.
 
 ## End-to-end audit and local build (2026-11-04)
