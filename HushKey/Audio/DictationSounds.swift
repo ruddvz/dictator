@@ -22,10 +22,13 @@ enum DictationCue: CaseIterable {
 
     static let sampleRate = 44_100.0
 
+    /// How long the cue plays, in seconds.
+    var duration: TimeInterval { notes.map { $0.1 + $0.2 }.max() ?? 0 }
+
     /// Mono samples in −1…1. Every note fades in over 4 ms and decays to silence, so the cue
     /// never clicks at either end.
     var samples: [Float] {
-        let length = notes.map { $0.1 + $0.2 }.max() ?? 0
+        let length = duration
         var output = [Float](repeating: 0, count: Int(length * Self.sampleRate) + 1)
         for (frequency, start, duration, gain) in notes {
             let first = Int(start * Self.sampleRate)
