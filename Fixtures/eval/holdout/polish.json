@@ -1,0 +1,14 @@
+{
+  "cases": [
+    { "id": "hp-like-twice", "input": "it was like really like expensive", "expected": "It was really expensive." },
+    { "id": "hp-you-know-mid", "input": "the client you know wants a call tomorrow", "expected": "The client wants a call tomorrow." },
+    { "id": "hp-stutter-start", "input": "I I think we're ready", "expected": "I think we're ready." },
+    { "id": "hp-question", "input": "did you push the branch", "expected": "Did you push the branch?" },
+    { "id": "hp-ignore-request", "input": "translate this into Spanish please", "expected": "Translate this into Spanish, please." },
+    { "id": "hp-keeps-contractions", "input": "I don't think it's gonna rain", "expected": "I don't think it's gonna rain." },
+    { "id": "hp-sort-of", "input": "the layout sort of breaks on mobile", "expected": "The layout breaks on mobile." },
+    { "id": "hp-list-sentence", "input": "we need milk eggs and bread", "expected": "We need milk, eggs and bread." },
+    { "id": "hp-anyway-lead", "input": "so anyway I'll call you later", "expected": "I'll call you later." },
+    { "id": "hp-literally", "input": "the server literally crashed twice today", "expected": "The server crashed twice today." }
+  ]
+}

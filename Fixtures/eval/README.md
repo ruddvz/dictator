@@ -7,6 +7,7 @@ Fixtures/eval/
   dev/        tune against these
     processor.json   deterministic text cases for DictationTranscriptProcessor
     audio.json       audio clips: spoken reference + per-mode checks
+    polish.json      Polished-level cases: rule-cleaned input, intended polished output
     audio/           consented recordings, <clip id>.wav|m4a|caf|aiff|mp3 (optional)
   holdout/    same layout; a fair check, not a tuning target
 ```
@@ -26,6 +27,10 @@ Each case runs `DictationTranscriptProcessor.process` with its `mode`, `snippets
 - Do not edit `expected` to match current output. Change it only when the intended behavior changes.
 
 Categories: `code`, `line-breaks`, `corrections`, `snippets`, `fillers`.
+
+## Polish cases (model-backed, reported)
+
+`polish.json` holds text as it reaches the Polished pass and the `expected` result: only fillers and stutters deleted, punctuation and capitals fixed. `PolishEvalTests` gates that every `expected` passes `DictationSmartCleanup.isSafeCleanup`. With `TEST_RUNNER_HUSHKEY_POLISH_MODEL=<path to a GGUF>` it also runs the local model and writes raw vs polished scores to [docs/eval/polish-report.md](../../docs/eval/polish-report.md). The few-shot examples in `DictationSmartCleanup.localExamples` must never repeat a polish input.
 
 ## Audio clips (reported, not gated)
 

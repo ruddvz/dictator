@@ -10,6 +10,8 @@ packages:
     exactVersion: 1.1.1
   HushKeyParakeet:
     path: Packages/HushKeyParakeet
+  HushKeyLlama:
+    path: Packages/HushKeyLlama
 settings:
   base:
     SWIFT_VERSION: "5.0"
@@ -25,6 +27,7 @@ targets:
       - package: argmax-oss-swift
         product: WhisperKit
       - package: HushKeyParakeet
+      - package: HushKeyLlama
     info:
       path: HushKey/Info.plist
       properties:
