@@ -299,10 +299,13 @@ struct KeycapShortcut: View {
         .accessibilityLabel("Shortcut \(label)")
     }
 
-    /// Splits "⌥⇧D" into one key per glyph, keeping word keys such as "fn" whole.
+    /// Splits "⌥⇧D" into one key per modifier glyph plus the key, keeping word keys such as
+    /// "fn", "F5", "Space" and "Mouse 4" whole.
     static func keys(in label: String) -> [String] {
         if label.hasPrefix("fn") { return ["fn"] + keys(in: String(label.dropFirst(2))) }
-        return label.map(String.init)
+        let modifiers = label.prefix { "⌃⌥⇧⌘".contains($0) }
+        let key = label.dropFirst(modifiers.count)
+        return modifiers.map(String.init) + (key.isEmpty ? [] : [String(key)])
     }
 }
 

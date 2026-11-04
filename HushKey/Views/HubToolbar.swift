@@ -234,7 +234,7 @@ struct Notice: Identifiable {
             notices.append(Notice(id: "shortcut", kind: .attention, icon: .keyboard,
                                   title: "Your dictation key needs a hand", detail: model.dictationShortcutStatus,
                                   action: "Fix it") { model in
-                UserDefaults.standard.set(SettingsView.Section.general.rawValue, forKey: "settingsSection")
+                UserDefaults.standard.set(SettingsView.Section.shortcuts.rawValue, forKey: "settingsSection")
                 model.screen = .settings
             })
         }

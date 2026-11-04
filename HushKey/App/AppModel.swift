@@ -152,22 +152,47 @@ final class AppModel {
         rawValue: UserDefaults.standard.string(forKey: DictationShortcut.preferenceKey) ?? "") ?? .default {
         didSet {
             UserDefaults.standard.set(dictationShortcut.rawValue, forKey: DictationShortcut.preferenceKey)
-            if started { installDictationShortcut() }
+            if started, !shortcutsSuspended { installDictationShortcut() }
         }
     }
     var selectedTextEditShortcut: SelectedTextEditShortcut = SelectedTextEditShortcut(
         rawValue: UserDefaults.standard.string(forKey: SelectedTextEditShortcut.preferenceKey) ?? "") ?? .default {
         didSet {
             UserDefaults.standard.set(selectedTextEditShortcut.rawValue, forKey: SelectedTextEditShortcut.preferenceKey)
-            if started { installSelectedTextEditShortcut() }
+            if started, !shortcutsSuspended { installSelectedTextEditShortcut() }
         }
     }
     var dictationCaptureBehavior: DictationCaptureBehavior = DictationCaptureBehavior(
         rawValue: UserDefaults.standard.string(forKey: DictationCaptureBehavior.preferenceKey) ?? "") ?? .hold {
         didSet {
             UserDefaults.standard.set(dictationCaptureBehavior.rawValue, forKey: DictationCaptureBehavior.preferenceKey)
-            if started { installDictationShortcut() }
+            if started, !shortcutsSuspended { installDictationShortcut() }
         }
+    }
+    /// Pastes the last transcript from any app; nil when turned off.
+    var pasteLastShortcut: PasteLastShortcut? = {
+        let raw = UserDefaults.standard.string(forKey: PasteLastShortcut.preferenceKey)
+        if raw == PasteLastShortcut.offValue { return nil }
+        return raw.flatMap(PasteLastShortcut.init(rawValue:)) ?? .default
+    }() {
+        didSet {
+            UserDefaults.standard.set(pasteLastShortcut?.rawValue ?? PasteLastShortcut.offValue,
+                                      forKey: PasteLastShortcut.preferenceKey)
+            if started, !shortcutsSuspended { installPasteLastShortcut() }
+        }
+    }
+    private(set) var pasteLastShortcutStatus = "Shortcut is not registered yet."
+    /// What each action is set to, for the recorder's conflict check.
+    var shortcutAssignments: [ShortcutAction: KeyCombo] {
+        var assignments: [ShortcutAction: KeyCombo] = [
+            .dictation: dictationShortcut.combo,
+            .editSelection: selectedTextEditShortcut.combo,
+            .insertAgain: insertion.shortcut.combo,
+            .undoInsertion: TextInsertionService.undoShortcut,
+            .silentCapture: captureShortcut.combo,
+        ]
+        assignments[.pasteLast] = pasteLastShortcut?.combo
+        return assignments
     }
     private(set) var dictationShortcutStatus = "Shortcut is not registered yet."
     var dictationShortcutNeedsAttention: Bool {
@@ -265,6 +290,14 @@ final class AppModel {
     private(set) var launchAtLoginMessage: String?
     var savesDictationHistory = UserDefaults.standard.object(forKey: "saveDictationHistory") as? Bool ?? true {
         didSet { UserDefaults.standard.set(savesDictationHistory, forKey: "saveDictationHistory") }
+    }
+    /// How long saved transcripts stay before HushKey deletes them from this Mac.
+    var dictationHistoryRetention = DictationHistoryRetention(
+        rawValue: UserDefaults.standard.string(forKey: DictationHistoryRetention.preferenceKey) ?? "") ?? .default {
+        didSet {
+            UserDefaults.standard.set(dictationHistoryRetention.rawValue, forKey: DictationHistoryRetention.preferenceKey)
+            pruneDictationHistory()
+        }
     }
     private(set) var dictationHistory: [DictationHistoryEntry]
     private(set) var didInsertCurrentDictation = false
@@ -420,6 +453,11 @@ final class AppModel {
     @ObservationIgnored private let functionKey = FunctionKeyMonitor()
     @ObservationIgnored private var functionKeyInstalledTrusted = false
     @ObservationIgnored private let selectedTextEditHotKey = GlobalHotKeyRegistration(id: 4)
+    @ObservationIgnored private let pasteLastHotKey = GlobalHotKeyRegistration(id: 5)
+    @ObservationIgnored private let dictationMouseButton = MouseButtonMonitor()
+    @ObservationIgnored private let pasteLastMouseButton = MouseButtonMonitor()
+    /// True while Settings records a new shortcut, so pressing a current one doesn't fire it.
+    @ObservationIgnored private var shortcutsSuspended = false
     /// Hold Control on its own to capture a silent word, the way fn holds dictation. Works in other apps.
     @ObservationIgnored private let silentControlKey = FunctionKeyMonitor(key: .control)
     @ObservationIgnored private var silentControlKeyInstalledTrusted = false
@@ -565,7 +603,9 @@ final class AppModel {
         installKeyMonitor()
         installDictationShortcut()
         installSelectedTextEditShortcut()
+        installPasteLastShortcut()
         insertion.restore()
+        pruneDictationHistory()
         updateMotionActivity()
         syncCaptureMode()
         NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification,
@@ -575,6 +615,7 @@ final class AppModel {
                 self?.syncSilentControlKey()
                 self?.insertion.restore()
                 self?.refreshLaunchAtLogin()
+                self?.pruneDictationHistory()
             }
         }
     }
@@ -2451,6 +2492,7 @@ final class AppModel {
                 entry, to: dictationHistoryURL, existing: dictationHistory)
             currentDictationHistoryEntryID = entry.id
             lastSavedDictationText = text
+            pruneDictationHistory()
             if dictationHistoryRecoveryCopyURL == nil { dictationHistoryMessage = nil }
         } catch {
             dictationHistoryMessage = "This transcript could not be saved to history: \(error.localizedDescription)"
@@ -2485,6 +2527,24 @@ final class AppModel {
     }
 
     private func installDictationShortcut() {
+        if let button = dictationShortcut.mouseButton {
+            dictationHotKey.unregister()
+            functionKey.uninstall()
+            dictationMouseButton.install(button: button) { [weak self] pressed in
+                guard let self else { return }
+                switch self.dictationCaptureBehavior {
+                case .hold:
+                    if pressed { self.beginShortcutDictation() } else { self.endShortcutDictation() }
+                case .toggle:
+                    if pressed { Task { @MainActor in await self.toggleDictation() } }
+                }
+            }
+            dictationShortcutStatus = dictationCaptureBehavior == .hold
+                ? "Hold \(dictationShortcut.label) to dictate from any app; release to stop."
+                : "Click \(dictationShortcut.label) to start or stop local dictation from any app."
+            return
+        }
+        dictationMouseButton.uninstall()
         if dictationShortcut.usesFunctionKey {
             dictationHotKey.unregister()
             functionKey.onAction = { [weak self] action in self?.handleFunctionKey(action) }
@@ -2513,6 +2573,68 @@ final class AppModel {
                 ? "Hold \(dictationShortcut.label) to dictate from any app; release to stop."
                 : "Press \(dictationShortcut.label) to start or stop local dictation from any app."
             : "Could not register \(dictationShortcut.label) (system status \(status))."
+    }
+
+    private func installPasteLastShortcut() {
+        pasteLastHotKey.unregister()
+        pasteLastMouseButton.uninstall()
+        guard let shortcut = pasteLastShortcut else {
+            pasteLastShortcutStatus = "Off. The menu bar item still pastes the last transcript."
+            return
+        }
+        if let button = shortcut.combo.mouseButton {
+            pasteLastMouseButton.install(button: button) { [weak self] pressed in
+                if pressed { Task { @MainActor in await self?.pasteLastDictationAgain() } }
+            }
+            pasteLastShortcutStatus = "Click \(shortcut.label) to paste your last transcript into the field it came from."
+            return
+        }
+        let status = pasteLastHotKey.register(keyCode: shortcut.keyCode, modifiers: shortcut.carbonModifiers) { [weak self] in
+            Task { @MainActor in await self?.pasteLastDictationAgain() }
+        }
+        pasteLastShortcutStatus = status == noErr
+            ? "Press \(shortcut.label) to paste your last transcript into the field it came from."
+            : "Could not register \(shortcut.label) (system status \(status)). Another app may use it."
+    }
+
+    /// Settings is recording a new shortcut: let every key reach the recorder.
+    func suspendShortcuts() {
+        guard !shortcutsSuspended else { return }
+        shortcutsSuspended = true
+        dictationHotKey.unregister()
+        functionKey.uninstall()
+        dictationMouseButton.uninstall()
+        selectedTextEditHotKey.unregister()
+        pasteLastHotKey.unregister()
+        pasteLastMouseButton.uninstall()
+        insertion.suspendShortcuts()
+    }
+
+    func resumeShortcuts() {
+        guard shortcutsSuspended else { return }
+        shortcutsSuspended = false
+        guard started else { return }
+        installDictationShortcut()
+        installSelectedTextEditShortcut()
+        installPasteLastShortcut()
+        insertion.resumeShortcuts()
+    }
+
+    /// Deletes saved transcripts older than the retention setting, on this Mac only.
+    func pruneDictationHistory(now: Date = Date()) {
+        guard !dictationHistoryArchiveUnreadable else { return }
+        let kept = dictationHistoryRetention.pruning(dictationHistory, now: now)
+        guard kept.count != dictationHistory.count else { return }
+        do {
+            if kept.isEmpty { try DictationHistoryStore.delete(at: dictationHistoryURL) }
+            else { try DictationHistoryStore.save(kept, to: dictationHistoryURL) }
+            if let current = currentDictationHistoryEntryID, !kept.contains(where: { $0.id == current }) {
+                currentDictationHistoryEntryID = nil
+            }
+            dictationHistory = kept
+        } catch {
+            dictationHistoryMessage = "Could not delete old transcripts: \(error.localizedDescription)"
+        }
     }
 
     private func installSelectedTextEditShortcut() {

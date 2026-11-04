@@ -1,5 +1,14 @@
 # HushKey progress
 
+## Completed: Settings split, shortcut recorder, paste-last shortcut, history retention (2026-11-04)
+
+- **Settings sections** (audit row 8): General is split into **Dictation** (language, engine, microphone, bar, sounds), **Shortcuts**, **Cleanup** (corrections, fillers, Apple Intelligence, nearby text, vocabulary, app profiles), **System** (login, Dock, mute) and **Appearance**; Insertion, Data & privacy and About stay. Still an in-page view with the sidebar. A saved `settingsSection` of "General" falls back to Dictation; `SettingsView.Section.general` stays as an alias for links in other files. The dictation-key notice now opens Shortcuts.
+- **Shortcut recorder** (`ShortcutRecorder.swift`, `KeyCombo.swift`): click, press keys; fn alone (dictation only), any key with ⌘/⌥/⌃ or an F-key, or a middle/side mouse button (dictation and paste-last; `MouseButtonMonitor`, event monitors, so apps still get the click). Escape cancels; HushKey's own shortcuts are suspended while recording. Conflicts: another HushKey action or an essential macOS shortcut (⌘C, ⌘V, ⌘Q, ⌘Tab, ⌘Space…) blocks saving; common ones (⌃Space, ⌃↑…) and mouse buttons save with a warning. **Reset to fn** on the dictation key; Reset on the others. The four old enums are now structs over `KeyCombo` with the same API, and old saved names (`optionShiftD`, `controlShiftE`…) still parse, so existing settings carry over.
+- **Paste last transcript** is a global shortcut (default ⌃⌘V, can be turned off; `pasteLastShortcut` in `AppModel`). Insert-again moved from Insertion to Shortcuts; Insertion links there.
+- **History retention** in Data & privacy: Keep / 30 days / 7 days / 24 hours (`DictationHistoryRetention`). Pruning is local, on launch, app activation, each save and when the choice changes.
+- **Verified here:** `xcodegen generate` + full suite: 260 tests, 3 skipped, 0 failures (27 new: parsing, capture, conflicts, retention, persistence). `Scripts/package-app.sh` built `dist/HushKey.app`. LIVE_CHECK_PLACEHOLDER
+- **Next:** Flow allows up to 4 bindings per action; HushKey keeps one. Key labels follow the current keyboard layout, but stored shortcuts are key positions.
+
 ## Completed: History rows to the audit spec (2026-11-04)
 
 - **Hover pill** on each History row: Copy (icon morphs to a check, "Copied"), Edit again, and ⋯. The ⋯ menu (also the right-click menu) has **Undo cleanup / Redo cleanup** (in place: the entry shows the raw recognition and remembers the cleaned text), **Paste again** (latest dictation only, only into its original field: HushKey brings that app forward, then the existing Paste-again gate checks focus), **Re-transcribe with Parakeet / Apple Speech** (only when the entry's audio is still held), Read aloud, Copy original recognition, Transform, Add a word, and Delete.
