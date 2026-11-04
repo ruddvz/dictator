@@ -1,3 +1,4 @@
+import AppKit
 import AVFoundation
 import XCTest
 @testable import HushKey
@@ -1363,5 +1364,16 @@ final class SafetyAndStorageTests: XCTestCase {
     private func recoveryCopy<Value>(from state: JSONArchiveLoad<Value>) -> URL? {
         if case .unreadable(let recoveryCopyURL) = state { return recoveryCopyURL }
         return nil
+    }
+}
+
+final class DockPolicyTests: XCTestCase {
+    func testMenuBarFirstShowsInDockOnlyWhileTheHubIsOpen() {
+        XCTAssertEqual(AppModel.activationPolicy(showsInDock: false, hubWindowOpen: false), .accessory)
+        XCTAssertEqual(AppModel.activationPolicy(showsInDock: false, hubWindowOpen: true), .regular)
+    }
+
+    func testAlwaysInDockKeepsTheIconWithTheWindowClosed() {
+        XCTAssertEqual(AppModel.activationPolicy(showsInDock: true, hubWindowOpen: false), .regular)
     }
 }

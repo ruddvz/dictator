@@ -309,8 +309,9 @@ private struct SystemSettings: View {
                 RowToggle(isOn: Binding(get: { model.launchesAtLogin }, set: { model.setLaunchesAtLogin($0) }),
                           label: "Launch HushKey at login")
             }
-            SettingsRow(title: "Show in Dock", detail: "Off keeps HushKey in the menu bar only.") {
-                RowToggle(isOn: $model.showsInDock, label: "Show HushKey in the Dock")
+            SettingsRow(title: "Always show in Dock",
+                        detail: "Off keeps HushKey in the menu bar, with a Dock icon only while this window is open.") {
+                RowToggle(isOn: $model.showsInDock, label: "Always show HushKey in the Dock")
             }
             SettingsRow(title: "Mute audio while dictating",
                         detail: "Music and videos go quiet while the mic is open, then come back.") {

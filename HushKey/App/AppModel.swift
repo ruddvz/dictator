@@ -278,8 +278,9 @@ final class AppModel {
         }
     }
     @ObservationIgnored private let outputMuter = OutputMuter()
-    /// Off makes HushKey a menu bar app with no Dock icon; it works the same either way.
-    var showsInDock = UserDefaults.standard.object(forKey: "showInDock") as? Bool ?? true {
+    /// On keeps a Dock icon at all times. Off (the default, like TypeWhisper and Wispr Flow) makes
+    /// HushKey a menu bar app that only shows in the Dock and ⌘-Tab while its window is open.
+    var showsInDock = UserDefaults.standard.object(forKey: "showInDock") as? Bool ?? false {
         didSet {
             UserDefaults.standard.set(showsInDock, forKey: "showInDock")
             applyDockVisibility()
@@ -2044,6 +2045,7 @@ final class AppModel {
         isStartingDictation = true
         stopsWhenStarted = false
         defer { isStartingDictation = false }
+        var timing = StartTiming()
         dictationStartGeneration += 1
         let generation = dictationStartGeneration
         dictationNotice = nil
@@ -2053,15 +2055,19 @@ final class AppModel {
         let target = NSWorkspace.shared.frontmostApplication
         let isHushKey = target?.bundleIdentifier == "com.ruddvz.hushkey"
         activeDictationTarget = isHushKey ? nil : target?.localizedName
+        timing.mark("reset")
         capturedInsertionTarget = isHushKey ? nil : insertion.captureInsertionTarget()
+        timing.mark("axTarget")
         capturedPasteTarget = nil
         if !isHushKey, let target {
             capturedPasteTarget = insertion.capturePasteTarget(into: target)
         }
+        timing.mark("pasteTarget")
         capturedInsertionTargetName = capturedInsertionTarget?.applicationName
         dictationTargetApp = isHushKey ? nil : target
         dictationHasTarget = insertion.isEnabled && (capturedInsertionTarget != nil || capturedPasteTarget != nil)
         insertion.logFocus("start insertTarget=\(capturedInsertionTarget != nil) pasteTarget=\(capturedPasteTarget != nil)")
+        timing.mark("logFocus")
         let targetBundleIdentifier = isHushKey ? nil : target?.bundleIdentifier
         let profileSettings = DictationAppProfile.resolve(
             requestedMode: dictationMode,
@@ -2082,11 +2088,14 @@ final class AppModel {
         activeDictationAppliesSpokenCorrections = appliesSpokenCorrections
         activeDictationUsesSmartCleanup = polishesWithAppleIntelligence && profileSettings.cleansFillers &&
             profileSettings.mode != .code
+        timing.mark("profile")
         smartCleanupSession = usesSmartCleanup ? DictationSmartCleanup.prepare() : nil
+        timing.mark("smartCleanup")
         captureDictationProfileName = profileSettings.appName
         captureDictationWritingStylePresetID = profileSettings.writingStylePresetID
         let nearbyHints = usesNearbyTextHints ? insertion.nearbyContextHints() : []
         usedNearbyTextHints = !nearbyHints.isEmpty
+        timing.mark("nearbyText")
         let usesParakeet = usesParakeet(for: activeDictationLanguageIdentifier)
         activeDictationUsesParakeet = usesParakeet
         activeDictationEngine = usesParakeet ? .parakeet : .appleSpeech
@@ -2094,6 +2103,7 @@ final class AppModel {
         lastParakeetConfidence = nil
         lastParakeetPeakLevel = nil
         if usesParakeet { parakeet.warmUp() }
+        timing.mark("parakeetWarmUp")
         // With Parakeet, Apple Speech only shows words while you talk, and only if it's already allowed.
         let showsApplePreview = !usesParakeet || SFSpeechRecognizer.authorizationStatus() == .authorized
 
@@ -2102,12 +2112,15 @@ final class AppModel {
         async let speechPreparation = showsApplePreview
             ? transcriber.prepare(localeIdentifier: activeDictationLanguageIdentifier) : false
         await audio.start()
+        timing.mark("micOpen")
         if audio.isRunning, generation == dictationStartGeneration {
             if showsApplePreview { transcriber.beginBuffering(sink: audio.sink) }
             retainedAudioSinkID = audio.sink.add { [retainedAudio] buffer, _ in retainedAudio.append(buffer) }
         }
         let speechReady = await speechPreparation
+        timing.mark("speechPrepare")
         guard generation == dictationStartGeneration, speechReady || usesParakeet, audio.isRunning else {
+            timing.report("failed")
             transcriber.stop()
             audio.stop()
             stopRetainingAudio(keep: false)
@@ -2130,6 +2143,7 @@ final class AppModel {
         lastDictationMicrophoneName = audio.activeDeviceName
         playDictationCue(.start)
         muteOutputForDictation()
+        timing.mark("cueAndMute")
         dictationStartedAt = Date()
         lastDictationDuration = nil
         let customWords = profileSettings.vocabulary
@@ -2141,6 +2155,8 @@ final class AppModel {
             ? await transcriber.start(sink: audio.sink, localeIdentifier: activeDictationLanguageIdentifier,
                                       contextualStrings: lastDictationContextualStrings)
             : false
+        timing.mark("speechStart")
+        timing.report(started ? "ok" : "noPreview")
         guard generation == dictationStartGeneration, audio.isRunning else {
             transcriber.stop()
             restoreOutputAfterDictation()
@@ -3029,13 +3045,24 @@ final class AppModel {
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    /// Whether the hub window is on screen; set by the app delegate as windows open and close.
+    @ObservationIgnored var isHubWindowOpen = false {
+        didSet { if oldValue != isHubWindowOpen { applyDockVisibility() } }
+    }
+
     func applyDockVisibility() {
         guard !AppDataDirectory.isRunningTests else { return }
-        let policy: NSApplication.ActivationPolicy = showsInDock ? .regular : .accessory
+        let policy = Self.activationPolicy(showsInDock: showsInDock, hubWindowOpen: isHubWindowOpen)
         guard NSApp.activationPolicy() != policy else { return }
         NSApp.setActivationPolicy(policy)
-        // Leaving the Dock hides the window along with the app; bring it back.
-        if !showsInDock { DispatchQueue.main.async { NSApp.activate(ignoringOtherApps: true) } }
+        // Joining the Dock while the window is open: keep it in front rather than behind the last app.
+        if policy == .regular, isHubWindowOpen { DispatchQueue.main.async { NSApp.activate(ignoringOtherApps: true) } }
+    }
+
+    /// Menu bar first: a Dock icon only when asked for, or while the hub window is open so it can
+    /// be found with ⌘-Tab. Closing the window drops back to the menu bar.
+    nonisolated static func activationPolicy(showsInDock: Bool, hubWindowOpen: Bool) -> NSApplication.ActivationPolicy {
+        showsInDock || hubWindowOpen ? .regular : .accessory
     }
 
     func setLaunchesAtLogin(_ enabled: Bool) {

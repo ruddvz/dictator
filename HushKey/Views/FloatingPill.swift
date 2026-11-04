@@ -2,6 +2,7 @@ import AppKit
 import Carbon.HIToolbox
 import CoreAudio
 import SwiftUI
+import os
 
 /// Always-on-top dictation indicator at the bottom of the screen. It is a non-activating panel,
 /// so clicking it never steals focus from the app that will receive the dictated text.
@@ -295,7 +296,11 @@ struct FloatingPillView: View {
             .onChange(of: model.audio.isRunning) { _, running in
                 if running { copied = false }
             }
-            .onChange(of: phase) { hoveredControl = nil }
+            .onChange(of: phase) { old, new in
+                hoveredControl = nil
+                Logger(subsystem: "com.ruddvz.hushkey", category: "start")
+                    .notice("pill \(String(describing: old), privacy: .public) -> \(String(describing: new), privacy: .public) hint=\(hint?.title ?? "-", privacy: .public)")
+            }
             .onChange(of: model.completedDictationCount) {
                 doneToken += 1
                 let token = doneToken

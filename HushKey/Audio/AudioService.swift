@@ -2,6 +2,7 @@ import AVFoundation
 import CoreAudio
 import Foundation
 import Observation
+import os
 
 /// Fans microphone buffers out to consumers (speech recognizer, session recorder) on the
 /// audio render thread. Consumers must be cheap and thread-safe.
@@ -166,6 +167,7 @@ final class AudioService {
             return
         }
 
+        let engineStart = ProcessInfo.processInfo.systemUptime
         let engine = AVAudioEngine()
         let input = engine.inputNode
         let deviceID = selectedDeviceID ?? AudioDevices.defaultInputID()
@@ -208,6 +210,8 @@ final class AudioService {
         }
 
         self.engine = engine
+        Logger(subsystem: "com.ruddvz.hushkey", category: "start").notice(
+            "audio engine build+start \(String(format: "%.0f", (ProcessInfo.processInfo.systemUptime - engineStart) * 1000), privacy: .public)ms")
         activeDeviceName = deviceID.flatMap(AudioDevices.name(of:))
         isRunning = true
     }
