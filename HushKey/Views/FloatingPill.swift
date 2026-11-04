@@ -12,6 +12,9 @@ final class FloatingPillController {
     private var contentSize = CGSize(width: 60, height: 14)
     /// A smaller size waits for the closing animation, so the panel never clips the pill as it shrinks.
     private var pendingShrink: DispatchWorkItem?
+    /// Canceled DispatchWorkItems can still run after they have been enqueued. This generation
+    /// makes sure only the most recent geometry measurement is allowed to resize the panel.
+    private var resizeGeneration = 0
     private var escapeMonitors: [Any] = []
     /// The screen the pill sits on: wherever the pointer was when it appeared or a dictation began.
     private var screen: NSScreen?
@@ -119,6 +122,7 @@ final class FloatingPillController {
     }
 
     private func hide() {
+        resizeGeneration &+= 1
         pendingShrink?.cancel()
         pendingShrink = nil
         panel?.orderOut(nil)
@@ -129,12 +133,17 @@ final class FloatingPillController {
     /// animation has settled. Resizing a window mid-animation clips the pill or makes it flicker.
     private func resize(to size: CGSize) {
         guard size.width > 0, size.height > 0 else { return }
+        resizeGeneration &+= 1
+        let generation = resizeGeneration
         pendingShrink?.cancel()
         pendingShrink = nil
         let grown = CGSize(width: max(size.width, contentSize.width), height: max(size.height, contentSize.height))
         apply(grown)
         guard grown != size else { return }
-        let shrink = DispatchWorkItem { [weak self] in self?.apply(size) }
+        let shrink = DispatchWorkItem { [weak self] in
+            guard let self, self.resizeGeneration == generation else { return }
+            self.apply(size)
+        }
         pendingShrink = shrink
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: shrink)
     }
@@ -323,7 +332,6 @@ struct FloatingPillView: View {
         .contentShape(Rectangle().inset(by: -6))
         .onHover { inside in
             isHovering = inside
-            if inside { model.audio.refreshDevices() }
         }
         .contextMenu { pillMenu }
         .accessibilityElement(children: .contain)
@@ -409,6 +417,8 @@ struct FloatingPillView: View {
     }
 
     private static let height: CGFloat = 26
+    /// The recording meter: `BreathRibbon`, sized per docs/DESIGN_SYSTEM.md.
+    static let ribbonSize = CGSize(width: 58, height: 18)
     static let idleSize = CGSize(width: 40, height: 8)
 
     /// One capsule from the first press to the typed text: the meter waits, listens, then works,
@@ -424,10 +434,11 @@ struct FloatingPillView: View {
                 }
                 .transition(.opacity.combined(with: .scale(scale: 0.6)))
             }
-            let meterMode: PillMeter.Mode = phase == .listening ? .live : phase == .preparing ? .waiting : .working
-            LiveLevel(model.audio) { PillMeter(level: $0, mode: meterMode) }
-                .frame(width: PillMeter.width, height: 14)
-                .padding(.horizontal, showsControls ? 1 : 6)
+            // The same breath ribbon as the hub, the hero and the app icon: one wave everywhere.
+            let ribbonMode: BreathRibbon.Mode = phase == .listening ? .live : phase == .preparing ? .waiting : .working
+            LiveLevel(model.audio) { BreathRibbon(level: $0, mode: ribbonMode, tint: Theme.ink) }
+                .frame(width: Self.ribbonSize.width, height: Self.ribbonSize.height)
+                .padding(.horizontal, showsControls ? 2 : 6)
             if phase == .listening { elapsed }
             if showsControls {
                 PillIconButton(systemImage: "checkmark", help: "Finish and type it", prominent: true, size: 18,
@@ -753,81 +764,3 @@ private struct PillIconButton: View {
         .accessibilityLabel(help)
     }
 }
-
-/// The recording meter: a row of short rounded bars that rest as dots and rise with your voice,
-/// tallest in the middle. Waiting for the mic, a soft highlight sweeps across the dots; while
-/// transcribing, it travels back and forth.
-struct PillMeter: View {
-    enum Mode: Equatable { case live, waiting, working }
-
-    var level: Float
-    var mode: Mode
-
-    static let barCount = 11
-    static let barWidth: CGFloat = 2
-    static let spacing: CGFloat = 1.6
-    static var width: CGFloat { CGFloat(barCount) * barWidth + CGFloat(barCount - 1) * spacing }
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private final class Smoother {
-        var envelope = SpeechEnvelope()
-        var target: Double = 0
-        var value: Double = 0
-        var lastFrame: TimeInterval?
-    }
-    @State private var smoother = Smoother()
-
-    var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 60)) { context in
-            let time = context.date.timeIntervalSinceReferenceDate
-            Canvas { graphics, size in
-                let energy = mode == .live ? advance(to: time) : 0
-                for index in 0..<Self.barCount {
-                    let (height, opacity) = Self.bar(index, energy: energy, mode: mode,
-                                                     time: reduceMotion ? 0 : time, maxHeight: size.height)
-                    let x = CGFloat(index) * (Self.barWidth + Self.spacing)
-                    let rect = CGRect(x: x, y: (size.height - height) / 2, width: Self.barWidth, height: height)
-                    graphics.fill(Capsule().path(in: rect), with: .color(Theme.ink.opacity(opacity)))
-                }
-            }
-        }
-        .onChange(of: level) { _, newValue in
-            guard mode == .live else { return }
-            smoother.target = Double(smoother.envelope.amount(for: newValue, at: Date.timeIntervalSinceReferenceDate))
-        }
-        .onChange(of: mode) { _, _ in smoother = Smoother() }
-        .accessibilityHidden(true)
-    }
-
-    /// Quick to rise with a syllable, slower to fall.
-    private func advance(to time: TimeInterval) -> Double {
-        let dt = min(0.05, time - (smoother.lastFrame ?? time))
-        smoother.lastFrame = time
-        let rate = smoother.target > smoother.value ? 26.0 : 7.0
-        smoother.value += (smoother.target - smoother.value) * min(1, rate * dt)
-        return smoother.value
-    }
-
-    /// Height and opacity of bar `index`. `energy` is 0…1, already eased.
-    static func bar(_ index: Int, energy: Double, mode: Mode, time: TimeInterval,
-                    maxHeight: CGFloat) -> (CGFloat, Double) {
-        let x = Double(index) / Double(barCount - 1)
-        let dot = Double(barWidth)
-        switch mode {
-        case .live:
-            // Centre-weighted, each bar on its own wobble so speech looks alive, not mirrored.
-            let profile = 0.35 + 0.65 * pow(sin(.pi * x), 1.2)
-            let wobble = 0.6 + 0.4 * sin(time * (9 + Double(index % 4) * 2.3) + Double(index) * 1.7)
-            let height = dot + (Double(maxHeight) - dot) * min(1, sqrt(energy) * profile * wobble)
-            return (CGFloat(height), 1)
-        case .waiting, .working:
-            let head = mode == .waiting
-                ? (time * 0.9).truncatingRemainder(dividingBy: 1.4) - 0.2
-                : 0.5 + 0.6 * sin(time * 2.6)
-            let glow = max(0, 1 - abs(x - head) * 4)
-            return (CGFloat(dot + 3 * glow), 0.45 + 0.55 * glow)
-        }
-    }
-}
-

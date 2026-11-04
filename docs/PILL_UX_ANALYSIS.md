@@ -36,10 +36,10 @@ _2026-11-02. Sources: the user's screenshots of HushKey (idle, recording) and Wi
 
 **P0, done in this pass**
 
-1. **Level bars instead of the ribbon** (`PillMeter`). Dense, rounded vertical bars that are full-contrast `ink` on the dark pill and centre-weighted. Each bar moves on its own smooth wobble, scaled by the shared `SpeechEnvelope` through a perceptual curve (`√energy`) so quiet speech still shows. They rise fast and fall slowly. In silence they rest as dots that breathe slightly, so the mic still reads as live.
-2. **Compact recording capsule**, 28 pt tall: × · bars · ✓. The ✓ is a filled sage `signal` circle, the one primary action. The timer only appears after 30 s, when it starts to help.
-3. **Hold mode shows bars only.** While fn (or the custom shortcut) is held, the pill is just the meter, about 80 pt wide. Click or hands-free dictation shows the × and ✓ controls.
-4. **One shape through the dictation.** Preparing and finishing keep the recording capsule and animate the bars instead: a soft sweep while waiting for the mic, and a travelling highlight while transcribing. A short hint bubble above the pill names the wait ("Waiting for microphone", "Preparing locally").
+1. ~~**Level bars instead of the ribbon** (`PillMeter`).~~ Reverted 2026-11-04: the bars made the pill the one place without HushKey's wave. The pill meter is the `BreathRibbon` again (58 × 18, `ink`), the same form as the hub chip, the hero and the app icon, and it reads whispers better than bars.
+2. **Compact recording capsule**, 28 pt tall: × · ribbon · ✓. The ✓ is a filled sage `signal` circle, the one primary action. The timer only appears after 30 s, when it starts to help.
+3. **Hold mode shows the ribbon only.** While fn (or the custom shortcut) is held, the pill is just the meter, about 80 pt wide. Click or hands-free dictation shows the × and ✓ controls.
+4. **One shape through the dictation.** Preparing and finishing keep the recording capsule and animate the ribbon instead: a soft sweep while waiting for the mic, and a travelling highlight while transcribing. A short hint bubble above the pill names the wait ("Waiting for microphone", "Preparing locally").
 5. **Hover hint bubble.** On hover the idle bar becomes a small mic capsule, with a tooltip above it: "Dictate" plus the shortcut keycap. Hovering × or ✓ shows "Cancel · esc" or "Finish · fn" in the same bubble. Instant, unlike `.help`.
 6. **Lighter no-target card.** Before words arrive it is a one-line hint strip, not a 340 pt card with a placeholder headline. Live text appears at 16 pt in a 320 pt card once there is something to read.
 7. **Tokens only.** The pill uses `Theme.paper`, `Theme.signal`, `Theme.ink` and `Theme.hairline`, which resolve to their dark values because the panel is forced dark.
