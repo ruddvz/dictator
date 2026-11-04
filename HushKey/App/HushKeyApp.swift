@@ -108,6 +108,8 @@ final class HushKeyAppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         model.prepareForTermination()
+        // ggml's Metal backend aborts at exit if a model is still loaded.
+        LocalCleanupModel.unloadAllBeforeExit()
     }
 
     private static func isLoginItemLaunch() -> Bool {

@@ -264,12 +264,17 @@ private struct CleanupSettings: View {
             SettingsRow(title: "Remove filler words", detail: "Drops um, uh, stutters and “you know”. Your words are never reworded.") {
                 RowToggle(isOn: $model.cleansDictationFillers, label: "Remove filler words")
             }
-            SettingsRow(title: "Polish with Apple Intelligence",
+            SettingsRow(title: DictationSmartCleanup.hasAppleIntelligence ? "Polish with Apple Intelligence" : "Polish on this Mac",
                         detail: DictationSmartCleanup.isAvailable
                             ? "Catches the fillers rules miss, like “I was like thinking”, and fixes punctuation. On this Mac; it can only remove fillers."
-                            : "Needs Apple Intelligence turned on in System Settings.") {
-                RowToggle(isOn: $model.polishesWithAppleIntelligence, label: "Polish with Apple Intelligence")
+                            : "Needs Apple Intelligence, or the small cleanup model below.") {
+                RowToggle(isOn: $model.polishesWithAppleIntelligence, label: "Polish dictation on this Mac")
                     .disabled(!DictationSmartCleanup.isAvailable || !model.cleansDictationFillers)
+            }
+            if !DictationSmartCleanup.hasAppleIntelligence {
+                SettingsRow(title: "Cleanup model", detail: LocalCleanupModel.shared.statusDescription) {
+                    LocalCleanupModelControls(isLocked: model.audio.isRunning || model.isFinalizingDictation)
+                }
             }
             SettingsRow(title: "Use nearby text for names",
                         detail: model.usesNearbyTextHints ? model.insertion.contextAccessStatus

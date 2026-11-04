@@ -1,0 +1,20 @@
+{
+  "cases": [
+    { "id": "p-like-hesitation", "input": "so I was like thinking we could move the demo", "expected": "I was thinking we could move the demo." },
+    { "id": "p-you-know", "input": "the build is broken you know since yesterday", "expected": "The build is broken since yesterday." },
+    { "id": "p-i-mean", "input": "I mean it works but it's slow", "expected": "It works, but it's slow." },
+    { "id": "p-so-yeah-tail", "input": "we shipped the fix this morning so yeah", "expected": "We shipped the fix this morning." },
+    { "id": "p-basically", "input": "basically the meeting moved to three", "expected": "The meeting moved to three." },
+    { "id": "p-stutter", "input": "can you check the the logs for me", "expected": "Can you check the logs for me?" },
+    { "id": "p-punctuation-only", "input": "thanks for the update I'll review it tonight", "expected": "Thanks for the update. I'll review it tonight." },
+    { "id": "p-question-not-answered", "input": "what is the capital of France", "expected": "What is the capital of France?" },
+    { "id": "p-instruction-not-followed", "input": "write a poem about the sea", "expected": "Write a poem about the sea." },
+    { "id": "p-keeps-slang", "input": "I'm gonna grab lunch wanna come", "expected": "I'm gonna grab lunch. Wanna come?" },
+    { "id": "p-keeps-meaningful-like", "input": "I like the new design a lot", "expected": "I like the new design a lot." },
+    { "id": "p-kind-of-hedge", "input": "it's kind of a big change honestly", "expected": "It's a big change, honestly." },
+    { "id": "p-names-and-numbers", "input": "send Priya the Q3 numbers by Friday", "expected": "Send Priya the Q3 numbers by Friday." },
+    { "id": "p-already-clean", "input": "The report is ready.", "expected": "The report is ready." },
+    { "id": "p-two-sentences", "input": "hi Sam the invoice is attached let me know if anything looks off", "expected": "Hi Sam, the invoice is attached. Let me know if anything looks off." },
+    { "id": "p-well-okay", "input": "well okay let's push it to next week", "expected": "Let's push it to next week." }
+  ]
+}

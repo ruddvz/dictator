@@ -11,7 +11,7 @@ enum CleanupLevel: String, CaseIterable, Identifiable {
         switch self {
         case .raw: "Verbatim speech. Every hesitation, repeated word and false start is kept."
         case .clean: "Removes um, uh, stutters and “no actually” backtracks using local text rules."
-        case .polished: "Cleaned plus on-device Apple Intelligence punctuation and flow tightening."
+        case .polished: "Cleaned plus an on-device model that drops the fillers rules miss and fixes punctuation."
         }
     }
 
@@ -84,12 +84,16 @@ struct StyleView: View {
                                 hasAI: DictationSmartCleanup.isAvailable,
                                 onSelect: { setCleanupLevel(level) }
                             )
-                            // Polished needs Apple Intelligence; without it the card can't be chosen.
+                            // Polished needs Apple Intelligence or the local model; without either it can't be chosen.
                             .disabled(level == .polished && !DictationSmartCleanup.isAvailable)
                             .opacity(level == .polished && !DictationSmartCleanup.isAvailable ? 0.5 : 1)
                             .help(level == .polished && !DictationSmartCleanup.isAvailable
-                                  ? "Needs Apple Intelligence, which isn't available on this Mac" : "")
+                                  ? "Download the on-device cleanup model below, or turn on Apple Intelligence" : "")
                         }
+                    }
+
+                    if !DictationSmartCleanup.hasAppleIntelligence {
+                        localModelRow
                     }
 
                     Label("HushKey never rewords or invents text. The polish pass only deletes fillers and refines punctuation. The raw transcript is always one click away in History.", icon: .shield)
@@ -118,6 +122,27 @@ struct StyleView: View {
             }
             .pageLayout()
         }
+    }
+
+    /// Without Apple Intelligence, Polished runs on a small model you download here.
+    private var localModelRow: some View {
+        HStack(alignment: .center, spacing: Theme.s4) {
+            Glyph(.sparkle, size: 17)
+                .foregroundStyle(Theme.signal)
+            Text(LocalCleanupModel.shared.statusDescription)
+                .font(.hkCallout)
+                .foregroundStyle(isLocalModelFailed ? Theme.danger : Theme.ink2)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            LocalCleanupModelControls(isLocked: model.audio.isRunning || model.isFinalizingDictation)
+        }
+        .padding(Theme.s4)
+        .background(Theme.well, in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+    }
+
+    private var isLocalModelFailed: Bool {
+        if case .failed = LocalCleanupModel.shared.phase { return true }
+        return false
     }
 
     private var appsRow: some View {

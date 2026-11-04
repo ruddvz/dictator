@@ -8,6 +8,14 @@
 - New: `PillSnapshotTests` and `HubSnapshotTests` render the pill and 8 hub screens to PNG when `TEST_RUNNER_HUSHKEY_SNAPSHOT_DIR` is set.
 - **Next:** the remaining items in [docs/UI_POLISH_AUDIT_2026-11-04.md](docs/UI_POLISH_AUDIT_2026-11-04.md) (shared `SelectableCard`, card surface, section headers, naming, remaining copy).
 - Verification: 334 tests pass (5 skipped: the snapshot tests and existing skips). Changes reviewed in rendered snapshots; not yet checked in the running app, because another session's build was running.
+## Completed: Polished without Apple Intelligence (local LLM cleanup, 2026-11-04)
+
+- **What:** on Macs without Apple Intelligence (macOS 14–15, or 26+ with it off), the Style page's Polished card and Settings › Cleanup now offer **Download 271 MB**. Once downloaded, Polished is selectable and runs SmolLM2 360M Instruct (Q4_K_M, Apache-2.0) on llama.cpp b11900 (MIT) on this Mac. Apple's model stays first choice where available. Both answers go through `isSafeCleanup`, so nothing is reworded.
+- **Code:** `Packages/HushKeyLlama` (llama.cpp's official xcframework pinned by checksum + `LlamaRunner`, our own wrapper; LLM.swift not used), `LocalCleanupModel.swift` (download with size + SHA-256 check, load while you talk, 10 min idle unload, freed at quit), `DictationSmartCleanup.engine`, `LocalCleanupModelControls`. Launch with `-localCleanupOnly YES` to force the local model on a Mac with Apple Intelligence.
+- **Model choice and licences:** [docs/research/LOCAL_LLM_CLEANUP_2026-11-04.md](docs/research/LOCAL_LLM_CLEANUP_2026-11-04.md). SmolLM2 360M beat Qwen3 0.6B and Qwen3.5 0.8B at half their size (holdout: 10/10 words match, 0% WER vs raw 20%; median 0.15 s). ghost-pepper has no LICENSE file, so only its idea was used. Attribution in `NOTICE.md`.
+- **Eval:** `Fixtures/eval/{dev,holdout}/polish.json` + `PolishEvalTests`; run with `TEST_RUNNER_HUSHKEY_POLISH_MODEL=<gguf>` → [docs/eval/polish-report.md](docs/eval/polish-report.md).
+- **Verification:** full suite 340 tests passed, 6 skipped, on this Mac (macOS 27.0.1), after rebasing on f74b902. Model-backed eval ran in-process; the real pinned download + SHA-256 check passed (`TEST_RUNNER_HUSHKEY_LIVE_DOWNLOAD=1`). Packaged `dist/HushKey.app` builds with `llama.framework` and its licence. **Not checked live:** the Style/Settings download UI and a real dictation through the local model, because another worktree's HushKey was running; also not run on an actual macOS 14/15 Mac.
+- **Next:** live check with `open dist/HushKey.app --args -localCleanupOnly YES` (Style → Download → pick Polished → dictate "so I was like thinking we could move the demo"); then gap 3, speaker labels in meeting notes.
 
 ## Research: open-source dictation landscape (2026-11-04)
 
