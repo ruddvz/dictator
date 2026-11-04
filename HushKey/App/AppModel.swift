@@ -2384,6 +2384,13 @@ final class AppModel {
                     break
                 }
             }
+            if let app = dictationTargetApp,
+               app.processIdentifier == NSWorkspace.shared.frontmostApplication?.processIdentifier {
+                if await insertion.pasteDirectly(text, into: app) {
+                    didInsertCurrentDictation = true
+                    return
+                }
+            }
             if insertion.requiresReviewAfterInsertion {
                 didInsertCurrentDictation = true
                 return
@@ -2394,9 +2401,24 @@ final class AppModel {
             switch await insertion.paste(text, into: app, target: pasteTarget) {
             case .inserted, .unconfirmed:
                 didInsertCurrentDictation = true
+                return
             case .unavailable:
-                showsFinishedTranscript = true
+                break
             }
+            if app.processIdentifier == NSWorkspace.shared.frontmostApplication?.processIdentifier {
+                if await insertion.pasteDirectly(text, into: app) {
+                    didInsertCurrentDictation = true
+                    return
+                }
+            }
+            showsFinishedTranscript = true
+        } else if let app = dictationTargetApp ?? NSWorkspace.shared.frontmostApplication,
+                  app.bundleIdentifier != "com.ruddvz.hushkey" {
+            if await insertion.pasteDirectly(text, into: app) {
+                didInsertCurrentDictation = true
+                return
+            }
+            showsFinishedTranscript = true
         } else {
             showsFinishedTranscript = true
         }
@@ -2408,32 +2430,27 @@ final class AppModel {
         guard insertion.isEnabled, !didInsertCurrentDictation, !text.isEmpty,
               let app = NSWorkspace.shared.frontmostApplication,
               app.processIdentifier != NSRunningApplication.current.processIdentifier,
-              let target = insertion.captureInsertionTarget() else { return false }
-        capturedInsertionTarget = target
-        capturedInsertionTargetName = target.applicationName
+              app.bundleIdentifier != "com.ruddvz.hushkey" else { return false }
+        capturedInsertionTarget = insertion.captureInsertionTarget()
+        capturedInsertionTargetName = capturedInsertionTarget?.applicationName
         dictationTargetApp = app
         capturedPasteTarget = insertion.capturePasteTarget(into: app)
-        if insertion.insert(text, ifStillFocused: target) {
+        if let target = capturedInsertionTarget, insertion.insert(text, ifStillFocused: target) {
             didInsertCurrentDictation = true
             return true
         }
-        if insertion.requiresReviewAfterInsertion {
-            dictationNotice = DictationRecovery.pasteUnconfirmed(insertion.status, canPasteAgain: false)
-            return false
+        if let pasteTarget = capturedPasteTarget {
+            switch await insertion.paste(text, into: app, target: pasteTarget) {
+            case .inserted, .unconfirmed:
+                didInsertCurrentDictation = true
+                return true
+            case .unavailable:
+                break
+            }
         }
-        guard let pasteTarget = capturedPasteTarget,
-              insertion.focusState(of: target).fieldIsFocused else {
-            dictationNotice = DictationRecovery.insertionFailed(insertion.status, canPasteAgain: false)
-            return false
-        }
-        switch await insertion.paste(text, into: app, target: pasteTarget) {
-        case .inserted:
+        if await insertion.pasteDirectly(text, into: app) {
             didInsertCurrentDictation = true
             return true
-        case .unconfirmed:
-            dictationNotice = DictationRecovery.pasteUnconfirmed(insertion.status, canPasteAgain: false)
-        case .unavailable:
-            dictationNotice = DictationRecovery.insertionFailed(insertion.status, canPasteAgain: false)
         }
         return false
     }

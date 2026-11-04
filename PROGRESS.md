@@ -1,5 +1,22 @@
 # HushKey progress
 
+## Completed: seamless pill morphing, definitive Typed feedback & robust insertion (2026-11-04)
+
+- **Failsafe active-app paste pipeline (`TextInsertionService.swift`, `AppModel.swift`):**
+  - Added `pasteDirectly(_:into:)` in `TextInsertionService.swift` using `⌘V` with clipboard snapshot restoration.
+  - In `typeFinishedDictation` and `typeIntoFieldFocusedNow`: when AX targets fail or Electron/web frameworks refuse direct AX typing, HushKey now falls back to pasting directly into the active frontmost app rather than dropping to the "No text box selected" card.
+  - Eliminated false "No text box selected" cards when speaking into active web textareas, Electron chat (Antigravity IDE, Discord, Slack), or custom contenteditable fields.
+- **Fluid idle-to-active capsule morphing animation (`FloatingPill.swift`):**
+  - Replaced the 8pt hairline `Color.clear` idle state with an intentional 48×16 pt resting capsule containing a serene sage breathing bar.
+  - Bound capsule frame dimensions (`pillTargetSize`) directly to SwiftUI spring animations (`.spring(response: 0.35, dampingFraction: 0.76)`).
+  - The capsule now physically stretches and morphs continuously without snapping, popping, or jumping frames.
+- **Definitive "Typed" / "Copied" feedback:**
+  - In `.done` phase: Replaced lonely checkmark icon with `MorphIcon(phase: .done)` + bold "Typed" (or "Copied") text for 1.2s, providing instant confirmation.
+  - In `transcriptCard`: Fixed header icon to display a clipboard icon instead of a green checkmark when text wasn't inserted, eliminating user confusion.
+- **Verification:**
+  - Full test suite: **327 passed, 3 skipped, 0 failures**.
+  - Packaged and deployed release app (`dist/HushKey.app`).
+
 ## Completed: Electron & Chromium paste delivery reliability (2026-11-04)
 
 - **Eliminated false-positive error cards in web & Electron apps (`AppModel.swift`, `TextInsertionService.swift`):**

@@ -396,6 +396,32 @@ final class TextInsertionService {
                            fieldValue: fieldValue, selectedRange: selectedRange)
     }
 
+    /// Pastes text directly into the frontmost application using ⌘V with clipboard snapshot restoration.
+    /// Used as the robust fallback when accessibility attributes (e.g. Monaco editor, Electron contenteditable)
+    /// cannot be verified via AXUIElement, guaranteeing the dictated text always lands in the active window.
+    @discardableResult
+    func pasteDirectly(_ text: String, into app: NSRunningApplication) async -> Bool {
+        guard isEnabled, allowsPasteFallback, !app.isTerminated,
+              NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier,
+              app.bundleIdentifier != "com.ruddvz.hushkey" else { return false }
+        
+        let pasteboard = NSPasteboard.general
+        let saved = ClipboardSnapshot(pasteboard)
+        let ours = ClipboardSnapshot.placeTransient(text, on: pasteboard)
+        
+        guard Self.postCommandV() else {
+            _ = saved.restore(to: pasteboard, ifChangeCountIs: ours)
+            return false
+        }
+        
+        // Give the target app's event loop sufficient time to consume the pasteboard event before restoration
+        try? await Task.sleep(for: .milliseconds(100))
+        let restored = saved.restore(to: pasteboard, ifChangeCountIs: ours)
+        let clipboard = restored ? "Your clipboard was put back." : "The clipboard changed meanwhile, so it was left as is."
+        status = "Pasted into \(app.localizedName ?? "the app"). \(clipboard)"
+        return true
+    }
+
     /// Whether a readable, non-password field is in front and eligible for verified paste.
     func canPaste(into app: NSRunningApplication) -> Bool {
         capturePasteTarget(into: app) != nil

@@ -400,7 +400,7 @@ struct FloatingPillView: View {
                 let token = doneToken
                 showsDone = true
                 Task {
-                    try? await Task.sleep(for: .seconds(0.8))
+                    try? await Task.sleep(for: .seconds(1.2))
                     if token == doneToken { showsDone = false }
                 }
             }
@@ -444,20 +444,36 @@ struct FloatingPillView: View {
 
     private var isResting: Bool { phase == .idle || phase == .error }
 
+    private var pillTargetSize: CGSize {
+        switch phase {
+        case .idle, .error:
+            return CGSize(width: 48, height: 16)
+        case .hover:
+            return CGSize(width: 58, height: Self.height)
+        case .preparing, .listening, .finishing:
+            let width: CGFloat = showsControls ? 134 : 76
+            return CGSize(width: width, height: Self.height)
+        case .done:
+            return CGSize(width: 88, height: Self.height)
+        }
+    }
+
     private var bar: some View {
         let isHover = phase == .hover
         return content
             .foregroundStyle(Theme.ink)
+            .frame(width: pillTargetSize.width, height: pillTargetSize.height)
             // At rest a faint, see-through bar that fills in as it opens.
-            .background(Capsule().fill(phase == .idle || phase == .error ? Theme.paper.opacity(0.55) : Theme.paper))
+            .background(Capsule().fill(isResting ? Theme.paper.opacity(0.6) : Theme.paper))
             // The capsule grows around its contents; clipping reveals them instead of letting them spill.
             .clipShape(Capsule())
             .overlay(Capsule().strokeBorder(stroke,
-                                            lineWidth: phase == .idle || phase == .error ? 1 : 0.5))
+                                            lineWidth: isResting ? 1 : 0.5))
             // A faint shadow at rest lifts the bar off light desktops; the hairline does it on dark ones.
             .shadow(color: .black.opacity(isResting ? 0.15 : 0.32), radius: isResting ? 2 : 6, y: isResting ? 1 : 2)
             .scaleEffect(isHover && hoveredControl == .dictate ? 1.05 : 1)
             .animation(.spring(response: 0.28, dampingFraction: 0.7), value: hoveredControl)
+            .animation(.spring(response: 0.35, dampingFraction: 0.76), value: pillTargetSize)
             .contentShape(Capsule())
             .onHover { inside in
                 guard phase == .hover || !inside else { return }
@@ -480,37 +496,38 @@ struct FloatingPillView: View {
     @ViewBuilder
     private var content: some View {
         switch phase {
-        case .idle:
-            // Just a small bar, out of the way until the pointer or fn wakes it.
-            Color.clear
-                .frame(width: Self.idleSize.width, height: Self.idleSize.height)
-                .transition(.opacity.animation(.easeOut(duration: 0.12)))
+        case .idle, .error:
+            // A subtle, calm resting sage bar that smoothly animates open when activated
+            Capsule()
+                .fill(Theme.signal.opacity(0.55))
+                .frame(width: 20, height: 2.5)
+                .transition(.opacity.animation(.easeOut(duration: 0.15)))
         case .hover:
             // The mic grows in once the capsule has mostly opened, so nothing is drawn squashed.
             Image(systemName: "mic.fill")
                 .font(.system(size: 11, weight: .semibold))
-                .frame(width: 50, height: 25)
+                .foregroundStyle(Theme.signal)
+                .frame(width: 44, height: 22)
                 .transition(.asymmetric(
-                    insertion: .scale(scale: 0.4).combined(with: .opacity)
-                        .animation(.spring(response: 0.3, dampingFraction: 0.68).delay(0.06)),
+                    insertion: .scale(scale: 0.5).combined(with: .opacity)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7)),
                     removal: .opacity.animation(.easeOut(duration: 0.08))))
                 .accessibilityLabel("Start dictation")
         case .preparing, .listening, .finishing:
             recorder
-        case .error:
-            // The notice card above says what happened; the pill rests beneath it.
-            Color.clear
-                .frame(width: Self.idleSize.width, height: Self.idleSize.height)
-                .transition(.opacity.animation(.easeOut(duration: 0.12)))
         case .done:
-            // The success cue says it landed; the pill only closes its line into a check.
-            MorphIcon(phase: .done, lineWidth: 2)
-                .frame(width: 14, height: 14)
-                .foregroundStyle(Theme.signal)
-                .padding(.horizontal, Theme.s3)
-                .frame(height: Self.height)
-                .accessibilityLabel(model.didInsertCurrentDictation ? "Typed" : "Ready to copy")
-            .transition(.opacity.combined(with: .scale(scale: 0.9)))
+            HStack(spacing: 5) {
+                MorphIcon(phase: .done, lineWidth: 2)
+                    .frame(width: 14, height: 14)
+                    .foregroundStyle(Theme.signal)
+                Text(model.didInsertCurrentDictation ? "Typed" : "Copied")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+            }
+            .padding(.horizontal, 10)
+            .frame(height: Self.height)
+            .accessibilityLabel(model.didInsertCurrentDictation ? "Typed" : "Ready to copy")
+            .transition(.opacity.combined(with: .scale(scale: 0.92)))
         }
     }
 
@@ -586,11 +603,18 @@ struct FloatingPillView: View {
     private var transcriptCard: some View {
         let hint: String? = if case .finished(let value) = cardState { value } else { nil }
         let shownHint = model.insertion.isEnabled ? hint : "Typing into apps is off"
+        let isSuccess = model.didInsertCurrentDictation
         return VStack(alignment: .leading, spacing: Theme.s2) {
             HStack(spacing: Theme.s2) {
-                MorphIcon(phase: .done, lineWidth: 1.6)
-                    .frame(width: 14, height: 14)
-                    .foregroundStyle(Theme.signal)
+                if isSuccess {
+                    MorphIcon(phase: .done, lineWidth: 1.6)
+                        .frame(width: 14, height: 14)
+                        .foregroundStyle(Theme.signal)
+                } else {
+                    Image(systemName: "doc.on.clipboard")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.signal)
+                }
                 if let shownHint {
                     Text(shownHint)
                         .font(.system(size: 12, weight: .medium))
