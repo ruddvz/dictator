@@ -28,12 +28,13 @@
 - **Next (user, with AirPods):** on Train, remove the 5 flagged takes. Record until every word is 10/10 with "Head still" showing. Then press **New session** and record each word 3+ times. Try a deliberate nod: it should say "Head moved" and save nothing.
 - A separate session is redesigning the app icon and menu bar icon.
 
-## Completed: app icon and menu bar icon redesign (2026-11-03)
+## Completed: app icon and menu bar icon redesign (2026-11-04)
 
-- App icon: a fog keycap (squircle, rounded side walls, dished face, crisp bevel) on the dark `heroBase` squircle with the hero's sage glow, carrying the breath ribbon in sage `signal`. A simplified cut is drawn for 16 and 32 px. Drawn by `Scripts/generate-app-icon.swift` (run by `package-app.sh`); no third-party artwork.
-- Menu bar: a solid 14 pt keycap with the ribbon cut out (template image), replacing the thin outline that read as an edge by the notch. While dictating it switches to `HushKeyMenuBarLive`, where the ribbon opens into a lens. Sidebar brand mark is now the morph icon cut into a matching `ink` tile (`listening` while dictating).
-- A key-shaped concept was tried and dropped: it read as a password manager rather than dictation.
-- Tests: 214 run, 3 skipped, 0 failed. Release package built; the icon was checked in the menu bar (dark menu bar only; system appearance was not changed) and in the compiled `AppIcon.icns`.
+- App icon: the breath ribbon in sage on a fog squircle (`sheet` → `selection`), lit from the upper left with a soft sheen and a sage shadow. A fuller ribbon is drawn for 16 and 32 px. A white top lip and a faint bottom line keep the light icon outlined on a light Dock. Drawn by `Scripts/generate-app-icon.swift` (run by `package-app.sh`); no third-party artwork.
+- Menu bar: the ribbon alone as a template glyph (17 × 13 pt in an 18 pt canvas), replacing the thin outline that read as an edge by the notch. While dictating it switches to `HushKeyMenuBarLive`, a fuller lens.
+- Sidebar brand row: the same ribbon in `signal` beside "HushKey", centred in the sidebar; it switches to the lens while dictating.
+- Explored and dropped with the user: keycap with ribbon, a key with meter-bar bitting (read as a password manager), a "shh" finger, an "h" monogram, and calm-face marks. The user chose the sage ribbon on fog.
+- Tests: 216 run, 3 skipped, 0 failed. Release package built and checked in the real menu bar (dark), the sidebar, and the compiled `AppIcon.icns`.
 
 ## Completed: Silent Lab end-to-end pass (2026-11-03)
 

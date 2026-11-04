@@ -1,9 +1,9 @@
 import AppKit
 import Foundation
 
-// Draws HushKey's app icon and menu bar glyph: a fog keycap carrying the sage breath ribbon,
-// the same form as `BreathRibbon` and `MorphIcon` in the app. Colours are the Fog & sage
-// tokens from docs/DESIGN_SYSTEM.md. Run from the repository root; package-app.sh runs it.
+// Draws HushKey's app icon and menu bar glyph: the breath ribbon from `BreathRibbon` and
+// `MorphIcon`, in sage `signal` on a fog squircle. Colours are the Fog & sage tokens from
+// docs/DESIGN_SYSTEM.md. Run from the repository root; package-app.sh runs it.
 
 let appIconURL = URL(fileURLWithPath: "HushKey/Assets.xcassets/AppIcon.appiconset")
 let menuIconURL = URL(fileURLWithPath: "HushKey/Assets.xcassets/HushKeyMenuBar.imageset")
@@ -42,7 +42,7 @@ func renderPNG(width: Int, height: Int, to url: URL, draw: (CGContext) -> Void) 
     try rep.representation(using: .png, properties: [:])!.write(to: url, options: .atomic)
 }
 
-/// Superellipse close to the macOS icon squircle; a lower exponent gives a rounder corner.
+/// Superellipse close to the macOS icon squircle.
 func squircle(_ rect: CGRect, exponent: CGFloat = 5) -> CGPath {
     let path = CGMutablePath()
     let steps = 360
@@ -57,16 +57,17 @@ func squircle(_ rect: CGRect, exponent: CGFloat = 5) -> CGPath {
     return path
 }
 
-/// The breath ribbon: a lens tapered to fine tips whose spine makes one soft S, like the hush
-/// in `MorphIcon`. `swell` > 1 is the ribbon opened by a voice: fuller, with a calmer spine.
-func ribbon(in rect: CGRect, swell: CGFloat = 1, taper: CGFloat = 1.35) -> CGPath {
-    let samples = 120
+/// The breath ribbon: a lens tapered at both ends whose spine makes one soft S, like the hush
+/// in `MorphIcon`. `amplitude` sets the S, `thickness` the half-width at the middle, and
+/// `taper` how fine the tips run.
+func ribbon(in rect: CGRect, amplitude: CGFloat = 0.22, thickness: CGFloat = 0.27, taper: CGFloat = 1.3) -> CGPath {
+    let samples = 160
     var top: [CGPoint] = [], bottom: [CGPoint] = []
     for index in 0...samples {
         let u = CGFloat(index) / CGFloat(samples)
         let x = rect.minX + u * rect.width
-        let spine = rect.midY + rect.height * 0.22 * sin(2 * .pi * u) / swell
-        let half = rect.height * 0.26 * pow(sin(.pi * u), taper) * (1 + (swell - 1) * 0.7)
+        let spine = rect.midY + rect.height * amplitude * sin(2 * .pi * u)
+        let half = rect.height * thickness * pow(sin(.pi * u), taper)
         top.append(CGPoint(x: x, y: spine + half))
         bottom.append(CGPoint(x: x, y: spine - half))
     }
@@ -74,39 +75,6 @@ func ribbon(in rect: CGRect, swell: CGFloat = 1, taper: CGFloat = 1.35) -> CGPat
     path.addLines(between: top + bottom.reversed())
     path.closeSubpath()
     return path
-}
-
-/// Fills a ribbon and rounds its two tips with a thin round-joined stroke of the same path.
-func fillRibbon(_ context: CGContext, _ path: CGPath, tip: CGFloat) {
-    context.addPath(path)
-    context.fillPath()
-    context.addPath(path)
-    context.setLineWidth(tip)
-    context.setLineJoin(.round)
-    context.strokePath()
-}
-
-/// Fills `path` with a linear gradient from `top` to `bottom` (y-up coordinates).
-func paint(_ context: CGContext, _ path: CGPath, _ fill: CGGradient, top: CGFloat, bottom: CGFloat, x: CGFloat = 512) {
-    context.saveGState()
-    context.addPath(path)
-    context.clip()
-    context.drawLinearGradient(fill, start: CGPoint(x: x, y: top), end: CGPoint(x: x, y: bottom), options: extend)
-    context.restoreGState()
-}
-
-/// A hairline along the top of `path`, fading out by `fade` of its height.
-func topLight(_ context: CGContext, _ path: CGPath, rect: CGRect, width: CGFloat, alpha: CGFloat, fade: CGFloat = 0.5) {
-    context.saveGState()
-    context.addPath(path)
-    context.clip()
-    context.addPath(path)
-    context.setLineWidth(width * 2)
-    context.replacePathWithStrokedPath()
-    context.clip()
-    context.drawLinearGradient(gradient([hex(0xFFFFFF, alpha), hex(0xFFFFFF, 0)], [0, fade]),
-                               start: CGPoint(x: rect.midX, y: rect.maxY), end: CGPoint(x: rect.midX, y: rect.minY), options: extend)
-    context.restoreGState()
 }
 
 func drawAppIcon(_ context: CGContext, side: CGFloat) {
@@ -119,118 +87,67 @@ func drawAppIcon(_ context: CGContext, side: CGFloat) {
     let bodyRect = CGRect(x: 100, y: 100, width: 824, height: 824)
     let body = squircle(bodyRect)
     context.saveGState()
-    context.setShadow(offset: CGSize(width: 0, height: -10 * k), blur: 22 * k, color: hex(0x000000, 0.3))
+    context.setShadow(offset: CGSize(width: 0, height: -10 * k), blur: 22 * k, color: hex(0x000000, 0.28))
     context.addPath(body)
-    context.setFillColor(hex(0x18201C))
+    context.setFillColor(hex(0xEEF0EE))
     context.fillPath()
     context.restoreGState()
 
-    // heroBase, lifted toward the top, with the hero's sage glow and fog mist.
+    // Fog: `sheet` at the top settling into `selection` at the bottom, with a faint sage
+    // breath of light behind the ribbon.
     context.saveGState()
     context.addPath(body)
     context.clip()
-    context.drawLinearGradient(gradient([hex(0x2C3A33), hex(0x18201C), hex(0x0E1311)], [0, 0.55, 1]),
+    context.drawLinearGradient(gradient([hex(0xFFFFFF), hex(0xF2F5F3), hex(0xDCE5DF)], [0, 0.5, 1]),
                                start: CGPoint(x: 512, y: 924), end: CGPoint(x: 512, y: 100), options: extend)
+    context.drawRadialGradient(gradient([hex(0x7FB39C, 0.16), hex(0x7FB39C, 0)], [0, 1]),
+                               startCenter: CGPoint(x: 512, y: 470), startRadius: 0,
+                               endCenter: CGPoint(x: 512, y: 470), endRadius: 400, options: [])
+    context.restoreGState()
     if !small {
-        context.drawRadialGradient(gradient([hex(0x7FB39C, 0.30), hex(0x7FB39C, 0)], [0, 1]),
-                                   startCenter: CGPoint(x: 330, y: 800), startRadius: 0,
-                                   endCenter: CGPoint(x: 330, y: 800), endRadius: 540, options: [])
-        context.drawRadialGradient(gradient([hex(0x8FA7B4, 0.14), hex(0x8FA7B4, 0)], [0, 1]),
-                                   startCenter: CGPoint(x: 800, y: 200), startRadius: 0,
-                                   endCenter: CGPoint(x: 800, y: 200), endRadius: 440, options: [])
-    }
-    context.restoreGState()
-    if !small { topLight(context, body, rect: bodyRect, width: 3, alpha: 0.22, fade: 0.6) }
-
-    // Keycap: a sage-fog skirt with the top face set high on it, so the front wall shows.
-    let skirtRect = small ? CGRect(x: 190, y: 190, width: 644, height: 644) : CGRect(x: 228, y: 204, width: 568, height: 600)
-    let skirt = squircle(skirtRect, exponent: small ? 3.6 : 4)
-    context.saveGState()
-    context.setShadow(offset: CGSize(width: 0, height: -40 * k), blur: 80 * k, color: hex(0x000000, 0.5))
-    context.addPath(skirt)
-    context.setFillColor(hex(0x9DB5A8))
-    context.fillPath()
-    context.restoreGState()
-    context.saveGState()
-    context.setShadow(offset: CGSize(width: 0, height: -8 * k), blur: 14 * k, color: hex(0x000000, 0.4))
-    context.addPath(skirt)
-    context.fillPath()
-    context.restoreGState()
-    // keycap → keycapEdge, deepening toward the front wall.
-    paint(context, skirt, gradient([hex(0xDDE7E1), hex(0xB4C8BC), hex(0x86A393)], [0, 0.45, 1]),
-          top: skirtRect.maxY, bottom: skirtRect.minY)
-    if !small {
-        // Round the side walls: a touch darker toward both edges.
+        // Edge: a white lip along the top, a faint fog line along the bottom so the light
+        // icon keeps its outline on a light Dock.
         context.saveGState()
-        context.addPath(skirt)
+        context.addPath(body)
         context.clip()
-        context.drawLinearGradient(gradient([hex(0x2A3A33, 0.16), hex(0x2A3A33, 0), hex(0x2A3A33, 0), hex(0x2A3A33, 0.16)],
-                                            [0, 0.18, 0.82, 1]),
-                                   start: CGPoint(x: skirtRect.minX, y: 0), end: CGPoint(x: skirtRect.maxX, y: 0), options: extend)
-        context.restoreGState()
-        topLight(context, skirt, rect: skirtRect, width: 3, alpha: 0.7, fade: 0.3)
-    }
-
-    let faceRect = small ? skirtRect.insetBy(dx: 52, dy: 52).offsetBy(dx: 0, dy: 30)
-        : CGRect(x: 268, y: 300, width: 488, height: 468)
-    let face = squircle(faceRect, exponent: small ? 3.6 : 4)
-    paint(context, face, gradient([hex(0xFFFFFF), hex(0xF4F7F5), hex(0xE3EBE6)], [0, 0.5, 1]),
-          top: faceRect.maxY, bottom: faceRect.minY)
-    if !small {
-        // Dished top: a soft shade under the far lip, light pooling toward the front.
-        context.saveGState()
-        context.addPath(face)
+        context.addPath(body)
+        context.setLineWidth(8)
+        context.replacePathWithStrokedPath()
         context.clip()
-        context.setShadow(offset: CGSize(width: 0, height: -14 * k), blur: 30 * k, color: hex(0x4C6A5C, 0.32))
-        context.addRect(faceRect.insetBy(dx: -80, dy: -80))
-        context.addPath(face)
-        context.setFillColor(hex(0xFFFFFF))
-        context.fillPath(using: .evenOdd)
-        context.restoreGState()
-        // Crisp bevel where the face meets the walls.
-        context.saveGState()
-        context.addPath(face)
-        context.setLineWidth(2.5)
-        context.setStrokeColor(hex(0xFFFFFF, 0.9))
-        context.strokePath()
+        context.drawLinearGradient(gradient([hex(0xFFFFFF, 1), hex(0xFFFFFF, 0), hex(0x66706B, 0), hex(0x66706B, 0.22)],
+                                            [0, 0.3, 0.6, 1]),
+                                   start: CGPoint(x: 512, y: 924), end: CGPoint(x: 512, y: 100), options: extend)
         context.restoreGState()
     }
 
-    // The breath ribbon in sage, printed into the face: a fine light edge below it, as if inset.
-    let ribbonRect = small
-        ? CGRect(x: faceRect.minX + faceRect.width * 0.06, y: faceRect.midY - 170, width: faceRect.width * 0.88, height: 340)
-        : CGRect(x: faceRect.minX + faceRect.width * 0.13, y: faceRect.midY - 112, width: faceRect.width * 0.74, height: 224)
-    let mark = ribbon(in: ribbonRect, taper: small ? 0.9 : 1.35)
-    if !small {
-        context.saveGState()
-        context.translateBy(x: 0, y: -3)
-        context.setFillColor(hex(0xFFFFFF, 0.95))
-        context.setStrokeColor(hex(0xFFFFFF, 0.95))
-        fillRibbon(context, mark, tip: 10)
-        context.restoreGState()
-    }
+    // The ribbon, in sage from a lit upper left to a deeper lower right.
+    let ribbonRect = small ? CGRect(x: 170, y: 320, width: 684, height: 384) : CGRect(x: 200, y: 352, width: 624, height: 320)
+    let mark = ribbon(in: ribbonRect, thickness: small ? 0.31 : 0.27, taper: small ? 1.0 : 1.3)
     context.saveGState()
-    context.addPath(mark)
-    context.setLineWidth(small ? 40 : 10)
-    context.setLineJoin(.round)
-    context.replacePathWithStrokedPath()
+    context.setShadow(offset: CGSize(width: 0, height: -16 * k), blur: 34 * k, color: hex(0x2F5244, 0.28))
+    context.beginTransparencyLayer(auxiliaryInfo: nil)
     context.addPath(mark)
     context.clip()
-    context.drawLinearGradient(gradient([hex(0x6E9F88), hex(0x4F7F6A), hex(0x426D5A)], [0, 0.55, 1]),
+    context.drawLinearGradient(gradient([hex(0x8CC0A8), hex(0x5E9079), hex(0x4F7F6A), hex(0x3B6553)], [0, 0.35, 0.65, 1]),
                                start: CGPoint(x: ribbonRect.minX, y: ribbonRect.maxY),
                                end: CGPoint(x: ribbonRect.maxX, y: ribbonRect.minY), options: extend)
+    if !small {
+        // A soft sheen across the upper half, so the ribbon reads as a curved surface.
+        context.drawLinearGradient(gradient([hex(0xFFFFFF, 0.22), hex(0xFFFFFF, 0)], [0, 1]),
+                                   start: CGPoint(x: 512, y: ribbonRect.maxY), end: CGPoint(x: 512, y: ribbonRect.midY),
+                                   options: [])
+    }
+    context.endTransparencyLayer()
     context.restoreGState()
 }
 
-/// Template glyph: the keycap as a solid squircle with the ribbon cut out of it.
+/// Template glyph: the ribbon alone. While dictating it opens into a fuller lens.
 func drawMenuBarMark(_ context: CGContext, scale: CGFloat, live: Bool) {
     context.scaleBy(x: scale, y: scale)
     context.setFillColor(hex(0x000000))
-    context.addPath(squircle(CGRect(x: 2, y: 2, width: 14, height: 14), exponent: 3.6))
+    context.addPath(ribbon(in: CGRect(x: 0.5, y: 2.5, width: 17, height: 13),
+                           amplitude: live ? 0.14 : 0.23, thickness: live ? 0.36 : 0.28, taper: live ? 1 : 1.1))
     context.fillPath()
-    context.setBlendMode(.clear)
-    let ribbonRect = CGRect(x: 3.7, y: 4.9, width: 10.6, height: 8.2)
-    fillRibbon(context, ribbon(in: ribbonRect, swell: live ? 1.6 : 1, taper: 1.1), tip: 1.2)
 }
 
 for (filename, size) in appIconSizes {
