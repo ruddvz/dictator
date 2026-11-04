@@ -171,11 +171,19 @@ private struct GeneralSettings: View {
         }
 
         SettingsGroup(title: "Cleanup") {
-            SettingsRow(title: "Spoken corrections", detail: "“Scratch that” and “actually” fix what you just said.") {
+            SettingsRow(title: "Spoken corrections",
+                        detail: "Say “no, actually”, “I mean” or “scratch that” and only what you meant is typed: “at four, no actually five” becomes “at five”.") {
                 RowToggle(isOn: $model.appliesSpokenCorrections, label: "Apply spoken corrections")
             }
-            SettingsRow(title: "Remove filler words", detail: "Drops a standalone um, uh or erm. The original is kept.") {
+            SettingsRow(title: "Remove filler words", detail: "Drops um, uh, stutters and “you know”. Your words are never reworded.") {
                 RowToggle(isOn: $model.cleansDictationFillers, label: "Remove filler words")
+            }
+            SettingsRow(title: "Polish with Apple Intelligence",
+                        detail: DictationSmartCleanup.isAvailable
+                            ? "Catches the fillers rules miss, like “I was like thinking”, and fixes punctuation. On this Mac; it can only remove fillers."
+                            : "Needs Apple Intelligence turned on in System Settings.") {
+                RowToggle(isOn: $model.polishesWithAppleIntelligence, label: "Polish with Apple Intelligence")
+                    .disabled(!DictationSmartCleanup.isAvailable || !model.cleansDictationFillers)
             }
             SettingsRow(title: "Use nearby text for names",
                         detail: model.usesNearbyTextHints ? model.insertion.contextAccessStatus

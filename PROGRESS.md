@@ -1,5 +1,24 @@
 # HushKey progress
 
+## Completed: Flow-style dictation bar, and filler / self-correction cleanup (2026-11-04)
+
+- **Bar, compared side by side with Wispr Flow 1.6.1337 (`FloatingPill.swift`):**
+  - At rest: a faint 40 × 8 grey capsule with a light hairline, like Flow's (was a dark blob with a sage dash; the 5 s "compact dot" is gone).
+  - Hover: a 50 × 25 mic button and a separate round Meeting notes button, with the "Dictate fn" / "Meeting notes" hint above. Was one wide labelled bar.
+  - Recording: 99 × 26, filled grey × circle, 11 discrete level bars (`PillMeter`; dots at rest, rise with speech; a sweep while waiting or transcribing), sage ✓. Flow's is about 97 × 25 with a white ✓; sage stays as the brand accent.
+  - Nothing above the bar while you talk (the "No text box selected" strip and live card are gone); the card appears only afterwards, to copy, as in Flow.
+  - Bug fixed: while recording, a click that just missed × landed on the bar and finished and typed the dictation. Only × and ✓ act now.
+- **Cleanup (`HushKey/Audio/DictationCleanup.swift`), on by default:**
+  - Rules: hesitations (um, uh, ah, er, hmm, "u h"), stutters ("I I", "the the", "I need I need"), comma-set tics ("you know,", ", like,", "Basically,"), keeping meaningful repeats ("very very", "bye bye", "that that", uh-oh, mm-hmm, U.S.). Restores the capitals the removals break.
+  - Self-corrections: "at four PM no actually 5 PM" → "at 5 PM", "Tuesday, no wait, on Wednesday", "two kids no three", "red one no the blue one", full restarts, "make that", "I mean", "sorry", "scratch that" / "never mind" (drops the sentence). It replaces what the correction lines up with (same first word, same last word, or same kind of value); bare "no"/"sorry"/"wait" act only on a clear line-up, so "no way", "sorry I'm late", "can't wait" stay.
+  - Polish with Apple Intelligence (on-device `FoundationModels`, prewarmed when dictation starts, ≤ 4 s timeout): runs after the rules and may only delete fillers, filler pairs and stutters and fix punctuation. Any answer that rewords, reorders, adds, deletes another word or loses punctuation is thrown away (`isSafeCleanup`). Probe on this Mac: about 0.7–1.8 s per dictation once warm.
+  - Settings → Cleanup: Spoken corrections, Remove filler words (new key, so it defaults on), Polish with Apple Intelligence.
+  - Research: Flow's cleanup is judgment-based AI (its help centre); FluidVoice uses an on-device model; MacParakeet uses rules only.
+- **Verified here:** 221 tests, 3 skipped, 0 failures (new `DictationCleanupTests`; eval cases `filler-basic` and `h-correction-at` no longer known gaps). Packaged; checked live: idle, hover and recording bar next to Flow's, × cancel with Undo, no strip while recording.
+- **Not verified live:** the full spoken path (Parakeet → rules → Apple Intelligence → typed). Background clicks couldn't reach the pill this time. Test: hold fn in TextEdit and say "um so I need to leave at four PM no actually 5 PM".
+- **Seen, not fixed:** two history entries "Hey, how's it going?" appeared from short test recordings in a quiet room; check whether Parakeet invents text on near-silence.
+- **Next (user feedback):** the main window still reads as generic next to Flow's hub: sidebar text and icon sizes, the logo lockup, theme / notifications / account controls in the toolbar, motion. Do it as its own session.
+
 ## Completed: HushKey works from the background, like Wispr Flow and TypeWhisper (2026-11-04)
 
 - **Problem (user):** HushKey only felt alive with its window open in front. Wispr Flow and TypeWhisper keep working with no window: TypeWhisper is a menu-bar-only app (`LSUIElement`), Wispr Flow a Dock app that keeps running with its window closed. Both start at login.

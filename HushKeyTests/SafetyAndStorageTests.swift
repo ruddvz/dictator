@@ -633,7 +633,7 @@ final class SafetyAndStorageTests: XCTestCase {
         XCTAssertEqual(DictationBacktrack.apply(to: "Use the old route, scratch that, new route."), "Use the new route.")
         XCTAssertEqual(DictationBacktrack.apply(to: "I want to meet Tuesday, actually Thursday."), "I want to meet Thursday.")
         XCTAssertEqual(DictationBacktrack.apply(to: "Let's meet Friday afternoon, actually Thursday."),
-                       "Let's meet Friday afternoon, actually Thursday.")
+                       "Let's meet Thursday afternoon.")
         XCTAssertEqual(DictationBacktrack.apply(to: "I like the first option."), "I like the first option.")
     }
 
@@ -646,7 +646,7 @@ final class SafetyAndStorageTests: XCTestCase {
     }
 
     func testOptionalCleanupRemovesOnlyStandaloneFillersAndKeepsRawRestorable() {
-        XCTAssertEqual(DictationLocalCleanup.removeFillers(from: "Um, could you, uh, send it?"), "could you send it?")
+        XCTAssertEqual(DictationLocalCleanup.removeFillers(from: "Um, could you, uh, send it?"), "Could you send it?")
         XCTAssertEqual(DictationLocalCleanup.removeFillers(from: "The umbrella is here."), "The umbrella is here.")
         XCTAssertEqual(DictationLocalCleanup.removeFillers(from: "ER is the emergency room."), "ER is the emergency room.")
         XCTAssertEqual(DictationTranscriptProcessor.process("Um, use foo underscore bar", mode: .code,
@@ -1238,7 +1238,7 @@ final class SafetyAndStorageTests: XCTestCase {
     func testLocalFillerTransformRunsWithoutTheLanguageModel() async throws {
         let service = LocalTransformService()
         let result = try await service.transform("Um, can you, uh, send it?", using: .removeFillers)
-        XCTAssertEqual(result, "can you send it?")
+        XCTAssertEqual(result, "Can you send it?")
         XCTAssertFalse(service.isTransforming)
     }
 

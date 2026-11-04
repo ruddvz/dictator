@@ -249,23 +249,18 @@ final class RetainedDictationAudio: @unchecked Sendable {
 enum TranscriptCard {
     enum State: Equatable {
         case hidden
-        case live(hint: String?)
         case finished(hint: String?)
     }
 
-    static let noTargetHint = "No text box selected. Talk, then copy."
+    static let noTargetHint = "No text box selected. Copy it to paste."
     static let notTypedHint = "Couldn’t type it. Copy it instead."
 
-    /// With a text box to type into, the words go there and only the pill shows. The card is
-    /// for when there's nowhere to type, or typing failed and the text needs copying.
-    static func state(isCapturing: Bool, hasTarget: Bool, transcript: String,
-                      isCollapsed: Bool, keepsFinishedText: Bool) -> State {
+    /// While you talk only the pill shows, as in Wispr Flow. Afterwards the card comes up only
+    /// when there was nowhere to type, or typing failed and the text needs copying.
+    static func state(isCapturing: Bool, hasTarget: Bool, transcript: String, keepsFinishedText: Bool) -> State {
         let hasText = !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        if isCapturing {
-            guard !isCollapsed, !hasTarget else { return .hidden }
-            return .live(hint: noTargetHint)
-        }
-        return keepsFinishedText && hasText ? .finished(hint: hasTarget ? notTypedHint : noTargetHint) : .hidden
+        guard !isCapturing, keepsFinishedText, hasText else { return .hidden }
+        return .finished(hint: hasTarget ? notTypedHint : noTargetHint)
     }
 
     /// The end of a growing transcript, cut at a word boundary, so the card shows the last

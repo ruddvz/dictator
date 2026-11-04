@@ -210,8 +210,19 @@ final class AppModel {
     var appliesSpokenCorrections = UserDefaults.standard.object(forKey: "applySpokenCorrections") as? Bool ?? true {
         didSet { UserDefaults.standard.set(appliesSpokenCorrections, forKey: "applySpokenCorrections") }
     }
-    var cleansDictationFillers = UserDefaults.standard.object(forKey: "cleanDictationFillers") as? Bool ?? false {
-        didSet { UserDefaults.standard.set(cleansDictationFillers, forKey: "cleanDictationFillers") }
+    /// Drops um, uh, stutters and comma-set tics. On by default, under a new key so the old
+    /// off-by-default setting doesn't keep it off.
+    var cleansDictationFillers = UserDefaults.standard.object(forKey: "removeFillerWords") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(cleansDictationFillers, forKey: "removeFillerWords") }
+    }
+    /// After the rules, Apple Intelligence on this Mac drops the fillers they can't judge and
+    /// fixes punctuation. It can only delete fillers, never reword.
+    var polishesWithAppleIntelligence = UserDefaults.standard.object(forKey: "smartCleanup") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(polishesWithAppleIntelligence, forKey: "smartCleanup") }
+    }
+    @ObservationIgnored private var smartCleanupSession: AnyObject?
+    private var usesSmartCleanup: Bool {
+        polishesWithAppleIntelligence && activeDictationCleansFillers && activeDictationMode != .code
     }
     var showsFloatingPill = UserDefaults.standard.object(forKey: "showFloatingPill") as? Bool ?? true {
         didSet { UserDefaults.standard.set(showsFloatingPill, forKey: "showFloatingPill") }
@@ -1754,6 +1765,7 @@ final class AppModel {
         activeDictationSnippets = profileSettings.snippets
         activeDictationCorrectionRules = profileSettings.correctionRules
         activeDictationCleansFillers = profileSettings.cleansFillers
+        smartCleanupSession = usesSmartCleanup ? DictationSmartCleanup.prepare() : nil
         captureDictationProfileName = profileSettings.appName
         captureDictationWritingStylePresetID = profileSettings.writingStylePresetID
         let nearbyHints = usesNearbyTextHints ? insertion.nearbyContextHints() : []
@@ -1889,7 +1901,15 @@ final class AppModel {
     /// text into the captured field or raise a notice the pill can recover from.
     private func finishDictation(rawText: String, recognitionError: String?) async {
         rawDictationText = rawText
-        let processed = DictationTranscriptProcessor.process(rawText, mode: activeDictationMode,
+        var source = rawText
+        if usesSmartCleanup {
+            // The rules first (they own spoken corrections), then the on-device model for what's left.
+            let ruled = DictationLocalCleanup.removeFillers(
+                from: appliesSpokenCorrections ? DictationBacktrack.apply(to: rawText) : rawText)
+            if let polished = await DictationSmartCleanup.clean(ruled, session: smartCleanupSession) { source = polished }
+        }
+        smartCleanupSession = nil
+        let processed = DictationTranscriptProcessor.process(source, mode: activeDictationMode,
                                                               snippets: activeDictationSnippets,
                                                               applyCorrections: appliesSpokenCorrections,
                                                               cleanupFillers: activeDictationCleansFillers,

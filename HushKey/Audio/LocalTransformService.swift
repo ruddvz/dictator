@@ -31,7 +31,7 @@ enum LocalWritingTransform: String, CaseIterable, Identifiable {
         case .professional: "Use a clear, professional tone without inventing context."
         case .bullets: "Organize the existing points into a readable list."
         case .actionItems: "Extract only the tasks that are explicitly stated."
-        case .removeFillers: "Remove standalone filler words using local text rules."
+        case .removeFillers: "Remove um, uh, stutters and comma-set fillers using local text rules."
         }
     }
 

@@ -56,8 +56,7 @@
 
     { "id": "filler-basic", "category": "fillers", "mode": "Natural",
       "input": "Um, could you, uh, send it?", "expected": "Could you send it?",
-      "cleanupFillers": true, "knownGap": true,
-      "note": "Removing a leading filler leaves the sentence lowercase." },
+      "cleanupFillers": true },
     { "id": "filler-keeps-real-words", "category": "fillers", "mode": "Natural",
       "input": "The umbrella is here.", "expected": "The umbrella is here.", "cleanupFillers": true },
     { "id": "filler-off-by-default", "category": "fillers", "mode": "Natural",

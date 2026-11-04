@@ -233,64 +233,6 @@ enum DictationContextHintExtractor {
     }
 }
 
-enum DictationBacktrack {
-    private static let markerExpression = try! NSRegularExpression(
-        pattern: #"(?:,\s*|;\s*)(?:scratch\s+that|actually|i\s+mean|no)\s*,?\s+"#,
-        options: [.caseInsensitive])
-    private static let anchorExpression = try! NSRegularExpression(
-        pattern: #"(?i)\b(called|named|equals)\s+([\p{L}\p{N}_'’.-]+(?:\s+[\p{L}\p{N}_'’.-]+){0,3})$"#)
-    private static let wordExpression = try! NSRegularExpression(pattern: #"[\p{L}\p{N}_'’.-]+"#)
-    private static let safeTailBoundaries: Set<String> = [
-        "a", "an", "for", "from", "meet", "my", "on", "prefer", "select", "send", "take", "the", "to", "use", "with", "your"
-    ]
-
-    /// Applies only explicit mid-sentence correction cues; raw recognition remains available to restore.
-    static func apply(to raw: String) -> String {
-        var result = raw
-        for _ in 0..<8 {
-            let fullRange = NSRange(result.startIndex..., in: result)
-            let nsResult = result as NSString
-            guard let match = markerExpression.matches(in: result, range: fullRange).last else { break }
-            let prefixRaw = nsResult.substring(to: match.range.location)
-            let suffixRaw = nsResult.substring(from: NSMaxRange(match.range))
-            let prefix = prefixRaw.trimmingCharacters(in: .whitespacesAndNewlines)
-                .replacingOccurrences(of: #"[,;:]$"#, with: "", options: .regularExpression)
-            let suffix = suffixRaw.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !prefix.isEmpty, !suffix.isEmpty,
-                  wordExpression.numberOfMatches(in: suffix, range: NSRange(suffix.startIndex..., in: suffix)) <= 8 else { break }
-
-            let prefixNSString = prefix as NSString
-            let anchorRange = anchorExpression.firstMatch(in: prefix,
-                                                          range: NSRange(location: 0, length: prefixNSString.length))
-            var correctedPrefix = prefix
-            if let anchorRange, anchorRange.range(at: 2).location != NSNotFound,
-               let tailRange = Range(anchorRange.range(at: 2), in: prefix) {
-                correctedPrefix.replaceSubrange(tailRange, with: suffix)
-            } else {
-                let suffixWords = wordExpression.numberOfMatches(in: suffix,
-                    range: NSRange(suffix.startIndex..., in: suffix))
-                let prefixWords = wordExpression.matches(in: prefix,
-                    range: NSRange(prefix.startIndex..., in: prefix))
-                guard suffixWords > 0, suffixWords <= 4,
-                      prefixWords.count > suffixWords + 1,
-                      let removalStart = Range(prefixWords[prefixWords.count - suffixWords].range, in: prefix)?.lowerBound else {
-                    break
-                }
-                let boundaryRange = prefixWords[prefixWords.count - suffixWords - 1].range
-                guard let boundary = Range(boundaryRange, in: prefix),
-                      safeTailBoundaries.contains(String(prefix[boundary]).lowercased()) else { break }
-                correctedPrefix = String(prefix[..<removalStart]).trimmingCharacters(in: .whitespacesAndNewlines)
-                if correctedPrefix.isEmpty { break }
-                correctedPrefix += " " + suffix
-            }
-
-            let leading = String(prefixRaw.prefix(while: { $0.isWhitespace || $0.isNewline }))
-            result = leading + correctedPrefix
-        }
-        return result
-    }
-}
-
 enum DictationCodeFormatter {
     private static let replacements: [(String, String)] = [
         (#"new\s+line"#, "\n"),
@@ -351,7 +293,7 @@ enum DictationTranscriptProcessor {
             let remainder = segment.text.dropFirst(leading.count)
             let trailing = remainder.reversed().prefix(while: \.isWhitespace).reversed()
             var text = String(remainder.dropLast(trailing.count))
-            if cleanupFillers { text = DictationLocalCleanup.removeFillers(from: text) }
+            if cleanupFillers { text = DictationLocalCleanup.removeFillers(from: text, restoresCapitals: mode != .code) }
             if mode == .code { text = DictationCodeFormatter.format(text) }
             else {
                 text = DictationModeFormatter.format(text, mode: mode)
@@ -376,21 +318,6 @@ enum DictationCorrectionRules {
     /// Corrects complete words or phrases with local rules before formatting and snippet expansion.
     static func apply(to text: String, rules: String) -> String {
         DictationSnippetExpander.expand(text, definitions: rules)
-    }
-}
-
-enum DictationLocalCleanup {
-    private static let fillerExpression = try! NSRegularExpression(
-        pattern: #"(?i)(?:,\s*|\s+)?(?<![\p{L}\p{N}_])(?:um+|uh+|erm+)(?![\p{L}\p{N}_])(?:\s*,)?"#)
-
-    /// Conservative, optional cleanup: removes only standalone filler words.
-    static func removeFillers(from text: String) -> String {
-        var result = fillerExpression.stringByReplacingMatches(
-            in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "")
-        result = result.replacingOccurrences(of: #"\s+([,.;:!?])"#, with: "$1", options: .regularExpression)
-        result = result.replacingOccurrences(of: #"^[\s,;:!?]+"#, with: "", options: .regularExpression)
-        result = result.replacingOccurrences(of: #"[ \t]{2,}"#, with: " ", options: .regularExpression)
-        return result.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 

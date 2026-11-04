@@ -32,8 +32,7 @@
     { "id": "h-correction-named", "category": "corrections", "mode": "Natural",
       "input": "Open the file named draft, I mean final.", "expected": "Open the file named final." },
     { "id": "h-correction-at", "category": "corrections", "mode": "Natural",
-      "input": "Call me at five, no six.", "expected": "Call me at six.",
-      "knownGap": true, "note": "\"at\" is not an accepted boundary word for tail corrections." },
+      "input": "Call me at five, no six.", "expected": "Call me at six." },
     { "id": "h-correction-sentence-start", "category": "corrections", "mode": "Natural",
       "input": "Yes, actually it works.", "expected": "Yes, actually it works." },
 

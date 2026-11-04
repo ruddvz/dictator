@@ -156,29 +156,20 @@ final class DictationRecoveryTests: XCTestCase {
         XCTAssertTrue(audio.isUsable)
     }
 
-    func testTranscriptCardLiveStates() {
-        XCTAssertEqual(TranscriptCard.state(isCapturing: true, hasTarget: false, transcript: "",
-                                            isCollapsed: false, keepsFinishedText: false),
-                       .live(hint: TranscriptCard.noTargetHint))
-        XCTAssertEqual(TranscriptCard.state(isCapturing: true, hasTarget: true, transcript: " ",
-                                            isCollapsed: false, keepsFinishedText: false), .hidden)
-        XCTAssertEqual(TranscriptCard.state(isCapturing: true, hasTarget: true, transcript: "hello",
-                                            isCollapsed: false, keepsFinishedText: false), .hidden)
-        XCTAssertEqual(TranscriptCard.state(isCapturing: true, hasTarget: false, transcript: "hello",
-                                            isCollapsed: true, keepsFinishedText: false), .hidden)
+    func testTranscriptCardStaysHiddenWhileTalking() {
+        for hasTarget in [false, true] {
+            XCTAssertEqual(TranscriptCard.state(isCapturing: true, hasTarget: hasTarget, transcript: "hello",
+                                                keepsFinishedText: true), .hidden)
+        }
     }
 
     func testTranscriptCardStaysUpOnlyWithoutATarget() {
-        XCTAssertEqual(TranscriptCard.state(isCapturing: false, hasTarget: false, transcript: "hello",
-                                            isCollapsed: true, keepsFinishedText: true),
+        XCTAssertEqual(TranscriptCard.state(isCapturing: false, hasTarget: false, transcript: "hello", keepsFinishedText: true),
                        .finished(hint: TranscriptCard.noTargetHint))
-        XCTAssertEqual(TranscriptCard.state(isCapturing: false, hasTarget: true, transcript: "hello",
-                                            isCollapsed: false, keepsFinishedText: false), .hidden)
-        XCTAssertEqual(TranscriptCard.state(isCapturing: false, hasTarget: false, transcript: "",
-                                            isCollapsed: false, keepsFinishedText: true), .hidden)
+        XCTAssertEqual(TranscriptCard.state(isCapturing: false, hasTarget: true, transcript: "hello", keepsFinishedText: false), .hidden)
+        XCTAssertEqual(TranscriptCard.state(isCapturing: false, hasTarget: false, transcript: "", keepsFinishedText: true), .hidden)
         // Typing into the field failed: the card comes back so the text can be copied.
-        XCTAssertEqual(TranscriptCard.state(isCapturing: false, hasTarget: true, transcript: "hello",
-                                            isCollapsed: false, keepsFinishedText: true),
+        XCTAssertEqual(TranscriptCard.state(isCapturing: false, hasTarget: true, transcript: "hello", keepsFinishedText: true),
                        .finished(hint: TranscriptCard.notTypedHint))
     }
 
