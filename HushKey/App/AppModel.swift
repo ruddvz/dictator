@@ -245,7 +245,7 @@ final class AppModel {
     }
     /// After the rules, Apple Intelligence on this Mac drops the fillers they can't judge and
     /// fixes punctuation. It can only delete fillers, never reword.
-    var polishesWithAppleIntelligence = UserDefaults.standard.object(forKey: "smartCleanup") as? Bool ?? true {
+    var polishesWithAppleIntelligence = UserDefaults.standard.object(forKey: "smartCleanup") as? Bool ?? false {
         didSet { UserDefaults.standard.set(polishesWithAppleIntelligence, forKey: "smartCleanup") }
     }
     @ObservationIgnored private var smartCleanupSession: AnyObject?
@@ -2080,6 +2080,10 @@ final class AppModel {
         let isHushKey = target?.bundleIdentifier == "com.ruddvz.hushkey"
         activeDictationTarget = isHushKey ? nil : target?.localizedName
         timing.mark("reset")
+
+        // Concurrently open the microphone off-main while resolving frontmost app focus and profiles on-main
+        async let audioStartup: Void = audio.start()
+
         capturedInsertionTarget = isHushKey ? nil : insertion.captureInsertionTarget()
         timing.mark("axTarget")
         capturedPasteTarget = nil
@@ -2090,7 +2094,8 @@ final class AppModel {
         capturedInsertionTargetName = capturedInsertionTarget?.applicationName
         dictationTargetApp = isHushKey ? nil : target
         dictationHasTarget = insertion.isEnabled && (capturedInsertionTarget != nil || capturedPasteTarget != nil)
-        insertion.logFocus("start insertTarget=\(capturedInsertionTarget != nil) pasteTarget=\(capturedPasteTarget != nil)")
+        Logger(subsystem: "com.ruddvz.hushkey", category: "insertion")
+            .notice("start insertTarget=\(self.capturedInsertionTarget != nil) pasteTarget=\(self.capturedPasteTarget != nil)")
         timing.mark("logFocus")
         let targetBundleIdentifier = isHushKey ? nil : target?.bundleIdentifier
         let profileSettings = DictationAppProfile.resolve(
@@ -2133,7 +2138,7 @@ final class AppModel {
         // spoken during the start aren't lost.
         async let speechPreparation = showsApplePreview
             ? transcriber.prepare(localeIdentifier: activeDictationLanguageIdentifier) : false
-        await audio.start()
+        await audioStartup
         timing.mark("micOpen")
         guard generation == dictationStartGeneration else {
             timing.report("superseded")

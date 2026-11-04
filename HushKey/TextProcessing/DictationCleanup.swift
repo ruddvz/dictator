@@ -384,8 +384,8 @@ enum DictationSmartCleanup {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 12, trimmed.count <= 4_000, isAvailable, #available(macOS 26.0, *) else { return nil }
         let session = (prepared as? LanguageModelSession) ?? LanguageModelSession(instructions: instructions)
-        // Long dictations get a little longer, but never hold the text back for more than 4 s.
-        let timeout = min(4, 1.5 + Double(trimmed.count) / 150)
+        // Keep the polish pass snappy so text lands without noticeable delay.
+        let timeout = min(1.5, 0.8 + Double(trimmed.count) / 300)
         let prompt = "<dictation>\n\(trimmed)\n</dictation>"
         let answer = await withTaskGroup(of: String?.self) { group in
             group.addTask { @MainActor in

@@ -164,7 +164,7 @@ final class MicTranscriber {
         sinkID = nil
         box.set(nil)
         finalizationTimeoutTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(2))
+            try? await Task.sleep(for: .milliseconds(500))
             self?.completeFinalization()
         }
     }

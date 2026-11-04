@@ -9,11 +9,11 @@ struct FunctionKeyGesture {
     enum Action: Equatable { case none, scheduleHoldStart, cancelHoldStart, startHold, endHold, abortHold, startHandsFree, stopHandsFree }
 
     /// fn must stay down this long before dictation starts, so fn+arrow and fn+F-key combos never trigger it.
-    static let holdDelay: TimeInterval = 0.12
+    static let holdDelay: TimeInterval = 0.10
     /// A press shorter than this counts as a tap.
-    static let tapLimit: TimeInterval = 0.3
+    static let tapLimit: TimeInterval = 0.25
     /// Two taps closer together than this start hands-free dictation.
-    static let doubleTapWindow: TimeInterval = 0.4
+    static let doubleTapWindow: TimeInterval = 0.35
 
     /// fn taps toggle hands-free dictation. Silent capture has no hands-free mode, so a quick
     /// Control hold simply ends the capture and the take is judged on its own length.
@@ -73,7 +73,7 @@ struct FunctionKeyGesture {
                 return .startHandsFree
             }
             lastTapAt = time
-            return wasHolding ? .abortHold : .cancelHoldStart
+            return wasHolding ? .endHold : .cancelHoldStart
         }
         lastTapAt = nil
         return wasHolding ? .endHold : .cancelHoldStart

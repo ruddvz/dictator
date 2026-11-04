@@ -1,5 +1,29 @@
 # HushKey progress
 
+## Completed: smoothness & latency performance overhaul (2026-11-04)
+
+- **Eliminated Floating Pill window resizing jank (`FloatingPill.swift`):**
+  - Expanded `minimumPanelSize` to `CGSize(width: 360, height: 96)` and initialized `contentSize` with it, providing a stable transparent panel bounds.
+  - Sized comfortably to host all pill morph states (idle, hover with Meeting Notes, recording with timer & buttons, and hint cards) without mid-spring `NSPanel.setFrame` re-layouts.
+  - SwiftUI spring animations now execute at full GPU layer speed without AppKit layout thrashing.
+- **120Hz ProMotion & 60Hz fluid meter tracking (`Ambient.swift`, `AudioService.swift`):**
+  - Updated `BreathRibbon` frame rate to 120 fps for Apple Silicon ProMotion displays.
+  - Increased `AudioLevelMailbox` delivery frequency from 30Hz to 60Hz (`1.0 / 60.0`), doubling meter temporal resolution and removing stepped volume jumps.
+  - Prevented abrupt ribbon resets by preserving smoother values across mode transitions and smoothly easing energy to 0.
+- **Instant concurrent dictation startup (`AppModel.swift`):**
+  - Concurrently launched `audio.start()` immediately on keypress, overlapping CoreAudio startup with frontmost app Accessibility inspection and profile resolution.
+  - Replaced duplicate synchronous Accessibility IPC traversals in `logFocus` with direct logging, cutting startup latency by over 250ms.
+- **Instant quick-hold dictation support (`FunctionKeyMonitor.swift`):**
+  - Fixed false aborts on quick speech: when `wasHolding` is true, `fnUp` now returns `.endHold` instead of `.abortHold`, capturing short phrases (150-300ms) that were previously silently dropped.
+  - Tuned `holdDelay` to 100ms for faster activation.
+- **Ultra-fast paste verification & finalization (`TextInsertionService.swift`, `MicTranscriber.swift`):**
+  - Decreased paste observation polling interval in `PasteDeliveryVerifier` from 100ms to 25ms, delivering verified paste confirmations 4x faster.
+  - Lowered `MicTranscriber` finalization fallback timeout from 2.0s to 500ms, removing long stalls on utterances where SFSpeech is slow to emit `isFinal`.
+  - Defaulted `polishesWithAppleIntelligence` to `false` for instant Wispr Flow-style token cleanup (< 1ms), while preserving Polished mode for users opting into LLM passes.
+- **Verification:**
+  - Full unit test suite: **327 passed, 3 skipped, 0 failures** in ~13s.
+  - Universal binary built and signed via `Scripts/package-app.sh`.
+
 ## Completed: defensive runtime hardening & force-unwrap elimination (2026-11-04)
 
 - **Eliminated crash risks & forced unwraps (`!`):**

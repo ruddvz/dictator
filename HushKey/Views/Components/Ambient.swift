@@ -13,8 +13,8 @@ struct BreathRibbon: View {
     var level: Float = 0
     var mode: Mode
     var tint: Color = Theme.signal
-    /// Upper frame rate. The pill runs at 60 to follow syllables; ambient uses run slower.
-    var frameRate: Double = 60
+    /// Upper frame rate. The pill runs at 120 to follow syllables smoothly on ProMotion displays; ambient uses run slower.
+    var frameRate: Double = 120
     /// Stops the clock, for example while the window is hidden.
     var paused = false
 
@@ -50,7 +50,11 @@ struct BreathRibbon: View {
             guard mode == .live else { return }
             smoother.target = Double(smoother.envelope.amount(for: newValue, at: Date.timeIntervalSinceReferenceDate))
         }
-        .onChange(of: mode) { _, _ in smoother = Smoother() }
+        .onChange(of: mode) { _, newMode in
+            if newMode == .rest {
+                smoother.target = 0
+            }
+        }
         .accessibilityHidden(true)
     }
 
@@ -58,7 +62,7 @@ struct BreathRibbon: View {
     private func advance(to time: TimeInterval) -> Double {
         let dt = min(0.05, time - (smoother.lastFrame ?? time))
         smoother.lastFrame = time
-        let rate = smoother.target > smoother.value ? 24.0 : 6.0
+        let rate = smoother.target > smoother.value ? 20.0 : 8.0
         smoother.value += (smoother.target - smoother.value) * min(1, rate * dt)
         return smoother.value
     }

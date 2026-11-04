@@ -13,13 +13,13 @@ final class AudioLevelMailboxTests: XCTestCase {
         XCTAssertEqual(first.peak, 0.9, accuracy: 0.0001)
     }
 
-    func testMeterDeliveryIsLimitedToThirtyPerSecond() {
+    func testMeterDeliveryIsLimitedToSixtyPerSecond() {
         let mailbox = AudioLevelMailbox()
 
         XCTAssertTrue(mailbox.offer(0.3, at: 2.0))
         _ = mailbox.take()
-        XCTAssertFalse(mailbox.offer(0.4, at: 2.02))
-        XCTAssertTrue(mailbox.offer(0.5, at: 2.04))
+        XCTAssertFalse(mailbox.offer(0.4, at: 2.01))
+        XCTAssertTrue(mailbox.offer(0.5, at: 2.02))
 
         let update = mailbox.take()
         XCTAssertEqual(update.level, 0.5, accuracy: 0.0001)

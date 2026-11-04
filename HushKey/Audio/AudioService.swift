@@ -47,14 +47,14 @@ final class AudioSink: @unchecked Sendable {
 
 /// Keeps render-thread meter callbacks from creating a backlog of MainActor tasks.
 /// The audio tap still accounts for every sample in the peak; the UI receives the latest
-/// level at most 30 times per second and never replays stale meter updates.
+/// level at up to 60 times per second for fluid waveform rendering and never replays stale meter updates.
 final class AudioLevelMailbox: @unchecked Sendable {
     struct Update {
         let level: Float
         let peak: Float
     }
 
-    static let minimumInterval: TimeInterval = 1.0 / 30.0
+    static let minimumInterval: TimeInterval = 1.0 / 60.0
 
     private let lock = NSLock()
     private var latest: Float = 0

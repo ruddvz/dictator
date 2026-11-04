@@ -850,7 +850,7 @@ enum PasteDeliveryVerifier {
     static func waitForConfirmation(originalValue: String,
                                     expectedValue: String,
                                     maximumChecks: Int = 20,
-                                    interval: Duration = .milliseconds(100),
+                                    interval: Duration = .milliseconds(25),
                                     observe: () -> Observation) async -> Result {
         guard maximumChecks > 0 else { return .timedOut }
         for check in 0..<maximumChecks {

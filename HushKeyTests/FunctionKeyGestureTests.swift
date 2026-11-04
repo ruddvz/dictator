@@ -9,6 +9,14 @@ final class FunctionKeyGestureTests: XCTestCase {
         XCTAssertEqual(gesture.fnUp(at: 1.5), .endHold)
     }
 
+    func testQuickHoldEndsHoldAndDoesNotAbort() {
+        var gesture = FunctionKeyGesture()
+        XCTAssertEqual(gesture.fnDown(at: 0), .scheduleHoldStart)
+        XCTAssertEqual(gesture.holdDelayElapsed(), .startHold)
+        // Released at 0.18s, which is under tapLimit (0.25s), but was already holding
+        XCTAssertEqual(gesture.fnUp(at: 0.18), .endHold)
+    }
+
     func testFnWithAnotherKeyIsAShortcutNotDictation() {
         var gesture = FunctionKeyGesture()
         _ = gesture.fnDown(at: 0)

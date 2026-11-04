@@ -22,7 +22,7 @@ struct PillResizeGeneration {
 final class FloatingPillController {
     private var panel: NSPanel?
     private weak var model: AppModel?
-    private var contentSize = CGSize(width: 60, height: 14)
+    private var contentSize = minimumPanelSize
     /// A smaller size waits for the closing animation, so the panel never clips the pill as it shrinks.
     private var pendingShrink: DispatchWorkItem?
     /// Canceled DispatchWorkItems can still run after they have been enqueued. This generation
@@ -206,7 +206,8 @@ final class FloatingPillController {
 
     /// Fits the recording capsule with × and ✓, the elapsed timer, the hover row with Meeting
     /// notes, and a one-line hint above, plus the 8 pt shadow margin on every side.
-    static let minimumPanelSize = CGSize(width: 220, height: 84)
+    /// Generous enough to host all pill morph states without mid-animation window resizing.
+    static let minimumPanelSize = CGSize(width: 360, height: 96)
 
     private func apply(_ size: CGSize) {
         guard size != contentSize else { return }
