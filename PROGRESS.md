@@ -1,5 +1,20 @@
 # HushKey progress
 
+## Completed: local voice profile and time saved (2026-11-04)
+
+- **`VoiceProfile` (`HushKey/Recording/VoiceProfile.swift`)**, a pure type read from the usage ledger and the saved history on this Mac (audit row 4):
+  - Pace by wpm of microphone time: Unhurried < 100, Steady 100–129, Quick 130–159, Rapid ≥ 160.
+  - Peak hours: the busiest 3-hour window (wraps past midnight), named Early bird (centre 5–10), Midday regular, Evening regular (17–21) or Night owl (22–4). Needs 5 dated entries.
+  - Catchphrase: the 2–4 word phrase in the most separate dictations (at least 3), longer phrase on a tie, no phrases made of function words.
+  - Cleanup: a word-level diff of raw vs final text. Pure deletions that are fillers or stutters count as fillers removed; short substitutions (vocabulary snaps, your replacements) give the most-corrected word, shown as it was fixed to. Self-correction deletions don't count as corrections.
+  - Time saved: words ÷ 40 wpm minus speaking time, only over days that measured microphone time, never negative; "about 25 min saved", "about 1.5 h saved", whole hours from 10 h.
+  - Cards unlock by lifetime dictations: pace 10, cleanup 20, peak hours 30, catchphrase 40 (history keeps 50).
+- **Home stats card:** the time-saved line now uses `VoiceProfile`, plus one more line: "Your voice profile in N dictations" before 10, then "Steady voice · night owl". Home skips the text diff (`readingText: false`).
+- **Insights:** a "Your voice" section after the first row (an intro with a progress strip before 10 dictations, then a 2 × 2 grid with locked tiles counting down), and time saved at the foot of the speed card. Subtitle now says Your voice reads the kept history.
+- **Verified here:** 254 tests, 3 skipped, 0 failures (22 new in `VoiceProfileTests`: thresholds, unlock steps, empty history, zero duration, untimed days, wrap-around hours, phrase ties, diff). Packaged with `Scripts/package-app.sh`.
+- **Checked in the packaged app** (dark mode, the user's real history, 4 of 4 cards): Home read "About 35 min saved vs typing" and "Quick voice · night owl"; Insights showed the 2 × 2 grid and the speed card's time-saved line, with no truncation or overlap and only grey and sage. That check turned up "i don't" as the catchphrase and 8–11 PM as night owl; contractions are now function words, "I" is capitalised, and 8–11 PM is Evening regular. Those fixes are covered by tests but weren't re-checked by eye.
+- **Not checked live:** the locked intro and countdown tiles (this Mac's history is already past 40 dictations), light mode, and the history-off copy.
+
 ## Completed: floating pill hover reliability (2026-11-04)
 
 - Removed microphone-device enumeration from the pill hover handler, so hover only changes view state and cannot block the entrance animation on a CoreAudio query.

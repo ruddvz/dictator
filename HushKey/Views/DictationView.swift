@@ -294,13 +294,7 @@ struct DictationView: View {
                 }
                 statRow(value: ledger.wordsPerMinute, label: "words per minute", order: 1)
                 statRow(value: streak, label: "day streak", order: 2)
-                if let saved = timeSaved(ledger) {
-                    Label(saved, icon: .clock)
-                        .hushIconSize(14)
-                        .font(.hkMeta.weight(.medium))
-                        .foregroundStyle(Theme.ink2)
-                        .help("Words at \(UsageLedger.typingWordsPerMinute) wpm typing, minus the time you spent speaking")
-                }
+                voiceLines(VoiceProfile(entries: model.dictationHistory, ledger: ledger, readingText: false))
                 Rectangle().fill(Theme.hairline).frame(height: 1)
                 VStack(alignment: .leading, spacing: Theme.s2) {
                     HStack {
@@ -322,14 +316,37 @@ struct DictationView: View {
         .accessibilityHint("Opens Insights")
     }
 
-    /// Typing time the words would have taken at 40 wpm, minus the time spent speaking them.
-    private func timeSaved(_ ledger: UsageLedger) -> String? {
-        let spoken = ledger.days.values.reduce(0) { $0 + $1.seconds }
-        let minutes = Double(ledger.totalWords) / Double(UsageLedger.typingWordsPerMinute) - spoken / 60
-        guard minutes >= 1 else { return nil }
-        let amount = minutes < 60 ? "\(Int(minutes.rounded())) min"
-            : (minutes / 60).formatted(.number.precision(.fractionLength(1))) + " h"
-        return "About \(amount) saved vs typing"
+    /// Time saved and the voice profile in two quiet lines; Insights has the full cards.
+    @ViewBuilder
+    private func voiceLines(_ profile: VoiceProfile) -> some View {
+        VStack(alignment: .leading, spacing: Theme.s1 + 2) {
+            if let saved = profile.timeSavedText {
+                Label(saved.prefix(1).uppercased() + saved.dropFirst() + " vs typing", icon: .clock)
+                    .help("Words at \(VoiceProfile.typingWordsPerMinute) wpm typing, minus the time you spent speaking")
+            }
+            if let next = profile.nextUnlock, next.card == .pace {
+                Label("Your voice profile in \(next.remaining) dictation\(next.remaining == 1 ? "" : "s")", icon: .waveform)
+                    .foregroundStyle(Theme.ink3)
+                    .help("After \(VoiceProfile.firstUnlock) dictations, Insights sketches how you talk, from the history on this Mac")
+            } else if let summary = Self.voiceSummary(profile) {
+                Label(summary, icon: .waveform)
+                    .help("Your voice profile, read from the history on this Mac. More in Insights.")
+            }
+        }
+        .hushIconSize(14)
+        .font(.hkMeta.weight(.medium))
+        .foregroundStyle(Theme.ink2)
+        .lineLimit(1)
+    }
+
+    /// "Steady voice · night owl", with only the parts that have unlocked and have data.
+    static func voiceSummary(_ profile: VoiceProfile) -> String? {
+        var parts: [String] = []
+        if let pace = profile.pace { parts.append("\(pace.rawValue) voice") }
+        if profile.isUnlocked(.peakHours), let peak = profile.peakHours {
+            parts.append(parts.isEmpty ? peak.timeOfDay.rawValue : peak.timeOfDay.rawValue.lowercased())
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
     private func statRow(value: Int?, label: String, order: Int) -> some View {
