@@ -59,12 +59,19 @@ final class DictationRecoveryTests: XCTestCase {
 
     func testParakeetOnlyAutoInsertsWithBothStrongSignalAndConfidence() {
         XCTAssertTrue(ParakeetAutoInsertGate.allowsAutomaticInsertion(peakLevel: 0.8, confidence: 0.9))
-        XCTAssertFalse(ParakeetAutoInsertGate.allowsAutomaticInsertion(peakLevel: 0.2, confidence: 0.9))
+        XCTAssertFalse(ParakeetAutoInsertGate.allowsAutomaticInsertion(peakLevel: 0.03, confidence: 0.9))
         XCTAssertFalse(ParakeetAutoInsertGate.allowsAutomaticInsertion(peakLevel: 0.8, confidence: 0.2))
     }
 
+    /// Real dictations from 2026-11-04 that the old 0.45 peak floor wrongly held for review.
+    func testOrdinaryAndQuietSpeechTypesWithoutReview() {
+        XCTAssertTrue(ParakeetAutoInsertGate.allowsAutomaticInsertion(peakLevel: 0.41, confidence: 0.95))
+        XCTAssertTrue(ParakeetAutoInsertGate.allowsAutomaticInsertion(peakLevel: 0.43, confidence: 1.0))
+        XCTAssertTrue(ParakeetAutoInsertGate.allowsAutomaticInsertion(peakLevel: 0.10, confidence: 0.57))
+    }
+
     func testLowSignalRequiresReviewEvenWhenParakeetFallsBackWithoutConfidence() {
-        XCTAssertTrue(ParakeetAutoInsertGate.requiresReview(peakLevel: 0.2, confidence: nil))
+        XCTAssertTrue(ParakeetAutoInsertGate.requiresReview(peakLevel: 0.03, confidence: nil))
         XCTAssertFalse(ParakeetAutoInsertGate.requiresReview(peakLevel: 0.8, confidence: nil))
     }
 
