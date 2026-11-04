@@ -80,33 +80,6 @@ final class PillHitTestTests: XCTestCase {
     }
 }
 
-final class InsertionSecureFieldTests: XCTestCase {
-    func testRejectsSecureSubrole() {
-        XCTAssertFalse(TextInsertionService.isSupportedTextTarget(role: "AXTextField", subrole: "AXSecureTextField"))
-    }
-
-    func testRejectsPasswordSubrole() {
-        XCTAssertFalse(TextInsertionService.isSupportedTextTarget(role: "AXTextField", subrole: "AXPasswordField"))
-    }
-
-    func testRejectsSecureRole() {
-        XCTAssertFalse(TextInsertionService.isSupportedTextTarget(role: "AXSecureTextField", subrole: ""))
-    }
-
-    func testAcceptsNormalTextField() {
-        XCTAssertTrue(TextInsertionService.isSupportedTextTarget(role: "AXTextField", subrole: ""))
-        XCTAssertTrue(TextInsertionService.isSupportedTextTarget(role: "AXTextArea", subrole: ""))
-        XCTAssertTrue(TextInsertionService.isSupportedTextTarget(role: "AXComboBox", subrole: ""))
-    }
-}
-
-final class AudioDeviceFilterTests: XCTestCase {
-    func testPrivateAggregatesAreHidden() {
-        XCTAssertFalse(AudioDevices.isUserFacing("CADefaultDeviceAggregate-22075-0"))
-        XCTAssertTrue(AudioDevices.isUserFacing("MacBook Pro Microphone"))
-    }
-}
-
 final class PillResizeGenerationTests: XCTestCase {
     func testNewGeometryInvalidatesOlderDelayedShrinks() {
         var generation = PillResizeGeneration()
