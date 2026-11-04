@@ -10,7 +10,7 @@
 - **Password guard:** `AXIsPassword` is now checked in `capturePasteTarget` and `pasteDirectly` too.
 - Removed duplicate `copyLastTranscript` (menu uses `copyDictationText`); corrected the misleading "off-main" comment on the mic start.
 - **Left as is (needs a product call):** smart cleanup (Apple Intelligence polish) default flipped from on to off in 53a6de2.
-- **Verification:** 332 tests passed, 3 skipped; packaged and launched. Menu, Style and pill context menu checked live; dictation itself not checked (needs the mic).
+- **Verification:** 332 tests passed, 3 skipped; packaged and launched. Not checked live yet: menu bar Language list, Style page, pill right-click menu and dictation (live check was stopped).
 
 ## Completed: Typed confirmation and tick-free Copied (2026-11-04)
 
