@@ -1,5 +1,30 @@
 # HushKey progress
 
+## Completed: Wispr Flow parity & superiority pass (2026-11-04)
+
+- **Word-level cleanup diff sheet & history indicators:**
+  - Added discrete `Cleaned` badge and `Original recognition` button in history row meta lines (`DictationView.swift`).
+  - Added "View changes" in ⋯ menu and right-click context menu.
+  - Built `HistoryDiffSheet`: visualizes exact word-level changes with deletions struck through in muted ink and replacements/snaps in sage text. Text selection is enabled and includes an "Undo cleanup" action to restore the original spoken words directly from the sheet.
+- **Cleanup Level Card Group in StyleView (`StyleView.swift`):**
+  - Added 3 interactive cards matching Wispr Flow's ladder: **Raw** (verbatim), **Clean** (fillers & false starts removed), and **Polished** (Apple Intelligence flow tightening).
+  - Included a live before→after preview sentence that transforms in real-time as users switch levels.
+  - Displayed zero-rewording privacy guarantee badge: "HushKey never rewords or invents text. The polish pass only deletes fillers and refines punctuation. The raw transcript is always one click away in History."
+- **Spoken voice commands (`DictationCustomization.swift`):**
+  - Expanded `DictationModeFormatter` to convert "press enter" and "hit enter" into newline breaks, alongside "new line" and "new paragraph". Verified in `SafetyAndStorageTests`.
+- **Flow bar temporary hide:**
+  - Added "Hide for 1 hour" in the pill right-click context menu (`FloatingPill.swift`).
+  - Implemented `hideFloatingPill(for: 3600)` with automatic `@MainActor` unhide timer in `AppModel.swift`.
+  - Added dynamic menu bar status: shows "Show dictation bar (hidden for 1 hr)" when temporarily hidden, allowing instant manual unhiding.
+- **Keyboard Shortcuts Sheet completeness (`HubToolbar.swift`):**
+  - Added missing global shortcuts: "Paste last transcript" (⌃⌘V), "Insert again", and "Undo insertion" (⌥⇧U).
+  - Fixed shortcut settings navigation link to open `SettingsView.Section.shortcuts` directly instead of redirecting through General.
+- **Verification:**
+  - `xcodegen generate` ran cleanly.
+  - Full test suite: **326 passed, 3 skipped, 0 failures**.
+  - Universal binary built and signed via `Scripts/package-app.sh`.
+  - Relaunched and verified running live at PID **33492**.
+
 ## Completed: codebase domain restructuring & pill transcript scroll preview (2026-11-04)
 
 - **Domain-driven architectural reorganization (`6b33bef`):**

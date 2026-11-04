@@ -227,7 +227,7 @@ struct Notice: Identifiable {
             notices.append(Notice(id: "error", kind: .error, icon: .warning,
                                   title: "Dictation hit a problem", detail: error,
                                   action: "Open Settings") { model in
-                UserDefaults.standard.set(SettingsView.Section.general.rawValue, forKey: "settingsSection")
+                UserDefaults.standard.set(SettingsView.Section.dictation.rawValue, forKey: "settingsSection")
                 model.screen = .settings
             })
         }
@@ -256,7 +256,7 @@ struct Notice: Identifiable {
                                   title: "Speech recognition is off",
                                   detail: "Local Apple Speech dictation needs permission in macOS Privacy & Security settings.",
                                   action: "Review setup") { model in
-                UserDefaults.standard.set(SettingsView.Section.general.rawValue, forKey: "settingsSection")
+                UserDefaults.standard.set(SettingsView.Section.dictation.rawValue, forKey: "settingsSection")
                 model.screen = .settings
             })
         }
@@ -505,10 +505,17 @@ struct KeyboardShortcutsSheet: View {
         if fn {
             rows.append(Row(icon: .waveform, title: "Hands-free", detail: "Double-tap, then talk as long as you like", keys: ["fn", "fn"]))
         }
+        if let pasteLast = model.pasteLastShortcut {
+            rows.append(Row(icon: .insert, title: "Paste last transcript", detail: "Pastes what you just dictated anywhere", keys: [pasteLast.label]))
+        }
         rows += [
             Row(icon: .close, title: "Cancel", detail: "While dictating; Undo brings it back", keys: ["esc"]),
             Row(icon: .edit, title: "Edit selected text by voice", detail: "Select text, hold, say the change",
                 keys: [model.selectedTextEditShortcut.label]),
+            Row(icon: .cursor, title: "Insert again", detail: "Types the last output at your cursor",
+                keys: [model.insertion.shortcut.label]),
+            Row(icon: .undo, title: "Undo insertion", detail: "Replaces the original field contents",
+                keys: ["⌥⇧U"]),
             Row(icon: .silent, title: "Silent capture", detail: "Silent lab: capture one mouthed word",
                 keys: [model.captureShortcut.label]),
             Row(icon: .sidebar, title: "Hide or show the sidebar", detail: "In this window", keys: ["⌃⌘S"]),
@@ -522,7 +529,7 @@ struct KeyboardShortcutsSheet: View {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: Theme.s1) {
                     Text("Keyboard shortcuts").font(.display(24))
-                    Text("Change them in Settings → General.").font(.hkCaption).foregroundStyle(Theme.ink2)
+                    Text("Change them in Settings → Shortcuts.").font(.hkCaption).foregroundStyle(Theme.ink2)
                 }
                 Spacer()
                 Button("Close", icon: .close) { dismiss() }
@@ -557,7 +564,7 @@ struct KeyboardShortcutsSheet: View {
             HStack {
                 Spacer()
                 Button("Open shortcut settings") {
-                    UserDefaults.standard.set(SettingsView.Section.general.rawValue, forKey: "settingsSection")
+                    UserDefaults.standard.set(SettingsView.Section.shortcuts.rawValue, forKey: "settingsSection")
                     withAnimation(Theme.snappy) { model.screen = .settings }
                     dismiss()
                 }

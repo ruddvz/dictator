@@ -688,6 +688,8 @@ final class SafetyAndStorageTests: XCTestCase {
 
     func testWritingModesFormatLineBreaksAndCodeTokens() {
         XCTAssertEqual(DictationModeFormatter.format("Hello new line team", mode: .message), "Hello\nteam")
+        XCTAssertEqual(DictationModeFormatter.format("Hello press enter team", mode: .message), "Hello\nteam")
+        XCTAssertEqual(DictationModeFormatter.format("Hello hit enter team", mode: .message), "Hello\nteam")
         XCTAssertEqual(DictationModeFormatter.format("Hello new paragraph team", mode: .email), "Hello\n\nteam")
         XCTAssertEqual(DictationCodeFormatter.format("open parenthesis value close parenthesis"), "(value)")
         XCTAssertEqual(DictationTranscriptProcessor.process("log underscore value new line", mode: .code,

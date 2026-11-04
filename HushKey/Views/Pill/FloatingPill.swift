@@ -778,7 +778,9 @@ struct FloatingPillView: View {
             model.openMainWindow?()
             NSApp.activate(ignoringOtherApps: true)
         }
-        Button("Hide the dictation bar") { model.showsFloatingPill = false }
+        Divider()
+        Button("Hide for 1 hour") { model.hideFloatingPill(for: 3600) }
+        Button("Hide dictation bar") { model.showsFloatingPill = false }
     }
 
     private var stroke: Color {

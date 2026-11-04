@@ -208,7 +208,7 @@ private struct HushKeyMenu: View {
             Divider()
             Button("More languages…") {
                 model.screen = .settings
-                UserDefaults.standard.set(SettingsView.Section.general.rawValue, forKey: "settingsSection")
+                UserDefaults.standard.set(SettingsView.Section.dictation.rawValue, forKey: "settingsSection")
                 model.openMainWindow?()
                 NSApp.activate(ignoringOtherApps: true)
             }
@@ -226,7 +226,7 @@ private struct HushKeyMenu: View {
                 Divider()
                 Button("Download Parakeet in Settings…") {
                     model.screen = .settings
-                    UserDefaults.standard.set(SettingsView.Section.general.rawValue, forKey: "settingsSection")
+                    UserDefaults.standard.set(SettingsView.Section.dictation.rawValue, forKey: "settingsSection")
                     model.openMainWindow?()
                     NSApp.activate(ignoringOtherApps: true)
                 }
@@ -270,7 +270,11 @@ private struct HushKeyMenu: View {
 
         // 5. Global controls
         Toggle("Pause global shortcuts", isOn: $model.isShortcutsPaused)
-        Toggle("Show dictation bar", isOn: $model.showsFloatingPill)
+        if model.pillHiddenUntil != nil {
+            Button("Show dictation bar (hidden for 1 hr)") { model.unhideFloatingPill() }
+        } else {
+            Toggle("Show dictation bar", isOn: $model.showsFloatingPill)
+        }
         Toggle("Dictation sounds", isOn: $model.playsDictationSounds)
         Toggle("Mute audio while dictating", isOn: $model.mutesAudioWhileDictating)
 

@@ -268,7 +268,10 @@ enum DictationModeFormatter {
         guard mode == .message || mode == .email else { return text }
         var result = text
         let paragraphBreak = mode == .email ? "\n\n" : "\n"
-        let replacements = [(#"new\s+paragraph"#, paragraphBreak), (#"new\s+line"#, "\n")]
+        let replacements = [
+            (#"new\s+paragraph"#, paragraphBreak),
+            (#"new\s+line|press\s+enter|hit\s+enter"#, "\n")
+        ]
         for (pattern, replacement) in replacements {
             guard let expression = try? NSRegularExpression(pattern: #"\b(?:"# + pattern + #")\b"#,
                                                            options: [.caseInsensitive]) else { continue }

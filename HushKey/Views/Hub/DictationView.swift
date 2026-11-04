@@ -685,6 +685,7 @@ private struct HistoryRow: View {
     @State private var isHovering = false
     @State private var copied = false
     @State private var expanded = false
+    @State private var showsDiff = false
 
     private var isReading: Bool { reader.speakingID == entry.id }
     private var isRetranscribing: Bool { model.retranscribingDictationID == entry.id }
@@ -716,6 +717,10 @@ private struct HistoryRow: View {
         .onTapGesture { if isLong { toggleExpanded() } }
         .onHover { hovering in withAnimation(.easeOut(duration: 0.12)) { isHovering = hovering } }
         .contextMenu { menuItems }
+        .sheet(isPresented: $showsDiff) {
+            HistoryDiffSheet(entry: entry)
+                .environment(model)
+        }
         .accessibilityElement(children: .contain)
         .accessibilityAction(named: expanded ? "Show less" : "Show full text") { if isLong { toggleExpanded() } }
     }
@@ -738,9 +743,28 @@ private struct HistoryRow: View {
                 .font(.hkMeta.monospacedDigit())
                 .foregroundStyle(Theme.ink3)
             if entry.cleanedText != nil {
-                Text("Original recognition")
+                Button {
+                    showsDiff = true
+                } label: {
+                    Text("Original recognition")
+                        .font(.hkMeta.weight(.medium))
+                        .foregroundStyle(Theme.ink2)
+                }
+                .buttonStyle(.plain)
+                .help("View word diff against cleaned text")
+            } else if let raw = entry.rawText, raw != entry.text {
+                Button {
+                    showsDiff = true
+                } label: {
+                    HStack(spacing: 3) {
+                        Glyph(.sparkle, size: 10)
+                        Text("Cleaned")
+                    }
                     .font(.hkMeta.weight(.medium))
-                    .foregroundStyle(Theme.ink2)
+                    .foregroundStyle(Theme.signal)
+                }
+                .buttonStyle(.plain)
+                .help("View word diff against original recognition")
             }
             if isRetranscribing {
                 ProgressView().controlSize(.mini)
@@ -822,6 +846,9 @@ private struct HistoryRow: View {
             reader.toggle(entry)
         }
         if let raw = entry.rawText, raw != entry.text {
+            Button("View changes", systemImage: "doc.text.magnifyingglass") {
+                showsDiff = true
+            }
             Button("Copy original recognition", systemImage: "doc.on.clipboard") {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(raw, forType: .string)
@@ -1010,5 +1037,166 @@ private struct StatsCardStyle: ButtonStyle {
             .onHover { hovering = $0 }
             .animation(Theme.snappy, value: hovering)
             .animation(Theme.snappy, value: configuration.isPressed)
+    }
+}
+
+/// An Apple-grade word diff sheet comparing raw spoken speech against the cleaned transcript.
+private struct HistoryDiffSheet: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    var entry: DictationHistoryEntry
+    @State private var copiedRaw = false
+
+    private var rawText: String {
+        entry.cleanedText != nil ? entry.text : (entry.rawText ?? entry.text)
+    }
+
+    private var finalText: String {
+        entry.cleanedText != nil ? entry.cleanedText! : entry.text
+    }
+
+    private struct DiffSegment: Identifiable {
+        let id = UUID()
+        let text: String
+        let kind: Kind
+        enum Kind { case unchanged, deleted, inserted }
+    }
+
+    private var segments: [DiffSegment] {
+        let rawTokens = VoiceProfile.tokens(rawText)
+        let finalTokens = VoiceProfile.tokens(finalText)
+        let gaps = VoiceProfile.gaps(rawTokens.map { $0.lowercased() }, finalTokens.map { $0.lowercased() })
+
+        var result: [DiffSegment] = []
+        var rawIdx = 0
+        var finalIdx = 0
+
+        for gap in gaps {
+            let commonRawEnd = gap.deleted.first ?? rawTokens.count
+            let commonFinalEnd = gap.inserted.first ?? finalTokens.count
+            while rawIdx < commonRawEnd && finalIdx < commonFinalEnd {
+                result.append(DiffSegment(text: finalTokens[finalIdx], kind: .unchanged))
+                rawIdx += 1
+                finalIdx += 1
+            }
+            for idx in gap.deleted {
+                result.append(DiffSegment(text: rawTokens[idx], kind: .deleted))
+            }
+            rawIdx = (gap.deleted.last ?? (rawIdx - 1)) + 1
+            for idx in gap.inserted {
+                result.append(DiffSegment(text: finalTokens[idx], kind: .inserted))
+            }
+            finalIdx = (gap.inserted.last ?? (finalIdx - 1)) + 1
+        }
+        while finalIdx < finalTokens.count {
+            result.append(DiffSegment(text: finalTokens[finalIdx], kind: .unchanged))
+            finalIdx += 1
+        }
+        return result
+    }
+
+    private var diffContent: Text {
+        var combined = Text("")
+        for (index, segment) in segments.enumerated() {
+            let space = index > 0 ? " " : ""
+            switch segment.kind {
+            case .unchanged:
+                combined = combined + Text(space + segment.text).foregroundColor(Theme.ink)
+            case .deleted:
+                combined = combined + Text(space + segment.text).strikethrough(true, color: Theme.ink3).foregroundColor(Theme.ink3)
+            case .inserted:
+                combined = combined + Text(space + segment.text).foregroundColor(Theme.signal).bold()
+            }
+        }
+        return combined
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.s5) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: Theme.s2) {
+                        Glyph(.sparkle, size: 20)
+                            .foregroundStyle(Theme.signal)
+                        Text("Cleanup changes")
+                            .font(.display(20))
+                    }
+                    Text("Local rules and Apple Intelligence only ever remove hesitations and format text. Your spoken words are never reworded.")
+                        .font(.hkCallout)
+                        .foregroundStyle(Theme.ink2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: Theme.s4)
+                Button("Close", icon: .close) { dismiss() }
+                    .buttonStyle(IconButtonStyle())
+                    .keyboardShortcut(.cancelAction)
+            }
+
+            VStack(alignment: .leading, spacing: Theme.s3) {
+                ScrollView {
+                    diffContent
+                        .font(.system(size: 16))
+                        .lineSpacing(4)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                        .textSelection(.enabled)
+                        .padding(Theme.s4)
+                }
+                .frame(minHeight: 120, maxHeight: 220)
+                .background(Theme.well, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
+                    .strokeBorder(Theme.hairline, lineWidth: 1))
+
+                HStack(spacing: Theme.s4) {
+                    HStack(spacing: 6) {
+                        Text("removed").strikethrough(true, color: Theme.ink3).foregroundColor(Theme.ink3).font(.hkCaption)
+                        Text("hesitation / stutter").font(.hkCaption).foregroundStyle(Theme.ink2)
+                    }
+                    HStack(spacing: 6) {
+                        Text("adjusted").foregroundColor(Theme.signal).bold().font(.hkCaption)
+                        Text("replacement / snap").font(.hkCaption).foregroundStyle(Theme.ink2)
+                    }
+                    HStack(spacing: 6) {
+                        Text("kept").foregroundColor(Theme.ink).font(.hkCaption)
+                        Text("spoken text").font(.hkCaption).foregroundStyle(Theme.ink2)
+                    }
+                }
+                .padding(.horizontal, Theme.s1)
+            }
+
+            HStack(spacing: Theme.s2) {
+                if entry.cleanedText != nil {
+                    Button("Redo cleanup", icon: .undo) {
+                        model.toggleCleanup(entry)
+                        dismiss()
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
+                } else if entry.undoingCleanup() != nil {
+                    Button("Undo cleanup", icon: .undo) {
+                        model.toggleCleanup(entry)
+                        dismiss()
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
+                }
+                Button(copiedRaw ? "Copied raw" : "Copy raw", icon: copiedRaw ? .check : .copy) {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(rawText, forType: .string)
+                    copiedRaw = true
+                    Task {
+                        try? await Task.sleep(for: .seconds(1.2))
+                        copiedRaw = false
+                    }
+                }
+                .buttonStyle(SecondaryButtonStyle())
+
+                Spacer()
+
+                Button("Done") { dismiss() }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .frame(minWidth: 80)
+            }
+        }
+        .padding(Theme.s6)
+        .frame(width: 520)
+        .background(Theme.sheet)
     }
 }

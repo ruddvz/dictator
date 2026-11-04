@@ -255,6 +255,30 @@ final class AppModel {
     var showsFloatingPill = UserDefaults.standard.object(forKey: "showFloatingPill") as? Bool ?? true {
         didSet { UserDefaults.standard.set(showsFloatingPill, forKey: "showFloatingPill") }
     }
+    @ObservationIgnored private var pillUnhideTask: Task<Void, Never>?
+    private(set) var pillHiddenUntil: Date?
+
+    /// Hides the floating pill temporarily, then brings it back after `duration` (e.g. 1 hour).
+    func hideFloatingPill(for duration: TimeInterval) {
+        pillUnhideTask?.cancel()
+        showsFloatingPill = false
+        let until = Date().addingTimeInterval(duration)
+        pillHiddenUntil = until
+        pillUnhideTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(duration))
+            guard let self, !Task.isCancelled, self.pillHiddenUntil == until else { return }
+            self.showsFloatingPill = true
+            self.pillHiddenUntil = nil
+        }
+    }
+
+    /// Brings the floating pill back immediately, cancelling any temporary hide timer.
+    func unhideFloatingPill() {
+        pillUnhideTask?.cancel()
+        pillUnhideTask = nil
+        pillHiddenUntil = nil
+        showsFloatingPill = true
+    }
     /// Tone per context (Personal messages, Work messages, Email, Other); see the Style page.
     var dictationToneSettings = AppModel.loadToneSettings() {
         didSet {
