@@ -176,7 +176,7 @@ struct DictationView: View {
                 Text(model.isSelectedTextEditCapturing ? "Listening for your edit"
                      : model.isFinalizingSelectedTextEdit ? "Applying your edit"
                      : model.isStartingDictation
-                        ? (model.audio.isStarting ? "Waiting for microphone access" : "Preparing local recognition")
+                        ? (model.audio.isStarting ? "Waiting for microphone…" : "Getting ready…")
                      : model.audio.isRunning ? "Listening" : isFinishing ? "Transcribing" : "Latest dictation")
                     .font(.system(size: 15, weight: .semibold))
                 modeMenu
@@ -205,7 +205,7 @@ struct DictationView: View {
                 if !isBusy, !model.rawDictationText.isEmpty, model.rawDictationText != model.transcriber.text {
                     Button("Original", icon: .undo) { model.restoreRawTranscript() }
                         .buttonStyle(SecondaryButtonStyle())
-                        .help("Restore the unprocessed on-device recognition")
+                        .help("Show what you said before cleanup")
                 }
                 Spacer()
                 if !model.insertion.status.isEmpty {
@@ -751,7 +751,7 @@ private struct HistoryRow: View {
                         .foregroundStyle(Theme.ink2)
                 }
                 .buttonStyle(.plain)
-                .help("View word diff against cleaned text")
+                .help("Compare with the cleaned-up text")
             } else if let raw = entry.rawText, raw != entry.text {
                 Button {
                     showsDiff = true

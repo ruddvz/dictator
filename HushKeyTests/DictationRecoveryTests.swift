@@ -39,7 +39,7 @@ final class DictationRecoveryTests: XCTestCase {
         let notice = DictationRecovery.notice(audioError: nil, transcriberError: nil, transcript: "",
                                               hasRetainedAudio: true, heardSound: false, microphoneName: "AirPods")
         XCTAssertEqual(notice?.kind, .silentMicrophone)
-        XCTAssertEqual(notice?.message, "We couldn't hear you")
+        XCTAssertEqual(notice?.message, "No sound from the microphone")
         XCTAssertEqual(notice?.canRetry, false)
         XCTAssertEqual(notice?.offersMicrophoneHelp, true)
         XCTAssertTrue(notice?.detail.contains("AirPods") == true)
@@ -118,9 +118,8 @@ final class DictationRecoveryTests: XCTestCase {
         let notice = DictationRecovery.pasteUnconfirmed(
             "Paste was sent, but the field did not confirm it.", canPasteAgain: true)
 
-        XCTAssertEqual(notice.message, "Check the field first")
-        XCTAssertTrue(notice.detail.contains("Check the destination before retrying"))
-        XCTAssertTrue(notice.detail.contains("transcript is saved in HushKey"))
+        XCTAssertEqual(notice.message, "Check the text field")
+        XCTAssertTrue(notice.detail.contains("Paste again only if it’s missing"))
         XCTAssertTrue(notice.canPasteAgain)
         XCTAssertFalse(notice.canRetry)
     }

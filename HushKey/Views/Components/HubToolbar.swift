@@ -233,16 +233,16 @@ struct Notice: Identifiable {
         }
         if model.dictationShortcutNeedsAttention {
             notices.append(Notice(id: "shortcut", kind: .attention, icon: .keyboard,
-                                  title: "Your dictation key needs a hand", detail: model.dictationShortcutStatus,
-                                  action: "Fix it") { model in
+                                  title: "The dictation key isn’t working", detail: model.dictationShortcutStatus,
+                                  action: "Fix…") { model in
                 UserDefaults.standard.set(SettingsView.Section.shortcuts.rawValue, forKey: "settingsSection")
                 model.screen = .settings
             })
         }
         if !model.insertion.isEnabled {
             notices.append(Notice(id: "insertion", kind: .attention, icon: .cursor,
-                                  title: "Dictations aren't typed for you",
-                                  detail: "Turn on insertion so finished text lands where your cursor is.",
+                                  title: "Typing into apps is off",
+                                  detail: "Turn it on so your words appear at the cursor.",
                                   action: "Turn on") { model in
                 UserDefaults.standard.set(SettingsView.Section.insertion.rawValue, forKey: "settingsSection")
                 model.screen = .settings
@@ -254,8 +254,8 @@ struct Notice: Identifiable {
         if !parakeetReady && SFSpeechRecognizer.authorizationStatus() != .authorized {
             notices.append(Notice(id: "speech-permission", kind: .attention, icon: .mic,
                                   title: "Speech recognition is off",
-                                  detail: "Local Apple Speech dictation needs permission in macOS Privacy & Security settings.",
-                                  action: "Review setup") { model in
+                                  detail: "Allow HushKey in Privacy & Security to dictate with Apple Speech.",
+                                  action: "Open Settings") { model in
                 UserDefaults.standard.set(SettingsView.Section.dictation.rawValue, forKey: "settingsSection")
                 model.screen = .settings
             })

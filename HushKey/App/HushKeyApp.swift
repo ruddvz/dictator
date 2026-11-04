@@ -162,13 +162,13 @@ private struct HushKeyMenu: View {
         Divider()
 
         // 2. Start / Stop
-        Button(model.meetingNotes.isCapturing ? "Stop meeting capture" :
-               meetingBusy ? "Meeting capture…" :
+        Button(model.meetingNotes.isCapturing ? "Stop Meeting Notes" :
+               meetingBusy ? "Starting Meeting…" :
                model.isFinalizingSelectedTextEdit ? "Finishing voice edit…" :
                model.isSelectedTextEditCapturing ? "Stop voice edit" :
                model.isStartingSelectedTextEdit ? "Cancel voice edit start" :
                isTranscribing ? "Finishing dictation…" :
-               model.audio.isRunning ? "Stop dictation" : "Start dictation") {
+               model.audio.isRunning ? "Stop Dictation" : "Start Dictation") {
             if model.meetingNotes.isCapturing {
                 model.meetingNotes.stop()
             } else {
@@ -211,15 +211,15 @@ private struct HushKeyMenu: View {
 
         Menu("Engine") {
             Picker("Engine", selection: $model.dictationEngine) {
-                Text("Apple Speech (On-device)").tag(DictationEngine.appleSpeech)
+                Text("Apple Speech").tag(DictationEngine.appleSpeech)
                 if model.parakeet.isDownloaded {
-                    Text("Parakeet v2 (Local Core ML)").tag(DictationEngine.parakeet)
+                    Text("Parakeet (more accurate)").tag(DictationEngine.parakeet)
                 }
             }
             .pickerStyle(.inline)
             if !model.parakeet.isDownloaded {
                 Divider()
-                Button("Download Parakeet in Settings…") {
+                Button("Download Parakeet…") {
                     model.screen = .settings
                     UserDefaults.standard.set(SettingsView.Section.dictation.rawValue, forKey: "settingsSection")
                     model.openMainWindow?()
@@ -231,31 +231,31 @@ private struct HushKeyMenu: View {
         Divider()
 
         // 4. History, Transcribe file, Recovery, Last transcription
-        Button("History…") {
+        Button("Show History") {
             model.screen = .dictation
             model.openMainWindow?()
             NSApp.activate(ignoringOtherApps: true)
         }
 
-        Button("Transcribe audio file…") {
+        Button("Transcribe a File…") {
             model.screen = .files
             model.openMainWindow?()
             NSApp.activate(ignoringOtherApps: true)
         }
 
         if model.canRecoverLastRecording {
-            Button("Recover last recording") {
+            Button("Recover Last Recording") {
                 Task { await model.recoverLastRecording() }
             }
         }
 
-        Menu("Last transcription") {
-            Button("Copy to clipboard") {
+        Menu("Last Dictation") {
+            Button("Copy") {
                 model.copyDictationText()
             }
             .disabled(lastText.isEmpty)
 
-            Button("Paste into active field") {
+            Button("Paste Again") {
                 Task { await model.pasteLastDictationAgain() }
             }
             .disabled(lastText.isEmpty)
@@ -264,11 +264,11 @@ private struct HushKeyMenu: View {
         Divider()
 
         // 5. Global controls
-        Toggle("Pause global shortcuts", isOn: $model.isShortcutsPaused)
+        Toggle("Pause Shortcuts", isOn: $model.isShortcutsPaused)
         if model.pillHiddenUntil != nil {
-            Button("Show dictation bar (hidden for 1 hr)") { model.unhideFloatingPill() }
+            Button("Show Dictation Bar Now") { model.unhideFloatingPill() }
         } else {
-            Toggle("Show dictation bar", isOn: $model.showsFloatingPill)
+            Toggle("Show Dictation Bar", isOn: $model.showsFloatingPill)
         }
         Toggle("Dictation sounds", isOn: $model.playsDictationSounds)
         Toggle("Mute audio while dictating", isOn: $model.mutesAudioWhileDictating)
@@ -297,7 +297,7 @@ private struct HushKeyMenu: View {
 
     private var statusLine: String {
         if model.audio.isRunning {
-            return model.meetingNotes.isCapturing ? "Meeting capture is active" : "Listening…"
+            return model.meetingNotes.isCapturing ? "Recording a meeting" : "Listening…"
         }
         if model.isFinalizingDictation || model.transcriber.isFinalizing {
             return "Transcribing…"

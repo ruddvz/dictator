@@ -598,7 +598,7 @@ struct FloatingPillView: View {
         HStack(spacing: Metrics.gap) {
             if showsControls {
                 PillIconButton(systemImage: "xmark",
-                               help: phase == .preparing ? "Cancel before the microphone starts" : "Cancel. Nothing is typed",
+                               help: phase == .preparing ? "Cancel before the microphone starts" : "Cancel without typing",
                                solid: true, size: Metrics.control,
                                onHover: { hoveredControl = $0 ? .cancel : nil }) {
                     model.cancelDictation(offersUndo: true)
@@ -645,10 +645,10 @@ struct FloatingPillView: View {
         case .hover: return .init(title: "Dictate", shortcut: model.dictationShortcut.label)
         case .preparing:
             if model.audio.isAwaitingPermission || model.transcriber.isAwaitingPermission {
-                return .init(title: "Answer the macOS prompt", shortcut: nil)
+                return .init(title: "Allow access in the dialog", shortcut: nil)
             }
             guard isSlowStart else { return nil }
-            return .init(title: model.audio.isStarting ? "Waiting for microphone" : "Preparing locally", shortcut: nil)
+            return .init(title: model.audio.isStarting ? "Waiting for microphone…" : "Getting ready…", shortcut: nil)
         default: return nil
         }
     }
@@ -696,7 +696,7 @@ struct FloatingPillView: View {
             .contentTransition(.opacity)
             HStack(spacing: Theme.s2) {
                 if !model.insertion.isEnabled {
-                    Button("Type for me next time") {
+                    Button("Turn on typing") {
                         UserDefaults.standard.set(SettingsView.Section.insertion.rawValue, forKey: "settingsSection")
                         model.screen = .settings
                         NSApp.activate(ignoringOtherApps: true)
@@ -854,7 +854,7 @@ struct FloatingPillView: View {
         Toggle("Dictation sounds", isOn: Binding(get: { model.playsDictationSounds },
                                                        set: { model.playsDictationSounds = $0 }))
         Divider()
-        Button("Move to the center") { onCentre() }
+        Button("Move to Center") { onCentre() }
         Button("Meeting notes") { model.openMeetingNotes() }
         Button("Open HushKey") {
             model.screen = .dictation
@@ -862,8 +862,8 @@ struct FloatingPillView: View {
             NSApp.activate(ignoringOtherApps: true)
         }
         Divider()
-        Button("Hide for 1 hour") { model.hideFloatingPill(for: 3600) }
-        Button("Hide dictation bar") { model.showsFloatingPill = false }
+        Button("Hide for 1 Hour") { model.hideFloatingPill(for: 3600) }
+        Button("Hide Dictation Bar") { model.showsFloatingPill = false }
     }
 
     private var stroke: Color {

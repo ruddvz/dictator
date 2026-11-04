@@ -66,22 +66,22 @@ enum DictationRecovery {
                        hasRetainedAudio: Bool, heardSound: Bool = true,
                        microphoneName: String? = nil) -> DictationNotice? {
         if let audioError, !audioError.isEmpty {
-            return DictationNotice(kind: .microphone, message: "Mic didn't start", detail: audioError,
+            return DictationNotice(kind: .microphone, message: "Microphone didn’t start", detail: audioError,
                                    canRetry: false, canPasteAgain: false)
         }
         guard transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
         if let transcriberError, !transcriberError.isEmpty {
-            return DictationNotice(kind: .recognition, message: "Couldn't transcribe", detail: transcriberError,
+            return DictationNotice(kind: .recognition, message: "Couldn’t transcribe", detail: transcriberError,
                                    canRetry: hasRetainedAudio, canPasteAgain: false)
         }
         if !heardSound {
             let source = microphoneName.map { "“\($0)”" } ?? "The microphone"
-            return DictationNotice(kind: .silentMicrophone, message: "We couldn't hear you",
-                                   detail: "\(source) stayed silent the whole time. Check that it isn't muted, or choose another microphone.",
+            return DictationNotice(kind: .silentMicrophone, message: "No sound from the microphone",
+                                   detail: "\(source) stayed silent. Check that it isn’t muted, or choose another microphone.",
                                    canRetry: false, canPasteAgain: false)
         }
-        return DictationNotice(kind: .nothingHeard, message: "Didn't catch that",
-                               detail: "No speech was recognized in the last recording.",
+        return DictationNotice(kind: .nothingHeard, message: "Didn’t catch that",
+                               detail: "No words were recognized. Try again.",
                                canRetry: hasRetainedAudio, canPasteAgain: false)
     }
 
@@ -113,32 +113,28 @@ enum DictationRecovery {
     }
 
     static func reviewBeforeInsertion(confidence: Float?, peakLevel: Float) -> DictationNotice {
-        let reason: String
-        if let confidence, confidence < ParakeetAutoInsertGate.minimumConfidence {
-            reason = String(format: "Parakeet confidence was %.2f", confidence)
-        } else {
-            reason = String(format: "Input peak was %.2f", peakLevel)
-        }
-        return DictationNotice(kind: .review, message: "Review before typing",
-                               detail: "\(reason), below the automatic typing limit. The transcript is saved in HushKey but was not inserted. Check it before using Insert.",
+        // The numbers stay out of the message; they're in the log for diagnosis.
+        _ = (confidence, peakLevel)
+        return DictationNotice(kind: .review, message: "Check before typing",
+                               detail: "HushKey wasn’t sure it heard you right, so nothing was typed. Review it, then choose Insert.",
                                canRetry: false, canPasteAgain: false)
     }
 
     static func insertionFailed(_ reason: String, canPasteAgain: Bool) -> DictationNotice {
-        DictationNotice(kind: .insertion, message: "Couldn't type it",
+        DictationNotice(kind: .insertion, message: "Couldn’t type it",
                         detail: reason + " The text is saved in HushKey.",
                         canRetry: false, canPasteAgain: canPasteAgain)
     }
 
-    static func pasteUnconfirmed(_ reason: String, canPasteAgain: Bool) -> DictationNotice {
-        DictationNotice(kind: .insertion, message: "Check the field first",
-                        detail: reason + " The transcript is saved in HushKey. Check the destination before retrying, because another paste could duplicate it.",
+    static func pasteUnconfirmed(_: String, canPasteAgain: Bool) -> DictationNotice {
+        DictationNotice(kind: .insertion, message: "Check the text field",
+                        detail: "It may already be there. Paste again only if it’s missing.",
                         canRetry: false, canPasteAgain: canPasteAgain)
     }
 
     static func focusLost(appName: String) -> DictationNotice {
         DictationNotice(kind: .focusLost, message: "Click back into \(appName)",
-                        detail: "Paste again only types into the field you dictated from. Focus it in \(appName), then try again.",
+                        detail: "Click the text field in \(appName), then choose Paste Again.",
                         canRetry: false, canPasteAgain: true)
     }
 }
