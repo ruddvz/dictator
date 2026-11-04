@@ -88,7 +88,7 @@ private struct MenuBarLabel: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        // The keycap glyph; its ribbon opens into a lens while dictating.
+        // The breath ribbon; it opens into a fuller lens while dictating.
         Image(model.audio.isRunning ? "HushKeyMenuBarLive" : "HushKeyMenuBar")
             .accessibilityLabel("HushKey")
             .task {
