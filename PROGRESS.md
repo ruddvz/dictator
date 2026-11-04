@@ -1,5 +1,16 @@
 # HushKey progress
 
+## Completed: defensive runtime hardening & force-unwrap elimination (2026-11-04)
+
+- **Eliminated crash risks & forced unwraps (`!`):**
+  - `WhisperKitFileTranscriber.swift`: Replaced `try await whisper!.transcribe(...)` with `guard let whisper else { throw CocoaError(.fileReadUnknown) }` to safeguard against unexpected state mutation during transcribing.
+  - `TemplateClassifier.swift`: Replaced `counts.values.max()!` and division by `n` with `counts.values.max() ?? 0` and `Double(max(n, 1))` to prevent crash on empty dataset evaluation.
+  - `AppModel.swift`: Replaced force-unwrap `by: { $0.sessionID! }` with safe UUID fallback `by: { $0.sessionID ?? UUID() }` when grouping research sessions.
+  - `DictationView.swift`: Simplified `entry.cleanedText != nil ? entry.cleanedText! : entry.text` to idiomatic `entry.cleanedText ?? entry.text`.
+- **Verification:**
+  - Full unit test suite: **326 passed, 3 skipped, 0 failures**.
+  - Packaged universal release build (`dist/HushKey.app`).
+
 ## Completed: Wispr Flow parity & superiority pass (2026-11-04)
 
 - **Word-level cleanup diff sheet & history indicators:**

@@ -1052,7 +1052,7 @@ private struct HistoryDiffSheet: View {
     }
 
     private var finalText: String {
-        entry.cleanedText != nil ? entry.cleanedText! : entry.text
+        entry.cleanedText ?? entry.text
     }
 
     private struct DiffSegment: Identifiable {

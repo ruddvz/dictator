@@ -876,7 +876,7 @@ final class AppModel {
                                                  condition: SessionRecorder.Condition) -> Int {
         guard !vocabulary.isEmpty else { return 0 }
         let sessions = Dictionary(grouping: templates.filter { ($0.condition ?? .silent) == condition && $0.sessionID != nil },
-                                  by: { $0.sessionID! })
+                                  by: { $0.sessionID ?? UUID() })
         return sessions.values.filter { takes in
             let counts = Dictionary(grouping: takes, by: \.label).mapValues(\.count)
             return vocabulary.allSatisfy { counts[$0, default: 0] >= sessionTakesPerWord }

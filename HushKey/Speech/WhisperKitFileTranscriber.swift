@@ -234,7 +234,8 @@ final class WhisperKitFileTranscriber {
             let options = languageIdentifier.isEmpty
                 ? DecodingOptions()
                 : DecodingOptions(language: languageIdentifier)
-            let results = try await whisper!.transcribe(
+            guard let whisper else { throw CocoaError(.fileReadUnknown) }
+            let results = try await whisper.transcribe(
                 audioPath: url.path,
                 audioInputOptions: AudioInputOptions(audioLoadingMode: .incremental),
                 decodeOptions: options,

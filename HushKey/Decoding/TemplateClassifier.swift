@@ -168,7 +168,7 @@ struct Evaluation: Sendable {
             labels: labels,
             confusion: confusion,
             accuracy: observed,
-            chance: Double(counts.values.max()!) / Double(n),
+            chance: Double(counts.values.max() ?? 0) / Double(max(n, 1)),
             permutationMean: nullAccuracies.reduce(0, +) / Double(max(permutations, 1)),
             permutationP95: nullAccuracies.isEmpty ? 0 : nullAccuracies[Int(Double(nullAccuracies.count - 1) * 0.95)],
             pValue: Double(atLeast + 1) / Double(permutations + 1),
