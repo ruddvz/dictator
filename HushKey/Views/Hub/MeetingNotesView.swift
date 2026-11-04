@@ -146,6 +146,7 @@ struct MeetingNotesView: View {
             }
         }
         .onAppear {
+            service.transforms = model.localTransformService
             if service.selectedNoteID == nil { service.select(service.notes.first?.id) }
         }
         .onChange(of: searchText) { _, _ in
@@ -191,7 +192,7 @@ struct MeetingNotesView: View {
             }
             Spacer(minLength: Theme.s4)
             if service.isCapturing {
-                Button("Stop and save", icon: .stop) { service.stop() }
+                Button("Stop and save", icon: .stop) { service.stop(presentsResult: false) }
                     .buttonStyle(PrimaryButtonStyle(tint: Theme.ink))
             } else if service.isFinalizing {
                 ProgressView().controlSize(.small)
@@ -340,8 +341,11 @@ struct MeetingNotesView: View {
                         Button("Export transcript…", systemImage: "doc.text") {
                             beginExport(note.transcript, title: note.title)
                         }
-                        Button("Export all notes…", systemImage: "doc.richtext") {
-                            beginExport(exportText(for: note), title: note.title)
+                        Button("Export as Markdown…", systemImage: "doc.richtext") {
+                            model.exportMeetingNote(note.id)
+                        }
+                        Button("Copy as Markdown", systemImage: "doc.on.doc") {
+                            model.copyMeetingNote(note.id)
                         }
                         Divider()
                         Button("Delete meeting note…", systemImage: "trash", role: .destructive) {
@@ -457,18 +461,7 @@ struct MeetingNotesView: View {
     }
 
     private func startMeeting() {
-        if service.audioSource == .microphone || service.audioSource == .both {
-            service.audio.selectedDeviceID = model.audio.selectedDeviceID
-        }
-        Task {
-            await service.start(
-                localeIdentifier: model.dictationLanguage,
-                contextualStrings: DictationContextHints.prioritized(
-                    customWords: DictationVocabulary.terms(from: model.dictationTerms),
-                    learnedWords: model.dataset.vocabulary),
-                dictationIsBusy: model.audio.isRunning || model.isFinalizingDictation ||
-                    model.transcriber.isRunning || model.transcriber.isFinalizing)
-        }
+        model.startMeeting()
     }
 
     private func binding<Value>(for note: MeetingNote, keyPath: WritableKeyPath<MeetingNote, Value>) -> Binding<Value> {
@@ -485,14 +478,6 @@ struct MeetingNotesView: View {
         exportFilename = title.replacingOccurrences(of: "/", with: "-")
         exportDocument = MeetingNoteDocument(text: text)
         isExporting = true
-    }
-
-    private func exportText(for note: MeetingNote) -> String {
-        var sections = [note.title, note.createdAt.formatted(date: .complete, time: .shortened), ""]
-        if !note.summary.isEmpty { sections += ["SUMMARY", note.summary, ""] }
-        if !note.actionItems.isEmpty { sections += ["ACTION ITEMS", note.actionItems, ""] }
-        sections += ["TRANSCRIPT", note.transcript]
-        return sections.joined(separator: "\n")
     }
 
     private func durationLabel(_ seconds: TimeInterval) -> String {

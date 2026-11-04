@@ -39,6 +39,16 @@ final class MeetingNotesService {
     private(set) var activeMeetingStartedAt: Date?
     private(set) var selectedNoteID: UUID?
     private(set) var activeAudioSource: MeetingAudioSource?
+    /// The meeting just saved, shown on the pill's result card until it is closed or opened.
+    private(set) var resultNoteID: UUID?
+    /// The note whose summary and action items are being drafted on this Mac right now.
+    private(set) var digestingNoteID: UUID?
+    /// Notes this session whose summary was picked from the transcript, not written by a model.
+    private(set) var fallbackDigestNoteIDs: Set<UUID> = []
+    /// A short problem to show beside the pill: capture could not start, or nothing was heard.
+    private(set) var notice: String?
+    /// Drafts the summary and action items once a meeting is saved; set when capture starts.
+    @ObservationIgnored weak var transforms: LocalTransformService?
     var audioSource: MeetingAudioSource = MeetingAudioSource(
         rawValue: UserDefaults.standard.string(forKey: "meetingAudioSource") ?? "") ?? .microphone {
         didSet { UserDefaults.standard.set(audioSource.rawValue, forKey: "meetingAudioSource") }
@@ -108,15 +118,19 @@ final class MeetingNotesService {
         guard !isStarting, !isCapturing, !isFinalizing else { return }
         guard recoveredDraft == nil, !draftArchiveUnreadable else {
             message = "Recover or discard the interrupted meeting transcript before starting another meeting."
+            notice = "Recover or discard the interrupted meeting first."
             return
         }
         guard !dictationIsBusy, captureGate.claim(.meeting) else {
             message = "Finish the current dictation before starting meeting notes."
+            notice = "Finish the current dictation first."
             return
         }
 
         isStarting = true
         message = nil
+        notice = nil
+        resultNoteID = nil
         generation += 1
         let startGeneration = generation
         transcriber.clear()
@@ -128,6 +142,7 @@ final class MeetingNotesService {
         guard startGeneration == generation else { return }
         guard speechReady else {
             message = transcriber.error ?? "On-device speech recognition is unavailable."
+            notice = message
             captureGate.release(.meeting)
             isStarting = false
             return
@@ -150,6 +165,7 @@ final class MeetingNotesService {
             case .systemAudio:
                 message = systemAudio.error ?? "Meeting audio capture could not start."
             }
+            notice = message
             captureGate.release(.meeting)
             isStarting = false
             return
@@ -174,7 +190,9 @@ final class MeetingNotesService {
         message = "Meeting setup cancelled."
     }
 
-    func stop() {
+    /// Stops capture and saves the note. `presentsResult` puts the result card on the pill (not
+    /// wanted when you stopped from the Meeting notes page, which already shows the note).
+    func stop(presentsResult: Bool = true) {
         if isStarting {
             cancelStarting()
             return
@@ -226,11 +244,17 @@ final class MeetingNotesService {
                 } else if let draft {
                     recoveredDraft = draft
                 }
+                if presentsResult { resultNoteID = note.id }
+                isFinalizing = false
+                captureGate.release(.meeting)
+                await digest(note.id)
+                return
             } else {
                 try? MeetingNotesDraftStore.delete(at: draftURL)
                 activeDraftID = nil
                 lastDraftCheckpointAt = nil
                 message = "No speech was recognized, so no meeting note was saved."
+                if presentsResult { notice = "No speech was heard, so nothing was saved." }
             }
 
             isFinalizing = false
@@ -248,6 +272,48 @@ final class MeetingNotesService {
         selectedNoteID = id
     }
 
+    func dismissResult() {
+        resultNoteID = nil
+    }
+
+    func dismissNotice() {
+        notice = nil
+    }
+
+    /// Fills an empty summary and action items for a saved meeting, on this Mac: Apple's
+    /// on-device model when it is ready, otherwise key sentences and commitments picked from the
+    /// transcript. Text you already wrote is never replaced; very short meetings are left alone.
+    func digest(_ id: UUID) async {
+        guard digestingNoteID == nil, !isGenerating,
+              let note = notes.first(where: { $0.id == id }),
+              note.summary.isEmpty || note.actionItems.isEmpty,
+              MeetingDigest.isLongEnoughToSummarize(note.transcript) else { return }
+        digestingNoteID = id
+        defer { digestingNoteID = nil }
+
+        if let transforms, transforms.modelIsAvailable, !transforms.isTransforming {
+            if note.summary.isEmpty { await generate(for: id, with: transforms, isActionItems: false) }
+            if notes.first(where: { $0.id == id })?.actionItems.isEmpty == true {
+                await generate(for: id, with: transforms, isActionItems: true)
+            }
+        }
+        guard let index = notes.firstIndex(where: { $0.id == id }), notes[index].transcript == note.transcript
+        else { return }
+        var changed = false
+        if notes[index].summary.isEmpty {
+            notes[index].summary = MeetingDigest.fallbackSummary(from: note.transcript)
+            fallbackDigestNoteIDs.insert(id)
+            changed = true
+        }
+        if notes[index].actionItems.isEmpty {
+            let items = MeetingDigest.fallbackActionItems(from: note.transcript)
+            notes[index].actionItems = items.isEmpty ? "No clear action items." : items.map { "- \($0)" }.joined(separator: "\n")
+            fallbackDigestNoteIDs.insert(id)
+            changed = true
+        }
+        if changed { persist() }
+    }
+
     func setMessage(_ value: String) {
         message = value
     }
@@ -260,6 +326,7 @@ final class MeetingNotesService {
             try MeetingNotesStore.save(updatedNotes, to: notesURL)
             notes = updatedNotes
             selectedNoteID = updatedSelection
+            if resultNoteID == id { resultNoteID = nil }
             message = nil
         } catch {
             message = "Meeting note could not be deleted: \(error.localizedDescription)"
@@ -305,6 +372,7 @@ final class MeetingNotesService {
             activeDraftID = nil
             lastDraftCheckpointAt = nil
             message = nil
+            Task { await digest(draft.id) }
         } catch {
             message = "The recovered transcript is still available, but could not be saved as a meeting note: \(error.localizedDescription)"
         }

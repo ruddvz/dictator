@@ -140,7 +140,16 @@ private struct MenuBarLabel: View {
         .task {
             model.openMainWindow = {
                 model.isHubWindowOpen = true
-                openWindow(id: "main")
+                // Bring the hub back if it is already open: openWindow on a WindowGroup always
+                // makes another window, so Open from the pill used to stack a second hub.
+                if let hub = NSApp.windows.first(where: { window in
+                    !(window is NSPanel) && window.canBecomeMain && (window.isVisible || window.isMiniaturized)
+                }) {
+                    if hub.isMiniaturized { hub.deminiaturize(nil) }
+                    hub.makeKeyAndOrderFront(nil)
+                } else {
+                    openWindow(id: "main")
+                }
                 NSApp.activate(ignoringOtherApps: true)
             }
         }
@@ -176,6 +185,10 @@ private struct HushKeyMenu: View {
             }
         }
         .disabled(meetingBusy || isTranscribing)
+        if !model.meetingNotes.isCapturing {
+            Button("Record meeting") { model.startMeeting() }
+                .disabled(meetingBusy || isTranscribing || model.audio.isRunning)
+        }
 
         Divider()
 
