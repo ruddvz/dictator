@@ -1,5 +1,33 @@
 # HushKey progress
 
+## Completed: idle pill hover redesign (2026-11-03)
+
+- **Problem (user):** hovering the idle pill "looks absolutely horrible". It showed a lone hush glyph next to a grey-filled Meeting notes circle, uneven padding, and a separate "Dictate fn" bubble floating above. The panel also resized mid-animation, so the pill clipped and flickered as it opened and closed.
+- **Now (`FloatingPill.swift`):**
+  - Hover opens the idle capsule into one 28 pt bar: hush glyph, "Dictate", the shortcut as a small sage `PillKey`, a hairline, then a quiet Meeting notes button with no fill until hovered. The "Dictate" bubble is gone; Meeting notes, × and ✓ still get a `PillHint` above (restyled, 24 pt, same `PillKey`).
+  - The capsule clips its contents while it grows, and they fade in after it opens. Idle is 82 % `paper` with a faint shadow, so it reads on light desktops as well as dark ones.
+  - `FloatingPillController.resize` grows the panel at once and shrinks it 0.5 s later, after the closing animation; the view is pinned bottom-centre inside it. That fixes the clip and flicker.
+  - The shadow margin is 8 pt and `PillPlacement.bottomInset` 8, so the pill sits where it did. Its hover top is 46 pt up, under the Silent HUD at 56.
+- **Verified here:** 216 tests, 3 skipped, 0 failures. Packaged and checked live in `dist/HushKey.app` with screen captures: idle, idle → hover → idle frames (no jump or clip), hover on white and black backdrops, the compact dot after 5 s. Clicking the pill started dictation and the × cancelled it while Finder stayed frontmost, and the panel shrank back cleanly. A drag gesture ended and saved its position.
+- **Not checked live (no real mouse available; only warps and background clicks):** the Meeting notes `PillHint` on hovering its button, and the pill actually sliding during a real drag. Both code paths are unchanged apart from styling.
+
+## Completed: Silent Lab tells head movement from jaw movement; one HushKey at a time (2026-11-03)
+
+- **Problem (user):** a slight head nod was taken as motion. It got saved as a take, and it got matched as a word.
+- **Measured on the 37 saved takes:** mouthed words tilt the head 0.3–1.3° with slow rotation under 0.08 rad/s. The 5 takes with a nod or turn reached 2–20° and up to 0.86 rad/s. The old check only caught spikes over 0.6 rad/s. Details: `docs/SILENT_SPEECH_RESEARCH.md` (head vs jaw section).
+- **Fixed (`MotionFeatures.headMoved`):** a take or capture is refused when the head tilts over 2.5°, when slow rotation passes 0.12 rad/s, or on any spike over 0.6 rad/s.
+  - Train won't save such a take, and Silent Use never types it.
+  - Saved takes that fail are flagged. They no longer train the classifier, count toward 10, or count in the evidence. On this data, clean-take accuracy went from 48 % to 53 % (chance 34 %).
+  - Auto-capture follows head motion live: it never starts on a nod, and it drops a capture a nod spoils.
+  - Train, Silent Use and the HUD show "Head moving · keep still" while it happens.
+- **Tried and rejected:** high-passing the classifier's features to strip head motion (accuracy 53 % → 28–41 %). A mouthed word moves the jaw slowly too.
+- **One HushKey:** a second launch, from any build or copy, brings the running one forward and quits (`HushKeyApp.handOffToRunningCopy`). Checked live: a packaged build and a debug build both quit while another copy ran.
+- **Verified here:** 216 tests, 3 skipped, 0 failures (2 new). `Scripts/silent-eval.sh` report updated. Signed package built.
+- **Seen live in the packaged app:** Train now counts only clean takes (yes 3, no 10+, next 9, back 6, stop 3 of 10), and "Remove 1 flagged" with "3 used · 1 not used" appears on yes.
+- **Not verified live (no AirPods connected):** the thresholds against your real nods. If good takes get refused as "Head moved", raise `MotionFeatures.maxHeadTilt` or `maxHeadRotation`.
+- **Next (user, with AirPods):** on Train, remove the 5 flagged takes. Record until every word is 10/10 with "Head still" showing. Then press **New session** and record each word 3+ times. Try a deliberate nod: it should say "Head moved" and save nothing.
+- A separate session is redesigning the app icon and menu bar icon.
+
 ## Completed: app icon and menu bar icon redesign (2026-11-03)
 
 - App icon: a fog keycap (squircle, rounded side walls, dished face, crisp bevel) on the dark `heroBase` squircle with the hero's sage glow, carrying the breath ribbon in sage `signal`. A simplified cut is drawn for 16 and 32 px. Drawn by `Scripts/generate-app-icon.swift` (run by `package-app.sh`); no third-party artwork.

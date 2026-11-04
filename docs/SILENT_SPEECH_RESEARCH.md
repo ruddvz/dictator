@@ -54,6 +54,26 @@ A caution on these numbers: with 33–37 takes, one take moves accuracy by about
    - Accepted words are typed into the frontmost app (**Type into the front app**, on by default). Rejected matches and the "nothing" class are never typed.
 3. **Junk takes became templates.** Head turns and stray presses were saved silently. They are now refused with a reason, and live captures with the same problems are never typed.
 
+## Head movement versus jaw movement (2026-11-03)
+
+AirPods report the head as one rigid body, so jaw movement and head movement arrive in the same stream. On this Mac's 37 takes they separate cleanly by size and speed:
+
+| | Head tilt over the take | Slow rotation (< 1.5 Hz) peak |
+|---|---:|---:|
+| 32 mouthed words | 0.3–1.3° | 0.015–0.079 rad/s |
+| 5 takes with a nod or turn | 2.0–19.8° | 0.06–0.86 rad/s |
+
+The old check only refused a take whose rotation spiked above 0.6 rad/s, so a slight nod (about 0.2–0.4 rad/s) passed. Now (`MotionFeatures.headMoved`) a take or live capture is refused when the head tilts more than 2.5° from where it began, or slow-band rotation passes 0.12 rad/s, or any spike passes 0.6 rad/s:
+
+- Train won't save it.
+- Silent Use won't type it.
+- Auto-capture won't start on it.
+- Saved takes that fail are flagged and no longer train the classifier.
+
+Removing those 5 takes raised leave-one-out accuracy from 48 % to 53 % (chance 34 %, p = 0.003).
+
+Filtering the slow band out of the classifier's features was also measured and rejected. A 1.5 Hz high-pass dropped clean-take accuracy to 28 % (all channels) or 38 % (rotation + acceleration), and gentler 0.3–0.5 Hz drift removal to 31–38 %. A silently mouthed word moves the jaw slowly too, so the filter removes the word along with the head. The rule is therefore: keep the head still (the app says so live), and refuse anything where it wasn't.
+
 ## Measuring further changes
 
 ```bash

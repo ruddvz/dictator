@@ -113,6 +113,9 @@ struct UseView: View {
                         isEnabled: model.isMotionInferenceEnabled && model.motion.status == .streaming,
                         onBegin: capture.begin,
                         onEnd: capture.end)
+                    if model.isMotionInferenceEnabled && model.motion.status == .streaming {
+                        HeadStillnessIndicator(isMoving: capture.headIsMoving)
+                    }
                 } else if model.isMotionInferenceEnabled && model.motion.status == .streaming {
                     autoControls
                 } else {

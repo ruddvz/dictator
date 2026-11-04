@@ -28,6 +28,7 @@ final class SilentCaptureHUDController {
         guard let model else { return }
         withObservationTracking {
             _ = model.capture.isCapturing
+            _ = model.capture.headIsMoving
             _ = model.silentFeedback
             _ = model.screen
         } onChange: { [weak self] in
@@ -45,7 +46,7 @@ final class SilentCaptureHUDController {
         }
         if model.capture.isCapturing {
             let prompt = model.screen == .train ? model.selectedWord.map { "Mouth “\($0)”…" } : nil
-            show(.capturing(prompt ?? "Mouth a word…"), autoHide: false)
+            show(model.capture.headIsMoving ? .headMoving : .capturing(prompt ?? "Mouth a word…"), autoHide: false)
         } else if let feedback = model.silentFeedback, feedback.id != lastFeedbackID {
             lastFeedbackID = feedback.id
             show(.outcome(feedback), autoHide: true)
@@ -108,6 +109,7 @@ final class SilentCaptureHUDController {
 struct SilentCaptureHUDView: View {
     enum State: Equatable {
         case capturing(String)
+        case headMoving
         case outcome(SilentCaptureFeedback)
     }
 
@@ -134,7 +136,10 @@ struct SilentCaptureHUDView: View {
     }
 
     private var isCapturing: Bool {
-        if case .capturing = state { true } else { false }
+        switch state {
+        case .capturing, .headMoving: true
+        case .outcome: false
+        }
     }
 
     private var kind: SilentCaptureFeedback.Kind? {
@@ -147,12 +152,14 @@ struct SilentCaptureHUDView: View {
     private var text: String {
         switch state {
         case .capturing(let prompt): prompt
+        case .headMoving: "Keep your head still"
         case .outcome(let feedback): feedback.text
         }
     }
 
     private var symbol: String {
-        switch kind {
+        if state == .headMoving { return "exclamationmark.triangle" }
+        return switch kind {
         case nil: "waveform.path"
         case .typed, .saved: "checkmark"
         case .notTyped: "text.badge.xmark"
@@ -163,7 +170,8 @@ struct SilentCaptureHUDView: View {
     }
 
     private var tint: Color {
-        switch kind {
+        if state == .headMoving { return Theme.finishing }
+        return switch kind {
         case nil, .typed, .saved: Theme.signal
         case .notTyped, .problem: Theme.finishing
         case .unsure, .ignored: Theme.ink3

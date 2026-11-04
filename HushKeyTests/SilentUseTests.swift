@@ -34,6 +34,57 @@ final class SilentUseTests: XCTestCase {
         XCTAssertEqual(MotionFeatures.takeIssue([]), .tooShort)
     }
 
+    /// Real numbers behind the thresholds: mouthed words tilted the head under 1.3° with slow rotation
+    /// under 0.08 rad/s; nods and turns went past 2° and 0.14 rad/s.
+    func testSlightNodsAndTiltsCountAsHeadMovementButJawMotionDoesNot() {
+        let rate = 50.0
+        func take(seconds: Double = 1, _ rotation: (Double) -> Double, tiltDegrees: Double = 0) -> [MotionSample] {
+            let count = Int(seconds * rate)
+            return (0..<count).map { i in
+                let t = Double(i) / rate
+                var sample = MotionSample(t: t, rotation: (rotation(t), 0, 0))
+                let half = tiltDegrees * .pi / 180 * Double(i) / Double(count - 1) / 2
+                (sample.qw, sample.qx) = (cos(half), sin(half)) // tilts steadily about x
+                return sample
+            }
+        }
+        // Articulation: fast and small.
+        XCTAssertNil(MotionFeatures.takeIssue(take { 0.08 * sin(2 * .pi * 5 * $0) }))
+        // A slight nod: slow and well under the old 0.6 rad/s spike limit.
+        XCTAssertEqual(MotionFeatures.takeIssue(take { 0.3 * sin(2 * .pi * 0.8 * $0) }), .headMoved)
+        // Drifting 4° over the take with almost no rotation rate.
+        XCTAssertEqual(MotionFeatures.takeIssue(take({ _ in 0.01 }, tiltDegrees: 4)), .headMoved)
+        XCTAssertNil(MotionFeatures.takeIssue(take({ _ in 0.01 }, tiltDegrees: 1)))
+        XCTAssertEqual(MotionFeatures.tilt(take({ _ in 0 }, tiltDegrees: 4)), 4 * .pi / 180, accuracy: 1e-3)
+    }
+
+    @MainActor
+    func testAutoCaptureIgnoresANodButCatchesAWord() {
+        let capture = CaptureController()
+        var segments = 0
+        capture.onSegment = { _ in segments += 1 }
+        for i in 0..<100 { capture.ingest(MotionSample(t: Double(i) / 50, rotation: (0.002, 0, 0))) }
+        capture.calibrate()
+        for i in 100..<220 { capture.ingest(MotionSample(t: Double(i) / 50, rotation: (0.002, 0, 0))) }
+        XCTAssertNotNil(capture.noiseFloor)
+        capture.autoEnabled = true
+        var t = 4.4
+        func feed(_ seconds: Double, _ rotation: (Double) -> Double) {
+            let end = t + seconds
+            while t < end {
+                capture.ingest(MotionSample(t: t, rotation: (rotation(t), 0, 0)))
+                t += 1 / 50
+            }
+        }
+        feed(1.2) { 0.4 * sin(2 * .pi * 0.8 * $0) } // nod
+        feed(1.0) { _ in 0.002 }
+        XCTAssertEqual(segments, 0)
+        XCTAssertFalse(capture.headIsMoving)
+        feed(0.6) { 0.06 * sin(2 * .pi * 6 * $0) } // jaw
+        feed(1.0) { _ in 0.002 }
+        XCTAssertEqual(segments, 1)
+    }
+
     func testSmoothingKeepsLengthAndAveragesNeighbours() {
         let frames: [[Double]] = [[0], [3], [0], [0]]
         let smoothed = MotionFeatures.smoothed(frames, window: 3)
