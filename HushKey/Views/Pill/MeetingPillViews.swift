@@ -218,7 +218,7 @@ struct MeetingNoticeCard: View {
 
     var body: some View {
         HStack(spacing: Theme.s2) {
-            Image(systemName: "person.2.wave.2")
+            Image(systemName: "person.2.fill")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(Theme.signal)
             Text(message)
