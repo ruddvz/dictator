@@ -318,6 +318,8 @@ struct FloatingPillView: View {
     /// The start is taking longer than a blink: only then name the wait and sweep the ribbon.
     /// A normal start (about 0.3 s) goes straight from the resting line to the live ribbon.
     @State private var isSlowStart = false
+    /// The timer joins the pill once a dictation passes 30 s.
+    @State private var showsElapsed = false
     /// The pointer is over a notice or the copy card: its countdown waits, as in Wispr Flow.
     @State private var isHoveringCard = false
     /// How long a card that loses nothing by closing stays up on its own.
@@ -325,12 +327,16 @@ struct FloatingPillView: View {
     static let finishedCountdown: TimeInterval = 8
     static let slowStartDelay: Duration = .milliseconds(600)
 
-    private enum Phase { case idle, hover, preparing, listening, finishing, error, done }
+    enum Phase: CaseIterable { case idle, hover, preparing, listening, finishing, error, done }
+    /// Renders one fixed phase, for snapshot reviews of the pill's spacing and icons.
+    var previewPhase: Phase? = nil
+    var previewShowsControls = true
     private enum PillControl { case dictate, cancel, finish, notes }
 
     private var isFinishing: Bool { model.isFinalizingDictation || model.transcriber.isFinalizing }
 
     private var phase: Phase {
+        if let previewPhase { return previewPhase }
         if isFinishing { return .finishing }
         // The microphone buffers while recognition gets ready, so show the live meter at once.
         if model.audio.isRunning { return .listening }
@@ -343,7 +349,8 @@ struct FloatingPillView: View {
     /// Hold to talk keeps a hand on the key, so the pill is just the meter; click and
     /// hands-free dictation get cancel and finish controls.
     private var showsControls: Bool {
-        (phase == .listening || phase == .preparing) && !model.dictationShortcutHeld
+        if previewPhase != nil { return previewShowsControls && (phase == .listening || phase == .preparing) }
+        return (phase == .listening || phase == .preparing) && !model.dictationShortcutHeld
     }
 
     private var cardState: TranscriptCard.State {
@@ -390,6 +397,14 @@ struct FloatingPillView: View {
             .onChange(of: model.audio.isRunning) { _, running in
                 if running { copied = false }
             }
+            // Keyed on the observed mic state; the start time itself isn't observed.
+            .task(id: model.audio.isRunning) {
+                showsElapsed = false
+                guard model.audio.isRunning else { return }
+                try? await Task.sleep(for: .seconds(30))
+                guard !Task.isCancelled, model.audio.isRunning else { return }
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showsElapsed = true }
+            }
             .onChange(of: phase) { old, new in
                 hoveredControl = nil
                 Logger(subsystem: "com.ruddvz.hushkey", category: "start")
@@ -413,13 +428,25 @@ struct FloatingPillView: View {
     /// pointer sees it grow rather than swap.
     private var pill: some View {
         let isHover = phase == .hover
-        return HStack(spacing: isHover ? 5 : 0) {
+        return HStack(spacing: isHover ? 6 : 0) {
+            // A matching empty slot on the left keeps the bar centred where it rested, so it grows
+            // in place instead of sliding left when Meeting notes appears on its right.
+            if isHover {
+                Color.clear
+                    .frame(width: Metrics.height, height: Metrics.height)
+                    .allowsHitTesting(false)
+            }
             bar
             if isHover {
-                PillIconButton(systemImage: "person.2.wave.2", help: "Open Meeting notes", solid: true, size: 25,
+                PillIconButton(systemImage: "person.2.fill", help: "Open Meeting notes", quiet: true,
+                               glyphSize: 11, size: Metrics.height,
                                onHover: { hoveredControl = $0 ? .notes : nil }) {
                     model.openMeetingNotes()
                 }
+                // Same material as the pill beside it, so the two read as one control family.
+                .background(Circle().fill(Theme.paper))
+                .overlay(Circle().strokeBorder(Theme.hairline, lineWidth: 0.5).allowsHitTesting(false))
+                .shadow(color: .black.opacity(0.32), radius: 6, y: 2)
                 .transition(.asymmetric(
                     insertion: .scale(scale: 0.3, anchor: .leading).combined(with: .opacity)
                         .combined(with: .offset(x: -14))
@@ -449,12 +476,13 @@ struct FloatingPillView: View {
     private var pillTargetSize: CGSize {
         switch phase {
         case .idle, .error:
-            return CGSize(width: 48, height: 16)
+            return Metrics.idle
         case .hover:
-            return CGSize(width: 58, height: Self.height)
+            return Metrics.hover
         case .preparing, .listening, .finishing:
-            let width: CGFloat = showsControls ? 134 : 76
-            return CGSize(width: width, height: Self.height)
+            let base = showsControls ? Metrics.recorderWidth : Metrics.meterOnlyWidth
+            let timer = phase == .listening && showsElapsed ? Metrics.timerWidth + Metrics.gap : 0
+            return CGSize(width: base + timer, height: Self.height)
         case .done:
             return CGSize(width: doneWidth, height: Self.height)
         }
@@ -501,15 +529,15 @@ struct FloatingPillView: View {
         case .idle, .error:
             // A subtle, calm resting sage bar that smoothly animates open when activated
             Capsule()
-                .fill(Theme.signal.opacity(0.55))
-                .frame(width: 20, height: 2.5)
+                .fill(Theme.signal.opacity(0.6))
+                .frame(width: Metrics.idleLine.width, height: Metrics.idleLine.height)
                 .transition(.opacity.animation(.easeOut(duration: 0.15)))
         case .hover:
             // The mic grows in once the capsule has mostly opened, so nothing is drawn squashed.
             Image(systemName: "mic.fill")
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(Theme.signal)
-                .frame(width: 44, height: 22)
+                .frame(width: Metrics.hover.width, height: Metrics.hover.height)
                 .transition(.asymmetric(
                     insertion: .scale(scale: 0.5).combined(with: .opacity)
                         .animation(.spring(response: 0.3, dampingFraction: 0.7)),
@@ -520,7 +548,8 @@ struct FloatingPillView: View {
         case .done:
             // Only shown when the words went in: the card above is the feedback otherwise.
             TypedConfirmation(verb: model.insertion.lastDeliveryVerified ? "Typed" : "Pasted",
-                              appName: Self.shownAppName(model.typedIntoAppName))
+                              appName: Self.shownAppName(model.typedIntoAppName) ?? (previewPhase == nil ? nil : "Notes"),
+                              settled: previewPhase != nil)
                 .frame(height: Self.height)
                 .transition(.opacity.combined(with: .scale(scale: 0.92)))
         }
@@ -537,26 +566,40 @@ struct FloatingPillView: View {
         let bold = NSFont.systemFont(ofSize: 12, weight: .semibold)
         let regular = NSFont.systemFont(ofSize: 12, weight: .medium)
         let verb = model.insertion.lastDeliveryVerified ? "Typed" : "Pasted"
-        var width = 12 + 14 + 5 + (verb as NSString).size(withAttributes: [.font: bold]).width + 12
-        if let app = Self.shownAppName(model.typedIntoAppName) {
+        var width = 12 + 14 + 6 + (verb as NSString).size(withAttributes: [.font: bold]).width + 12
+        if let app = Self.shownAppName(model.typedIntoAppName) ?? (previewPhase == nil ? nil : "Notes") {
             width += 4 + ("into \(app)" as NSString).size(withAttributes: [.font: regular]).width
         }
         return ceil(width)
     }
 
-    private static let height: CGFloat = 26
+    /// The pill's geometry, on a 4 pt grid. Controls sit concentric inside the capsule: a 20 pt
+    /// circle in a 28 pt capsule leaves the same 4 pt on every side, so the curves run parallel.
+    enum Metrics {
+        static let height: CGFloat = 28
+        static let control: CGFloat = 20
+        static let inset: CGFloat = (height - control) / 2
+        static let gap: CGFloat = 8
+        static let idle = CGSize(width: 44, height: 14)
+        static let idleLine = CGSize(width: 18, height: 2.5)
+        static let hover = CGSize(width: 60, height: height)
+        /// × · ribbon · ✓, and the ribbon alone while the shortcut is held.
+        static let recorderWidth = inset + control + gap + ribbonSize.width + gap + control + inset
+        static let meterOnlyWidth = ribbonSize.width + 2 * 12
+        static let timerWidth: CGFloat = 30
+    }
+    private static let height = Metrics.height
     /// The recording meter: `BreathRibbon`, sized per docs/DESIGN_SYSTEM.md.
     static let ribbonSize = CGSize(width: 58, height: 18)
-    static let idleSize = CGSize(width: 40, height: 8)
 
     /// One capsule from the first press to the typed text: the meter waits, listens, then works,
     /// so the pill never jumps between shapes mid-dictation.
     private var recorder: some View {
-        HStack(spacing: 5) {
+        HStack(spacing: Metrics.gap) {
             if showsControls {
                 PillIconButton(systemImage: "xmark",
                                help: phase == .preparing ? "Cancel before the microphone starts" : "Cancel. Nothing is typed",
-                               solid: true, size: 18,
+                               solid: true, size: Metrics.control,
                                onHover: { hoveredControl = $0 ? .cancel : nil }) {
                     model.cancelDictation(offersUndo: true)
                 }
@@ -570,19 +613,18 @@ struct FloatingPillView: View {
             }
             LiveLevel(model.audio) { BreathRibbon(level: $0, mode: ribbonMode, tint: Theme.ink) }
                 .frame(width: Self.ribbonSize.width, height: Self.ribbonSize.height)
-                .padding(.horizontal, showsControls ? 2 : 6)
-            if phase == .listening { elapsed }
+            if phase == .listening, showsElapsed { elapsed }
             if showsControls {
-                PillIconButton(systemImage: "checkmark", help: "Finish and type it", prominent: true, size: 18,
+                PillIconButton(systemImage: "checkmark", help: "Finish and type it", prominent: true,
+                               disabled: phase == .preparing, size: Metrics.control,
                                onHover: { hoveredControl = $0 ? .finish : nil }) {
                     Task { await model.toggleDictation() }
                 }
                 .disabled(phase == .preparing)
-                .opacity(phase == .preparing ? 0.35 : 1)
                 .transition(.opacity.combined(with: .scale(scale: 0.6)))
             }
         }
-        .padding(.horizontal, showsControls ? 4 : 8)
+        .padding(.horizontal, showsControls ? Metrics.inset : 12)
         .frame(height: Self.height)
         .transition(.opacity.combined(with: .scale(scale: 0.9)))
 
@@ -832,16 +874,16 @@ struct FloatingPillView: View {
     }
 
     /// Elapsed time, only once a dictation runs long enough for it to help.
+    /// Shown from 30 s on, in a fixed-width slot so the pill grows once instead of every second.
     private var elapsed: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
-            let seconds = Int(context.date.timeIntervalSince(model.dictationStartedAt ?? context.date))
-            if seconds >= 30 {
-                Text(String(format: "%d:%02d", seconds / 60, seconds % 60))
-                    .font(.system(size: 11, weight: .medium).monospacedDigit())
-                    .foregroundStyle(Theme.ink2)
-                    .padding(.trailing, 2)
-            }
+            let seconds = max(0, Int(context.date.timeIntervalSince(model.dictationStartedAt ?? context.date)))
+            Text(String(format: "%d:%02d", seconds / 60, seconds % 60))
+                .font(.system(size: 11, weight: .medium).monospacedDigit())
+                .foregroundStyle(Theme.ink2)
+                .frame(width: Metrics.timerWidth, alignment: .trailing)
         }
+        .transition(.opacity)
     }
 
     private var accessibilityLabel: String {
@@ -874,13 +916,13 @@ private struct PillHint: View {
     var body: some View {
         HStack(spacing: 6) {
             Text(title)
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(Theme.ink)
             if let shortcut { PillKey(label: shortcut) }
         }
-        .padding(.leading, 10)
-        .padding(.trailing, shortcut == nil ? 10 : 4)
-        .frame(height: 24)
+        .padding(.leading, 9)
+        .padding(.trailing, shortcut == nil ? 9 : 3)
+        .frame(height: 22)
         .background(Capsule().fill(Theme.paper))
         .overlay(Capsule().strokeBorder(Theme.ink.opacity(0.12), lineWidth: 0.5))
         .shadow(color: .black.opacity(0.28), radius: 5, y: 2)
@@ -894,12 +936,12 @@ private struct PillKey: View {
 
     var body: some View {
         Text(label)
-            .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+            .font(.system(size: 10, weight: .semibold, design: .rounded))
             .foregroundStyle(Theme.ink)
-            .padding(.horizontal, 5)
-            .frame(minWidth: 18, minHeight: 16)
-            .background(RoundedRectangle(cornerRadius: 4.5, style: .continuous).fill(Theme.keycap))
-            .overlay(RoundedRectangle(cornerRadius: 4.5, style: .continuous).strokeBorder(Theme.keycapEdge, lineWidth: 0.5))
+            .padding(.horizontal, 4)
+            .frame(minWidth: 16, minHeight: 16)
+            .background(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(Theme.keycap))
+            .overlay(RoundedRectangle(cornerRadius: 4, style: .continuous).strokeBorder(Theme.keycapEdge, lineWidth: 0.5))
             .accessibilityLabel("Shortcut \(label)")
     }
 }
@@ -917,6 +959,10 @@ private struct PillIconButton: View {
     var quiet = false
     /// A filled grey circle that stands on its own, off the pill or beside the meter.
     var solid = false
+    /// Drawn neutral, not as a faded accent, while it can't be pressed yet.
+    var disabled = false
+    /// Glyph point size; by default about half the circle, so × and ✓ read at the same weight.
+    var glyphSize: CGFloat? = nil
     var size: CGFloat = 20
     /// Reports hover to the pill, which shows its own hint instead of a slow system tooltip.
     var onHover: ((Bool) -> Void)? = nil
@@ -927,17 +973,19 @@ private struct PillIconButton: View {
         Button(action: action) {
             HStack(spacing: 4) {
                 Image(systemName: systemImage)
-                    .font(.system(size: quiet ? 11 : prominent ? 10 : 9, weight: quiet ? .semibold : .bold))
+                    .font(.system(size: glyphSize ?? (quiet ? 11 : (size * 0.45).rounded()), weight: quiet || glyphSize != nil ? .semibold : .bold))
                 if let title {
                     Text(title).font(.system(size: 12, weight: .semibold))
                         .lineLimit(1)
                         .fixedSize()
                 }
             }
-            .foregroundStyle(prominent ? Theme.paper : tint.opacity(hovering || solid ? 0.95 : 0.7))
+            .foregroundStyle(disabled ? tint.opacity(0.3)
+                             : prominent ? Theme.paper : tint.opacity(hovering || solid ? 0.95 : 0.7))
             .frame(minWidth: title == nil ? size : 24, minHeight: title == nil ? size : 24)
             .padding(.horizontal, title == nil ? 0 : 9)
-            .background(Capsule().fill(prominent ? Theme.signal.opacity(hovering ? 1 : 0.9)
+            .background(Capsule().fill(disabled ? tint.opacity(0.1)
+                                       : prominent ? Theme.signal.opacity(hovering ? 1 : 0.9)
                                        : tint.opacity(hovering ? (solid ? 0.3 : 0.16) : quiet ? 0 : solid ? 0.2 : 0.1)))
             .background(Capsule().fill(solid ? Theme.paper : .clear))
             .animation(Theme.snappy, value: hovering)
@@ -1025,14 +1073,17 @@ private struct TypedConfirmation: View {
     /// "Typed" when HushKey read the words back from the field, "Pasted" when it couldn't check.
     let verb: String
     let appName: String?
+    var settled = false
     @State private var icon: MorphIcon.Phase = .working
     @State private var showsText = false
+    @State private var tickScale: CGFloat = 0.8
 
     var body: some View {
-        HStack(spacing: 5) {
-            MorphIcon(phase: icon, lineWidth: 2)
+        HStack(spacing: 6) {
+            MorphIcon(phase: settled ? .done : icon, lineWidth: 1.8)
                 .frame(width: 14, height: 14)
                 .foregroundStyle(Theme.signal)
+                .scaleEffect(settled ? 1 : tickScale)
             HStack(spacing: 4) {
                 Text(verb)
                     .font(.system(size: 12, weight: .semibold))
@@ -1045,14 +1096,16 @@ private struct TypedConfirmation: View {
             }
             .lineLimit(1)
             .fixedSize()
-            .opacity(showsText ? 1 : 0)
-            .offset(x: showsText ? 0 : -4)
+            .opacity(settled || showsText ? 1 : 0)
+            .offset(x: settled || showsText ? 0 : -4)
         }
         .padding(.horizontal, 12)
         .onAppear {
-            guard !reduceMotion else { icon = .done; showsText = true; return }
+            guard !reduceMotion else { icon = .done; showsText = true; tickScale = 1; return }
             icon = .done
-            withAnimation(.easeOut(duration: 0.22).delay(0.12)) { showsText = true }
+            // The check settles with a small overshoot as the stroke lands, then the words follow.
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.55).delay(0.05)) { tickScale = 1 }
+            withAnimation(.easeOut(duration: 0.22).delay(0.14)) { showsText = true }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(appName.map { "\(verb) into \($0)" } ?? verb)
