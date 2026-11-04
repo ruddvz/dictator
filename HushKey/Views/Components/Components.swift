@@ -94,7 +94,7 @@ struct SettingsGroup<Content: View>: View {
                 Text(title)
                     .font(.hkTitle3)
                     .foregroundStyle(Theme.ink)
-                    .padding(.leading, 2)
+                    
             }
             VStack(alignment: .leading, spacing: 0) { content }
                 .padding(.top, -1)

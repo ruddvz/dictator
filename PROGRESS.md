@@ -1,5 +1,14 @@
 # HushKey progress
 
+## Completed: pill pixel pass, one voice for copy, top visual fixes (2026-11-04)
+
+- Pill: `Metrics` grid (28/20/4/8), concentric matched controls, neutral disabled ✓, Meeting notes button in the pill's material, quieter hint, no hover jump, timer slot, springy Typed check.
+- Copy: notices, pill, menu bar (title case) and Home prompts rewritten in one voice.
+- Visual: empty ring for unselected cards, `ink3`/`signal` contrast, equal-height Style cards, truncations, flush group titles, matched menu width.
+- New: `PillSnapshotTests` and `HubSnapshotTests` render the pill and 8 hub screens to PNG when `TEST_RUNNER_HUSHKEY_SNAPSHOT_DIR` is set.
+- **Next:** the remaining items in [docs/UI_POLISH_AUDIT_2026-11-04.md](docs/UI_POLISH_AUDIT_2026-11-04.md) (shared `SelectableCard`, card surface, section headers, naming, remaining copy).
+- Verification: 334 tests pass (5 skipped: the snapshot tests and existing skips). Changes reviewed in rendered snapshots; not yet checked in the running app, because another session's build was running.
+
 ## Research: open-source dictation landscape (2026-11-04)
 
 - [docs/research/OPEN_SOURCE_LANDSCAPE_2026-11-04.md](docs/research/OPEN_SOURCE_LANDSCAPE_2026-11-04.md): dimastatz/whisper-flow (a Python server; only its partial-finalization rule is useful) and 20 other apps with their licences.

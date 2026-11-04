@@ -325,7 +325,7 @@ struct DictationView: View {
                     .help("Words at \(VoiceProfile.typingWordsPerMinute) wpm typing, minus the time you spent speaking")
             }
             if let next = profile.nextUnlock, next.card == .pace {
-                Label("Your voice profile in \(next.remaining) dictation\(next.remaining == 1 ? "" : "s")", icon: .waveform)
+                Label("Voice profile in \(next.remaining) more", icon: .waveform)
                     .foregroundStyle(Theme.ink3)
                     .help("After \(VoiceProfile.firstUnlock) dictations, Insights sketches how you talk, from the history on this Mac")
             } else if let summary = Self.voiceSummary(profile) {

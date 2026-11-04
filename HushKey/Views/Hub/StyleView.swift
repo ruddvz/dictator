@@ -154,7 +154,7 @@ private struct CleanupLevelCard: View {
                 HStack {
                     Text(level.rawValue).font(.hkHeadline).foregroundStyle(Theme.ink)
                     Spacer()
-                    Glyph(isSelected ? .checkCircle : .record)
+                    Glyph(isSelected ? .checkCircle : .ring)
                         .foregroundStyle(isSelected ? Theme.signal : Theme.ink3)
                         .contentTransition(.symbolEffect(.replace))
                 }
@@ -174,7 +174,7 @@ private struct CleanupLevelCard: View {
                 .background(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous).fill(Theme.sheet))
             }
             .padding(Theme.s4)
-            .frame(maxWidth: .infinity, minHeight: 180, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 190, maxHeight: .infinity, alignment: .topLeading)
             .background(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
                 .fill(isSelected ? Theme.signalSoft : hovering ? Theme.hover : Theme.well))
             .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
@@ -202,7 +202,7 @@ private struct ToneCard: View {
                 HStack {
                     Text(tone.rawValue).font(.hkHeadline).foregroundStyle(Theme.ink)
                     Spacer()
-                    Glyph(isSelected ? .checkCircle : .record)
+                    Glyph(isSelected ? .checkCircle : .ring)
                         .foregroundStyle(isSelected ? Theme.signal : Theme.ink3)
                         .contentTransition(.symbolEffect(.replace))
                 }
@@ -217,7 +217,7 @@ private struct ToneCard: View {
                     .contentTransition(.opacity)
             }
             .padding(Theme.s4)
-            .frame(maxWidth: .infinity, minHeight: 190, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 190, maxHeight: .infinity, alignment: .topLeading)
             .background(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
                 .fill(isSelected ? Theme.signalSoft : hovering ? Theme.hover : Theme.well))
             .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)

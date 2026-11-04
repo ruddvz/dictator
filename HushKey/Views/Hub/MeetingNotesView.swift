@@ -204,7 +204,7 @@ struct MeetingNotesView: View {
             } else {
                 MenuPicker(selection: $meeting.audioSource,
                            options: MeetingAudioSource.allCases.map { ($0, $0.rawValue) },
-                           width: 170)
+                           width: Theme.menuWidth)
                 Button("Start", icon: .record, action: startMeeting)
                     .buttonStyle(PrimaryButtonStyle())
                     .disabled(model.captureGate.owner != nil || service.hasPendingDraftRecovery)

@@ -44,9 +44,9 @@ enum Theme {
     static let hairline = dynamic(light: 0xDCE1DD, dark: 0x2C3430)
     static let ink = dynamic(light: 0x1E2321, dark: 0xE9EEEB)
     static let ink2 = dynamic(light: 0x626B66, dark: 0x9BA6A0)
-    static let ink3 = dynamic(light: 0x5D6761, dark: 0x8B9690)
+    static let ink3 = dynamic(light: 0x737C77, dark: 0x7E8983)  // quieter than ink2, still ≥ 4.5:1
     static let inverseInk = dynamic(light: 0xFAFBFA, dark: 0x121614)
-    static let signal = dynamic(light: 0x4F7F6A, dark: 0x7FB39C)      // the one accent
+    static let signal = dynamic(light: 0x4A7763, dark: 0x7FB39C)      // the one accent
     static let signalSoft = dynamic(light: 0xE3ECE7, dark: 0x22322B)  // tinted fills behind signal
     static let keycap = dynamic(light: 0xDDE7E1, dark: 0x2A3A33)
     static let keycapEdge = dynamic(light: 0x9DB5A8, dark: 0x4C6A5C)

@@ -19,7 +19,7 @@ enum HushIcon: String, CaseIterable, Identifiable {
     case play, stop, copy, check, edit, more, trash, search, close, undo, plus
     case chevronRight, chevronDown, arrowRight, arrowUpRight, arrowDownRight, download, share, refresh, insert
     // Things
-    case warning, info, sparkle, flame, globe, folder, document, mic, waveform, record, shield
+    case warning, info, sparkle, flame, globe, folder, document, mic, waveform, record, ring, shield
     case clock, window, list, grid, speaker, checkCircle, cursor
     case mail, message, code, briefcase, quote, swap, minus
 
@@ -69,7 +69,7 @@ enum HushIcon: String, CaseIterable, Identifiable {
             "exclamationmark.triangle": .warning, "exclamationmark.circle": .warning,
             "info.circle": .info, "sparkles": .sparkle, "flame": .flame, "globe": .globe,
             "folder": .folder, "doc.richtext": .document, "note.text": .document, "waveform.path": .waveform,
-            "waveform": .waveform, "record.circle": .record, "circle": .record, "lock.shield": .shield,
+            "waveform": .waveform, "record.circle": .record, "circle": .ring, "lock.shield": .shield,
             "checkmark.shield": .shield, "hourglass": .clock, "clock": .clock, "macwindow": .window,
             "checklist": .list, "text.alignleft": .list, "square.grid.2x2": .grid,
             "speaker.wave.2": .speaker, "checkmark.circle": .checkCircle, "text.cursor": .cursor,
@@ -351,6 +351,9 @@ enum HushIcon: String, CaseIterable, Identifiable {
                     $0.move(x, 12 - height / 2); $0.to(x, 12 + height / 2)
                 }
             }
+
+        case .ring:
+            line { $0.circle(12, 12, r: 8.5) }
 
         case .record:
             line { $0.circle(12, 12, r: 8.5) }
