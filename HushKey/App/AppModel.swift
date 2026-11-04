@@ -2393,7 +2393,8 @@ final class AppModel {
                     break
                 }
             }
-            if let app = dictationTargetApp,
+            // Unverified paste only into the field dictation started in, never one focus moved to.
+            if insertion.focusState(of: target).fieldIsFocused, let app = dictationTargetApp,
                app.processIdentifier == NSWorkspace.shared.frontmostApplication?.processIdentifier {
                 if await insertion.pasteDirectly(text, into: app) {
                     didInsertCurrentDictation = true

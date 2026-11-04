@@ -396,30 +396,65 @@ final class TextInsertionService {
                            fieldValue: fieldValue, selectedRange: selectedRange)
     }
 
-    /// Pastes text directly into the frontmost application using ⌘V with clipboard snapshot restoration.
-    /// Used as the robust fallback when accessibility attributes (e.g. Monaco editor, Electron contenteditable)
-    /// cannot be verified via AXUIElement, guaranteeing the dictated text always lands in the active window.
+    /// Pastes with ⌘V into the frontmost app when its field can't be read back to verify the paste
+    /// (Monaco, Electron and other contenteditable editors). Only sent when that app has a focused,
+    /// editable, non-password element: with nothing to type into, the words would vanish, so the
+    /// caller shows the Copy card instead.
     @discardableResult
     func pasteDirectly(_ text: String, into app: NSRunningApplication) async -> Bool {
-        guard isEnabled, allowsPasteFallback, !app.isTerminated,
+        guard isEnabled, allowsPasteFallback, AXIsProcessTrusted(), !app.isTerminated, !text.isEmpty,
               NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier,
               app.bundleIdentifier != "com.ruddvz.hushkey" else { return false }
-        
+        exposeWebContent(of: app)
+        let name = app.localizedName ?? "the app"
+        guard let focused = focusedElement() else {
+            status = "Nothing has focus in \(name). Nothing was pasted."
+            return false
+        }
+        var pid: pid_t = 0
+        var settable = DarwinBoolean(false)
+        let selectedTextSettable = AXUIElementIsAttributeSettable(
+            focused, kAXSelectedTextAttribute as CFString, &settable) == .success && settable.boolValue
+        var ancestor: CFTypeRef?
+        let hasEditableAncestor = AXUIElementCopyAttributeValue(
+            focused, "AXEditableAncestor" as CFString, &ancestor) == .success && ancestor != nil
+        guard AXUIElementGetPid(focused, &pid) == .success, pid == app.processIdentifier,
+              Self.allowsUnverifiedPaste(role: stringAttribute(kAXRoleAttribute, of: focused) ?? "",
+                                         subrole: stringAttribute(kAXSubroleAttribute, of: focused) ?? "",
+                                         selectedTextSettable: selectedTextSettable,
+                                         hasEditableAncestor: hasEditableAncestor) else {
+            status = "No text box is focused in \(name). Nothing was pasted."
+            return false
+        }
+
         let pasteboard = NSPasteboard.general
         let saved = ClipboardSnapshot(pasteboard)
         let ours = ClipboardSnapshot.placeTransient(text, on: pasteboard)
-        
         guard Self.postCommandV() else {
             _ = saved.restore(to: pasteboard, ifChangeCountIs: ours)
+            status = "The paste shortcut could not be sent to \(name). Nothing was inserted."
             return false
         }
-        
-        // Give the target app's event loop sufficient time to consume the pasteboard event before restoration
-        try? await Task.sleep(for: .milliseconds(100))
+        // Electron and web editors read the pasteboard asynchronously; putting the old clipboard
+        // back too soon pastes that instead of the dictation.
+        try? await Task.sleep(for: Self.unverifiedPasteRestoreDelay)
         let restored = saved.restore(to: pasteboard, ifChangeCountIs: ours)
         let clipboard = restored ? "Your clipboard was put back." : "The clipboard changed meanwhile, so it was left as is."
-        status = "Pasted into \(app.localizedName ?? "the app"). \(clipboard)"
+        status = "Pasted into \(name). \(clipboard)"
         return true
+    }
+
+    nonisolated static let unverifiedPasteRestoreDelay: Duration = .milliseconds(500)
+
+    /// Whether an element that can't be read back still looks like somewhere to type: a text role,
+    /// a settable selection, or (Chromium) an editable ancestor. Never a password field.
+    nonisolated static func allowsUnverifiedPaste(role: String, subrole: String,
+                                                  selectedTextSettable: Bool, hasEditableAncestor: Bool) -> Bool {
+        guard subrole != (kAXSecureTextFieldSubrole as String),
+              !role.localizedCaseInsensitiveContains("secure"),
+              !subrole.localizedCaseInsensitiveContains("secure"),
+              !subrole.localizedCaseInsensitiveContains("password") else { return false }
+        return isSupportedTextTarget(role: role, subrole: subrole) || selectedTextSettable || hasEditableAncestor
     }
 
     /// Whether a readable, non-password field is in front and eligible for verified paste.

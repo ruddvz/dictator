@@ -6,7 +6,7 @@
 - **No false "Copied" pill:** the done pill shows only when the words were typed. When they weren't, the transcript card is the feedback (nothing is on the clipboard until Copy is pressed).
 - **Copy button:** after pressing it reads "Copied" with no tick.
 - **Verification:** 327 tests passed, 3 skipped; packaged and launched `dist/HushKey.app`. Not yet checked live with a real dictation (needs the mic).
-- **Open concern (from 51ce92d):** `pasteDirectly` sends ⌘V to whatever app is frontmost with no text-field check, then restores the clipboard after 100 ms. With no text box focused the words vanish while the pill says "Typed", and a slow Electron app could paste the old clipboard. The "No text box selected" card is now effectively unreachable.
+- **Fixed: unverified ⌘V fallback (`TextInsertionService.pasteDirectly`):** now pastes only when the frontmost app has a focused, editable, non-password element (text role, settable selection, or Chromium `AXEditableAncestor`); otherwise the Copy card shows. In the captured-field path it only pastes if that same field still has focus. The clipboard is restored after 500 ms instead of 100 ms. `UnverifiedPasteGateTests` cover the gate. 332 tests pass, 3 skipped. Not checked live yet.
 
 ## Completed: seamless pill morphing, definitive Typed feedback & robust insertion (2026-11-04)
 
