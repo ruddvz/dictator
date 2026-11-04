@@ -1,5 +1,10 @@
 # HushKey progress
 
+## Research: open-source dictation landscape (2026-11-04)
+
+- [docs/research/OPEN_SOURCE_LANDSCAPE_2026-11-04.md](docs/research/OPEN_SOURCE_LANDSCAPE_2026-11-04.md): dimastatz/whisper-flow (a Python server; only its partial-finalization rule is useful) and 20 other apps with their licences.
+- **Next, in order:** (1) live typing while speaking, (2) local LLM cleanup before macOS 26, (3) speaker labels in meeting notes via FluidAudio diarization, (4) learn from corrections.
+
 ## Completed: review of Antigravity's 2026-11-04 commits (9ee7d66..51ce92d) and fixes
 
 - **Honest pill:** unverified deliveries (unconfirmed paste, unverified ⌘V, AX edit needing review) now show "Pasted into <App>"; "Typed" only when HushKey read the words back (`TextInsertionService.lastDeliveryVerified`).
