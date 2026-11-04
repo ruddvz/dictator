@@ -155,6 +155,21 @@ private struct GeneralSettings: View {
             }
         }
 
+        SettingsGroup(title: "System", footer: model.launchAtLoginMessage) {
+            SettingsRow(title: "Launch at login",
+                        detail: "HushKey works from the menu bar with its window closed. Starting at login keeps fn ready.") {
+                RowToggle(isOn: Binding(get: { model.launchesAtLogin }, set: { model.setLaunchesAtLogin($0) }),
+                          label: "Launch HushKey at login")
+            }
+            SettingsRow(title: "Show in Dock", detail: "Off keeps HushKey in the menu bar only.") {
+                RowToggle(isOn: $model.showsInDock, label: "Show HushKey in the Dock")
+            }
+            SettingsRow(title: "Mute audio while dictating",
+                        detail: "Music and videos go quiet while the mic is open, then come back.") {
+                RowToggle(isOn: $model.mutesAudioWhileDictating, label: "Mute audio while dictating")
+            }
+        }
+
         SettingsGroup(title: "Cleanup") {
             SettingsRow(title: "Spoken corrections", detail: "“Scratch that” and “actually” fix what you just said.") {
                 RowToggle(isOn: $model.appliesSpokenCorrections, label: "Apply spoken corrections")

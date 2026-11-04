@@ -1,5 +1,25 @@
 # HushKey progress
 
+## Completed: HushKey works from the background, like Wispr Flow and TypeWhisper (2026-11-04)
+
+- **Problem (user):** HushKey only felt alive with its window open in front. Wispr Flow and TypeWhisper keep working with no window: TypeWhisper is a menu-bar-only app (`LSUIElement`), Wispr Flow a Dock app that keeps running with its window closed. Both start at login.
+- **Cause:** `model.start()`, the fn monitor, the pill and the Silent HUD were all started from the main window's `.task`. A launch that never showed the window (login item, restored with no window) left fn deaf and no pill. "Open HushKey" from the pill depended on a closure that the window set. There was no Quit in the menu bar.
+- **Fixed (`HushKeyApp.swift`):**
+  - `HushKeyAppDelegate` owns the model and starts everything in `applicationDidFinishLaunching`, window or not. Closing the last window leaves HushKey running.
+  - Launched as a login item, it closes the window SwiftUI opens and stays in the menu bar.
+  - The menu bar label sets `openMainWindow` (opens and activates), so the pill and menu can always bring the window back.
+  - Menu bar menu: Start/Stop dictation, Paste last transcript, Open HushKey, Settings… (⌘,), Microphone picker, dictation bar, sounds, mute toggle, Quit HushKey (⌘Q).
+- **New settings, Settings → General → System:**
+  - **Launch at login** (`SMAppService.mainApp`), turned on once on first run of a release build; debug builds never register themselves. Shows "Allow HushKey under Login Items" when macOS needs approval.
+  - **Show in Dock**: off makes HushKey menu-bar only (`.accessory`), like TypeWhisper.
+  - **Mute audio while dictating** (`OutputMuter.swift`, on by default): mutes the default output after the start cue, restores it when dictation stops, is cancelled or fails, and on quit. It only undoes its own change, and a crash mid-dictation is undone on next launch. Devices without a mute switch get volume 0 and their old volume back.
+- **Verified here:** 216 tests, 3 skipped, 0 failures. Signed `Scripts/package-app.sh` build, checked live:
+  - Started dictation from the pill with the main window off-Space: output muted (`output muted: true`), finishing unmuted it and cleared the crash marker.
+  - Show in Dock off → `lsappinfo` type `UIElement` (no Dock icon); on → `Foreground`.
+  - Launch at login registered (toggle reads on); the System section renders.
+- **Not verified live:** an actual login-item start at login (needs a log out/in); fn-hold from another app with the window closed (no physical fn press available here); muting with real music playing.
+- **Next:** log out and in to check HushKey comes up in the menu bar with no window, and that fn works straight away. Then a full Wispr Flow side-by-side of the pill and hub (`docs/PILL_UX_ANALYSIS.md`).
+
 ## Completed: idle pill hover redesign (2026-11-03)
 
 - **Problem (user):** hovering the idle pill "looks absolutely horrible". It showed a lone hush glyph next to a grey-filled Meeting notes circle, uneven padding, and a separate "Dictate fn" bubble floating above. The panel also resized mid-animation, so the pill clipped and flickered as it opened and closed.

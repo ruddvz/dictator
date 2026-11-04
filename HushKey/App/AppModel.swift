@@ -3,6 +3,7 @@ import AVFoundation
 import Speech
 import Observation
 import os
+import ServiceManagement
 import UniformTypeIdentifiers
 
 /// What the last silent capture did, for the small HUD shown while another app is in front.
@@ -229,6 +230,25 @@ final class AppModel {
         didSet { UserDefaults.standard.set(playsDictationSounds, forKey: "playDictationCues") }
     }
     @ObservationIgnored private let cuePlayer = DictationSoundPlayer()
+    /// Silences music and videos while the mic is open, then brings them back (Wispr Flow's
+    /// "mute music while dictating"). On by default.
+    var mutesAudioWhileDictating = UserDefaults.standard.object(forKey: "muteAudioWhileDictating") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(mutesAudioWhileDictating, forKey: "muteAudioWhileDictating")
+            if !mutesAudioWhileDictating { outputMuter.restore() }
+        }
+    }
+    @ObservationIgnored private let outputMuter = OutputMuter()
+    /// Off makes HushKey a menu bar app with no Dock icon; it works the same either way.
+    var showsInDock = UserDefaults.standard.object(forKey: "showInDock") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(showsInDock, forKey: "showInDock")
+            applyDockVisibility()
+        }
+    }
+    /// Mirrors the login item macOS has on record, so a change in System Settings shows here.
+    private(set) var launchesAtLogin = SMAppService.mainApp.status == .enabled
+    private(set) var launchAtLoginMessage: String?
     var savesDictationHistory = UserDefaults.standard.object(forKey: "saveDictationHistory") as? Bool ?? true {
         didSet { UserDefaults.standard.set(savesDictationHistory, forKey: "saveDictationHistory") }
     }
@@ -499,6 +519,7 @@ final class AppModel {
                 self?.refreshFunctionKeyStatus()
                 self?.syncSilentControlKey()
                 self?.insertion.restore()
+                self?.refreshLaunchAtLogin()
             }
         }
     }
@@ -1775,6 +1796,7 @@ final class AppModel {
         }
         lastDictationMicrophoneName = audio.activeDeviceName
         playDictationCue(.start)
+        muteOutputForDictation()
         dictationStartedAt = Date()
         lastDictationDuration = nil
         let customWords = profileSettings.vocabulary
@@ -1788,6 +1810,7 @@ final class AppModel {
             : false
         guard generation == dictationStartGeneration, audio.isRunning else {
             transcriber.stop()
+            restoreOutputAfterDictation()
             audio.stop()
             stopRetainingAudio(keep: false)
             captureGate.release(.dictation)
@@ -1801,6 +1824,7 @@ final class AppModel {
                 stopDictation()
             }
         } else if !started {
+            restoreOutputAfterDictation()
             audio.stop()
             stopRetainingAudio(keep: false)
             captureGate.release(.dictation)
@@ -1815,6 +1839,7 @@ final class AppModel {
 
     private func stopDictation() {
         guard audio.isRunning else { return }
+        restoreOutputAfterDictation()
         dictationStartGeneration += 1
         isFinalizingDictation = true
         if transcriber.isRunning { transcriber.beginFinalization() }
@@ -2357,6 +2382,7 @@ final class AppModel {
         dictationShortcutHeld = false
         dictationStartGeneration += 1
         functionKey.reset()
+        restoreOutputAfterDictation()
         guard wasStarting || wasListening else { return }
         transcriber.cancelPendingAuthorization()
         audio.stop()
@@ -2525,6 +2551,59 @@ final class AppModel {
         screen = .meetings
         openMainWindow?()
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func applyDockVisibility() {
+        guard !AppDataDirectory.isRunningTests else { return }
+        let policy: NSApplication.ActivationPolicy = showsInDock ? .regular : .accessory
+        guard NSApp.activationPolicy() != policy else { return }
+        NSApp.setActivationPolicy(policy)
+        // Leaving the Dock hides the window along with the app; bring it back.
+        if !showsInDock { DispatchQueue.main.async { NSApp.activate(ignoringOtherApps: true) } }
+    }
+
+    func setLaunchesAtLogin(_ enabled: Bool) {
+        do {
+            if enabled { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
+            launchAtLoginMessage = nil
+        } catch {
+            launchAtLoginMessage = "Couldn’t change the login item: \(error.localizedDescription)"
+        }
+        refreshLaunchAtLogin()
+    }
+
+    func refreshLaunchAtLogin() {
+        let status = SMAppService.mainApp.status
+        launchesAtLogin = status == .enabled
+        if status == .requiresApproval {
+            launchAtLoginMessage = "Allow HushKey under Login Items in System Settings."
+        }
+    }
+
+    /// A dictation app that isn't running can't hear fn, so HushKey starts at login unless you
+    /// turn it off. Asked once; release builds only, so debug builds never register themselves.
+    func enableLaunchAtLoginOnFirstRun() {
+        #if !DEBUG
+        let key = "didSetUpLaunchAtLogin"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+        if SMAppService.mainApp.status != .enabled { setLaunchesAtLogin(true) }
+        #endif
+    }
+
+    /// Quitting mid-dictation must not leave the Mac muted.
+    func prepareForTermination() {
+        outputMuter.restore()
+    }
+
+    private func muteOutputForDictation() {
+        guard mutesAudioWhileDictating else { return }
+        // Let the start cue finish first.
+        outputMuter.mute(after: playsDictationSounds ? DictationCue.start.duration + 0.05 : 0)
+    }
+
+    private func restoreOutputAfterDictation() {
+        outputMuter.restore()
     }
 
     private func playDictationCue(_ cue: DictationCue) {
