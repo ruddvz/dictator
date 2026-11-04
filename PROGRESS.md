@@ -1,5 +1,12 @@
 # HushKey progress
 
+## Completed: pill hover morphs instead of swapping (2026-11-04)
+
+- The resting bar is now one capsule that springs open into the mic button (40 × 8 → 50 × 25) as its fill darkens, and the mic grows in once it has opened. The Meeting notes circle slides out from behind it (scale, offset, fade, 50 ms later), and it all reverses on leave. The mic button swells slightly under the pointer. The hover target extends 6 pt around the thin bar.
+- Tested in a clean worktree because a hub session was mid-edit here: 221 tests, 0 failures, packaged and launched.
+- **Not verified by eye:** another session held the screen, so the motion wasn't filmed. Check it by hovering the bar.
+- Hub work is split: `redesign-hushkey-s-main` owns the hub and a custom icon family (`HushIcons`); `full-wispr-flow-audit-on` writes `docs/WISPR_FLOW_FULL_AUDIT.md` only. The pill moves to the new icons once they land.
+
 ## Completed: Flow-style dictation bar, and filler / self-correction cleanup (2026-11-04)
 
 - **Bar, compared side by side with Wispr Flow 1.6.1337 (`FloatingPill.swift`):**

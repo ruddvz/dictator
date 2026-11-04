@@ -291,35 +291,66 @@ struct FloatingPillView: View {
             }
     }
 
+    /// The bar, plus the Meeting notes button that slides out beside it on hover. The bar itself
+    /// is one capsule that springs between sizes (rest → mic button → recorder), so the
+    /// pointer sees it grow rather than swap.
     private var pill: some View {
+        let isHover = phase == .hover
+        return HStack(spacing: isHover ? 5 : 0) {
+            bar
+            if isHover {
+                PillIconButton(systemImage: "person.2.wave.2", help: "Open Meeting notes", solid: true, size: 25,
+                               onHover: { hoveredControl = $0 ? .notes : nil }) {
+                    model.openMeetingNotes()
+                }
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.3, anchor: .leading).combined(with: .opacity)
+                        .combined(with: .offset(x: -14))
+                        .animation(.spring(response: 0.38, dampingFraction: 0.74).delay(0.05)),
+                    removal: .scale(scale: 0.5, anchor: .leading).combined(with: .opacity)
+                        .combined(with: .offset(x: -10))
+                        .animation(.easeIn(duration: 0.12))))
+            }
+        }
+        // A generous hover target around the thin resting bar, inside the panel's shadow margin.
+        .contentShape(Rectangle().inset(by: -6))
+        .onHover { inside in
+            isHovering = inside
+            if inside { model.audio.refreshDevices() }
+        }
+        .contextMenu { pillMenu }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { // VoiceOver and other assistive presses, which can't miss
+            guard phase != .finishing, phase != .error else { return }
+            Task { await model.toggleDictation() }
+        }
+    }
+
+    private var bar: some View {
         let isHover = phase == .hover
         return content
             .foregroundStyle(Theme.ink)
-            // At rest a faint, see-through bar; on hover the controls are their own shapes.
-            .background(Capsule().fill(isHover ? .clear : phase == .idle ? Theme.paper.opacity(0.55) : Theme.paper))
+            // At rest a faint, see-through bar that fills in as it opens.
+            .background(Capsule().fill(phase == .idle ? Theme.paper.opacity(0.55) : Theme.paper))
             // The capsule grows around its contents; clipping reveals them instead of letting them spill.
-            .clipShape(isHover ? AnyShape(Rectangle()) : AnyShape(Capsule()))
-            .overlay(Capsule().strokeBorder(isHover ? .clear : stroke,
+            .clipShape(Capsule())
+            .overlay(Capsule().strokeBorder(stroke,
                                             lineWidth: phase == .error && model.dictationNotice?.isNeutral != true ? 1 : phase == .idle ? 1 : 0.5))
             // A faint shadow at rest lifts the bar off light desktops; the hairline does it on dark ones.
             .shadow(color: .black.opacity(phase == .idle ? 0.15 : 0.32), radius: phase == .idle ? 2 : 6, y: phase == .idle ? 1 : 2)
-            .contentShape(isHover ? AnyShape(Rectangle()) : AnyShape(Capsule()))
+            .scaleEffect(isHover && hoveredControl == .dictate ? 1.05 : 1)
+            .animation(.spring(response: 0.28, dampingFraction: 0.7), value: hoveredControl)
+            .contentShape(Capsule())
             .onHover { inside in
-                isHovering = inside
-                if inside { model.audio.refreshDevices() }
+                guard phase == .hover || !inside else { return }
+                hoveredControl = inside ? .dictate : (hoveredControl == .dictate ? nil : hoveredControl)
             }
             .onTapGesture { press() }
             .gesture(DragGesture(minimumDistance: 10) // a slightly shaky click should not move it
                 .onChanged { _ in onDrag(false) }
                 .onEnded { _ in onDrag(true) })
-            .contextMenu { pillMenu }
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel(accessibilityLabel)
-            .accessibilityAddTraits(.isButton)
-            .accessibilityAction { // VoiceOver and other assistive presses, which can't miss
-                guard phase != .finishing, phase != .error else { return }
-                Task { await model.toggleDictation() }
-            }
     }
 
     private func press() {
@@ -339,10 +370,15 @@ struct FloatingPillView: View {
                 .frame(width: Self.idleSize.width, height: Self.idleSize.height)
                 .transition(.opacity.animation(.easeOut(duration: 0.12)))
         case .hover:
-            hoverBar
-                // Fade in once the capsule has mostly opened, so nothing is drawn squashed.
-                .transition(.asymmetric(insertion: .opacity.animation(.easeOut(duration: 0.18).delay(0.07)),
-                                        removal: .opacity.animation(.easeOut(duration: 0.1))))
+            // The mic grows in once the capsule has mostly opened, so nothing is drawn squashed.
+            Image(systemName: "mic.fill")
+                .font(.system(size: 11, weight: .semibold))
+                .frame(width: 50, height: 25)
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.4).combined(with: .opacity)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.68).delay(0.06)),
+                    removal: .opacity.animation(.easeOut(duration: 0.08))))
+                .accessibilityLabel("Start dictation")
         case .preparing, .listening, .finishing:
             recorder
         case .error:
@@ -367,27 +403,6 @@ struct FloatingPillView: View {
 
     private static let height: CGFloat = 26
     static let idleSize = CGSize(width: 40, height: 8)
-
-    /// The idle bar opened by the pointer: a mic button that starts dictation and, beside it, a
-    /// round Meeting notes button. Each names itself in the hint above while hovered.
-    private var hoverBar: some View {
-        HStack(spacing: 5) {
-            Image(systemName: "mic.fill")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Theme.ink)
-                .frame(width: 50, height: 25)
-                .background(Capsule().fill(Theme.paper))
-                .overlay(Capsule().strokeBorder(Theme.ink.opacity(0.14), lineWidth: 0.5))
-                .contentShape(Capsule())
-                .onHover { hoveredControl = $0 ? .dictate : nil }
-                .accessibilityLabel("Start dictation")
-            PillIconButton(systemImage: "person.2.wave.2", help: "Open Meeting notes", solid: true, size: 25,
-                           onHover: { hoveredControl = $0 ? .notes : nil }) {
-                model.openMeetingNotes()
-            }
-        }
-        .fixedSize()
-    }
 
     /// One capsule from the first press to the typed text: the meter waits, listens, then works,
     /// so the pill never jumps between shapes mid-dictation.
