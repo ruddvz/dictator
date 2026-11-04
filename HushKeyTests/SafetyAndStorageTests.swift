@@ -56,6 +56,26 @@ final class SafetyAndStorageTests: XCTestCase {
     }
 
     @MainActor
+    func testQuittingFinalizesAnActiveResearchRecording() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: "hushkey-termination-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let recorder = SessionRecorder(rootURL: root.appending(path: "sessions", directoryHint: .isDirectory))
+        let model = AppModel(dictationHistoryURL: root.appending(path: "history.json"),
+                             fileTranscriptionHistoryURL: root.appending(path: "files.json"),
+                             sessionRecorder: recorder)
+
+        recorder.start(audio: model.audio)
+        XCTAssertTrue(recorder.isRecording)
+
+        model.prepareForTermination()
+
+        XCTAssertFalse(recorder.isRecording)
+        let sessionURL = try XCTUnwrap(recorder.lastSessionURL)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: sessionURL.appending(path: "meta.json").path))
+    }
+
+    @MainActor
     func testHoldCaptureEmitsOneSegmentOnRelease() {
         let capture = CaptureController()
         var received: [[MotionSample]] = []
@@ -238,6 +258,34 @@ final class SafetyAndStorageTests: XCTestCase {
         XCTAssertEqual(restored.vocabulary, ["yes"])
         XCTAssertEqual(restored.templates.first?.condition, .silent)
         XCTAssertEqual(restored.templates.first?.sessionID, sessionID)
+    }
+
+    func testUnreadableTrainingDatasetIsPreservedAndCannotBeOverwritten() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "hushkey-dataset-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let url = root.appending(path: "dataset.json")
+        let original = Data("{broken".utf8)
+        try original.write(to: url)
+
+        guard case .unreadable(let recoveryCopyURL) = TemplateStore.loadState(from: url) else {
+            return XCTFail("Corrupt dataset should be reported as unreadable")
+        }
+        XCTAssertNotNil(recoveryCopyURL)
+        XCTAssertEqual(try Data(contentsOf: url), original)
+        XCTAssertThrowsError(try TemplateStore.save(.starter, to: url))
+        XCTAssertEqual(try Data(contentsOf: url), original)
+        if let recoveryCopyURL {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: recoveryCopyURL.path))
+        }
+    }
+
+    @MainActor func testSessionRecorderDirectoryNamesCannotCollideWithinOneSecond() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let first = SessionRecorder.sessionDirectoryName(date: now, id: UUID(), condition: .silent)
+        let second = SessionRecorder.sessionDirectoryName(date: now, id: UUID(), condition: .silent)
+        XCTAssertNotEqual(first, second)
+        XCTAssertTrue(first.hasSuffix("-silent"))
     }
 
     func testDictationHistoryRoundTripsLocally() throws {

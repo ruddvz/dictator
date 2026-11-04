@@ -11,6 +11,7 @@ struct ContentView: View {
     @AppStorage("sidebarCollapsed") private var collapsed = false
     /// The page shown before the current one, so a page switch can rise from the side it came from.
     @State private var previousScreen: AppModel.Screen = .dictation
+    @State private var showsShortcuts = false
     @Namespace private var selectionSpace
 
     static let labScreens: [AppModel.Screen] = [.setup, .train, .evaluate, .use]
@@ -31,7 +32,7 @@ struct ContentView: View {
         }
         .padding(.top, Theme.toolbarHeight)
         .overlay(alignment: .top) {
-            HubToolbar(collapsed: $collapsed)
+            HubToolbar(collapsed: $collapsed, showsShortcuts: $showsShortcuts)
                 .frame(height: Theme.toolbarHeight - Theme.s2)
         }
         .background(Theme.paper)
@@ -41,8 +42,23 @@ struct ContentView: View {
         .groupBoxStyle(CardGroupBoxStyle())
         .tint(Theme.ink)
         .preferredColorScheme(appearance.colorScheme)
-        .animation(Theme.snappy, value: collapsed)
-        .onChange(of: model.screen) { old, _ in previousScreen = old }
+        .animation(reduceMotion ? nil : Theme.glide, value: collapsed)
+        .transaction { transaction in
+            if reduceMotion {
+                transaction.disablesAnimations = true
+                transaction.animation = nil
+            }
+        }
+        .onChange(of: model.screen) { old, new in
+            previousScreen = old
+            NSAccessibility.post(element: NSApplication.shared, notification: .announcementRequested,
+                                 userInfo: [.announcement: new.rawValue, .priority: NSNumber(value: 50)])
+        }
+        .sheet(isPresented: $showsShortcuts) {
+            KeyboardShortcutsSheet()
+                .environment(model)
+                .preferredColorScheme(appearance.colorScheme)
+        }
     }
 
     // MARK: Sidebar
@@ -77,6 +93,7 @@ struct ContentView: View {
                         .padding(.bottom, Theme.s2)
                         .transition(.opacity)
                 }
+                SidebarItem(title: "Shortcuts", icon: .keyboard, collapsed: collapsed) { showsShortcuts = true }
                 row(.settings)
             }
             .padding([.horizontal, .bottom], Theme.s3)
@@ -173,7 +190,7 @@ struct ContentView: View {
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
-        .animation(Theme.snappy, value: model.screen)
+        .animation(reduceMotion ? nil : Theme.snappy, value: model.screen)
     }
 }
 
@@ -251,20 +268,34 @@ private struct SidebarRow: View {
     var screen: AppModel.Screen
     var collapsed: Bool
     var selection: Namespace.ID
-    @State private var hovering = false
-
-    private var isSelected: Bool { model.screen == screen }
 
     var body: some View {
-        Button {
+        SidebarItem(title: screen.sidebarTitle, icon: screen.icon, collapsed: collapsed,
+                    isSelected: model.screen == screen, selection: selection) {
             withAnimation(Theme.snappy) { model.screen = screen }
-        } label: {
+        }
+        .accessibilityIdentifier("sidebar.\(screen.id)")
+    }
+}
+
+/// One sidebar entry: a page, or an action such as Shortcuts.
+private struct SidebarItem: View {
+    var title: String
+    var icon: HushIcon
+    var collapsed: Bool
+    var isSelected = false
+    var selection: Namespace.ID?
+    var action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
             HStack(spacing: Theme.s3) {
-                Glyph(screen.icon, size: 19)
-                    .foregroundStyle(isSelected ? Theme.ink : hovering ? Theme.ink : Theme.ink2)
+                Glyph(icon, size: 19)
+                    .foregroundStyle(isSelected || hovering ? Theme.ink : Theme.ink2)
                     .frame(width: 22)
                 if !collapsed {
-                    Text(screen.sidebarTitle)
+                    Text(title)
                         .font(.system(size: 15.5, weight: isSelected ? .medium : .regular))
                         .foregroundStyle(Theme.ink)
                         .lineLimit(1)
@@ -279,7 +310,7 @@ private struct SidebarRow: View {
             .frame(maxWidth: .infinity, alignment: collapsed ? .center : .leading)
             .frame(height: Theme.sidebarRow)
             .background {
-                if isSelected {
+                if isSelected, let selection {
                     RoundedRectangle(cornerRadius: Theme.r3, style: .continuous)
                         .fill(Theme.selection)
                         .matchedGeometryEffect(id: "selection", in: selection)
@@ -294,10 +325,9 @@ private struct SidebarRow: View {
         .buttonStyle(PressStyle())
         .onHover { hovering = $0 }
         .animation(.easeOut(duration: 0.12), value: hovering)
-        .help(collapsed ? screen.sidebarTitle : "")
-        .accessibilityLabel(screen.sidebarTitle)
+        .help(collapsed ? title : "")
+        .accessibilityLabel(title)
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
-        .accessibilityIdentifier("sidebar.\(screen.id)")
     }
 }
 
@@ -318,12 +348,24 @@ private struct SetupChecklist: View {
     }
 
     private var steps: [Step] {
-        [
+        var steps = [
             Step(title: "Allow microphone", isDone: microphoneGranted, opens: .dictation, permission: .microphone),
-            Step(title: "Allow speech recognition", isDone: speechGranted, opens: .dictation, permission: .speechRecognition),
-            Step(title: "Turn on text insertion", isDone: model.insertion.isEnabled, opens: .settings, settingsSection: .insertion),
-            Step(title: "Finish a first dictation", isDone: !model.dictationHistory.isEmpty, opens: .dictation),
         ]
+        if !usesDownloadedParakeet {
+            steps.append(Step(title: "Allow speech recognition", isDone: speechGranted,
+                              opens: .dictation, permission: .speechRecognition))
+        }
+        steps.append(Step(title: "Turn on text insertion", isDone: model.insertion.isEnabled,
+                          opens: .settings, settingsSection: .insertion))
+        steps.append(Step(title: "Finish a first dictation", isDone: model.didCompleteFirstDictation,
+                          opens: .dictation))
+        return steps
+    }
+
+    private var usesDownloadedParakeet: Bool {
+        model.dictationEngine == .parakeet
+            && model.parakeet.isDownloaded
+            && model.parakeet.model.supports(localeIdentifier: model.dictationLanguage)
     }
 
     var body: some View {
@@ -371,6 +413,9 @@ private struct SetupChecklist: View {
         .onAppear(perform: refresh)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in refresh() }
         .onChange(of: model.audio.isRunning) { _, _ in refresh() }
+        .onChange(of: model.dictationEngine) { _, _ in refresh() }
+        .onChange(of: model.dictationLanguage) { _, _ in refresh() }
+        .onChange(of: model.parakeet.isDownloaded) { _, _ in refresh() }
     }
 
     /// Shows the macOS prompt the first time; once it has been answered "Don't Allow", only

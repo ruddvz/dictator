@@ -169,7 +169,7 @@ private struct EvaluationResultView: View {
                             .foregroundStyle(Theme.ink2)
                     }
                 } else {
-                    Label("Session holdout needs examples from at least two distinct sessions.", icon: .info)
+                    Label("Holdout requires at least three takes of every label in each of two sessions.", icon: .info)
                         .font(.hkCaption)
                         .foregroundStyle(Theme.ink2)
                 }
@@ -223,7 +223,7 @@ private struct EvaluationResultView: View {
         }
         guard let holdout = result.sessionHoldoutAccuracy,
               let baseline = result.sessionHoldoutChance else {
-            return "The permutation check passed. Record every word in a second session so one can be held out."
+            return "The permutation check passed. Complete two sessions with at least three takes of every label in each."
         }
         guard holdout > baseline else {
             return "The permutation check passed, but held-out sessions did not beat their majority baseline."
@@ -231,7 +231,10 @@ private struct EvaluationResultView: View {
         guard result.templateCount >= AppModel.minimumEvidenceTemplates else {
             return "Promising, but \(AppModel.minimumEvidenceTemplates) or more takes are needed to trust it."
         }
-        return "Your words are distinguishable, including on sessions held out from training."
+        guard result.sessionHoldoutComplete else {
+            return "The holdout is incomplete. Complete every label in two sessions before trusting this result."
+        }
+        return "Your labels are distinguishable in complete sessions held out from training."
     }
 
     private func metric(_ title: String, _ value: String, highlight: Bool = false) -> some View {

@@ -216,6 +216,7 @@ private final class FirstMouseHostingView<Content: View>: NSHostingView<Content>
 }
 
 struct FloatingPillView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(AppModel.self) private var model
     /// Dragging slides the pill along the bottom edge; `true` when the drag ends.
     var onDrag: (Bool) -> Void = { _ in }
@@ -276,6 +277,12 @@ struct FloatingPillView: View {
             .animation(.spring(response: 0.34, dampingFraction: 0.78), value: cardState)
             .animation(.spring(response: 0.34, dampingFraction: 0.78), value: showsControls)
             .animation(Theme.snappy, value: hint)
+            .transaction { transaction in
+                if reduceMotion {
+                    transaction.disablesAnimations = true
+                    transaction.animation = nil
+                }
+            }
             .onChange(of: model.audio.isRunning) { _, running in
                 if running { copied = false }
             }
@@ -525,7 +532,12 @@ struct FloatingPillView: View {
     @ViewBuilder
     private func errorContent(_ notice: DictationNotice) -> some View {
         let tint = notice.isNeutral ? Theme.ink2 : Theme.danger
-        Image(systemName: notice.isNeutral ? "arrow.uturn.backward.circle" : "exclamationmark.circle.fill")
+        let symbol = if notice.isReview { "eye" } else if notice.kind == .cancelled {
+            "arrow.uturn.backward.circle"
+        } else {
+            "exclamationmark.circle.fill"
+        }
+        Image(systemName: symbol)
             .font(.system(size: 14, weight: .semibold))
             .foregroundStyle(tint)
         Text(notice.message)
@@ -591,6 +603,8 @@ struct FloatingPillView: View {
             }
         }
         .pickerStyle(.inline)
+        .disabled(model.audio.isRunning || model.audio.isStarting)
+        .help("Stop recording before changing microphones.")
     }
 
     /// Right-click menu: microphone, sounds, and getting back to HushKey.
@@ -638,9 +652,11 @@ struct FloatingPillView: View {
         case .listening: model.dictationShortcutHeld ? "Listening. Release \(model.dictationShortcut.label) to finish" : "Listening. Stop dictation"
         case .finishing: "Transcribing"
         case .error:
-            model.dictationNotice?.isNeutral == true
-                ? "Dictation cancelled. \(model.dictationNotice?.detail ?? "")"
-                : "Dictation problem: \(model.dictationNotice?.message ?? ""). \(model.dictationNotice?.detail ?? "")"
+            model.dictationNotice?.isReview == true
+                ? "Transcript saved for review before typing. \(model.dictationNotice?.detail ?? "")"
+                : model.dictationNotice?.kind == .cancelled
+                    ? "Dictation cancelled. \(model.dictationNotice?.detail ?? "")"
+                    : "Dictation problem: \(model.dictationNotice?.message ?? ""). \(model.dictationNotice?.detail ?? "")"
         case .done: "Dictation finished"
         }
     }

@@ -8,6 +8,8 @@ struct DictationNotice: Equatable {
         case microphone
         /// Speech recognition failed or returned an error with no text.
         case recognition
+        /// Parakeet returned text from a weak or uncertain signal; keep it for review, never type it automatically.
+        case review
         /// Recognition finished but heard nothing.
         case nothingHeard
         /// The microphone ran but stayed silent the whole time: muted, wrong input, or blocked.
@@ -46,7 +48,8 @@ struct DictationNotice: Equatable {
     /// Mic problems offer Sound settings and a microphone picker instead of a retry.
     var offersMicrophoneHelp: Bool { kind == .microphone || kind == .silentMicrophone }
     /// Not a failure: shown in neutral ink instead of the danger colour.
-    var isNeutral: Bool { kind == .cancelled }
+    var isNeutral: Bool { kind == .cancelled || kind == .review }
+    var isReview: Bool { kind == .review }
     /// The settings pane to open when macOS is blocking dictation.
     var missingPermission: Privacy? {
         if case .permission(let privacy) = kind { privacy } else { nil }
@@ -109,6 +112,18 @@ enum DictationRecovery {
                         canRetry: true, canPasteAgain: false)
     }
 
+    static func reviewBeforeInsertion(confidence: Float?, peakLevel: Float) -> DictationNotice {
+        let reason: String
+        if let confidence, confidence < ParakeetAutoInsertGate.minimumConfidence {
+            reason = String(format: "Parakeet confidence was %.2f", confidence)
+        } else {
+            reason = String(format: "Input peak was %.2f", peakLevel)
+        }
+        return DictationNotice(kind: .review, message: "Review before typing",
+                               detail: "\(reason), below the automatic typing limit. The transcript is saved in HushKey but was not inserted. Check it before using Insert.",
+                               canRetry: false, canPasteAgain: false)
+    }
+
     static func insertionFailed(_ reason: String, canPasteAgain: Bool) -> DictationNotice {
         DictationNotice(kind: .insertion, message: "Couldn't type it",
                         detail: reason + " The text is saved in HushKey.",
@@ -128,6 +143,22 @@ enum DictationRecovery {
     }
 }
 
+/// Provisional safety screen for Parakeet's nonempty results. Until real-voice/quiet-room
+/// calibration exists, only stronger input and model confidence may type without review.
+enum ParakeetAutoInsertGate {
+    static let minimumPeakLevel: Float = 0.45
+    static let minimumConfidence: Float = 0.35
+
+    static func allowsAutomaticInsertion(peakLevel: Float, confidence: Float) -> Bool {
+        !requiresReview(peakLevel: peakLevel, confidence: confidence)
+    }
+
+    /// Weak input remains review-only even if Parakeet fails and Apple Speech supplies the text.
+    static func requiresReview(peakLevel: Float, confidence: Float?) -> Bool {
+        peakLevel < minimumPeakLevel || (confidence.map { $0 < minimumConfidence } ?? false)
+    }
+}
+
 /// A dictation the person cancelled, offered back in History for the rest of the session.
 struct CancelledDictation: Identifiable, Equatable {
     let id = UUID()
@@ -144,11 +175,14 @@ struct CancelledDictation: Identifiable, Equatable {
 
 /// How a dictation was set up when it started, so a recovered recording is formatted the same way.
 struct DictationRunSettings {
+    var engine: DictationEngine
     var mode: DictationMode
     var languageIdentifier: String
     var snippets: String
     var correctionRules: String
     var cleansFillers: Bool
+    var appliesSpokenCorrections: Bool
+    var usesSmartCleanup: Bool
     var tone: DictationTone
     var contextualStrings: [String]
     var profileName: String?
@@ -189,9 +223,14 @@ final class RetainedDictationAudio: @unchecked Sendable {
     static let maximumSeconds: Double = 300
 
     private let lock = NSLock()
+    private let copyBuffer: (AVAudioPCMBuffer) -> AVAudioPCMBuffer?
     private var buffers: [AVAudioPCMBuffer] = []
     private var seconds: Double = 0
     private var overflowed = false
+
+    init(copyBuffer: @escaping (AVAudioPCMBuffer) -> AVAudioPCMBuffer? = RetainedDictationAudio.copy) {
+        self.copyBuffer = copyBuffer
+    }
 
     /// True when every buffer of the last recording is held and can be replayed.
     var isUsable: Bool { lock.withLock { !buffers.isEmpty && !overflowed } }
@@ -209,7 +248,13 @@ final class RetainedDictationAudio: @unchecked Sendable {
             buffers = []
             return
         }
-        guard let copy = Self.copy(buffer) else { return }
+        guard let copy = copyBuffer(buffer) else {
+            // Any missing interval makes the retained recording unsafe to replay.
+            overflowed = true
+            buffers = []
+            seconds = 0
+            return
+        }
         buffers.append(copy)
         seconds += added
     }
@@ -236,9 +281,12 @@ final class RetainedDictationAudio: @unchecked Sendable {
         copy.frameLength = buffer.frameLength
         let source = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: buffer.audioBufferList))
         let destination = UnsafeMutableAudioBufferListPointer(copy.mutableAudioBufferList)
-        for (from, to) in zip(source, destination) {
-            guard let fromData = from.mData, let toData = to.mData else { continue }
-            memcpy(toData, fromData, Int(min(from.mDataByteSize, to.mDataByteSize)))
+        guard source.count == destination.count else { return nil }
+        for index in source.indices {
+            let from = source[index], to = destination[index]
+            guard let fromData = from.mData, let toData = to.mData,
+                  from.mDataByteSize <= to.mDataByteSize else { return nil }
+            memcpy(toData, fromData, Int(from.mDataByteSize))
         }
         return copy
     }

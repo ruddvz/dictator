@@ -156,6 +156,8 @@ private struct GeneralSettings: View {
                 MenuPicker(selection: $audio.selectedDeviceID,
                            options: [(AudioDeviceID?.none, "System default")]
                             + audio.devices.map { (Optional($0.id), $0.name) })
+                    .disabled(audio.isRunning || audio.isStarting)
+                    .help("Stop recording before changing microphones.")
             }
             SettingsRow(title: "Dictation bar", detail: "The small bar at the bottom of your screen.") {
                 RowToggle(isOn: $model.showsFloatingPill, label: "Show the dictation bar")
@@ -296,10 +298,14 @@ private struct DataSettings: View {
         }
 
         SettingsGroup(title: "Your files", footer: model.dataMessage) {
-            SettingsRow(title: "Training dataset", detail: "Silent Lab templates, saved in Application Support.") {
+            SettingsRow(title: model.datasetArchiveUnreadable ? "Training dataset needs attention" : "Training dataset",
+                        detail: model.datasetArchiveUnreadable
+                            ? "The saved file couldn’t be read. Its recovery copy is kept in Application Support."
+                            : "Silent Lab templates, saved in Application Support.") {
                 HStack(spacing: Theme.s2) {
                     Button("Export…") { model.exportDataset() }
                         .buttonStyle(SecondaryButtonStyle())
+                        .disabled(model.datasetArchiveUnreadable)
                     Button("Delete…") { confirmDeleteTemplates = true }
                         .buttonStyle(DestructiveButtonStyle())
                 }
@@ -326,8 +332,13 @@ private struct DataSettings: View {
                 }
             }
         }
-        .confirmationDialog("Delete all training templates from this Mac?", isPresented: $confirmDeleteTemplates, titleVisibility: .visible) {
-            Button("Delete templates", role: .destructive) { model.clearTrainingData() }
+        .confirmationDialog(model.datasetArchiveUnreadable
+                            ? "Remove the unreadable training dataset from this Mac?"
+                            : "Delete all training templates from this Mac?",
+                            isPresented: $confirmDeleteTemplates, titleVisibility: .visible) {
+            Button(model.datasetArchiveUnreadable ? "Remove unreadable dataset" : "Delete templates", role: .destructive) {
+                model.clearTrainingData()
+            }
         }
         .confirmationDialog("Delete all session logs and local audio files?", isPresented: $confirmDeleteSessions, titleVisibility: .visible) {
             Button("Delete session logs", role: .destructive) { model.deleteSessionLogs() }

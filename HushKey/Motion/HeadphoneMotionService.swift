@@ -30,7 +30,9 @@ final class HeadphoneMotionService {
         return .waiting
     }
 
-    private(set) var status: Status = .waiting
+    private(set) var status: Status = .waiting {
+        didSet { if status != oldValue { onStatusChange?(status) } }
+    }
     private(set) var isConnected = false
     private(set) var latest: MotionSample?
     private(set) var history: [MotionSample] = []
@@ -38,6 +40,7 @@ final class HeadphoneMotionService {
     private(set) var sampleCount = 0
 
     var onSample: ((MotionSample) -> Void)?
+    var onStatusChange: ((Status) -> Void)?
 
     @ObservationIgnored private let manager = CMHeadphoneMotionManager()
     @ObservationIgnored private let proxy = DelegateProxy()

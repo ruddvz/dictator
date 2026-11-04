@@ -57,6 +57,26 @@ final class DictationRecoveryTests: XCTestCase {
                                               hasRetainedAudio: true, heardSound: false))
     }
 
+    func testParakeetOnlyAutoInsertsWithBothStrongSignalAndConfidence() {
+        XCTAssertTrue(ParakeetAutoInsertGate.allowsAutomaticInsertion(peakLevel: 0.8, confidence: 0.9))
+        XCTAssertFalse(ParakeetAutoInsertGate.allowsAutomaticInsertion(peakLevel: 0.2, confidence: 0.9))
+        XCTAssertFalse(ParakeetAutoInsertGate.allowsAutomaticInsertion(peakLevel: 0.8, confidence: 0.2))
+    }
+
+    func testLowSignalRequiresReviewEvenWhenParakeetFallsBackWithoutConfidence() {
+        XCTAssertTrue(ParakeetAutoInsertGate.requiresReview(peakLevel: 0.2, confidence: nil))
+        XCTAssertFalse(ParakeetAutoInsertGate.requiresReview(peakLevel: 0.8, confidence: nil))
+    }
+
+    func testParakeetReviewNoticeKeepsTranscriptAvailableWithoutTyping() {
+        let notice = DictationRecovery.reviewBeforeInsertion(confidence: 0.2, peakLevel: 0.3)
+        XCTAssertEqual(notice.kind, .review)
+        XCTAssertTrue(notice.isReview)
+        XCTAssertTrue(notice.isNeutral)
+        XCTAssertFalse(notice.canRetry)
+        XCTAssertFalse(notice.canPasteAgain)
+    }
+
     func testMicrophoneThatDidNotStartOffersHelp() {
         let notice = DictationRecovery.notice(audioError: "Input device has no usable format.", transcriberError: nil,
                                               transcript: "", hasRetainedAudio: false)
@@ -137,6 +157,20 @@ final class DictationRecoveryTests: XCTestCase {
         audio.reset()
         XCTAssertFalse(audio.isUsable)
         XCTAssertTrue(audio.snapshot().isEmpty)
+    }
+
+    func testRetainedAudioDiscardedWhenAnyBufferCannotBeCopied() throws {
+        var copyCount = 0
+        let audio = RetainedDictationAudio { buffer in
+            copyCount += 1
+            return copyCount == 1 ? buffer : nil
+        }
+        audio.append(try makeBuffer(seconds: 0.5, value: 0.25))
+        XCTAssertTrue(audio.isUsable)
+        audio.append(try makeBuffer(seconds: 0.5, value: 0.25))
+        XCTAssertFalse(audio.isUsable)
+        XCTAssertTrue(audio.snapshot().isEmpty)
+        XCTAssertEqual(audio.duration, 0)
     }
 
     func testRetainedAudioDropsEverythingPastTheCap() throws {

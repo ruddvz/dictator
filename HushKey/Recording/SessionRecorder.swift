@@ -39,6 +39,12 @@ final class SessionRecorder {
         URL.documentsDirectory.appending(path: "HushKey/Sessions", directoryHint: .isDirectory)
     }
 
+    private let rootURL: URL
+
+    init(rootURL: URL? = nil) {
+        self.rootURL = rootURL ?? Self.root
+    }
+
     @ObservationIgnored private var directory: URL?
     @ObservationIgnored private var startUptime: TimeInterval = 0
     @ObservationIgnored private var motionHandle: FileHandle?
@@ -53,11 +59,11 @@ final class SessionRecorder {
         guard !isRecording else { return }
         error = nil
         microphoneAudioRequested = includeMicrophoneAudio
-        let stamp = Date().formatted(.iso8601.year().month().day().time(includingFractionalSeconds: false))
-            .replacingOccurrences(of: ":", with: "")
-        let dir = Self.root.appending(path: "\(stamp)-\(condition.slug)", directoryHint: .isDirectory)
+        let dir = rootURL.appending(path: Self.sessionDirectoryName(date: Date(), id: UUID(), condition: condition),
+                                    directoryHint: .isDirectory)
         do {
-            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: false)
             motionHandle = try Self.makeFile(dir.appending(path: "motion.csv"), header: MotionSample.csvHeader)
             eventsHandle = try Self.makeFile(dir.appending(path: "events.csv"), header: "start,end,kind,label,confidence")
         } catch {
@@ -119,6 +125,12 @@ final class SessionRecorder {
         includeMicrophoneAudio && microphoneIsRunning
     }
 
+    static func sessionDirectoryName(date: Date, id: UUID, condition: Condition) -> String {
+        let stamp = date.formatted(.iso8601.year().month().day().time(includingFractionalSeconds: true))
+            .replacingOccurrences(of: ":", with: "")
+        return "\(stamp)-\(id.uuidString)-\(condition.slug)"
+    }
+
     func deleteAllSessions() throws {
         guard !isRecording else { throw CocoaError(.userCancelled) }
         if FileManager.default.fileExists(atPath: Self.root.path) {
@@ -161,7 +173,9 @@ final class SessionRecorder {
     }
 
     private static func makeFile(_ url: URL, header: String) throws -> FileHandle {
-        try Data((header + "\n").utf8).write(to: url)
+        guard FileManager.default.createFile(atPath: url.path, contents: Data((header + "\n").utf8)) else {
+            throw CocoaError(.fileWriteFileExists)
+        }
         let handle = try FileHandle(forWritingTo: url)
         try handle.seekToEnd()
         return handle

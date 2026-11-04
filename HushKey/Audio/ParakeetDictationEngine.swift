@@ -73,6 +73,7 @@ final class ParakeetDictationEngine {
     }
 
     private(set) var phase: Phase = .notDownloaded
+    private(set) var activeTranscriptions = 0
     private(set) var downloadFraction: Double = 0
     private(set) var downloadDetail: String?
     private(set) var bytesOnDisk: Int64?
@@ -108,7 +109,8 @@ final class ParakeetDictationEngine {
 
     var isDownloaded: Bool { model.isDownloaded(in: modelRoot) }
     var isReady: Bool { phase == .ready }
-    var isBusy: Bool { phase == .downloading || phase == .warmingUp }
+    var isTranscribing: Bool { activeTranscriptions > 0 }
+    var isBusy: Bool { phase == .downloading || phase == .warmingUp || isTranscribing }
 
     /// One line for the Settings row: size, progress, warm-up, or what's wrong.
     var statusDescription: String {
@@ -222,6 +224,8 @@ final class ParakeetDictationEngine {
 
     /// Recognizes recorded microphone audio. Loads the model first if it isn't loaded yet.
     func transcribe(_ buffers: [AVAudioPCMBuffer]) async throws -> ParakeetTranscript {
+        activeTranscriptions += 1
+        defer { activeTranscriptions -= 1 }
         let samples = try await Task.detached(priority: .userInitiated) {
             try ParakeetRecognizer.samples(from: buffers)
         }.value

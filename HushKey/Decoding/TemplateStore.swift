@@ -13,24 +13,21 @@ enum TemplateStore {
         AppDataDirectory.url.appending(path: "dataset.json")
     }
 
-    static func load() -> Dataset {
-        load(from: url) ?? .starter
-    }
-
-    static func save(_ dataset: Dataset) {
-        do {
-            try save(dataset, to: url)
-        } catch {
-            print("HushKey: failed to save dataset: \(error)")
-        }
+    static func loadState(from url: URL = url) -> JSONArchiveLoad<Dataset> {
+        LocalJSONArchive.load(Dataset.self, from: url)
     }
 
     static func load(from url: URL) -> Dataset? {
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        return try? JSONDecoder().decode(Dataset.self, from: data)
+        if case .loaded(let dataset) = loadState(from: url) { return dataset }
+        return nil
     }
 
     static func save(_ dataset: Dataset, to url: URL) throws {
-        try JSONEncoder().encode(dataset).write(to: url, options: .atomic)
+        try LocalJSONArchive.save(dataset, protectingExistingAs: Dataset.self, to: url)
+    }
+
+    static func delete(at url: URL = url) throws {
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        try FileManager.default.removeItem(at: url)
     }
 }

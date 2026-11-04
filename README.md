@@ -1,12 +1,12 @@
 # HushKey
 
-HushKey is a native macOS dictation app with a separate experimental lab for silent mouthing. Voice and softly whispered speech use macOS on-device recognition; silent motion decoding is limited to a small, user-trained vocabulary and is not general lip reading.
+HushKey is a native macOS dictation app with a separate experimental Silent Lab. Live speech uses Apple's on-device recognizer by default, with an optional downloaded Parakeet model that also runs locally. Silent motion decoding is limited to a small, user-trained vocabulary and is not general lip reading.
 
 ## Current status
 
 - macOS 14 or later; designed for Apple Silicon and Intel Macs.
 - The app opens to Voice & Whisper dictation. Use the button, hold the configurable global shortcut (`⌥⇧D` by default), or choose press-to-toggle; then review/edit, copy, or optionally insert a complete phrase into a supported text field. For the one-click Insert button, start with the shortcut while the destination field is focused; HushKey keeps that target in memory and rechecks it before returning to insert.
-- Speech recognition uses Apple's on-device Speech framework and exposes languages supported for on-device recognition on this Mac. HushKey does not send audio to a remote service.
+- The **Speech engine** setting offers Apple's built-in on-device Speech framework or a user-downloaded Parakeet model for local Neural Engine recognition. Apple Speech streams words as you talk; Parakeet returns text when you finish. If Parakeet is missing or does not support the selected language, dictation falls back to Apple Speech. HushKey does not send audio to a remote service.
 - Dictation includes Natural, Message, Email, Code, and Automatic modes; explicit spoken corrections with raw-transcript restore; local recognition hints, snippets, and deterministic correction rules; and a one-step guarded insertion undo. Automatic mode maps common Mac apps and supports local per-app overrides for writing mode, vocabulary, on-device language, snippets, correction rules, filler cleanup, and an optional Transform style. Explicit modes use the global preferences.
 - **Transforms** offers review-first local polish, concise, professional, bullets, and action-item drafts using Apple's on-device Foundation Model when available (macOS 26+); conservative filler removal works without a model on macOS 14+. Create up to 12 local writing styles for tone, format, or translation. Every generated draft stays reviewable and can be undone; HushKey has no cloud fallback.
 - **Voice edit selected text** lets you select text in another app, hold `⌥⇧E` (configurable), and speak an edit instruction. HushKey reads the selection only after that shortcut, creates an on-device preview, and rechecks the original app, field, text, and selection before Apply. The instruction and selection are not added to dictation history. This flow requires Accessibility insertion and Apple's on-device Foundation Model (macOS 26+).
@@ -52,8 +52,8 @@ The packaged app is at `dist/HushKey.app`. The packaging script builds in an iso
 
 ## Dictation flow
 
-1. Use **Start dictation**, hold the configurable global shortcut (`⌥⇧D` by default), or choose press-to-toggle in **Settings & Data**. The shortcut works from any app; HushKey listens only while dictation is active.
-2. Choose a writing mode. **Automatic** maps common email, messaging, and code apps when the global shortcut starts dictation. In **Settings & Data → App profiles**, add a bundle identifier, writing mode, and extra terms. Open **Optional app-specific overrides** to choose a local language, snippets, correction rules, filler cleanup, or a saved Transform style. Overrides apply only when Automatic dictation starts from that app; explicit modes use the global preferences. Profiles use app identity only and do not read app text. **Code** formats spoken symbols, while Message and Email support spoken line breaks. Corrections such as “scratch that” are applied only with an explicit pause cue.
+1. Use **Start dictation**, hold the configurable global shortcut (`⌥⇧D` by default), or choose press-to-toggle in **Settings**. The shortcut works from any app; HushKey listens only while dictation is active.
+2. Choose a writing mode. **Automatic** maps common email, messaging, and code apps when the global shortcut starts dictation. In **Settings → App profiles**, add a bundle identifier, writing mode, and extra terms. Open **Optional app-specific overrides** to choose a local language, snippets, correction rules, filler cleanup, or a saved Transform style. Overrides apply only when Automatic dictation starts from that app; explicit modes use the global preferences. Profiles use app identity only and do not read app text. **Code** formats spoken symbols, while Message and Email support spoken line breaks. Corrections such as “scratch that” are applied only with an explicit pause cue.
 3. Stop when you’re finished. Edit the recognized phrase, restore the original recognition if needed, then **Copy text** or enable Accessibility and choose **Insert into current app**. The insertion shortcut (`⌥⇧I` by default) inserts the current output once into the focused supported field. Press `⌥⇧U` immediately in that same unchanged field to undo.
 4. Search recent transcripts and restore either the processed text or original recognition. Add names under **Snippets & Vocabulary → Vocabulary** for local recognition hints (or use **Import…/Export…** there to move a plain-text word list, one term per line or comma-separated, to and from other apps), common phrases under **Snippets**, and repeatable misspelling replacements under **Corrections**. Corrections apply locally to complete word or phrase matches; raw recognition remains available to restore.
 5. Open **Transforms** to create and edit a local preview. Apply it only after review; undo restores the prior transcript. Model-backed actions require macOS 26+ with Apple's on-device model available. Filler removal uses local text rules and works on supported macOS 14+ systems.
@@ -77,7 +77,7 @@ Open **Meeting notes**, choose **Microphone**, **System audio**, or **Both sides
 
 ## Safe text insertion
 
-Text insertion is off by default. Enable it in **Settings & Data**, approve HushKey under **System Settings → Privacy & Security → Accessibility**, then use the configurable global shortcut (`⌥⇧I` by default) in a supported text field. For the Dictation screen's named-target Insert button, start dictation with its global shortcut while that field is focused.
+Text insertion is off by default. Enable it in **Settings → Insertion**, approve HushKey under **System Settings → Privacy & Security → Accessibility**, then use the configurable global shortcut (`⌥⇧I` by default) in a supported text field. For the Dictation screen's named-target Insert button, start dictation with its global shortcut while that field is focused.
 
 HushKey uses Accessibility to inspect the frontmost app and focused control, allows only supported text fields, rejects secure/password controls, and rechecks the process, field contents, and selection before insertion. Direct typing uses the selected-text attribute. If typing is declined and **Paste fallback** is enabled, HushKey temporarily places the text on the clipboard, waits up to two seconds for the same field to expose the exact expected text, then restores the prior clipboard if nothing else changed it meanwhile; otherwise it leaves the newer clipboard contents intact. A paste that cannot be verified is reported as uncertain, and the transcript stays available. Check the target field before choosing **Paste again**, because it may already have received the text. Unsupported controls fail closed. Undo is available only while the same field stays focused and its contents remain unchanged.
 
@@ -85,14 +85,14 @@ For a voice edit, select text in another app and hold the dedicated selected-tex
 
 ## Local data and privacy
 
-- Templates: `~/Library/Application Support/HushKey/dataset.json`.
-- Recent dictations: `~/Library/Application Support/HushKey/dictation-history.json`.
-- File transcription history: `~/Library/Application Support/HushKey/file-transcription-history.json` (up to 50 searchable jobs with edited text and timed cues; source audio is not copied).
+- Templates: `~/Library/Application Support/com.ruddvz.hushkey/dataset.json`.
+- Recent dictations: `~/Library/Application Support/com.ruddvz.hushkey/dictation-history.json`.
+- File transcription history: `~/Library/Application Support/com.ruddvz.hushkey/file-transcription-history.json` (up to 50 searchable jobs with edited text and timed cues; source audio is not copied).
 - Experiment sessions: `~/Documents/HushKey/Sessions/`, with motion CSV, event CSV, metadata, and optional microphone audio.
 - No telemetry, remote text processing, or paid API is used by HushKey. WhisperKit model files are fetched only after the user asks to download a model; the selected file is then processed locally.
-- Use **Settings & Data** to configure shortcuts and vocabulary hints, choose the microphone, enable/disable transcript history, record synchronized sessions, export the dataset or sessions, and delete local files. Clear recent transcripts from the Dictation screen.
+- Use **Settings → Data & privacy** to configure privacy, local data, and research recording. Dictation and shortcut controls live under **Settings → General**; text insertion has its own section. Clear recent transcripts from the Dictation screen.
 - Voice recognition requires the user to start the mic and is local-only; no remote recognition fallback is used. Audio is saved only if the separate research recorder is explicitly active.
-- WhisperKit models are stored at `~/Library/Application Support/HushKey/WhisperKitModels/`; choose **Remove model** in **Transcribe files** to reclaim the downloaded model files.
+- WhisperKit models are stored at `~/Library/Application Support/com.ruddvz.hushkey/WhisperKitModels/`; choose **Remove model** in **Transcribe files** to reclaim the downloaded model files.
 - Nearby-text hints require an explicit opt-in and Accessibility permission. HushKey extracts terms transiently; it does not save the surrounding text.
 
 ## Project naming

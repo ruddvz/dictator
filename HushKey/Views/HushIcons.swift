@@ -17,7 +17,7 @@ enum HushIcon: String, CaseIterable, Identifiable {
     case sidebar, sun, moon, bell, power, lock, keyboard
     // Actions
     case play, stop, copy, check, edit, more, trash, search, close, undo, plus
-    case chevronRight, chevronDown, arrowRight, arrowUpRight, download, share, refresh, insert
+    case chevronRight, chevronDown, arrowRight, arrowUpRight, arrowDownRight, download, share, refresh, insert
     // Things
     case warning, info, sparkle, flame, globe, folder, document, mic, waveform, record, shield
     case clock, window, list, grid, speaker, checkCircle, cursor
@@ -41,7 +41,7 @@ enum HushIcon: String, CaseIterable, Identifiable {
         case .moon: .tilt(-18)
         case .bell: .swing
         case .undo: .nudge(-2)
-        case .arrowRight, .chevronRight, .copy, .sidebar, .insert, .share, .meetings: .nudge(2)
+        case .arrowRight, .arrowDownRight, .chevronRight, .copy, .sidebar, .insert, .share, .meetings: .nudge(2)
         case .download, .chevronDown: .lift
         case .mail, .message, .quote: .tilt(-6)
         case .swap: .nudge(2)
@@ -81,7 +81,7 @@ enum HushIcon: String, CaseIterable, Identifiable {
             "headphones.slash": .connect, "questionmark": .info, "text.badge.xmark": .close,
             "hand.raised.slash": .warning, "waveform.badge.plus": .waveform, "text.badge.plus": .document,
             "text.magnifyingglass": .search, "circle.dashed": .record, "checkmark.seal": .checkCircle,
-            "arrow.down.right": .arrowUpRight, "hand.tap": .record, "person.2": .meetings,
+            "arrow.down.right": .arrowDownRight, "hand.tap": .record, "person.2": .meetings,
         ]
         guard let icon = map[name] ?? map[symbol] else { return nil }
         self = icon
@@ -288,6 +288,9 @@ enum HushIcon: String, CaseIterable, Identifiable {
 
         case .arrowUpRight:
             line { $0.move(7, 17); $0.to(17, 7); $0.move(9, 7); $0.to(17, 7); $0.to(17, 15) }
+
+        case .arrowDownRight:
+            line { $0.move(7, 7); $0.to(17, 17); $0.move(9, 17); $0.to(17, 17); $0.to(17, 9) }
 
         case .download:
             line {
@@ -684,13 +687,13 @@ private struct IconMotion: ViewModifier {
 // MARK: - Labels and buttons
 
 extension Label where Title == Text, Icon == Glyph {
-    init(_ title: String, icon: HushIcon) {
+    @MainActor init(_ title: String, icon: HushIcon) {
         self.init { Text(title) } icon: { Glyph(icon) }
     }
 }
 
 extension Button where Label == SwiftUI.Label<Text, Glyph> {
-    init(_ title: String, icon: HushIcon, role: ButtonRole? = nil, action: @escaping () -> Void) {
+    @MainActor init(_ title: String, icon: HushIcon, role: ButtonRole? = nil, action: @escaping () -> Void) {
         self.init(role: role, action: action) { SwiftUI.Label(title, icon: icon) }
     }
 }

@@ -40,6 +40,26 @@ final class ParakeetRecognizerTests: XCTestCase {
         }
     }
 
+    /// Local signal check used to tune the no-speech gate without microphone access.
+    func testSilenceAndQuietNoiseDiagnosticsOnDownloadedModel() async throws {
+        guard let path = ProcessInfo.processInfo.environment["PARAKEET_MODEL_ROOT"] else {
+            throw XCTSkip("Set PARAKEET_MODEL_ROOT to inspect no-speech behavior.")
+        }
+        let root = URL(fileURLWithPath: path)
+        let model = try XCTUnwrap(ParakeetModel.allCases.first { $0.isDownloaded(in: root) })
+        let recognizer = ParakeetRecognizer()
+        try await recognizer.load(model, from: root)
+        let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1))
+        for (name, buffer) in [("silence", try Self.tone(format: format, frames: 96_000, amplitude: 0)),
+                               ("quiet-tone", try Self.tone(format: format, frames: 96_000, amplitude: 0.003)),
+                               ("quiet-noise", try Self.noise(format: format, frames: 96_000, amplitude: 0.01))] {
+            let result = try await recognizer.transcribe(ParakeetRecognizer.samples(from: [buffer]))
+            print("parakeet-no-speech \(name): confidence=\(result.confidence), text=\(result.text.debugDescription)")
+            XCTAssertTrue(result.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                          "Synthetic \(name) should not produce transcript text")
+        }
+    }
+
     /// Opt-in timing on a downloaded model: `PARAKEET_MODEL_ROOT=<ParakeetModels folder> swift test`.
     func testLoadAndTranscribeTimingsOnADownloadedModel() async throws {
         guard let path = ProcessInfo.processInfo.environment["PARAKEET_MODEL_ROOT"] else {
@@ -69,12 +89,27 @@ final class ParakeetRecognizerTests: XCTestCase {
                      Double(info.resident_size) / 1_048_576))
     }
 
-    private static func tone(format: AVAudioFormat, frames: AVAudioFrameCount) throws -> AVAudioPCMBuffer {
+    private static func tone(format: AVAudioFormat, frames: AVAudioFrameCount,
+                             amplitude: Float = 0.5) throws -> AVAudioPCMBuffer {
         let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames))
         buffer.frameLength = frames
         let data = try XCTUnwrap(buffer.floatChannelData)
         for frame in 0..<Int(frames) {
-            data[0][frame] = 0.5 * sin(Float(frame) * 2 * .pi * 440 / Float(format.sampleRate))
+            data[0][frame] = amplitude * sin(Float(frame) * 2 * .pi * 440 / Float(format.sampleRate))
+        }
+        return buffer
+    }
+
+    private static func noise(format: AVAudioFormat, frames: AVAudioFrameCount,
+                              amplitude: Float) throws -> AVAudioPCMBuffer {
+        let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames))
+        buffer.frameLength = frames
+        let data = try XCTUnwrap(buffer.floatChannelData)
+        var state: UInt32 = 0x12345678
+        for frame in 0..<Int(frames) {
+            state = 1_664_525 &* state &+ 1_013_904_223
+            let unit = Float(state) / Float(UInt32.max)
+            data[0][frame] = (unit * 2 - 1) * amplitude
         }
         return buffer
     }

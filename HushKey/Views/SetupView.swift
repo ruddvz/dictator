@@ -11,7 +11,7 @@ struct SetupView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.s5) {
                 PageHeader(eyebrow: "", title: "Connect",
-                           subtitle: "Teach HushKey words you mouth with AirPods in. Step one: live motion.")
+                           subtitle: "Test whether AirPods head-motion data can separate a few mouth movements. It does not read lips.")
                 LabProgress()
 
                 LabHero(symbol: statusSymbol, tint: statusColor, title: statusTitle, message: statusMessage) {

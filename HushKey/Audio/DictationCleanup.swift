@@ -389,7 +389,7 @@ enum DictationSmartCleanup {
         let prompt = "<dictation>\n\(trimmed)\n</dictation>"
         let answer = await withTaskGroup(of: String?.self) { group in
             group.addTask { @MainActor in
-                try? await session.respond(to: prompt, options: GenerationOptions(sampling: .greedy)).content
+                try? await session.respond(to: prompt, options: GenerationOptions(samplingMode: .greedy)).content
             }
             group.addTask {
                 try? await Task.sleep(for: .seconds(timeout))

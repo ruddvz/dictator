@@ -1,11 +1,21 @@
 # HushKey progress
 
+## End-to-end audit and local build (2026-11-04)
+
+- The canonical repo remains `/Users/rudra/Projects/HushKey` on `feature/flow-style-ui`. `dist/HushKey.app` is the only `.app` bundle left under the Projects repo; its bundle ID is `com.ruddvz.hushkey`. No app bundle remains under `/Users/rudra/Documents/ChatGPT/HushKey`. The older webcam/Ollama prototype is recoverable in the Trash; it was not merged into this app.
+- Three read-only audit passes covered app flows, dictation/audio, Silent Lab, storage, and UI/accessibility. Fixed findings included incomplete session holdouts unlocking Silent Use; unsafe Parakeet auto-insert on weak input/fallback; capture continuing across screen or motion-stream loss; corrupted template data being overwritten; filename collisions; retained-audio partial-copy failures; microphone changes during capture; history restore retaining a stale app target; and model removal while transcription was busy.
+- Silent Use now requires two complete sessions with at least three takes of every label in each, and direct typing defaults off. Setup copy no longer claims AirPods can read lips. Parakeet transcripts with weak peak or model confidence are kept for review instead of automatic insertion. On the downloaded local model, synthetic silence, a quiet tone, and quiet noise each returned empty text at 0.10 confidence; this is not a human quiet-room speech test.
+- UI work restored the bespoke HushKey glyph family and hover detail; improved muted-text contrast; corrected the first-dictation checklist and negative insight arrow; exposed Insights heatmap cells to VoiceOver; added file drop and History-to-Transforms entry points; corrected settings navigation and review copy; added VoiceOver page announcements; and made Reduce Motion suppress transitions and idle animation.
+- `xcodegen generate` and `Scripts/package-app.sh` succeeded; strict code-signature verification passed. The app suite ran 230 tests: 227 passed, 3 skipped, 0 failed. Standalone Parakeet tests ran 7: 5 passed, 2 skipped; the downloaded-model silence/tone/noise diagnostic passed separately. `git diff --check` passed.
+- **Still needs live acceptance:** consented microphone dictation and insertion across supported apps, microphone disconnect/change recovery, VoiceOver and keyboard navigation, and AirPods motion capture with two complete sessions. Auto-insert thresholds remain provisional until real voice and quiet-room samples are evaluated. No macOS permissions were changed here.
+- **Next:** run the live acceptance matrix with the user and compatible headphones; tune behavior only from observed failures.
+
 ## Completed: pill hover morphs instead of swapping (2026-11-04)
 
 - The resting bar is now one capsule that springs open into the mic button (40 × 8 → 50 × 25) as its fill darkens, and the mic grows in once it has opened. The Meeting notes circle slides out from behind it (scale, offset, fade, 50 ms later), and it all reverses on leave. The mic button swells slightly under the pointer. The hover target extends 6 pt around the thin bar.
 - Tested in a clean worktree because a hub session was mid-edit here: 221 tests, 0 failures, packaged and launched.
 - **Not verified by eye:** another session held the screen, so the motion wasn't filmed. Check it by hovering the bar.
-- Hub work is split: `redesign-hushkey-s-main` owns the hub and a custom icon family (`HushIcons`); `full-wispr-flow-audit-on` writes `docs/WISPR_FLOW_FULL_AUDIT.md` only. The pill moves to the new icons once they land.
+- Hub work is consolidated on this branch. Following user feedback, standard controls use SF Symbols again while the HushKey ribbon remains the brand mark.
 
 ## Completed: Flow-style dictation bar, and filler / self-correction cleanup (2026-11-04)
 
@@ -24,7 +34,7 @@
 - **Verified here:** 221 tests, 3 skipped, 0 failures (new `DictationCleanupTests`; eval cases `filler-basic` and `h-correction-at` no longer known gaps). Packaged; checked live: idle, hover and recording bar next to Flow's, × cancel with Undo, no strip while recording.
 - **Not verified live:** the full spoken path (Parakeet → rules → Apple Intelligence → typed). Background clicks couldn't reach the pill this time. Test: hold fn in TextEdit and say "um so I need to leave at four PM no actually 5 PM".
 - **Seen, not fixed:** two history entries "Hey, how's it going?" appeared from short test recordings in a quiet room; check whether Parakeet invents text on near-silence.
-- **Next (user feedback):** the main window still reads as generic next to Flow's hub: sidebar text and icon sizes, the logo lockup, theme / notifications / account controls in the toolbar, motion. Do it as its own session.
+- **Next:** complete consented live dictation and Silent Lab acceptance with the user's microphone permissions and AirPods; see the latest entry above.
 
 ## Completed: HushKey works from the background, like Wispr Flow and TypeWhisper (2026-11-04)
 

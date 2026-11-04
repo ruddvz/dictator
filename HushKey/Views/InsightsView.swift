@@ -89,9 +89,9 @@ struct InsightsView: View {
                 Spacer(minLength: Theme.s2)
                 if let change = ledger.monthChange() {
                     Label(change.formatted(.percent.precision(.fractionLength(0))) + " this month",
-                          icon: change >= 0 ? .arrowUpRight : .arrowUpRight)
+                          icon: change >= 0 ? .arrowUpRight : .arrowDownRight)
                         .font(.hkMeta.weight(.medium))
-                        .foregroundStyle(Theme.signal)
+                        .foregroundStyle(change >= 0 ? Theme.signal : Theme.ink2)
                         .padding(.horizontal, Theme.s2)
                         .padding(.vertical, Theme.s1)
                         .background(Capsule().fill(Theme.signalSoft))

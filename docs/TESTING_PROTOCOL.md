@@ -2,6 +2,8 @@
 
 ## Before recording
 
+The app's Silent Use screen has a provisional readiness floor of three takes per label in each of two complete sessions. For research evaluation, collect at least 10 templates per word as specified below; passing the in-app floor is not evidence of production accuracy.
+
 - Use a Mac with compatible head-tracking headphones connected as its active audio output. Confirm that Setup shows **Streaming**, a nonzero sample rate, and changing motion plots in diagnostics.
 - Record the headphone model as reported by the user or packaging. HushKey cannot identify the hardware model from Core Motion.
 - Choose five short, distinct words or commands and keep the same vocabulary for all conditions.
@@ -79,7 +81,7 @@ Run this separately from the AirPods motion study:
 2. Edit the transcript, save TXT, and export SRT and WebVTT. Check subtitle timestamps against the source audio, confirm no cue extends past the media duration, and confirm the source file remains unchanged.
 3. Confirm a completed job appears in searchable Recent file transcripts. Edit its text, switch screens, return, restore it, and verify the edited text and original timed cues remain. In a disposable data folder, induce a history-save failure while the transcript is edited, choose a second source file, and confirm the source and transcript stay unchanged. After a successful save, choose the second source and verify the first job remains recoverable.
 4. Delete one saved job, then clear all saved file transcripts. Also start a transcription and clear history before it finishes; confirm the running job remains exportable but never repopulates Recent file transcripts. Confirm deletion persists after reopening HushKey and that source audio was never copied into Application Support.
-5. Choose a WhisperKit model and explicitly download it. Verify the download state reaches completion and the model appears in `~/Library/Application Support/HushKey/WhisperKitModels/`.
+5. Choose a WhisperKit model and explicitly download it. Verify the download state reaches completion and the model appears in `~/Library/Application Support/com.ruddvz.hushkey/WhisperKitModels/`.
 6. Disconnect from the network after download and transcribe a local file with WhisperKit. Reopen HushKey to confirm the model remains available, then remove it and confirm the model files are deleted.
 7. Repeat with files of increasing length. Watch memory use and report engine, model variant, language, file duration, first-run download time, transcription time, and qualitative errors. Do not claim a model is more accurate without a representative benchmark.
 

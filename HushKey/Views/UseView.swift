@@ -8,10 +8,10 @@ struct UseView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.s5) {
                 PageHeader(eyebrow: "", title: "Silent Use",
-                           subtitle: "Hold Control in any app and mouth a trained word. Unsure matches are shown faded, never typed.") {
+                           subtitle: "Experimental motion commands. AirPods do not read lips; uncertain matches stay in HushKey.") {
                     if model.insertion.isEnabled {
-                        StatusChip(title: "Types with \(model.insertion.shortcut.label)", icon: .shield,
-                                   tint: Theme.signal)
+                        StatusChip(title: model.silentTypesIntoFrontApp ? "Direct typing on" : "Direct typing off",
+                                   icon: .shield, tint: model.silentTypesIntoFrontApp ? Theme.signal : Theme.ink2)
                     }
                 }
                 LabProgress()
@@ -71,8 +71,8 @@ struct UseView: View {
                 ? "Checking your silent takes…"
                 : "Run Evaluate. It must beat chance and held-out sessions."
         }
-        if result.sessionHoldoutAccuracy == nil {
-            return "Record every word in a second session (Train → New session) so one can be held out."
+        if !result.sessionHoldoutComplete || result.sessionHoldoutAccuracy == nil {
+            return "Complete two sessions with at least three takes of every label in each before testing Silent Use."
         }
         if result.pValue >= 0.05 {
             return "The result isn’t clear of chance yet. HushKey won’t guess."
@@ -98,8 +98,8 @@ struct UseView: View {
         @Bindable var capture = model.capture
         return SettingsGroup(title: "Capture") {
             SettingsRow(title: "Capture mode",
-                        detail: model.useCaptureMode == .hold ? "Hold Control, or \(model.captureShortcut.label) here, while you mouth a word."
-                            : "Starts on its own when you move.") {
+                        detail: model.useCaptureMode == .hold ? "Hold Control, or \(model.captureShortcut.label) here, for a trained motion pattern."
+                            : "Starts on motion; it does not identify words from lip movement.") {
                 MenuPicker(selection: $model.useCaptureMode,
                            options: CaptureController.Mode.allCases.map { ($0, $0.rawValue) })
                     .disabled(!model.isMotionInferenceEnabled)
@@ -107,7 +107,7 @@ struct UseView: View {
             GroupRow {
                 if model.useCaptureMode == .hold {
                     HoldToCaptureButton(
-                        title: "Mouth a word",
+                        title: "Test a movement",
                         shortcut: "Control",
                         isCapturing: capture.isCapturing,
                         isEnabled: model.isMotionInferenceEnabled && model.motion.status == .streaming,
@@ -126,7 +126,9 @@ struct UseView: View {
             }
             SettingsRow(title: "Type into the front app",
                         detail: model.insertion.isEnabled
-                            ? "Accepted words go straight into the field you’re in. Rejected ones never do."
+                            ? (model.silentTypesIntoFrontApp
+                                ? "Accepted predictions type into the front field. This experimental feature has not been validated for your setup."
+                                : "Accepted predictions stay in HushKey. Enable direct typing only after testing it.")
                             : "Turn on text insertion in Settings first. Until then words stay here.",
                         detailTint: model.insertion.isEnabled ? Theme.ink2 : Theme.finishing) {
                 Toggle("", isOn: $model.silentTypesIntoFrontApp)
@@ -198,7 +200,7 @@ struct UseView: View {
             }
             Group {
                 if !model.decoded.contains(where: { !isRest($0) }) {
-                    Text(model.isMotionInferenceEnabled ? "Mouth a trained word…" : "Pass the evidence checks to begin.")
+                    Text(model.isMotionInferenceEnabled ? "Test a trained movement…" : "Pass the evidence checks to begin.")
                         .foregroundStyle(Theme.ink3)
                 } else {
                     decodedText.textSelection(.enabled)

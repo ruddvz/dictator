@@ -315,6 +315,7 @@ struct EmptyState<Action: View>: View {
     var message: String
     @ViewBuilder var action: Action
     @State private var shown = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: Theme.s2) {
@@ -337,7 +338,10 @@ struct EmptyState<Action: View>: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, Theme.s6 + 8)
         .reveal()
-        .onAppear { withAnimation(.easeOut(duration: 0.9).delay(0.1)) { shown = true } }
+        .onAppear {
+            if reduceMotion { shown = true }
+            else { withAnimation(.easeOut(duration: 0.9).delay(0.1)) { shown = true } }
+        }
     }
 }
 

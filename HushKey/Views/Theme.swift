@@ -42,8 +42,8 @@ enum Theme {
     static let hover = dynamic(light: 0xE7ECE8, dark: 0x1E2522)
     static let hairline = dynamic(light: 0xDCE1DD, dark: 0x2C3430)
     static let ink = dynamic(light: 0x1E2321, dark: 0xE9EEEB)
-    static let ink2 = dynamic(light: 0x66706B, dark: 0x9BA6A0)
-    static let ink3 = dynamic(light: 0x949D98, dark: 0x6C7671)
+    static let ink2 = dynamic(light: 0x626B66, dark: 0x9BA6A0)
+    static let ink3 = dynamic(light: 0x5D6761, dark: 0x8B9690)
     static let inverseInk = dynamic(light: 0xFAFBFA, dark: 0x121614)
     static let signal = dynamic(light: 0x4F7F6A, dark: 0x7FB39C)      // the one accent
     static let signalSoft = dynamic(light: 0xE3ECE7, dark: 0x22322B)  // tinted fills behind signal
@@ -64,6 +64,8 @@ enum Theme {
     // Motion
     static let snappy = Animation.spring(response: 0.32, dampingFraction: 0.82)
     static let gentle = Animation.spring(response: 0.5, dampingFraction: 0.86)
+    /// Fast out, soft landing, for panels and the sidebar width (Wispr's most used curve).
+    static let glide = Animation.timingCurve(0.05, 0.6, 0.4, 0.95, duration: 0.28)
     /// Gap between items that enter one after another (sections, rows, heatmap columns).
     static let stagger: Double = 0.05
 
@@ -113,7 +115,8 @@ struct Reveal: ViewModifier {
             .opacity(shown ? 1 : 0)
             .offset(y: shown || reduceMotion ? 0 : distance)
             .onAppear {
-                withAnimation(Theme.gentle.delay(Double(order) * Theme.stagger)) { shown = true }
+                if reduceMotion { shown = true }
+                else { withAnimation(Theme.gentle.delay(Double(order) * Theme.stagger)) { shown = true } }
             }
     }
 }
@@ -539,12 +542,15 @@ struct ActivityHeatmap: View {
                                   : Theme.signal.opacity(0.3 + 0.7 * Double(count) / Double(maxCount)))
                             .frame(width: 10, height: 10)
                             .help(day > today ? "" : "\(day.formatted(date: .abbreviated, time: .omitted)): \(count) dictation\(count == 1 ? "" : "s")")
+                            .accessibilityElement()
+                            .accessibilityHidden(day > today)
+                            .accessibilityLabel("\(day.formatted(date: .long, time: .omitted)): \(count) dictation\(count == 1 ? "" : "s")")
                     }
                 }
                 .reveal(column / 2, distance: 4) // the weeks fill in left to right
             }
         }
-        .accessibilityElement(children: .ignore)
+        .accessibilityElement(children: .contain)
         .accessibilityLabel("Dictation activity for the last \(weeks) weeks")
     }
 }

@@ -82,7 +82,7 @@ Each color has a light and dark value (`Theme.dynamic`). Light is the default; S
 | `selection` | #E0E7E2 | #26302B | selected sidebar row |
 | `hover` | #E7ECE8 | #1E2522 | hover fills |
 | `hairline` | #DCE1DD | #2C3430 | borders, dividers |
-| `ink` / `ink2` / `ink3` | #1E2321 / #66706B / #949D98 | #E9EEEB / #9BA6A0 / #6C7671 | primary / secondary / tertiary text |
+| `ink` / `ink2` / `ink3` | #1E2321 / #626B66 / #5D6761 | #E9EEEB / #9BA6A0 / #8B9690 | primary / secondary / tertiary text; secondary and tertiary now meet 4.5:1 on the common window, sheet and inset surfaces |
 | `signal` | #4F7F6A | #7FB39C | the one accent: primary buttons, live mic, progress |
 | `signalSoft` | #E3ECE7 | #22322B | tinted fills (active capture, selected cards) |
 | `heroBase` | #18201C | #0E1311 | home hero panel, dark in both modes |

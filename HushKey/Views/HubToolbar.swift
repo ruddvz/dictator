@@ -1,4 +1,6 @@
 import AppKit
+import AVFoundation
+import Speech
 import SwiftUI
 
 /// The strip above the sheet, level with the window controls: the sidebar toggle on the left;
@@ -6,8 +8,10 @@ import SwiftUI
 struct HubToolbar: View {
     @Environment(AppModel.self) private var model
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(AppearancePreference.storageKey) private var appearance: AppearancePreference = .light
     @Binding var collapsed: Bool
+    @Binding var showsShortcuts: Bool
     @State private var showsNotices = false
     @State private var showsProfile = false
     @State private var themeTurns = 0.0
@@ -15,7 +19,7 @@ struct HubToolbar: View {
     var body: some View {
         HStack(spacing: Theme.s1) {
             Button {
-                withAnimation(Theme.snappy) { collapsed.toggle() }
+                withAnimation(reduceMotion ? nil : Theme.glide) { collapsed.toggle() }
             } label: {
                 Glyph(.sidebar, active: collapsed)
             }
@@ -61,6 +65,7 @@ struct HubToolbar: View {
             .popover(isPresented: $showsNotices, arrowEdge: .bottom) {
                 NoticesPopover(notices: notices) { showsNotices = false }
                     .environment(model)
+                    .preferredColorScheme(appearance.colorScheme)
             }
             .help("Notices")
             .accessibilityLabel("Notices, \(notices.attentionCount) to look at")
@@ -70,8 +75,9 @@ struct HubToolbar: View {
             }
             .buttonStyle(ToolbarButtonStyle(active: showsProfile))
             .popover(isPresented: $showsProfile, arrowEdge: .bottom) {
-                ProfilePopover { showsProfile = false }
+                ProfilePopover(showShortcuts: { showsShortcuts = true }) { showsProfile = false }
                     .environment(model)
+                    .preferredColorScheme(appearance.colorScheme)
             }
             .help("Your profile")
             .accessibilityLabel("Profile")
@@ -219,7 +225,10 @@ struct Notice: Identifiable {
         if let error = model.audio.error ?? model.transcriber.error {
             notices.append(Notice(id: "error", kind: .error, icon: .warning,
                                   title: "Dictation hit a problem", detail: error,
-                                  action: "Open Settings") { $0.screen = .settings })
+                                  action: "Open Settings") { model in
+                UserDefaults.standard.set(SettingsView.Section.general.rawValue, forKey: "settingsSection")
+                model.screen = .settings
+            })
         }
         if model.dictationShortcutNeedsAttention {
             notices.append(Notice(id: "shortcut", kind: .attention, icon: .keyboard,
@@ -238,6 +247,18 @@ struct Notice: Identifiable {
                 model.screen = .settings
             })
         }
+        let parakeetReady = model.dictationEngine == .parakeet
+            && model.parakeet.isDownloaded
+            && model.parakeet.model.supports(localeIdentifier: model.dictationLanguage)
+        if !parakeetReady && SFSpeechRecognizer.authorizationStatus() != .authorized {
+            notices.append(Notice(id: "speech-permission", kind: .attention, icon: .mic,
+                                  title: "Speech recognition is off",
+                                  detail: "Local Apple Speech dictation needs permission in macOS Privacy & Security settings.",
+                                  action: "Review setup") { model in
+                UserDefaults.standard.set(SettingsView.Section.general.rawValue, forKey: "settingsSection")
+                model.screen = .settings
+            })
+        }
         if model.dictationHistoryArchiveUnreadable {
             notices.append(Notice(id: "archive", kind: .attention, icon: .folder,
                                   title: "Saved history couldn't be read",
@@ -247,7 +268,7 @@ struct Notice: Identifiable {
         if let cancelled = model.cancelledDictation {
             notices.append(Notice(id: "cancelled", kind: .attention, icon: .undo,
                                   title: "A cancelled dictation can come back",
-                                  detail: "\(cancelled.durationLabel) kept in memory until you quit.",
+                                  detail: "\(cancelled.durationLabel) kept in memory until you quit. Restore to HushKey; it will not type into another app.",
                                   action: "Recover") { model in
                 Task { await model.recoverCancelledDictation() }
             })
@@ -364,6 +385,7 @@ private struct NoticesPopover: View {
 private struct ProfilePopover: View {
     @Environment(AppModel.self) private var model
     @AppStorage(AppearancePreference.storageKey) private var appearance: AppearancePreference = .light
+    var showShortcuts: () -> Void
     var dismiss: () -> Void
 
     var body: some View {
@@ -404,6 +426,11 @@ private struct ProfilePopover: View {
             VStack(spacing: 2) {
                 link("Vocabulary & snippets", .vocabulary) { $0.screen = .personalization }
                 link("Insights", .insights) { $0.screen = .insights }
+                link("Keyboard shortcuts", .keyboard) { _ in showShortcuts() }
+                link("Data & privacy", .shield) { model in
+                    UserDefaults.standard.set(SettingsView.Section.data.rawValue, forKey: "settingsSection")
+                    model.screen = .settings
+                }
                 link("Settings", .settings) { $0.screen = .settings }
                 RowDivider().padding(.vertical, Theme.s1)
                 link("Quit HushKey", .power) { _ in NSApp.terminate(nil) }
@@ -451,5 +478,93 @@ struct PopoverRowStyle: ButtonStyle {
             .onHover { hovering = $0 }
             .opacity(configuration.isPressed ? 0.7 : 1)
             .animation(.easeOut(duration: 0.1), value: hovering)
+    }
+}
+
+// MARK: - Keyboard shortcuts
+
+/// Every shortcut in one place, with the current keys; Settings changes them.
+struct KeyboardShortcutsSheet: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+
+    private struct Row {
+        var icon: HushIcon
+        var title: String
+        var detail: String
+        var keys: [String]
+    }
+
+    private var rows: [Row] {
+        let fn = model.dictationShortcut.usesFunctionKey
+        let holds = fn || model.dictationCaptureBehavior == .hold
+        var rows = [Row(icon: .dictation, title: "Dictate",
+                        detail: holds ? "Hold, talk, let go" : "Press to start, again to stop",
+                        keys: [model.dictationShortcut.label])]
+        if fn {
+            rows.append(Row(icon: .waveform, title: "Hands-free", detail: "Double-tap, then talk as long as you like", keys: ["fn", "fn"]))
+        }
+        rows += [
+            Row(icon: .close, title: "Cancel", detail: "While dictating; Undo brings it back", keys: ["esc"]),
+            Row(icon: .edit, title: "Edit selected text by voice", detail: "Select text, hold, say the change",
+                keys: [model.selectedTextEditShortcut.label]),
+            Row(icon: .silent, title: "Silent capture", detail: "Silent lab: capture one mouthed word",
+                keys: [model.captureShortcut.label]),
+            Row(icon: .sidebar, title: "Hide or show the sidebar", detail: "In this window", keys: ["⌃⌘S"]),
+            Row(icon: .settings, title: "Settings", detail: "Open HushKey's settings", keys: ["⌘,"]),
+        ]
+        return rows
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.s5) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: Theme.s1) {
+                    Text("Keyboard shortcuts").font(.display(24))
+                    Text("Change them in Settings → General.").font(.hkCaption).foregroundStyle(Theme.ink2)
+                }
+                Spacer()
+                Button("Close", icon: .close) { dismiss() }
+                    .buttonStyle(IconButtonStyle())
+                    .keyboardShortcut(.cancelAction)
+            }
+            VStack(spacing: 0) {
+                ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
+                    HStack(spacing: Theme.s3) {
+                        Glyph(row.icon, size: 18)
+                            .foregroundStyle(Theme.ink2)
+                            .frame(width: 22)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(row.title).font(.hkRowTitle)
+                            Text(row.detail).font(.system(size: 13)).foregroundStyle(Theme.ink2)
+                        }
+                        Spacer()
+                        HStack(spacing: Theme.s1) {
+                            ForEach(Array(row.keys.enumerated()), id: \.offset) { _, key in
+                                if key == "esc" || key == "fn" { Keycap(glyph: key, size: 12) }
+                                else { KeycapShortcut(label: key, size: 12) }
+                            }
+                        }
+                    }
+                    .padding(.vertical, Theme.s3)
+                    .padding(.horizontal, Theme.s4)
+                    .overlay(alignment: .top) { if index > 0 { RowDivider() } }
+                    .reveal(index, distance: 6)
+                }
+            }
+            .background(Theme.well, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
+            HStack {
+                Spacer()
+                Button("Open shortcut settings") {
+                    UserDefaults.standard.set(SettingsView.Section.general.rawValue, forKey: "settingsSection")
+                    withAnimation(Theme.snappy) { model.screen = .settings }
+                    dismiss()
+                }
+                .buttonStyle(SecondaryButtonStyle())
+            }
+        }
+        .padding(Theme.s5)
+        .frame(width: 520)
+        .background(Theme.sheet)
     }
 }

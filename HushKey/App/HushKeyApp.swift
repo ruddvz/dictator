@@ -140,6 +140,7 @@ private struct HushKeyMenu: View {
                 Text(device.name).tag(Optional(device.id))
             }
         }
+        .disabled(model.audio.isRunning || model.audio.isStarting)
         Toggle("Show dictation bar", isOn: $model.showsFloatingPill)
         Toggle("Dictation sounds", isOn: $model.playsDictationSounds)
         Toggle("Mute audio while dictating", isOn: $model.mutesAudioWhileDictating)

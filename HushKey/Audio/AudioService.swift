@@ -1,5 +1,6 @@
 import AVFoundation
 import CoreAudio
+import Foundation
 import Observation
 
 /// Fans microphone buffers out to consumers (speech recognizer, session recorder) on the
@@ -43,6 +44,55 @@ final class AudioSink: @unchecked Sendable {
     }
 }
 
+/// Keeps render-thread meter callbacks from creating a backlog of MainActor tasks.
+/// The audio tap still accounts for every sample in the peak; the UI receives the latest
+/// level at most 30 times per second and never replays stale meter updates.
+final class AudioLevelMailbox: @unchecked Sendable {
+    struct Update {
+        let level: Float
+        let peak: Float
+    }
+
+    static let minimumInterval: TimeInterval = 1.0 / 30.0
+
+    private let lock = NSLock()
+    private var latest: Float = 0
+    private var peak: Float = 0
+    private var taskPending = false
+    private var lastScheduledAt = -Double.infinity
+
+    /// Returns true when the caller should enqueue one MainActor delivery.
+    func offer(_ level: Float, at time: TimeInterval = ProcessInfo.processInfo.systemUptime) -> Bool {
+        lock.withLock {
+            latest = level
+            peak = max(peak, level)
+            guard !taskPending, time - lastScheduledAt >= Self.minimumInterval else { return false }
+            taskPending = true
+            lastScheduledAt = time
+            return true
+        }
+    }
+
+    /// Takes all samples since the previous delivery, then allows one new task to queue.
+    func take() -> Update {
+        lock.withLock {
+            let update = Update(level: latest, peak: peak)
+            peak = 0
+            taskPending = false
+            return update
+        }
+    }
+
+    func reset() {
+        lock.withLock {
+            latest = 0
+            peak = 0
+            taskPending = false
+            lastScheduledAt = -Double.infinity
+        }
+    }
+}
+
 @MainActor @Observable
 final class AudioService {
     private(set) var isRunning = false
@@ -58,13 +108,17 @@ final class AudioService {
     /// `nil` means "system default input".
     var selectedDeviceID: AudioDeviceID? {
         didSet {
-            guard oldValue != selectedDeviceID, isRunning else { return }
-            stop()
-            Task { await start() }
+            guard oldValue != selectedDeviceID else { return }
+            guard !isRunning, !isStarting else {
+                selectedDeviceID = oldValue
+                error = "Stop the current recording before changing microphones."
+                return
+            }
         }
     }
 
     @ObservationIgnored let sink = AudioSink()
+    @ObservationIgnored private let levelMailbox = AudioLevelMailbox()
     @ObservationIgnored private var engine: AVAudioEngine?
     @ObservationIgnored private var permissionTask: Task<LocalPermissionOutcome, Never>?
     @ObservationIgnored private var permissionRequestID: UUID?
@@ -84,6 +138,7 @@ final class AudioService {
         }
         error = nil
         peakLevel = 0
+        levelMailbox.reset()
 
         let requestID = UUID()
         permissionRequestID = requestID
@@ -131,10 +186,14 @@ final class AudioService {
             return
         }
 
-        sink.setLevelHandler { [weak self] level in
+        let mailbox = levelMailbox
+        sink.setLevelHandler { [weak self, mailbox] level in
+            guard mailbox.offer(level) else { return }
             Task { @MainActor in
-                self?.level = level
-                self?.peakLevel = max(self?.peakLevel ?? 0, level)
+                guard let self, self.startGeneration == generation else { return }
+                let update = mailbox.take()
+                self.level = update.level
+                self.peakLevel = max(self.peakLevel, update.peak)
             }
         }
         input.installTap(onBus: 0, bufferSize: 1024, format: format, block: Self.tapBlock(for: sink))
@@ -155,6 +214,8 @@ final class AudioService {
 
     func stop() {
         startGeneration += 1
+        let finalLevel = levelMailbox.take()
+        peakLevel = max(peakLevel, finalLevel.peak)
         permissionRequestID = nil
         permissionTask?.cancel()
         permissionTask = nil

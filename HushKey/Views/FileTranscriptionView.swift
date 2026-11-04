@@ -8,6 +8,7 @@ struct FileTranscriptionView: View {
     @State private var historySearch = ""
     @State private var pendingSaveTask: Task<Void, Never>?
     @State private var confirmClearHistory = false
+    @State private var isDropTargeted = false
 
     private var workspace: FileTranscriptionWorkspace { model.fileTranscriptionWorkspace }
     private var transcription: LocalFileTranscriber { model.fileTranscriber }
@@ -167,7 +168,7 @@ struct FileTranscriptionView: View {
                     } else if let status = currentStatus {
                         Text(status).foregroundStyle(Theme.ink2)
                     } else {
-                        Text("M4A, MP3, WAV, MOV and more. The audio itself is never kept.")
+                        Text("M4A, MP3, WAV, MOV and more. Choose a file or drop it here. Audio is never kept.")
                             .foregroundStyle(Theme.ink2)
                     }
                 }
@@ -198,6 +199,13 @@ struct FileTranscriptionView: View {
         .padding(Theme.s5)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.signalSoft, in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.r1, style: .continuous)
+            .strokeBorder(isDropTargeted ? Theme.signal : Theme.hairline.opacity(0), lineWidth: 1.5))
+        .dropDestination(for: URL.self) { urls, _ in
+            guard !isBusy, let url = urls.first, url.isFileURL else { return false }
+            selectFile(url)
+            return true
+        } isTargeted: { isDropTargeted = $0 }
     }
 
     private var transcriptCard: some View {
@@ -400,20 +408,25 @@ struct FileTranscriptionView: View {
         panel.canChooseDirectories = false
         panel.prompt = "Choose Audio"
         if panel.runModal() == .OK, let url = panel.url {
-            FileTranscriptionSourceSwitchGate.run(
-                saveCurrentSession: { persistActiveSession() },
-                switchSource: {
-                    pendingSaveTask?.cancel()
-                    workspace.selectedURL = url
-                    workspace.activeSessionID = nil
-                    workspace.activeSourceName = nil
-                    workspace.activeLanguageIdentifier = ""
-                    workspace.activeModelVariant = nil
-                    exportMessage = nil
-                    transcription.clear()
-                    whisper.clear()
-                })
+            selectFile(url)
         }
+    }
+
+    private func selectFile(_ url: URL) {
+        guard url.isFileURL, !isBusy else { return }
+        FileTranscriptionSourceSwitchGate.run(
+            saveCurrentSession: { persistActiveSession() },
+            switchSource: {
+                pendingSaveTask?.cancel()
+                workspace.selectedURL = url
+                workspace.activeSessionID = nil
+                workspace.activeSourceName = nil
+                workspace.activeLanguageIdentifier = ""
+                workspace.activeModelVariant = nil
+                exportMessage = nil
+                transcription.clear()
+                whisper.clear()
+            })
     }
 
     private func save(content: String, fileExtension: String, type: UTType) {

@@ -36,14 +36,13 @@ struct BreathRibbon: View {
     static let restThickness = 0.14
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / frameRate, paused: paused || (reduceMotion && mode == .rest))) { context in
+        TimelineView(.animation(minimumInterval: 1 / frameRate, paused: paused || reduceMotion)) { context in
             let time = context.date.timeIntervalSinceReferenceDate
             Canvas { graphics, size in
                 let energy = mode == .live ? advance(to: time) : 0
-                // Reduce Motion: nothing travels; the voice still swells the line, and waiting
-                // or working fades softly in place instead of sweeping.
+                // Reduce Motion: nothing travels or pulses; the live voice level still shapes the line.
                 let flow = reduceMotion ? 0 : time
-                let fade = reduceMotion && (mode == .waiting || mode == .working) ? 0.55 + 0.45 * sin(time * 2.4) : 1
+                let fade = reduceMotion ? 0.78 : 1
                 Self.draw(in: graphics, size: size, energy: energy, mode: mode, time: flow, tint: tint, opacity: fade)
             }
         }

@@ -19,7 +19,7 @@ struct DictationEngineRows: View {
                         detailTint: needsAttention ? Theme.danger : Theme.ink2) {
                 MenuPicker(selection: $parakeet.model,
                            options: ParakeetModel.allCases.map { ($0, $0.title) })
-                    .disabled(parakeet.isBusy)
+                    .disabled(parakeet.isBusy || model.audio.isRunning || model.isFinalizingDictation)
             }
             GroupRow {
                 if parakeet.phase == .downloading {
@@ -45,12 +45,18 @@ struct DictationEngineRows: View {
                             Button(downloadTitle) { parakeet.download() }
                                 .buttonStyle(PrimaryButtonStyle())
                         } else {
+                            if parakeet.isTranscribing {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .accessibilityLabel("Transcribing with Parakeet")
+                            }
                             if parakeet.phase != .ready {
                                 Button("Load now") { parakeet.warmUp() }
                                     .buttonStyle(PrimaryButtonStyle())
                             }
                             Button("Remove model") { parakeet.removeModel() }
                                 .buttonStyle(SecondaryButtonStyle())
+                                .disabled(parakeet.isBusy || model.audio.isRunning || model.isFinalizingDictation)
                         }
                     }
                 }

@@ -294,6 +294,13 @@ struct DictationView: View {
                 }
                 statRow(value: ledger.wordsPerMinute, label: "words per minute", order: 1)
                 statRow(value: streak, label: "day streak", order: 2)
+                if let saved = timeSaved(ledger) {
+                    Label(saved, icon: .clock)
+                        .hushIconSize(14)
+                        .font(.hkMeta.weight(.medium))
+                        .foregroundStyle(Theme.ink2)
+                        .help("Words at \(UsageLedger.typingWordsPerMinute) wpm typing, minus the time you spent speaking")
+                }
                 Rectangle().fill(Theme.hairline).frame(height: 1)
                 VStack(alignment: .leading, spacing: Theme.s2) {
                     HStack {
@@ -313,6 +320,16 @@ struct DictationView: View {
         .help("Open Insights")
         .accessibilityElement(children: .combine)
         .accessibilityHint("Opens Insights")
+    }
+
+    /// Typing time the words would have taken at 40 wpm, minus the time spent speaking them.
+    private func timeSaved(_ ledger: UsageLedger) -> String? {
+        let spoken = ledger.days.values.reduce(0) { $0 + $1.seconds }
+        let minutes = Double(ledger.totalWords) / Double(UsageLedger.typingWordsPerMinute) - spoken / 60
+        guard minutes >= 1 else { return nil }
+        let amount = minutes < 60 ? "\(Int(minutes.rounded())) min"
+            : (minutes / 60).formatted(.number.precision(.fractionLength(1))) + " h"
+        return "About \(amount) saved vs typing"
     }
 
     private func statRow(value: Int?, label: String, order: Int) -> some View {
@@ -637,60 +654,74 @@ private struct HeroBackdrop: View {
 /// edit again, more). The actions slide in one after another; Copy turns into a check.
 private struct HistoryRow: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var entry: DictationHistoryEntry
     var isLocked: Bool
     var reader: HistoryReader
 
     @State private var isHovering = false
     @State private var copied = false
+    @State private var expanded = false
 
     private var isReading: Bool { reader.speakingID == entry.id }
     private var showsActions: Bool { isHovering || isReading || copied }
+    /// Long dictations show three lines; the adjacent control opens the rest.
+    private var isLong: Bool { entry.text.count > 220 || entry.text.filter(\.isNewline).count > 2 }
 
     var body: some View {
-        HStack(alignment: .center, spacing: Theme.s4) {
-            Text(entry.createdAt.formatted(date: .omitted, time: .shortened))
-                .font(.system(size: 14).monospacedDigit())
-                .foregroundStyle(isHovering ? Theme.ink : Theme.ink2)
-                .frame(width: 82, alignment: .leading)
-            Text(entry.text)
-                .font(.hkBody)
-                .lineSpacing(3)
-                .lineLimit(3)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .textSelection(.enabled)
-            HStack(spacing: 2) {
-                action(isReading ? "Stop reading" : "Read aloud", isReading ? .stop : .play, order: 0) {
-                    reader.toggle(entry)
-                }
-                action(copied ? "Copied" : "Copy", copied ? .check : .copy, order: 1) {
-                    model.copyDictation(entry)
-                    withAnimation(Theme.snappy) { copied = true }
-                    Task {
-                        try? await Task.sleep(for: .seconds(1.4))
-                        withAnimation(Theme.snappy) { copied = false }
-                    }
-                }
-                .foregroundStyle(copied ? Theme.signal : Theme.ink2)
-                action("Edit again", .edit, order: 2) { model.restoreDictation(entry) }
-                    .disabled(isLocked)
-                moreMenu
-                    .opacity(showsActions ? 1 : 0)
-                    .offset(x: showsActions ? 0 : 8)
-                    .animation(Theme.snappy.delay(showsActions ? 3 * 0.03 : 0), value: showsActions)
+        HStack(alignment: .firstTextBaseline, spacing: Theme.s4) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(entry.createdAt.formatted(date: .omitted, time: .shortened))
+                    .font(.system(size: 14).monospacedDigit())
+                    .foregroundStyle(isHovering ? Theme.ink : Theme.ink2)
+                // Words and seconds, for the row you're looking at.
+                Text(meta)
+                    .font(.hkMeta.monospacedDigit())
+                    .foregroundStyle(Theme.ink3)
+                    .opacity(isHovering || expanded ? 1 : 0)
             }
-            .frame(width: 128, alignment: .trailing)
+            .frame(width: 82, alignment: .leading)
+            VStack(alignment: .leading, spacing: Theme.s1) {
+                Text(entry.text)
+                    .font(.hkBody)
+                    .lineSpacing(3)
+                    .lineLimit(expanded ? nil : 3)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
+                if isLong {
+                    Button {
+                        withAnimation(reduceMotion ? nil : Theme.gentle) { expanded.toggle() }
+                    } label: {
+                        HStack(spacing: 3) {
+                            Text(expanded ? "Show less" : "Show more")
+                            Glyph(.chevronDown, size: 12)
+                                .rotationEffect(.degrees(expanded ? 180 : 0))
+                        }
+                    }
+                    .font(.hkMeta.weight(.medium))
+                    .foregroundStyle(Theme.ink2)
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(expanded ? "Show less text" : "Show full text")
+                    .accessibilityHint(expanded ? "Collapses this dictation" : "Expands this dictation")
+                }
+            }
         }
         .padding(.horizontal, Theme.s4)
         .padding(.vertical, 15)
         .frame(minHeight: Theme.listRow)
         .background(isHovering ? Theme.well : .clear)
+        .overlay(alignment: .topTrailing) { actionPill.padding(Theme.s2) }
         .contentShape(Rectangle())
-        .onHover { hovering in withAnimation(.easeOut(duration: 0.14)) { isHovering = hovering } }
+        .onHover { hovering in withAnimation(.easeOut(duration: 0.12)) { isHovering = hovering } }
         .contextMenu {
             Button(isReading ? "Stop reading" : "Read aloud") { reader.toggle(entry) }
             Button("Copy") { model.copyDictation(entry) }
             Button("Edit again") { model.restoreDictation(entry) }.disabled(isLocked)
+            Button("Transform…", systemImage: "wand.and.stars") {
+                model.restoreDictation(entry)
+                model.screen = .transforms
+            }
+            .disabled(isLocked)
             if entry.rawText != nil {
                 Button("Restore original recognition") { model.restoreDictation(entry, useRawText: true) }.disabled(isLocked)
             }
@@ -698,6 +729,45 @@ private struct HistoryRow: View {
             Button("Delete", role: .destructive) { model.deleteDictation(entry) }
         }
         .accessibilityElement(children: .contain)
+    }
+
+    private var meta: String {
+        let words = "\(entry.wordCount) w"
+        guard let duration = entry.duration else { return words }
+        let seconds = Int(duration.rounded())
+        return words + " · " + (seconds < 60 ? "\(seconds) s" : "\(seconds / 60):\(String(format: "%02d", seconds % 60))")
+    }
+
+    /// Wispr-style floating actions: a small capsule over the row's top right that fades and
+    /// slides in on hover, each button a beat after the one before.
+    private var actionPill: some View {
+        HStack(spacing: 0) {
+            action(isReading ? "Stop reading" : "Read aloud", isReading ? .stop : .play, order: 0) {
+                reader.toggle(entry)
+            }
+            action(copied ? "Copied" : "Copy", copied ? .check : .copy, order: 1) {
+                model.copyDictation(entry)
+                withAnimation(Theme.snappy) { copied = true }
+                Task {
+                    try? await Task.sleep(for: .seconds(1.4))
+                    withAnimation(Theme.snappy) { copied = false }
+                }
+            }
+            .foregroundStyle(copied ? Theme.signal : Theme.ink2)
+            action("Edit again", .edit, order: 2) { model.restoreDictation(entry) }
+                .disabled(isLocked)
+            moreMenu
+                .opacity(showsActions ? 1 : 0)
+                .animation(Theme.snappy.delay(showsActions ? 3 * 0.03 : 0), value: showsActions)
+        }
+        .padding(2)
+        .background(Theme.sheet, in: Capsule())
+        .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 1))
+        .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
+        .opacity(showsActions ? 1 : 0)
+        .offset(x: showsActions ? 0 : 6)
+        .animation(.easeOut(duration: 0.12), value: showsActions)
+        .allowsHitTesting(showsActions)
     }
 
     private var moreMenu: some View {
@@ -715,10 +785,11 @@ private struct HistoryRow: View {
             Button("Add a word to Vocabulary", systemImage: "character.book.closed") {
                 withAnimation(Theme.snappy) { model.screen = .personalization }
             }
-            if let duration = entry.duration {
-                Divider()
-                Text("\(entry.wordCount) words · \(Int(duration.rounded())) s")
+            Button("Transform this dictation", systemImage: "wand.and.stars") {
+                model.restoreDictation(entry)
+                model.screen = .transforms
             }
+            .disabled(isLocked)
             Divider()
             Button("Delete", systemImage: "trash", role: .destructive) {
                 reader.stop(entry)
@@ -740,7 +811,7 @@ private struct HistoryRow: View {
             .contentTransition(.symbolEffect(.replace))
             .help(title)
             .opacity(showsActions ? 1 : 0)
-            .offset(x: showsActions ? 0 : 8)
+            .scaleEffect(showsActions ? 1 : 0.7)
             .animation(Theme.snappy.delay(showsActions ? Double(order) * 0.03 : 0), value: showsActions)
     }
 }
@@ -823,12 +894,12 @@ private struct CancelledDictationRow: View {
                     .foregroundStyle(Theme.ink3)
             }
             Spacer(minLength: Theme.s2)
-            Button("Recover", icon: .undo) {
+            Button("Restore to HushKey", icon: .undo) {
                 Task { await model.recoverCancelledDictation() }
             }
             .buttonStyle(SecondaryButtonStyle())
             .disabled(isLocked)
-            .help("Transcribe it on this Mac and add it to History")
+            .help("Transcribe it on this Mac and add it to History. It will not type into another app.")
             Button("Discard", icon: .close) { withAnimation(Theme.snappy) { model.discardCancelledDictation() } }
                 .buttonStyle(IconButtonStyle())
                 .help("Forget this recording")

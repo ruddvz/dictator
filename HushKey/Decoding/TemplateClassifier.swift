@@ -103,6 +103,8 @@ struct Evaluation: Sendable {
     var sessionHoldoutAccuracy: Double?
     var sessionHoldoutChance: Double?
     var sessionHoldoutSessions: Int
+    /// True only when every scored fold contains every label with the documented minimum takes.
+    var sessionHoldoutComplete: Bool
 
     static func run(templates: [Template], featureSet: FeatureSet, permutations: Int = 500,
                     smoothing: Int = MotionFeatures.defaultSmoothing,
@@ -174,12 +176,17 @@ struct Evaluation: Sendable {
             templateCount: n,
             sessionHoldoutAccuracy: sessionHoldout?.accuracy,
             sessionHoldoutChance: sessionHoldout?.chance,
-            sessionHoldoutSessions: sessionHoldout?.sessions ?? 0)
+            sessionHoldoutSessions: sessionHoldout?.sessions ?? 0,
+            sessionHoldoutComplete: sessionHoldout?.complete ?? false)
     }
+
+    /// The UI asks for three takes of every word in each session. A holdout score is
+    /// meaningful only when every session can train and test the same complete label set.
+    private static let minimumSessionTakesPerLabel = 3
 
     private static func leaveOneSessionOut(
         templates: [Template], rawSequences: [[[Double]]], labels: [String]
-    ) -> (accuracy: Double, chance: Double, sessions: Int)? {
+    ) -> (accuracy: Double, chance: Double, sessions: Int, complete: Bool)? {
         guard templates.allSatisfy({ $0.sessionID != nil }) else { return nil }
         let sessions = Array(Set(templates.compactMap(\.sessionID)))
         guard sessions.count >= 2 else { return nil }
@@ -188,11 +195,16 @@ struct Evaluation: Sendable {
         var baselineCorrect = 0.0
         var tested = 0
         var completedSessions = 0
+        let expectedLabels = Set(labels)
         for heldOut in sessions {
             let test = templates.indices.filter { templates[$0].sessionID == heldOut }
             let train = templates.indices.filter { templates[$0].sessionID != heldOut }
             let trainingCounts = Dictionary(grouping: train, by: { templates[$0].label }).mapValues(\.count)
-            guard !test.isEmpty, Set(trainingCounts.keys).count >= 2 else { continue }
+            let testCounts = Dictionary(grouping: test, by: { templates[$0].label }).mapValues(\.count)
+            guard expectedLabels.allSatisfy({ label in
+                (trainingCounts[label] ?? 0) >= minimumSessionTakesPerLabel &&
+                (testCounts[label] ?? 0) >= minimumSessionTakesPerLabel
+            }) else { return nil }
             let scales = MotionFeatures.channelScales(train.map { rawSequences[$0] })
             let trainingSequences = Dictionary(uniqueKeysWithValues: train.map { ($0, MotionFeatures.scaled(rawSequences[$0], by: scales)) })
 
@@ -210,6 +222,6 @@ struct Evaluation: Sendable {
             completedSessions += 1
         }
         guard completedSessions >= 2, tested > 0 else { return nil }
-        return (Double(correct) / Double(tested), baselineCorrect / Double(tested), completedSessions)
+        return (Double(correct) / Double(tested), baselineCorrect / Double(tested), completedSessions, true)
     }
 }

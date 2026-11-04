@@ -83,10 +83,11 @@ final class AppModel {
     let fileTranscriptionWorkspace = FileTranscriptionWorkspace()
     let insertion = TextInsertionService()
     let capture = CaptureController()
-    let recorder = SessionRecorder()
+    let recorder: SessionRecorder
 
     var screen: Screen = .dictation {
         didSet {
+            if oldValue != screen { capture.cancel() }
             syncCaptureMode()
             updateMotionActivity()
         }
@@ -94,7 +95,9 @@ final class AppModel {
 
     // MARK: Training
 
-    private(set) var dataset = TemplateStore.load()
+    private(set) var dataset = Dataset.starter
+    private(set) var datasetArchiveUnreadable = false
+    private(set) var datasetRecoveryCopyURL: URL?
     var selectedWord: String? {
         didSet {
             guard selectedWord != oldValue else { return }
@@ -222,7 +225,7 @@ final class AppModel {
     }
     @ObservationIgnored private var smartCleanupSession: AnyObject?
     private var usesSmartCleanup: Bool {
-        polishesWithAppleIntelligence && activeDictationCleansFillers && activeDictationMode != .code
+        activeDictationUsesSmartCleanup
     }
     var showsFloatingPill = UserDefaults.standard.object(forKey: "showFloatingPill") as? Bool ?? true {
         didSet { UserDefaults.standard.set(showsFloatingPill, forKey: "showFloatingPill") }
@@ -265,6 +268,7 @@ final class AppModel {
     }
     private(set) var dictationHistory: [DictationHistoryEntry]
     private(set) var didInsertCurrentDictation = false
+    private(set) var didCompleteFirstDictation = UserDefaults.standard.bool(forKey: "completedFirstDictation")
     private(set) var rawDictationText = ""
     private(set) var transformUndoOriginalText: String?
     private(set) var transformUndoOutputText: String?
@@ -303,7 +307,14 @@ final class AppModel {
     }
     /// Bumped each time a dictation ends with text, so the pill can flash its done state.
     private(set) var completedDictationCount = 0 {
-        didSet { if completedDictationCount > oldValue, dictationNotice == nil { playDictationCue(.success) } }
+        didSet {
+            guard completedDictationCount > oldValue else { return }
+            if dictationNotice == nil { playDictationCue(.success) }
+            if !didCompleteFirstDictation {
+                didCompleteFirstDictation = true
+                UserDefaults.standard.set(true, forKey: "completedFirstDictation")
+            }
+        }
     }
     private(set) var dictationResultGeneration = 0
     /// Whether the running or last dictation has a text field to type into.
@@ -356,11 +367,17 @@ final class AppModel {
     @ObservationIgnored private var lastDictationContextualStrings: [String] = []
     /// This dictation is recognized by Parakeet on release; Apple Speech, if allowed, only previews it.
     @ObservationIgnored private var activeDictationUsesParakeet = false
+    @ObservationIgnored private var activeDictationEngine: DictationEngine = .appleSpeech
+    @ObservationIgnored private var activeParakeetNeedsReview = false
+    @ObservationIgnored private var lastParakeetConfidence: Float?
+    @ObservationIgnored private var lastParakeetPeakLevel: Float?
     @ObservationIgnored private let parakeetLog = Logger(subsystem: "com.ruddvz.hushkey", category: "parakeet")
     @ObservationIgnored private var activeDictationLanguageIdentifier = "en-US"
     @ObservationIgnored private var activeDictationSnippets = ""
     @ObservationIgnored private var activeDictationCorrectionRules = ""
     @ObservationIgnored private var activeDictationCleansFillers = false
+    @ObservationIgnored private var activeDictationAppliesSpokenCorrections = true
+    @ObservationIgnored private var activeDictationUsesSmartCleanup = false
     @ObservationIgnored private var captureDictationProfileName: String?
     @ObservationIgnored private var captureDictationWritingStylePresetID: UUID?
 
@@ -380,7 +397,7 @@ final class AppModel {
         didSet { UserDefaults.standard.set(minConfidence, forKey: "silentMinConfidence") }
     }
     /// Types each accepted Silent Use word into the frontmost app. Rejected matches are never typed.
-    var silentTypesIntoFrontApp = UserDefaults.standard.object(forKey: "silentTypesIntoFrontApp") as? Bool ?? true {
+    var silentTypesIntoFrontApp = UserDefaults.standard.object(forKey: "silentTypesIntoFrontApp") as? Bool ?? false {
         didSet { UserDefaults.standard.set(silentTypesIntoFrontApp, forKey: "silentTypesIntoFrontApp") }
     }
     private(set) var decoded: [DecodedWord] = []
@@ -406,8 +423,21 @@ final class AppModel {
     @ObservationIgnored private var selectedTextEditGeneration = 0
 
     init(dictationHistoryURL: URL = DictationHistoryStore.url,
-         fileTranscriptionHistoryURL: URL = FileTranscriptionSessionStore.url) {
+         fileTranscriptionHistoryURL: URL = FileTranscriptionSessionStore.url,
+         sessionRecorder: SessionRecorder? = nil) {
         self.dictationHistoryURL = dictationHistoryURL
+        recorder = sessionRecorder ?? SessionRecorder()
+        switch TemplateStore.loadState() {
+        case .missing:
+            dataset = .starter
+        case .loaded(let savedDataset):
+            dataset = savedDataset
+        case .unreadable(let recoveryCopyURL):
+            dataset = .starter
+            datasetArchiveUnreadable = true
+            datasetRecoveryCopyURL = recoveryCopyURL
+            dataMessage = Self.archiveRecoveryMessage("Silent Lab dataset", copy: recoveryCopyURL)
+        }
         var loadedHistory: [DictationHistoryEntry] = []
         switch DictationHistoryStore.loadState(from: dictationHistoryURL) {
         case .missing:
@@ -515,6 +545,9 @@ final class AppModel {
         guard !started else { return }
         started = true
         motion.onSample = { [weak self] sample in self?.ingest(sample) }
+        motion.onStatusChange = { [weak self] status in
+            if status != .streaming { self?.capture.cancel() }
+        }
         capture.onSegment = { [weak self] segment in self?.handleSegment(segment) }
         capture.onTooShort = { [weak self] in self?.handleTooShortCapture() }
         audio.refreshDevices()
@@ -611,12 +644,14 @@ final class AppModel {
                 }
                 lastTakeIssue = nil
                 trainingNotice = nil
-                addTemplate(Template(label: word, samples: segment,
-                                     condition: trainingCondition, sessionID: experimentSessionID))
+                let saved = addTemplate(Template(label: word, samples: segment,
+                                                 condition: trainingCondition, sessionID: experimentSessionID))
                 recorder.logEvent(segment, kind: "train", label: word, confidence: nil)
                 let count = templateCount(for: word, condition: trainingCondition)
                 silentFeedback = SilentCaptureFeedback(
-                    kind: .saved, text: "Saved “\(word)” · \(min(count, Self.takesPerWord))/\(Self.takesPerWord)")
+                    kind: saved ? .saved : .problem,
+                    text: saved ? "Saved “\(word)” · \(min(count, Self.takesPerWord))/\(Self.takesPerWord)"
+                        : "Couldn’t save “\(word)” to this Mac")
                 if count == Self.takesPerWord { advanceTraining(from: word) }
             } else if recorder.isRecording {
                 recorder.logEvent(segment, kind: "segment", label: recorder.prompt, confidence: nil)
@@ -820,17 +855,29 @@ final class AppModel {
         persist()
     }
 
-    func addTemplate(_ template: Template) {
+    @discardableResult
+    func addTemplate(_ template: Template) -> Bool {
         dataset.templates.append(template)
         lastTemplateID = template.id
-        persist()
+        return persist()
     }
 
     func clearTrainingData() {
+        if datasetArchiveUnreadable {
+            do {
+                try TemplateStore.delete()
+                datasetArchiveUnreadable = false
+                datasetRecoveryCopyURL = nil
+                dataMessage = "Unreadable dataset removed. Its recovery copy was kept if one could be made."
+            } catch {
+                dataMessage = "Couldn’t remove the unreadable dataset: \(error.localizedDescription)"
+                return
+            }
+        }
         dataset.templates.removeAll()
         lastTemplateID = nil
         persist()
-        dataMessage = "Training templates deleted from this Mac."
+        if !datasetArchiveUnreadable { dataMessage = "Training templates deleted from this Mac." }
     }
 
     func exportDataset() {
@@ -1120,9 +1167,20 @@ final class AppModel {
         persist()
     }
 
-    private func persist() {
-        TemplateStore.save(dataset)
-        rebuildClassifier()
+    @discardableResult
+    private func persist() -> Bool {
+        do {
+            try TemplateStore.save(dataset, to: TemplateStore.url)
+            datasetArchiveUnreadable = false
+            datasetRecoveryCopyURL = nil
+            if dataMessage?.contains("Silent Lab dataset") == true { dataMessage = nil }
+            rebuildClassifier()
+            return true
+        } catch {
+            dataMessage = "Couldn’t save Silent Lab training data: \(error.localizedDescription)"
+            rebuildClassifier()
+            return false
+        }
     }
 
     private func rebuildClassifier() {
@@ -1201,6 +1259,7 @@ final class AppModel {
         return evaluation.templateCount >= minimumEvidenceTemplates &&
             evaluation.accuracy > evaluation.chance &&
             evaluation.pValue < 0.05 &&
+            evaluation.sessionHoldoutComplete && evaluation.sessionHoldoutSessions >= 2 &&
             holdout > holdoutBaseline
     }
 
@@ -1634,6 +1693,11 @@ final class AppModel {
         capturedInsertionTarget = nil
         capturedPasteTarget = nil
         capturedInsertionTargetName = nil
+        activeDictationTarget = nil
+        dictationTargetApp = nil
+        dictationHasTarget = false
+        activeDictationProfileName = nil
+        activeDictationWritingStylePresetID = nil
         rawDictationText = entry.rawText ?? entry.text
         clearLocalTransformUndo()
         didInsertCurrentDictation = false
@@ -1765,6 +1829,9 @@ final class AppModel {
         activeDictationSnippets = profileSettings.snippets
         activeDictationCorrectionRules = profileSettings.correctionRules
         activeDictationCleansFillers = profileSettings.cleansFillers
+        activeDictationAppliesSpokenCorrections = appliesSpokenCorrections
+        activeDictationUsesSmartCleanup = polishesWithAppleIntelligence && profileSettings.cleansFillers &&
+            profileSettings.mode != .code
         smartCleanupSession = usesSmartCleanup ? DictationSmartCleanup.prepare() : nil
         captureDictationProfileName = profileSettings.appName
         captureDictationWritingStylePresetID = profileSettings.writingStylePresetID
@@ -1772,6 +1839,10 @@ final class AppModel {
         usedNearbyTextHints = !nearbyHints.isEmpty
         let usesParakeet = usesParakeet(for: activeDictationLanguageIdentifier)
         activeDictationUsesParakeet = usesParakeet
+        activeDictationEngine = usesParakeet ? .parakeet : .appleSpeech
+        activeParakeetNeedsReview = false
+        lastParakeetConfidence = nil
+        lastParakeetPeakLevel = nil
         if usesParakeet { parakeet.warmUp() }
         // With Parakeet, Apple Speech only shows words while you talk, and only if it's already allowed.
         let showsApplePreview = !usesParakeet || SFSpeechRecognizer.authorizationStatus() == .authorized
@@ -1883,11 +1954,18 @@ final class AppModel {
     /// Recognizes a recording with Parakeet, then applies the vocabulary Apple Speech would get as
     /// hints. Nil when Parakeet fails or hears nothing, so the caller can fall back to Apple Speech.
     private func parakeetText(_ recorded: [AVAudioPCMBuffer]) async -> String? {
+        let peakLevel = audio.peakLevel
+        activeParakeetNeedsReview = ParakeetAutoInsertGate.requiresReview(peakLevel: peakLevel, confidence: nil)
+        lastParakeetConfidence = nil
+        lastParakeetPeakLevel = peakLevel
         guard !recorded.isEmpty else { return nil }
         do {
             let transcript = try await parakeet.transcribe(recorded)
             let model = parakeet.model.rawValue
-            parakeetLog.info("\(model, privacy: .public): \(transcript.processingSeconds, format: .fixed(precision: 3), privacy: .public) s for \(transcript.audioSeconds, format: .fixed(precision: 2), privacy: .public) s of audio")
+            lastParakeetConfidence = transcript.confidence
+            activeParakeetNeedsReview = ParakeetAutoInsertGate.requiresReview(
+                peakLevel: peakLevel, confidence: transcript.confidence)
+            parakeetLog.info("\(model, privacy: .public): \(transcript.processingSeconds, format: .fixed(precision: 3), privacy: .public) s for \(transcript.audioSeconds, format: .fixed(precision: 2), privacy: .public) s of audio, confidence \(transcript.confidence, format: .fixed(precision: 2), privacy: .public), peak \(peakLevel, format: .fixed(precision: 2), privacy: .public), auto-insert \(!self.activeParakeetNeedsReview, privacy: .public)")
             guard !transcript.text.isEmpty else { return nil }
             let vocabulary = lastDictationContextualStrings.filter { !Self.allModeHints.contains($0) }
             return DictationVocabularySnapper.apply(transcript.text, terms: vocabulary)
@@ -1905,13 +1983,13 @@ final class AppModel {
         if usesSmartCleanup {
             // The rules first (they own spoken corrections), then the on-device model for what's left.
             let ruled = DictationLocalCleanup.removeFillers(
-                from: appliesSpokenCorrections ? DictationBacktrack.apply(to: rawText) : rawText)
+                from: activeDictationAppliesSpokenCorrections ? DictationBacktrack.apply(to: rawText) : rawText)
             if let polished = await DictationSmartCleanup.clean(ruled, session: smartCleanupSession) { source = polished }
         }
         smartCleanupSession = nil
         let processed = DictationTranscriptProcessor.process(source, mode: activeDictationMode,
                                                               snippets: activeDictationSnippets,
-                                                              applyCorrections: appliesSpokenCorrections,
+                                                              applyCorrections: activeDictationAppliesSpokenCorrections,
                                                               cleanupFillers: activeDictationCleansFillers,
                                                               correctionRules: activeDictationCorrectionRules,
                                                               tone: activeDictationTone)
@@ -1922,15 +2000,19 @@ final class AppModel {
             dictationResultGeneration += 1
         }
         saveCurrentDictation()
-        if let notice = DictationRecovery.notice(audioError: nil, transcriberError: recognitionError,
+        let finished = processed.trimmingCharacters(in: .whitespacesAndNewlines)
+        if activeParakeetNeedsReview && !finished.isEmpty {
+            dictationNotice = DictationRecovery.reviewBeforeInsertion(
+                confidence: lastParakeetConfidence, peakLevel: lastParakeetPeakLevel ?? audio.peakLevel)
+            showsFinishedTranscript = true
+            retainedAudio.reset()
+        } else if let notice = DictationRecovery.notice(audioError: nil, transcriberError: recognitionError,
                                                  transcript: processed, hasRetainedAudio: retainedAudio.isUsable,
                                                  heardSound: audio.peakLevel >= DictationRecovery.silenceLevel,
                                                  microphoneName: lastDictationMicrophoneName) {
             dictationNotice = notice
         } else {
             retainedAudio.reset()
-            let finished = processed.trimmingCharacters(in: .whitespacesAndNewlines)
-            recordUsage(raw: rawText, final: finished)
             insertion.logFocus("finish hasTarget=\(dictationHasTarget)")
             if dictationHasTarget {
                 await typeFinishedDictation(finished)
@@ -1942,6 +2024,9 @@ final class AppModel {
                 showsFinishedTranscript = true
             }
             insertion.logFocus("after inserted=\(didInsertCurrentDictation) card=\(showsFinishedTranscript) notice=\(dictationNotice != nil)")
+        }
+        if !finished.isEmpty {
+            recordUsage(raw: rawText, final: finished)
             completedDictationCount += 1
         }
         finishesWithoutTyping = false
@@ -2047,7 +2132,7 @@ final class AppModel {
         }
         dictationNotice = nil
         isFinalizingDictation = true
-        if usesParakeet(for: activeDictationLanguageIdentifier), let text = await parakeetText(recorded) {
+        if activeDictationUsesParakeet, let text = await parakeetText(recorded) {
             await finishDictation(rawText: text, recognitionError: nil)
             return
         }
@@ -2467,7 +2552,7 @@ final class AppModel {
         lastDictationDuration = duration
         finishesWithoutTyping = true
         isFinalizingDictation = true
-        if usesParakeet(for: activeDictationLanguageIdentifier), let text = await parakeetText(recorded) {
+        if activeDictationUsesParakeet, let text = await parakeetText(recorded) {
             await finishDictation(rawText: text, recognitionError: nil)
             return
         }
@@ -2521,9 +2606,12 @@ final class AppModel {
     private static let allModeHints = Set(DictationMode.allCases.flatMap(modeHints(for:)))
 
     private func currentRunSettings() -> DictationRunSettings {
-        DictationRunSettings(mode: activeDictationMode, languageIdentifier: activeDictationLanguageIdentifier,
+        DictationRunSettings(engine: activeDictationEngine, mode: activeDictationMode,
+                             languageIdentifier: activeDictationLanguageIdentifier,
                              snippets: activeDictationSnippets, correctionRules: activeDictationCorrectionRules,
-                             cleansFillers: activeDictationCleansFillers, tone: activeDictationTone,
+                             cleansFillers: activeDictationCleansFillers,
+                             appliesSpokenCorrections: activeDictationAppliesSpokenCorrections,
+                             usesSmartCleanup: activeDictationUsesSmartCleanup, tone: activeDictationTone,
                              contextualStrings: lastDictationContextualStrings,
                              profileName: captureDictationProfileName,
                              writingStylePresetID: captureDictationWritingStylePresetID,
@@ -2531,11 +2619,20 @@ final class AppModel {
     }
 
     private func apply(_ settings: DictationRunSettings) {
+        activeDictationEngine = settings.engine
+        activeDictationUsesParakeet = settings.engine == .parakeet &&
+            parakeet.model.supports(localeIdentifier: settings.languageIdentifier) && parakeet.isDownloaded
+        activeParakeetNeedsReview = false
+        lastParakeetConfidence = nil
+        lastParakeetPeakLevel = nil
         activeDictationMode = settings.mode
         activeDictationLanguageIdentifier = settings.languageIdentifier
         activeDictationSnippets = settings.snippets
         activeDictationCorrectionRules = settings.correctionRules
         activeDictationCleansFillers = settings.cleansFillers
+        activeDictationAppliesSpokenCorrections = settings.appliesSpokenCorrections
+        activeDictationUsesSmartCleanup = settings.usesSmartCleanup
+        smartCleanupSession = settings.usesSmartCleanup ? DictationSmartCleanup.prepare() : nil
         activeDictationTone = settings.tone
         lastDictationContextualStrings = settings.contextualStrings
         captureDictationProfileName = settings.profileName
@@ -2613,6 +2710,11 @@ final class AppModel {
 
     /// Quitting mid-dictation must not leave the Mac muted.
     func prepareForTermination() {
+        cancelDictation(offersUndo: false)
+        if isSelectedTextEditCapturing { stopSelectedTextEditCapture() }
+        capture.cancel()
+        audio.stop()
+        recorder.stop()
         outputMuter.restore()
     }
 

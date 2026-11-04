@@ -13,9 +13,9 @@ enum LocalJSONArchiveError: LocalizedError {
         switch self {
         case .unreadable(let recoveryCopyURL):
             if let recoveryCopyURL {
-                return "The saved archive could not be read. HushKey kept a recovery copy at \(recoveryCopyURL.path). Remove the unreadable archive before saving new history."
+                return "The saved archive could not be read. HushKey kept a recovery copy at \(recoveryCopyURL.path). Remove the unreadable archive before saving new data."
             }
-            return "The saved archive could not be read. HushKey left it in place and could not create a recovery copy. Remove the unreadable archive before saving new history."
+            return "The saved archive could not be read. HushKey left it in place and could not create a recovery copy. Remove the unreadable archive before saving new data."
         }
     }
 }

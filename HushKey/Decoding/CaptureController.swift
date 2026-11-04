@@ -62,10 +62,13 @@ final class CaptureController {
         finish()
     }
 
-    /// Drops a held capture without emitting it, for a key hold that turned out to be a shortcut.
+    /// Drops a capture without emitting it, for an aborted hold, lost motion stream, or page change.
     func cancel() {
-        guard isCapturing, isManual else { return }
+        guard isCapturing || isCalibrating else { return }
         discard()
+        isCalibrating = false
+        calibration = []
+        calibrationEnd = nil
     }
 
     func calibrate() {
