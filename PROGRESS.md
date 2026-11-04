@@ -1,5 +1,13 @@
 # HushKey progress
 
+## Completed: one wave again, and PR consolidation (2026-11-04)
+
+- **Wave regression fixed.** The Flow-style bar pass (`d9e4662`) had replaced the pill's `BreathRibbon` with `PillMeter` dot bars, so the pill was the only surface not showing HushKey's wave. The pill meter is the 58 × 18 `ink` ribbon again (live, waiting and working modes unchanged); `PillMeter` is removed and `docs/PILL_UX_ANALYSIS.md` records the reversal.
+- The audit session's uncommitted work (Silent Use gating, Parakeet review-before-insert, capture/storage fixes, 30 Hz meter mailbox) was tested and committed as `b40708e`.
+- **Verified here:** 233 tests, 3 skipped, 0 failures; packaged with `Scripts/package-app.sh`. **Not verified by eye:** screen access was declined, so the recording ribbon was not seen live. Check it by clicking the pill: a tapered ribbon between × and ✓, no row of bars.
+- **PRs:** ruddvz/hushkey#1 and ruddvz/hushkey#2 have no commits outside ruddvz/hushkey#3, so they can be closed as superseded. ruddvz/hushkey#3 is mergeable into `main` (the red check is the known billing block). Closing and merging need the user's go-ahead.
+- **Next, one session each, in this order:** (1) live acceptance matrix with the user: spoken dictation into TextEdit, Notes, Safari and Slack; mic unplug; VoiceOver pass; (2) History rows: hover pill with Copy → check, ⋯ menu (Paste again, Re-transcribe, Delete with Undo), meta line; (3) Settings split (Dictation · Shortcuts · Cleanup · System · Appearance) and a shortcut recorder; (4) Home voice profile and time saved; (5) first-run onboarding with a practice field and whisper test. Source: `docs/WISPR_FLOW_FULL_AUDIT.md`.
+
 ## End-to-end audit and local build (2026-11-04)
 
 - The canonical repo remains `/Users/rudra/Projects/HushKey` on `feature/flow-style-ui`. `dist/HushKey.app` is the only `.app` bundle left under the Projects repo; its bundle ID is `com.ruddvz.hushkey`. No app bundle remains under `/Users/rudra/Documents/ChatGPT/HushKey`. The older webcam/Ollama prototype is recoverable in the Trash; it was not merged into this app.
