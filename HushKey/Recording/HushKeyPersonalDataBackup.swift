@@ -81,6 +81,8 @@ struct HushKeyPersonalDataBackup: Codable, Equatable {
             guard !entry.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                   entry.text.utf8.count <= 300_000,
                   (entry.rawText?.utf8.count ?? 0) <= 300_000,
+                  (entry.cleanedText?.utf8.count ?? 0) <= 300_000,
+                  (entry.appName?.utf8.count ?? 0) <= 1_000,
                   entry.duration.map({ $0.isFinite && $0 >= 0 }) ?? true else {
                 throw BackupError.invalidHistoryEntry
             }

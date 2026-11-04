@@ -29,6 +29,11 @@ struct HushKeyApp: App {
         }
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentMinSize)
+        .commands {
+            CommandGroup(after: .help) {
+                Button("HushKey Setup Tour…") { appDelegate.model.openOnboarding() }
+            }
+        }
 
         MenuBarExtra {
             HushKeyMenu(model: appDelegate.model)
@@ -51,12 +56,15 @@ final class HushKeyAppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         launchedAtLogin = Self.isLoginItemLaunch()
+        // A normal launch opens the hub, so start in the Dock; a login launch stays in the menu bar.
+        model.isHubWindowOpen = !launchedAtLogin
         model.applyDockVisibility()
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !AppDataDirectory.isRunningTests else { return }
         model.start()
+        observeHubWindows()
         pill.attach(to: model)
         silentHUD.attach(to: model)
         model.enableLaunchAtLoginOnFirstRun()
@@ -69,6 +77,30 @@ final class HushKeyAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+
+    /// Tracks whether the hub window is open, so the Dock icon can follow it (menu bar first).
+    private func observeHubWindows() {
+        let center = NotificationCenter.default
+        for name in [NSWindow.didBecomeKeyNotification, NSWindow.didDeminiaturizeNotification] {
+            center.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
+                guard (note.object as? NSWindow)?.canBecomeMain == true else { return }
+                MainActor.assumeIsolated { self?.model.isHubWindowOpen = true }
+            }
+        }
+        // After a close or minimise, look again once AppKit has updated its window list.
+        for name in [NSWindow.willCloseNotification, NSWindow.didMiniaturizeNotification] {
+            center.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
+                guard let closing = note.object as? NSWindow, closing.canBecomeMain else { return }
+                DispatchQueue.main.async {
+                    MainActor.assumeIsolated {
+                        self?.model.isHubWindowOpen = NSApp.windows.contains {
+                            $0 !== closing && $0.isVisible && !$0.isMiniaturized && $0.canBecomeMain
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     func applicationWillTerminate(_ notification: Notification) {
         model.prepareForTermination()

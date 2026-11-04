@@ -143,10 +143,13 @@ enum DictationRecovery {
     }
 }
 
-/// Provisional safety screen for Parakeet's nonempty results. Until real-voice/quiet-room
-/// calibration exists, only stronger input and model confidence may type without review.
+/// Safety screen for Parakeet's nonempty results: text from near-silence or a doubtful model is
+/// shown for review instead of typed. Calibrated on real use (2026-11-04): ordinary speech into
+/// a MacBook mic peaked at 0.10–0.46 with confidence 0.57–1.00, and the old 0.45 peak floor held
+/// back three of four good dictations. The floor is now the speech gate itself
+/// (`SpeechEnvelope.gate`): below it, nothing counted as speech.
 enum ParakeetAutoInsertGate {
-    static let minimumPeakLevel: Float = 0.45
+    static let minimumPeakLevel: Float = SpeechEnvelope.gate
     static let minimumConfidence: Float = 0.35
 
     static func allowsAutomaticInsertion(peakLevel: Float, confidence: Float) -> Bool {

@@ -12,7 +12,7 @@ struct InsightsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.s5) {
                 PageHeader(eyebrow: "", title: "Insights",
-                           subtitle: "Counted on this Mac from finished dictations. Only daily totals are kept, never text.")
+                           subtitle: "Counted on this Mac from finished dictations. Totals are kept by day; Your voice reads the history you keep here.")
                 if ledger.totalDictations == 0 {
                     Text(model.savesDictationHistory
                          ? "Finish a dictation and your numbers start here."
@@ -26,6 +26,9 @@ struct InsightsView: View {
                     wordsCard.reveal(3)
                 }
                 .fixedSize(horizontal: false, vertical: true)
+                VoiceProfileSection(profile: VoiceProfile(entries: model.dictationHistory, ledger: ledger),
+                                    savesHistory: model.savesDictationHistory)
+                    .reveal(4)
                 HStack(alignment: .top, spacing: Theme.s4) {
                     categoriesCard.reveal(4)
                     streakCard.reveal(5)
@@ -65,6 +68,14 @@ struct InsightsView: View {
             }
             .frame(maxWidth: .infinity)
             .help("Compared with typing at about \(UsageLedger.typingWordsPerMinute) words per minute")
+            if let saved = VoiceProfile.timeSavedText(minutes: VoiceProfile.minutesSaved(ledger: ledger)) {
+                Rectangle().fill(Theme.hairline).frame(height: 1)
+                Label(saved.prefix(1).uppercased() + saved.dropFirst() + " vs typing", icon: .clock)
+                    .hushIconSize(14)
+                    .font(.hkCallout.weight(.medium))
+                    .foregroundStyle(Theme.ink2)
+                    .help("Words at \(VoiceProfile.typingWordsPerMinute) wpm typing, minus the time you spent speaking")
+            }
         }
     }
 
@@ -152,6 +163,138 @@ struct InsightsView: View {
                 Text("More").font(.hkMeta).foregroundStyle(Theme.ink2)
             }
         }
+    }
+}
+
+/// "Your voice": cards that unlock one at a time, with an honest count before the first.
+private struct VoiceProfileSection: View {
+    var profile: VoiceProfile
+    var savesHistory: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.s3) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Your voice").font(.display(22))
+                Spacer()
+                Text("\(profile.unlockedCards.count) of \(VoiceProfile.Card.allCases.count) cards".uppercased())
+                    .font(.hkMeta.weight(.medium)).tracking(0.6).foregroundStyle(Theme.ink2)
+            }
+            if profile.unlockedCards.isEmpty {
+                lockedIntro
+            } else {
+                let columns = [GridItem(.flexible(), spacing: Theme.s4, alignment: .top),
+                               GridItem(.flexible(), spacing: Theme.s4, alignment: .top)]
+                LazyVGrid(columns: columns, alignment: .leading, spacing: Theme.s4) {
+                    ForEach(VoiceProfile.Card.allCases, id: \.self) { card in
+                        if profile.isUnlocked(card) { VoiceTile(title: card.title) { content(card) } }
+                        else { LockedTile(card: card, remaining: card.unlocksAt - profile.dictations) }
+                    }
+                }
+                Text("Read from your last \(profile.historyCount) saved dictation\(profile.historyCount == 1 ? "" : "s") on this Mac.")
+                    .font(.hkCaption).foregroundStyle(Theme.ink3)
+            }
+        }
+    }
+
+    private var lockedIntro: some View {
+        let done = min(profile.dictations, VoiceProfile.firstUnlock)
+        return InsightCard {
+            Text(savesHistory
+                 ? "After \(VoiceProfile.firstUnlock) dictations, HushKey sketches how you talk: your pace, what cleanup fixes, when you talk most and the phrase you say most. It's read from the history on this Mac and goes nowhere else."
+                 : "Your voice is read from the history on this Mac. Turn on saving history in Settings to build it.")
+                .font(.hkBody)
+                .fixedSize(horizontal: false, vertical: true)
+            if savesHistory {
+                ProgressStrip(progress: Double(done) / Double(VoiceProfile.firstUnlock))
+                Text("\(done) of \(VoiceProfile.firstUnlock) dictations so far")
+                    .font(.hkCaption).foregroundStyle(Theme.ink2)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder
+    private func content(_ card: VoiceProfile.Card) -> some View {
+        switch card {
+        case .pace:
+            if let pace = profile.pace, let wpm = profile.wordsPerMinute {
+                headline(pace.rawValue, detail: "\(wpm) words a minute. \(pace.detail)")
+            } else {
+                headline("Not measured yet", detail: "Pace needs dictations with recorded microphone time.")
+            }
+        case .cleanup:
+            headline("\(profile.fillersRemoved.formatted()) filler\(profile.fillersRemoved == 1 ? "" : "s") removed",
+                     detail: profile.mostCorrected.map { "Fixed most often: \($0.text), \(times($0.count))." }
+                        ?? "No word has needed fixing yet.")
+        case .peakHours:
+            if let peak = profile.peakHours {
+                headline(peak.timeOfDay.rawValue,
+                         detail: "Most often \(peak.label), \(peak.share.formatted(.percent.precision(.fractionLength(0)))) of your dictations.")
+            } else {
+                headline("Not enough yet", detail: "Shows once there are \(VoiceProfile.minimumForPeakHours) dictations in history.")
+            }
+        case .phrase:
+            if let phrase = profile.catchphrase {
+                headline("“\(phrase.text)”", detail: "In \(phrase.count) of your last \(profile.historyCount) dictations.")
+            } else {
+                headline("Nothing repeats yet",
+                         detail: "A phrase shows here once it's in \(VoiceProfile.minimumPhraseDictations) dictations.")
+            }
+        }
+    }
+
+    private func headline(_ title: String, detail: String) -> some View {
+        VStack(alignment: .leading, spacing: Theme.s1) {
+            Text(title).font(.display(22)).lineLimit(2)
+            Text(detail).font(.hkCallout).foregroundStyle(Theme.ink2).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func times(_ count: Int) -> String { count == 1 ? "once" : count == 2 ? "twice" : "\(count) times" }
+}
+
+private struct VoiceTile<Content: View>: View {
+    var title: String
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        InsightCard {
+            SectionLabel(title: title)
+            content
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct LockedTile: View {
+    var card: VoiceProfile.Card
+    var remaining: Int
+
+    var body: some View {
+        InsightCard {
+            SectionLabel(title: card.title)
+            Label("In \(remaining) more dictation\(remaining == 1 ? "" : "s")", icon: .lock)
+                .hushIconSize(14)
+                .font(.hkCallout)
+                .foregroundStyle(Theme.ink3)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// A thin hairline track with a sage fill.
+private struct ProgressStrip: View {
+    var progress: Double
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Theme.hairline)
+                Capsule().fill(Theme.signal).frame(width: max(6, geo.size.width * min(1, max(0, progress))))
+            }
+        }
+        .frame(height: 6)
+        .accessibilityHidden(true)
     }
 }
 

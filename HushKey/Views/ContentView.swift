@@ -33,9 +33,10 @@ struct ContentView: View {
         .padding(.top, Theme.toolbarHeight)
         .overlay(alignment: .top) {
             HubToolbar(collapsed: $collapsed, showsShortcuts: $showsShortcuts)
-                .frame(height: Theme.toolbarHeight - Theme.s2)
+                .frame(height: Theme.titlebarHeight)
         }
         .background(Theme.paper)
+        .background(TrafficLightInset(height: Theme.titlebarHeight))
         .ignoresSafeArea()
         .foregroundStyle(Theme.ink)
         .font(.hkBody)
@@ -58,6 +59,15 @@ struct ContentView: View {
             KeyboardShortcutsSheet()
                 .environment(model)
                 .preferredColorScheme(appearance.colorScheme)
+        }
+        .sheet(isPresented: Binding(get: { model.showsOnboarding }, set: { model.showsOnboarding = $0 })) {
+            OnboardingView()
+                .environment(model)
+                .preferredColorScheme(appearance.colorScheme)
+        }
+        .task {
+            // The first run shows once, the first time the window opens.
+            if !AppDataDirectory.isRunningTests, OnboardingRecord().showsOnLaunch { model.showsOnboarding = true }
         }
     }
 
@@ -401,6 +411,19 @@ private struct SetupChecklist: View {
                             withAnimation(Theme.snappy) { model.screen = step.opens }
                         }
                     }
+                    Button {
+                        model.openOnboarding()
+                    } label: {
+                        HStack(spacing: Theme.s1) {
+                            Glyph(.play, size: 11)
+                            Text("Take the 60-second tour")
+                        }
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Theme.ink2)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 2)
                 }
                 .padding(Theme.s3)
                 .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))

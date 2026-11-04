@@ -152,22 +152,47 @@ final class AppModel {
         rawValue: UserDefaults.standard.string(forKey: DictationShortcut.preferenceKey) ?? "") ?? .default {
         didSet {
             UserDefaults.standard.set(dictationShortcut.rawValue, forKey: DictationShortcut.preferenceKey)
-            if started { installDictationShortcut() }
+            if started, !shortcutsSuspended { installDictationShortcut() }
         }
     }
     var selectedTextEditShortcut: SelectedTextEditShortcut = SelectedTextEditShortcut(
         rawValue: UserDefaults.standard.string(forKey: SelectedTextEditShortcut.preferenceKey) ?? "") ?? .default {
         didSet {
             UserDefaults.standard.set(selectedTextEditShortcut.rawValue, forKey: SelectedTextEditShortcut.preferenceKey)
-            if started { installSelectedTextEditShortcut() }
+            if started, !shortcutsSuspended { installSelectedTextEditShortcut() }
         }
     }
     var dictationCaptureBehavior: DictationCaptureBehavior = DictationCaptureBehavior(
         rawValue: UserDefaults.standard.string(forKey: DictationCaptureBehavior.preferenceKey) ?? "") ?? .hold {
         didSet {
             UserDefaults.standard.set(dictationCaptureBehavior.rawValue, forKey: DictationCaptureBehavior.preferenceKey)
-            if started { installDictationShortcut() }
+            if started, !shortcutsSuspended { installDictationShortcut() }
         }
+    }
+    /// Pastes the last transcript from any app; nil when turned off.
+    var pasteLastShortcut: PasteLastShortcut? = {
+        let raw = UserDefaults.standard.string(forKey: PasteLastShortcut.preferenceKey)
+        if raw == PasteLastShortcut.offValue { return nil }
+        return raw.flatMap(PasteLastShortcut.init(rawValue:)) ?? .default
+    }() {
+        didSet {
+            UserDefaults.standard.set(pasteLastShortcut?.rawValue ?? PasteLastShortcut.offValue,
+                                      forKey: PasteLastShortcut.preferenceKey)
+            if started, !shortcutsSuspended { installPasteLastShortcut() }
+        }
+    }
+    private(set) var pasteLastShortcutStatus = "Shortcut is not registered yet."
+    /// What each action is set to, for the recorder's conflict check.
+    var shortcutAssignments: [ShortcutAction: KeyCombo] {
+        var assignments: [ShortcutAction: KeyCombo] = [
+            .dictation: dictationShortcut.combo,
+            .editSelection: selectedTextEditShortcut.combo,
+            .insertAgain: insertion.shortcut.combo,
+            .undoInsertion: TextInsertionService.undoShortcut,
+            .silentCapture: captureShortcut.combo,
+        ]
+        assignments[.pasteLast] = pasteLastShortcut?.combo
+        return assignments
     }
     private(set) var dictationShortcutStatus = "Shortcut is not registered yet."
     var dictationShortcutNeedsAttention: Bool {
@@ -253,8 +278,9 @@ final class AppModel {
         }
     }
     @ObservationIgnored private let outputMuter = OutputMuter()
-    /// Off makes HushKey a menu bar app with no Dock icon; it works the same either way.
-    var showsInDock = UserDefaults.standard.object(forKey: "showInDock") as? Bool ?? true {
+    /// On keeps a Dock icon at all times. Off (the default, like TypeWhisper and Wispr Flow) makes
+    /// HushKey a menu bar app that only shows in the Dock and ⌘-Tab while its window is open.
+    var showsInDock = UserDefaults.standard.object(forKey: "showInDock") as? Bool ?? false {
         didSet {
             UserDefaults.standard.set(showsInDock, forKey: "showInDock")
             applyDockVisibility()
@@ -265,6 +291,14 @@ final class AppModel {
     private(set) var launchAtLoginMessage: String?
     var savesDictationHistory = UserDefaults.standard.object(forKey: "saveDictationHistory") as? Bool ?? true {
         didSet { UserDefaults.standard.set(savesDictationHistory, forKey: "saveDictationHistory") }
+    }
+    /// How long saved transcripts stay before HushKey deletes them from this Mac.
+    var dictationHistoryRetention = DictationHistoryRetention(
+        rawValue: UserDefaults.standard.string(forKey: DictationHistoryRetention.preferenceKey) ?? "") ?? .default {
+        didSet {
+            UserDefaults.standard.set(dictationHistoryRetention.rawValue, forKey: DictationHistoryRetention.preferenceKey)
+            pruneDictationHistory()
+        }
     }
     private(set) var dictationHistory: [DictationHistoryEntry]
     private(set) var didInsertCurrentDictation = false
@@ -317,6 +351,11 @@ final class AppModel {
         }
     }
     private(set) var dictationResultGeneration = 0
+    /// The first-run tour is on screen (shown once on first launch; reopened from Help or Get set up).
+    var showsOnboarding = false
+    /// The tour's practice field is waiting for a dictation: while HushKey is in front, a finished
+    /// dictation stays in the app for the field to show, instead of raising the pill's card.
+    @ObservationIgnored var practiceKeepsDictationInApp = false
     /// Whether the running or last dictation has a text field to type into.
     private(set) var dictationHasTarget = false
     /// The app dictation started in, used to paste when its field refuses direct typing.
@@ -331,6 +370,17 @@ final class AppModel {
     private(set) var cancelledDictation: CancelledDictation?
     @ObservationIgnored private var cancelledDictationAudio: [AVAudioPCMBuffer] = []
     @ObservationIgnored private var cancelledDictationSettings: DictationRunSettings?
+    /// The History entry just deleted, for "Deleted · Undo". Memory only; the deletion is already saved.
+    private(set) var deletedDictation: DeletedDictation?
+    /// The latest dictation's audio, in memory only, so History can run it through the other engine.
+    /// Dropped when the next dictation starts, history or session audio is deleted, or the app quits.
+    @ObservationIgnored private var heldHistoryAudio: (entryID: UUID, buffers: [AVAudioPCMBuffer], engine: DictationEngine)?
+    private(set) var heldHistoryAudioEntryID: UUID?
+    /// Entries whose audio was held this session and has since been dropped ("Audio no longer available").
+    private(set) var droppedHistoryAudioEntryIDs: Set<UUID> = []
+    private(set) var retranscribingDictationID: UUID?
+    @ObservationIgnored private var finishingAudioOverride: [AVAudioPCMBuffer]?
+    @ObservationIgnored private var lastRecognitionUsedParakeet = false
     /// A recovered dictation is saved and shown, never typed into whatever has focus now.
     @ObservationIgnored private var finishesWithoutTyping = false
     /// The tone picked from the Style page when this dictation started.
@@ -409,6 +459,11 @@ final class AppModel {
     @ObservationIgnored private let functionKey = FunctionKeyMonitor()
     @ObservationIgnored private var functionKeyInstalledTrusted = false
     @ObservationIgnored private let selectedTextEditHotKey = GlobalHotKeyRegistration(id: 4)
+    @ObservationIgnored private let pasteLastHotKey = GlobalHotKeyRegistration(id: 5)
+    @ObservationIgnored private let dictationMouseButton = MouseButtonMonitor()
+    @ObservationIgnored private let pasteLastMouseButton = MouseButtonMonitor()
+    /// True while Settings records a new shortcut, so pressing a current one doesn't fire it.
+    @ObservationIgnored private var shortcutsSuspended = false
     /// Hold Control on its own to capture a silent word, the way fn holds dictation. Works in other apps.
     @ObservationIgnored private let silentControlKey = FunctionKeyMonitor(key: .control)
     @ObservationIgnored private var silentControlKeyInstalledTrusted = false
@@ -554,7 +609,9 @@ final class AppModel {
         installKeyMonitor()
         installDictationShortcut()
         installSelectedTextEditShortcut()
+        installPasteLastShortcut()
         insertion.restore()
+        pruneDictationHistory()
         updateMotionActivity()
         syncCaptureMode()
         NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification,
@@ -564,6 +621,7 @@ final class AppModel {
                 self?.syncSilentControlKey()
                 self?.insertion.restore()
                 self?.refreshLaunchAtLogin()
+                self?.pruneDictationHistory()
             }
         }
     }
@@ -1156,6 +1214,7 @@ final class AppModel {
     func deleteSessionLogs() {
         do {
             try recorder.deleteAllSessions()
+            dropHistoryAudio()
             dataMessage = "Session logs and local audio files deleted."
         } catch {
             dataMessage = "Session deletion failed: \(error.localizedDescription)"
@@ -1565,12 +1624,17 @@ final class AppModel {
         dictationHistoryMessage = "Copied to the clipboard."
     }
 
+    /// Deletes one entry right away and keeps it in memory for a few seconds so it can be undone.
     func deleteDictation(_ entry: DictationHistoryEntry) {
+        guard let index = dictationHistory.firstIndex(where: { $0.id == entry.id }) else { return }
+        let deleted = dictationHistory[index]
         let remaining = dictationHistory.filter { $0.id != entry.id }
         do {
             if remaining.isEmpty { try DictationHistoryStore.delete(at: dictationHistoryURL) }
             else { try DictationHistoryStore.save(remaining, to: dictationHistoryURL) }
             dictationHistory = remaining
+            if let previous = deletedDictation, previous.entry.id != entry.id { forgetDeletedAudio(previous.entry.id) }
+            deletedDictation = DeletedDictation(entry: deleted, index: index)
             if currentDictationHistoryEntryID == entry.id {
                 cancelPendingDictationHistorySave()
                 currentDictationHistoryEntryID = nil
@@ -1580,6 +1644,189 @@ final class AppModel {
         } catch {
             dictationHistoryMessage = "Could not delete this dictation: \(error.localizedDescription)"
         }
+    }
+
+    // MARK: History row actions
+
+    /// Puts the last deleted entry back where it was.
+    func undoDeleteDictation() {
+        guard let deleted = deletedDictation else { return }
+        let restored = deleted.restoring(into: dictationHistory)
+        do {
+            try DictationHistoryStore.save(restored, to: dictationHistoryURL)
+            dictationHistory = restored
+            deletedDictation = nil
+            // The open transcript was this entry and hasn't changed since: keep saving into it.
+            if currentDictationHistoryEntryID == nil,
+               transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines) == deleted.entry.text,
+               lastSavedDictationText == deleted.entry.text {
+                currentDictationHistoryEntryID = deleted.entry.id
+            }
+            if dictationHistoryRecoveryCopyURL == nil { dictationHistoryMessage = nil }
+        } catch {
+            dictationHistoryMessage = "Could not restore this dictation: \(error.localizedDescription)"
+        }
+    }
+
+    /// Ends the Undo window for a deletion; called when the bar times out.
+    func expireDeletedDictation(_ id: UUID) {
+        guard deletedDictation?.entry.id == id else { return }
+        deletedDictation = nil
+        forgetDeletedAudio(id)
+    }
+
+    /// Shows what the recognizer heard before cleanup ("Undo cleanup"), or puts the cleanup back.
+    func toggleCleanup(_ entry: DictationHistoryEntry) {
+        guard canClearDictationHistory,
+              let current = dictationHistory.first(where: { $0.id == entry.id }),
+              let updated = current.undoingCleanup() ?? current.redoingCleanup() else { return }
+        let entries = dictationHistory.map { $0.id == updated.id ? updated : $0 }
+        do {
+            try DictationHistoryStore.save(entries, to: dictationHistoryURL)
+            dictationHistory = entries
+            if currentDictationHistoryEntryID == updated.id {
+                // The editor shows this entry: keep it in step so autosave doesn't undo the change.
+                cancelPendingDictationHistorySave()
+                transcriber.replaceText(updated.text)
+                lastSavedDictationText = updated.text
+                clearLocalTransformUndo()
+            }
+            if dictationHistoryRecoveryCopyURL == nil { dictationHistoryMessage = nil }
+        } catch {
+            dictationHistoryMessage = "Could not change this dictation: \(error.localizedDescription)"
+        }
+    }
+
+    /// The engine History would use to re-run this entry's audio.
+    func retranscribeEngine(for entry: DictationHistoryEntry) -> DictationEngine? {
+        guard let held = heldHistoryAudio, held.entryID == entry.id else { return nil }
+        return held.engine == .parakeet ? .appleSpeech : .parakeet
+    }
+
+    func retranscribeState(for entry: DictationHistoryEntry) -> DictationHistoryActionState {
+        let other = retranscribeEngine(for: entry)
+        var problem: String?
+        switch other {
+        case .parakeet?:
+            if !parakeet.isDownloaded { problem = "Download Parakeet in Settings to re-transcribe" }
+            else if !parakeet.model.supports(localeIdentifier: activeDictationLanguageIdentifier) {
+                problem = "Parakeet doesn’t know this language"
+            }
+        case .appleSpeech?:
+            if SFSpeechRecognizer.authorizationStatus() != .authorized { problem = "Allow Speech Recognition to re-transcribe" }
+        case nil:
+            break
+        }
+        return DictationRetranscribeGate.state(
+            hasAudio: heldHistoryAudioEntryID == entry.id && other != nil,
+            hadAudio: droppedHistoryAudioEntryIDs.contains(entry.id),
+            isBusy: !canClearDictationHistory || isStartingSelectedTextEdit || isFinalizingSelectedTextEdit
+                || retranscribingDictationID != nil,
+            otherEngineProblem: problem)
+    }
+
+    /// Runs the latest dictation's kept audio through the other engine and replaces the entry's
+    /// text. Nothing is typed into another app.
+    func retranscribeDictation(_ entry: DictationHistoryEntry) async {
+        guard retranscribeState(for: entry).isAvailable, let held = heldHistoryAudio, held.entryID == entry.id,
+              let engine = retranscribeEngine(for: entry) else { return }
+        guard captureGate.claim(.dictation) else {
+            dictationHistoryMessage = "Meeting capture is active. Stop it before re-transcribing."
+            return
+        }
+        // Save any edit open in the editor first, then make this entry the open one.
+        cancelPendingDictationHistorySave()
+        saveCurrentDictation()
+        let previousHasTarget = dictationHasTarget
+        currentDictationHistoryEntryID = entry.id
+        transcriber.replaceText(entry.text)
+        rawDictationText = entry.rawText ?? entry.text
+        clearLocalTransformUndo()
+        lastSavedDictationText = entry.text
+        lastDictationDuration = entry.duration
+        dictationNotice = nil
+        dictationHasTarget = false
+        finishesWithoutTyping = true
+        retranscribingDictationID = entry.id
+        isFinalizingDictation = true
+        activeDictationUsesParakeet = engine == .parakeet
+        activeDictationEngine = engine
+        finishingAudioOverride = held.buffers
+        defer {
+            dictationHasTarget = previousHasTarget
+            finishesWithoutTyping = false
+            retranscribingDictationID = nil
+            // Nothing heard: the entry wasn't changed, so the editor shows it again.
+            if transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                transcriber.replaceText(entry.text)
+                lastSavedDictationText = entry.text
+            }
+        }
+        if engine == .parakeet {
+            if let text = await parakeetText(held.buffers) {
+                activeParakeetNeedsReview = false
+                await finishDictation(rawText: text, recognitionError: nil)
+            } else {
+                endRetranscribe(failure: "Parakeet couldn’t transcribe this recording. The entry is unchanged.")
+            }
+            return
+        }
+        let started = await transcriber.transcribe(recorded: held.buffers, localeIdentifier: activeDictationLanguageIdentifier,
+                                                   contextualStrings: lastDictationContextualStrings)
+        guard started else {
+            endRetranscribe(failure: "Apple Speech couldn’t start: \(transcriber.error ?? "speech recognition is unavailable"). The entry is unchanged.")
+            return
+        }
+        let rawText = await transcriber.waitForFinalization()
+        await finishDictation(rawText: rawText, recognitionError: transcriber.error)
+    }
+
+    private func endRetranscribe(failure: String) {
+        finishingAudioOverride = nil
+        isFinalizingDictation = false
+        captureGate.release(.dictation)
+        dictationHistoryMessage = "Could not re-transcribe: \(failure)"
+    }
+
+    /// "Paste again" from History: only the latest dictation, only into the field it came from.
+    func pasteAgainState(for entry: DictationHistoryEntry) -> DictationHistoryActionState {
+        DictationHistoryPasteGate.state(
+            isLatestDictation: currentDictationHistoryEntryID == entry.id,
+            hasTarget: capturedInsertionTarget != nil || capturedPasteTarget != nil,
+            textMatches: transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines) == entry.text,
+            isBusy: !canClearDictationHistory, alreadyInserted: didInsertCurrentDictation,
+            insertionEnabled: insertion.isEnabled)
+    }
+
+    /// Brings the original app forward, then types the dictation only if its field still has focus.
+    func pasteDictationAgain(_ entry: DictationHistoryEntry) async {
+        guard pasteAgainState(for: entry).isAvailable else { return }
+        dictationTargetApp?.activate()
+        try? await Task.sleep(for: .milliseconds(350))
+        await pasteLastDictationAgain()
+    }
+
+    private func holdHistoryAudio(_ buffers: [AVAudioPCMBuffer], for entryID: UUID, engine: DictationEngine) {
+        if let previous = heldHistoryAudio?.entryID, previous != entryID { droppedHistoryAudioEntryIDs.insert(previous) }
+        heldHistoryAudio = (entryID, buffers, engine)
+        heldHistoryAudioEntryID = entryID
+        droppedHistoryAudioEntryIDs.remove(entryID)
+    }
+
+    private func dropHistoryAudio() {
+        guard let entryID = heldHistoryAudio?.entryID else { return }
+        heldHistoryAudio = nil
+        heldHistoryAudioEntryID = nil
+        droppedHistoryAudioEntryIDs.insert(entryID)
+    }
+
+    /// A deletion that can no longer be undone frees its audio too.
+    private func forgetDeletedAudio(_ entryID: UUID) {
+        if heldHistoryAudio?.entryID == entryID {
+            heldHistoryAudio = nil
+            heldHistoryAudioEntryID = nil
+        }
+        droppedHistoryAudioEntryIDs.remove(entryID)
     }
 
     @discardableResult
@@ -1663,6 +1910,9 @@ final class AppModel {
             try DictationHistoryStore.delete(at: dictationHistoryURL)
             cancelPendingDictationHistorySave()
             dictationHistory.removeAll()
+            deletedDictation = nil
+            dropHistoryAudio()
+            droppedHistoryAudioEntryIDs = []
             dictationHistoryRecoveryCopyURL = nil
             dictationHistoryArchiveUnreadable = false
             currentDictationHistoryEntryID = nil
@@ -1795,23 +2045,29 @@ final class AppModel {
         isStartingDictation = true
         stopsWhenStarted = false
         defer { isStartingDictation = false }
+        var timing = StartTiming()
         dictationStartGeneration += 1
         let generation = dictationStartGeneration
         dictationNotice = nil
         showsFinishedTranscript = false
         retainedAudio.reset()
+        dropHistoryAudio()
         let target = NSWorkspace.shared.frontmostApplication
         let isHushKey = target?.bundleIdentifier == "com.ruddvz.hushkey"
         activeDictationTarget = isHushKey ? nil : target?.localizedName
+        timing.mark("reset")
         capturedInsertionTarget = isHushKey ? nil : insertion.captureInsertionTarget()
+        timing.mark("axTarget")
         capturedPasteTarget = nil
         if !isHushKey, let target {
             capturedPasteTarget = insertion.capturePasteTarget(into: target)
         }
+        timing.mark("pasteTarget")
         capturedInsertionTargetName = capturedInsertionTarget?.applicationName
         dictationTargetApp = isHushKey ? nil : target
         dictationHasTarget = insertion.isEnabled && (capturedInsertionTarget != nil || capturedPasteTarget != nil)
         insertion.logFocus("start insertTarget=\(capturedInsertionTarget != nil) pasteTarget=\(capturedPasteTarget != nil)")
+        timing.mark("logFocus")
         let targetBundleIdentifier = isHushKey ? nil : target?.bundleIdentifier
         let profileSettings = DictationAppProfile.resolve(
             requestedMode: dictationMode,
@@ -1832,11 +2088,12 @@ final class AppModel {
         activeDictationAppliesSpokenCorrections = appliesSpokenCorrections
         activeDictationUsesSmartCleanup = polishesWithAppleIntelligence && profileSettings.cleansFillers &&
             profileSettings.mode != .code
-        smartCleanupSession = usesSmartCleanup ? DictationSmartCleanup.prepare() : nil
+        timing.mark("profile")
         captureDictationProfileName = profileSettings.appName
         captureDictationWritingStylePresetID = profileSettings.writingStylePresetID
         let nearbyHints = usesNearbyTextHints ? insertion.nearbyContextHints() : []
         usedNearbyTextHints = !nearbyHints.isEmpty
+        timing.mark("nearbyText")
         let usesParakeet = usesParakeet(for: activeDictationLanguageIdentifier)
         activeDictationUsesParakeet = usesParakeet
         activeDictationEngine = usesParakeet ? .parakeet : .appleSpeech
@@ -1844,6 +2101,7 @@ final class AppModel {
         lastParakeetConfidence = nil
         lastParakeetPeakLevel = nil
         if usesParakeet { parakeet.warmUp() }
+        timing.mark("parakeetWarmUp")
         // With Parakeet, Apple Speech only shows words while you talk, and only if it's already allowed.
         let showsApplePreview = !usesParakeet || SFSpeechRecognizer.authorizationStatus() == .authorized
 
@@ -1852,12 +2110,15 @@ final class AppModel {
         async let speechPreparation = showsApplePreview
             ? transcriber.prepare(localeIdentifier: activeDictationLanguageIdentifier) : false
         await audio.start()
+        timing.mark("micOpen")
         if audio.isRunning, generation == dictationStartGeneration {
             if showsApplePreview { transcriber.beginBuffering(sink: audio.sink) }
             retainedAudioSinkID = audio.sink.add { [retainedAudio] buffer, _ in retainedAudio.append(buffer) }
         }
         let speechReady = await speechPreparation
+        timing.mark("speechPrepare")
         guard generation == dictationStartGeneration, speechReady || usesParakeet, audio.isRunning else {
+            timing.report("failed")
             transcriber.stop()
             audio.stop()
             stopRetainingAudio(keep: false)
@@ -1880,6 +2141,10 @@ final class AppModel {
         lastDictationMicrophoneName = audio.activeDeviceName
         playDictationCue(.start)
         muteOutputForDictation()
+        timing.mark("cueAndMute")
+        // Only needed when the dictation finishes, so it waits until the microphone is open.
+        smartCleanupSession = usesSmartCleanup ? DictationSmartCleanup.prepare() : nil
+        timing.mark("smartCleanup")
         dictationStartedAt = Date()
         lastDictationDuration = nil
         let customWords = profileSettings.vocabulary
@@ -1891,6 +2156,8 @@ final class AppModel {
             ? await transcriber.start(sink: audio.sink, localeIdentifier: activeDictationLanguageIdentifier,
                                       contextualStrings: lastDictationContextualStrings)
             : false
+        timing.mark("speechStart")
+        timing.report(started ? "ok" : "noPreview")
         guard generation == dictationStartGeneration, audio.isRunning else {
             transcriber.stop()
             restoreOutputAfterDictation()
@@ -1968,6 +2235,7 @@ final class AppModel {
             parakeetLog.info("\(model, privacy: .public): \(transcript.processingSeconds, format: .fixed(precision: 3), privacy: .public) s for \(transcript.audioSeconds, format: .fixed(precision: 2), privacy: .public) s of audio, confidence \(transcript.confidence, format: .fixed(precision: 2), privacy: .public), peak \(peakLevel, format: .fixed(precision: 2), privacy: .public), auto-insert \(!self.activeParakeetNeedsReview, privacy: .public)")
             guard !transcript.text.isEmpty else { return nil }
             let vocabulary = lastDictationContextualStrings.filter { !Self.allModeHints.contains($0) }
+            lastRecognitionUsedParakeet = true
             return DictationVocabularySnapper.apply(transcript.text, terms: vocabulary)
         } catch {
             parakeetLog.error("Parakeet failed, using Apple Speech: \(error.localizedDescription, privacy: .public)")
@@ -1978,6 +2246,12 @@ final class AppModel {
     /// Shared end of a live dictation and of a retry: process, save, then either type the
     /// text into the captured field or raise a notice the pill can recover from.
     private func finishDictation(rawText: String, recognitionError: String?) async {
+        // What was recognized, and by which engine, so History can re-run it with the other one.
+        let recordedForHistory = finishingAudioOverride ?? retainedAudio.snapshot()
+        let recognizedBy: DictationEngine = lastRecognitionUsedParakeet ? .parakeet : .appleSpeech
+        finishingAudioOverride = nil
+        lastRecognitionUsedParakeet = false
+        let isRetranscribing = retranscribingDictationID != nil
         rawDictationText = rawText
         var source = rawText
         if usesSmartCleanup {
@@ -2001,7 +2275,17 @@ final class AppModel {
         }
         saveCurrentDictation()
         let finished = processed.trimmingCharacters(in: .whitespacesAndNewlines)
-        if activeParakeetNeedsReview && !finished.isEmpty {
+        if !finished.isEmpty, let entryID = currentDictationHistoryEntryID, !recordedForHistory.isEmpty {
+            holdHistoryAudio(recordedForHistory, for: entryID, engine: recognizedBy)
+        }
+        if isRetranscribing {
+            // Re-running History audio never types anywhere or raises the pill's notices.
+            retainedAudio.reset()
+            showsFinishedTranscript = false
+            dictationHistoryMessage = finished.isEmpty
+                ? "\(recognizedBy.title) heard no words in this recording. The entry is unchanged."
+                : "Re-transcribed with \(recognizedBy.title)."
+        } else if activeParakeetNeedsReview && !finished.isEmpty {
             dictationNotice = DictationRecovery.reviewBeforeInsertion(
                 confidence: lastParakeetConfidence, peakLevel: lastParakeetPeakLevel ?? audio.peakLevel)
             showsFinishedTranscript = true
@@ -2018,14 +2302,14 @@ final class AppModel {
                 await typeFinishedDictation(finished)
                 // Typing didn't go through: keep the words on screen with Copy beside the notice.
                 if !didInsertCurrentDictation, dictationNotice != nil { showsFinishedTranscript = true }
-            } else if finishesWithoutTyping {
+            } else if finishesWithoutTyping || (practiceKeepsDictationInApp && NSApp.isActive) {
                 showsFinishedTranscript = false
             } else if !(await typeIntoFieldFocusedNow(finished)) {
                 showsFinishedTranscript = true
             }
             insertion.logFocus("after inserted=\(didInsertCurrentDictation) card=\(showsFinishedTranscript) notice=\(dictationNotice != nil)")
         }
-        if !finished.isEmpty {
+        if !finished.isEmpty, !isRetranscribing {
             recordUsage(raw: rawText, final: finished)
             completedDictationCount += 1
         }
@@ -2223,12 +2507,14 @@ final class AppModel {
         let entry = DictationHistoryEntry(id: currentDictationHistoryEntryID ?? UUID(),
                                           text: text,
                                           rawText: raw.isEmpty || raw == text ? nil : raw,
-                                          duration: lastDictationDuration)
+                                          duration: lastDictationDuration,
+                                          appName: activeDictationTarget)
         do {
             dictationHistory = try DictationHistoryStore.upsertingAndSaving(
                 entry, to: dictationHistoryURL, existing: dictationHistory)
             currentDictationHistoryEntryID = entry.id
             lastSavedDictationText = text
+            pruneDictationHistory()
             if dictationHistoryRecoveryCopyURL == nil { dictationHistoryMessage = nil }
         } catch {
             dictationHistoryMessage = "This transcript could not be saved to history: \(error.localizedDescription)"
@@ -2263,6 +2549,24 @@ final class AppModel {
     }
 
     private func installDictationShortcut() {
+        if let button = dictationShortcut.mouseButton {
+            dictationHotKey.unregister()
+            functionKey.uninstall()
+            dictationMouseButton.install(button: button) { [weak self] pressed in
+                guard let self else { return }
+                switch self.dictationCaptureBehavior {
+                case .hold:
+                    if pressed { self.beginShortcutDictation() } else { self.endShortcutDictation() }
+                case .toggle:
+                    if pressed { Task { @MainActor in await self.toggleDictation() } }
+                }
+            }
+            dictationShortcutStatus = dictationCaptureBehavior == .hold
+                ? "Hold \(dictationShortcut.label) to dictate from any app; release to stop."
+                : "Click \(dictationShortcut.label) to start or stop local dictation from any app."
+            return
+        }
+        dictationMouseButton.uninstall()
         if dictationShortcut.usesFunctionKey {
             dictationHotKey.unregister()
             functionKey.onAction = { [weak self] action in self?.handleFunctionKey(action) }
@@ -2291,6 +2595,68 @@ final class AppModel {
                 ? "Hold \(dictationShortcut.label) to dictate from any app; release to stop."
                 : "Press \(dictationShortcut.label) to start or stop local dictation from any app."
             : "Could not register \(dictationShortcut.label) (system status \(status))."
+    }
+
+    private func installPasteLastShortcut() {
+        pasteLastHotKey.unregister()
+        pasteLastMouseButton.uninstall()
+        guard let shortcut = pasteLastShortcut else {
+            pasteLastShortcutStatus = "Off. The menu bar item still pastes the last transcript."
+            return
+        }
+        if let button = shortcut.combo.mouseButton {
+            pasteLastMouseButton.install(button: button) { [weak self] pressed in
+                if pressed { Task { @MainActor in await self?.pasteLastDictationAgain() } }
+            }
+            pasteLastShortcutStatus = "Click \(shortcut.label) to paste your last transcript into the field it came from."
+            return
+        }
+        let status = pasteLastHotKey.register(keyCode: shortcut.keyCode, modifiers: shortcut.carbonModifiers) { [weak self] in
+            Task { @MainActor in await self?.pasteLastDictationAgain() }
+        }
+        pasteLastShortcutStatus = status == noErr
+            ? "Press \(shortcut.label) to paste your last transcript into the field it came from."
+            : "Could not register \(shortcut.label) (system status \(status)). Another app may use it."
+    }
+
+    /// Settings is recording a new shortcut: let every key reach the recorder.
+    func suspendShortcuts() {
+        guard !shortcutsSuspended else { return }
+        shortcutsSuspended = true
+        dictationHotKey.unregister()
+        functionKey.uninstall()
+        dictationMouseButton.uninstall()
+        selectedTextEditHotKey.unregister()
+        pasteLastHotKey.unregister()
+        pasteLastMouseButton.uninstall()
+        insertion.suspendShortcuts()
+    }
+
+    func resumeShortcuts() {
+        guard shortcutsSuspended else { return }
+        shortcutsSuspended = false
+        guard started else { return }
+        installDictationShortcut()
+        installSelectedTextEditShortcut()
+        installPasteLastShortcut()
+        insertion.resumeShortcuts()
+    }
+
+    /// Deletes saved transcripts older than the retention setting, on this Mac only.
+    func pruneDictationHistory(now: Date = Date()) {
+        guard !dictationHistoryArchiveUnreadable else { return }
+        let kept = dictationHistoryRetention.pruning(dictationHistory, now: now)
+        guard kept.count != dictationHistory.count else { return }
+        do {
+            if kept.isEmpty { try DictationHistoryStore.delete(at: dictationHistoryURL) }
+            else { try DictationHistoryStore.save(kept, to: dictationHistoryURL) }
+            if let current = currentDictationHistoryEntryID, !kept.contains(where: { $0.id == current }) {
+                currentDictationHistoryEntryID = nil
+            }
+            dictationHistory = kept
+        } catch {
+            dictationHistoryMessage = "Could not delete old transcripts: \(error.localizedDescription)"
+        }
     }
 
     private func installSelectedTextEditShortcut() {
@@ -2515,7 +2881,8 @@ final class AppModel {
         let token = cancelNoticeToken
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(5))
-            guard let self, token == cancelNoticeToken, dictationNotice?.kind == .cancelled else { return }
+            // With the pill on screen its countdown ring closes the notice, and waits while hovered.
+            guard let self, !showsFloatingPill, token == cancelNoticeToken, dictationNotice?.kind == .cancelled else { return }
             dismissDictationNotice()
         }
     }
@@ -2552,6 +2919,7 @@ final class AppModel {
         lastDictationDuration = duration
         finishesWithoutTyping = true
         isFinalizingDictation = true
+        finishingAudioOverride = recorded
         if activeDictationUsesParakeet, let text = await parakeetText(recorded) {
             await finishDictation(rawText: text, recognitionError: nil)
             return
@@ -2560,6 +2928,7 @@ final class AppModel {
                                                    contextualStrings: lastDictationContextualStrings)
         guard started else {
             finishesWithoutTyping = false
+            finishingAudioOverride = nil
             isFinalizingDictation = false
             captureGate.release(.dictation)
             dictationNotice = DictationRecovery.notice(
@@ -2663,6 +3032,14 @@ final class AppModel {
         NSWorkspace.shared.open(url)
     }
 
+    /// Opens the first-run tour again, bringing the window forward if it was closed.
+    func openOnboarding() {
+        showsOnboarding = true
+        // An open hub shows the tour as a sheet; only open a window when there isn't one.
+        if !NSApp.windows.contains(where: { $0.isVisible && $0.canBecomeMain }) { openMainWindow?() }
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
     /// Brings HushKey forward on Meeting notes, from the pill.
     func openMeetingNotes() {
         screen = .meetings
@@ -2670,13 +3047,24 @@ final class AppModel {
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    /// Whether the hub window is on screen; set by the app delegate as windows open and close.
+    @ObservationIgnored var isHubWindowOpen = false {
+        didSet { if oldValue != isHubWindowOpen { applyDockVisibility() } }
+    }
+
     func applyDockVisibility() {
         guard !AppDataDirectory.isRunningTests else { return }
-        let policy: NSApplication.ActivationPolicy = showsInDock ? .regular : .accessory
+        let policy = Self.activationPolicy(showsInDock: showsInDock, hubWindowOpen: isHubWindowOpen)
         guard NSApp.activationPolicy() != policy else { return }
         NSApp.setActivationPolicy(policy)
-        // Leaving the Dock hides the window along with the app; bring it back.
-        if !showsInDock { DispatchQueue.main.async { NSApp.activate(ignoringOtherApps: true) } }
+        // Joining the Dock while the window is open: keep it in front rather than behind the last app.
+        if policy == .regular, isHubWindowOpen { DispatchQueue.main.async { NSApp.activate(ignoringOtherApps: true) } }
+    }
+
+    /// Menu bar first: a Dock icon only when asked for, or while the hub window is open so it can
+    /// be found with ⌘-Tab. Closing the window drops back to the menu bar.
+    nonisolated static func activationPolicy(showsInDock: Bool, hubWindowOpen: Bool) -> NSApplication.ActivationPolicy {
+        showsInDock || hubWindowOpen ? .regular : .accessory
     }
 
     func setLaunchesAtLogin(_ enabled: Bool) {

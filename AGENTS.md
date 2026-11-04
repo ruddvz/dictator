@@ -3,7 +3,7 @@
 ## One copy, one branch
 
 - **The only working copy is `~/Projects/HushKey`.** Don't create or use other clones (for example under `~/Documents/Codex/...` or `~/Documents/ChatGPT/...`). Work found in another copy should be moved here, then that copy deleted.
-- **Branch:** `feature/flow-style-ui` (PR ruddvz/hushkey#3 into `main`). `feature/hushkey-macos-prototype` is retired. Don't push to it.
+- **Branch:** `feature/flow-style-ui`. It was merged into `main` (ruddvz/hushkey#3, 2026-11-04); keep working here and open a new PR into `main` when a batch is ready. `feature/hushkey-macos-prototype` and `rudx/eval-harness` are retired. Don't push to them.
 - Before starting: `git pull --ff-only`. Commit small, focused changes and push when done, so the other agent can pull them.
 - If another agent may be editing at the same time, use a git worktree on its own branch (`git worktree add ../HushKey-<task> -b <you>/<task>`) and merge back into `feature/flow-style-ui` when done. Never use bare `git stash` (the stash list is shared).
 - Record what you finished and what's next in `PROGRESS.md`.

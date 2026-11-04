@@ -17,7 +17,9 @@ struct HubToolbar: View {
     @State private var themeTurns = 0.0
 
     var body: some View {
-        HStack(spacing: Theme.s1) {
+        // Measured against Wispr Flow: the sidebar toggle sits 99 pt in, level with the traffic
+        // lights; theme, bell and profile are 36 pt apart, the last 22 pt from the edge.
+        HStack(spacing: Theme.s2) {
             Button {
                 withAnimation(reduceMotion ? nil : Theme.glide) { collapsed.toggle() }
             } label: {
@@ -27,10 +29,9 @@ struct HubToolbar: View {
             .keyboardShortcut("s", modifiers: [.control, .command])
             .help(collapsed ? "Show sidebar (⌃⌘S)" : "Hide sidebar (⌃⌘S)")
             .accessibilityLabel(collapsed ? "Show sidebar" : "Hide sidebar")
-            .padding(.leading, 78) // clears the window controls
+            .padding(.leading, 85) // clears the window controls; centred 99 pt in
 
             LiveActivityChip()
-                .padding(.leading, Theme.s2)
 
             Spacer()
 
@@ -82,7 +83,7 @@ struct HubToolbar: View {
             .help("Your profile")
             .accessibilityLabel("Profile")
         }
-        .padding(.trailing, Theme.s3)
+        .padding(.trailing, Theme.s2)
     }
 
     private var isDark: Bool {
@@ -234,7 +235,7 @@ struct Notice: Identifiable {
             notices.append(Notice(id: "shortcut", kind: .attention, icon: .keyboard,
                                   title: "Your dictation key needs a hand", detail: model.dictationShortcutStatus,
                                   action: "Fix it") { model in
-                UserDefaults.standard.set(SettingsView.Section.general.rawValue, forKey: "settingsSection")
+                UserDefaults.standard.set(SettingsView.Section.shortcuts.rawValue, forKey: "settingsSection")
                 model.screen = .settings
             })
         }

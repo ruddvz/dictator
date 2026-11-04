@@ -611,6 +611,24 @@ final class TextInsertionService {
         return field.substring(with: NSRange(location: range.location, length: range.length))
     }
 
+    /// The fixed undo shortcut, ⌥⇧U.
+    static let undoShortcut = KeyCombo(.key(UInt32(kVK_ANSI_U)), modifiers: [.option, .shift])
+
+    /// Settings is recording a shortcut; free the keys until it's done.
+    func suspendShortcuts() {
+        hotKey.unregister()
+        undoHotKey.unregister()
+    }
+
+    func resumeShortcuts() {
+        guard isEnabled else { return }
+        registerShortcut()
+        _ = undoHotKey.register(keyCode: Self.undoShortcut.keyCode,
+                                modifiers: Self.undoShortcut.carbonModifiers) { [weak self] in
+            self?.onUndoShortcut?()
+        }
+    }
+
     private func registerShortcut() {
         let result = hotKey.register(keyCode: shortcut.keyCode, modifiers: shortcut.carbonModifiers) { [weak self] in
             self?.onInsertShortcut?()

@@ -6,18 +6,31 @@ import SwiftUI
 /// (label, one-line description, right-aligned control) on the right.
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
-    @AppStorage("settingsSection") private var section: Section = .general
+    @AppStorage("settingsSection") private var section: Section = .dictation
 
+    /// Short sections, so none scrolls for screens. "General" was split into the first five;
+    /// a saved "General" falls back to Dictation.
     enum Section: String, CaseIterable, Identifiable {
-        case general = "General"
+        case dictation = "Dictation"
+        case shortcuts = "Shortcuts"
+        case cleanup = "Cleanup"
+        case system = "System"
+        case appearance = "Appearance"
         case insertion = "Insertion"
         case data = "Data & privacy"
         case about = "About"
         var id: String { rawValue }
 
+        /// Where links to the old General section land.
+        static var general: Section { .dictation }
+
         var icon: HushIcon {
             switch self {
-            case .general: .settings
+            case .dictation: .mic
+            case .shortcuts: .keyboard
+            case .cleanup: .sparkle
+            case .system: .settings
+            case .appearance: .sun
             case .insertion: .cursor
             case .data: .shield
             case .about: .info
@@ -27,7 +40,7 @@ struct SettingsView: View {
 
     var body: some View {
         // The title and section nav stay put; only the section's content scrolls, so the nav is
-        // always in reach on long sections such as General.
+        // always in reach.
         VStack(alignment: .leading, spacing: Theme.s5) {
             PageHeader(eyebrow: "", title: "Settings", subtitle: "")
 
@@ -37,7 +50,11 @@ struct SettingsView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: Theme.s6) {
                         switch section {
-                        case .general: GeneralSettings()
+                        case .dictation: DictationSettings()
+                        case .shortcuts: ShortcutSettings()
+                        case .cleanup: CleanupSettings()
+                        case .system: SystemSettings()
+                        case .appearance: AppearanceSettings()
                         case .insertion: InsertionSettings()
                         case .data: DataSettings()
                         case .about: AboutSettings()
@@ -105,22 +122,65 @@ private struct SettingsNav: View {
     }
 }
 
-// MARK: - General
+// MARK: - Dictation
 
-private struct GeneralSettings: View {
+private struct DictationSettings: View {
     @Environment(AppModel.self) private var model
-    @AppStorage(AppearancePreference.storageKey) private var appearance: AppearancePreference = .light
 
     var body: some View {
         @Bindable var model = model
         @Bindable var audio = model.audio
 
         SettingsGroup(title: "Dictation") {
+            SettingsRow(title: "Language", detail: "Recognized on this Mac. Nothing is sent online.") {
+                LanguageButton(selection: $model.dictationLanguage)
+            }
+            DictationEngineRows()
+            SettingsRow(title: "Microphone", detail: microphoneDetail,
+                        detailTint: (audio.error ?? model.transcriber.error) == nil ? Theme.ink2 : Theme.danger) {
+                MenuPicker(selection: $audio.selectedDeviceID,
+                           options: [(AudioDeviceID?.none, "System default")]
+                            + audio.devices.map { (Optional($0.id), $0.name) })
+                    .disabled(audio.isRunning || audio.isStarting)
+                    .help("Stop recording before changing microphones.")
+            }
+        }
+
+        SettingsGroup(title: "While you dictate") {
+            SettingsRow(title: "Dictation bar", detail: "The small bar at the bottom of your screen.") {
+                RowToggle(isOn: $model.showsFloatingPill, label: "Show the dictation bar")
+            }
+            SettingsRow(title: "Sounds", detail: "A soft cue when the mic opens, when text lands, and when something fails.") {
+                RowToggle(isOn: $model.playsDictationSounds, label: "Play dictation sounds")
+            }
+        }
+    }
+
+    private var microphoneDetail: String {
+        if let error = model.audio.error ?? model.transcriber.error { return error }
+        if let name = model.audio.activeDeviceName { return "Listening with \(name)." }
+        return "Used for dictation and meeting notes. Audio is never saved."
+    }
+}
+
+// MARK: - Shortcuts
+
+private struct ShortcutSettings: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        @Bindable var model = model
+        let insertion = model.insertion
+
+        SettingsGroup(title: "Dictation",
+                      footer: "Click a shortcut, then press the new keys. fn, a key with ⌘, ⌥ or ⌃, or a side mouse button all work.") {
             SettingsRow(title: "Dictation key",
                         detail: model.dictationShortcutStatus,
                         detailTint: model.dictationShortcutNeedsAttention ? Theme.danger : Theme.ink2) {
-                MenuPicker(selection: $model.dictationShortcut,
-                           options: DictationShortcut.allCases.map { ($0, $0.menuTitle) })
+                ShortcutRecorder(action: .dictation, combo: model.dictationShortcut.combo,
+                                 defaultCombo: DictationShortcut.default.combo, resetLabel: "Reset to fn") {
+                    if let combo = $0 { model.dictationShortcut = DictationShortcut(combo) }
+                }
             }
             if model.dictationShortcut.usesFunctionKey, model.dictationShortcutNeedsAttention {
                 GroupRow {
@@ -147,40 +207,54 @@ private struct GeneralSettings: View {
                                options: DictationCaptureBehavior.allCases.map { ($0, $0.rawValue) })
                 }
             }
-            SettingsRow(title: "Language", detail: "Recognized on this Mac. Nothing is sent online.") {
-                LanguageButton(selection: $model.dictationLanguage)
-            }
-            DictationEngineRows()
-            SettingsRow(title: "Microphone", detail: microphoneDetail,
-                        detailTint: (audio.error ?? model.transcriber.error) == nil ? Theme.ink2 : Theme.danger) {
-                MenuPicker(selection: $audio.selectedDeviceID,
-                           options: [(AudioDeviceID?.none, "System default")]
-                            + audio.devices.map { (Optional($0.id), $0.name) })
-                    .disabled(audio.isRunning || audio.isStarting)
-                    .help("Stop recording before changing microphones.")
-            }
-            SettingsRow(title: "Dictation bar", detail: "The small bar at the bottom of your screen.") {
-                RowToggle(isOn: $model.showsFloatingPill, label: "Show the dictation bar")
-            }
-            SettingsRow(title: "Sounds", detail: "A soft cue when the mic opens, when text lands, and when something fails.") {
-                RowToggle(isOn: $model.playsDictationSounds, label: "Play dictation sounds")
+            SettingsRow(title: "Paste last transcript", detail: model.pasteLastShortcutStatus) {
+                ShortcutRecorder(action: .pasteLast, combo: model.pasteLastShortcut?.combo,
+                                 defaultCombo: PasteLastShortcut.default.combo, allowsTurningOff: true) {
+                    model.pasteLastShortcut = $0.map(PasteLastShortcut.init)
+                }
             }
         }
 
-        SettingsGroup(title: "System", footer: model.launchAtLoginMessage) {
-            SettingsRow(title: "Launch at login",
-                        detail: "HushKey works from the menu bar with its window closed. Starting at login keeps fn ready.") {
-                RowToggle(isOn: Binding(get: { model.launchesAtLogin }, set: { model.setLaunchesAtLogin($0) }),
-                          label: "Launch HushKey at login")
+        SettingsGroup(title: "Editing and inserting") {
+            SettingsRow(title: "Edit selected text by voice", detail: model.selectedTextEditShortcutStatus) {
+                ShortcutRecorder(action: .editSelection, combo: model.selectedTextEditShortcut.combo,
+                                 defaultCombo: SelectedTextEditShortcut.default.combo) {
+                    if let combo = $0 { model.selectedTextEditShortcut = SelectedTextEditShortcut(combo) }
+                }
             }
-            SettingsRow(title: "Show in Dock", detail: "Off keeps HushKey in the menu bar only.") {
-                RowToggle(isOn: $model.showsInDock, label: "Show HushKey in the Dock")
+            SettingsRow(title: "Insert again",
+                        detail: insertion.isEnabled ? "Types the last transcript or silent word again, from Dictation or Silent Use."
+                            : "Turn on typing in Insertion to use this.") {
+                ShortcutRecorder(action: .insertAgain, combo: insertion.shortcut.combo,
+                                 defaultCombo: InsertionShortcut.default.combo) {
+                    if let combo = $0 { insertion.shortcut = InsertionShortcut(combo) }
+                }
             }
-            SettingsRow(title: "Mute audio while dictating",
-                        detail: "Music and videos go quiet while the mic is open, then come back.") {
-                RowToggle(isOn: $model.mutesAudioWhileDictating, label: "Mute audio while dictating")
+            .disabled(!insertion.isEnabled)
+            .opacity(insertion.isEnabled ? 1 : 0.5)
+            SettingsRow(title: "Undo the last insertion", detail: "Right after, while the field is unchanged.") {
+                KeycapShortcut(label: TextInsertionService.undoShortcut.label, size: 12)
             }
         }
+
+        SettingsGroup(title: "Silent input") {
+            SettingsRow(title: "Silent capture", detail: "Hold to capture a word in Train or Silent Use. Holding Control works too.") {
+                ShortcutRecorder(action: .silentCapture, combo: model.captureShortcut.combo,
+                                 defaultCombo: CaptureShortcut.default.combo) {
+                    if let combo = $0 { model.captureShortcut = CaptureShortcut(combo) }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Cleanup
+
+private struct CleanupSettings: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        @Bindable var model = model
 
         SettingsGroup(title: "Cleanup") {
             SettingsRow(title: "Spoken corrections",
@@ -214,22 +288,45 @@ private struct GeneralSettings: View {
             }
         }
 
-        SettingsGroup(title: "Shortcuts") {
-            SettingsRow(title: "Edit selected text by voice", detail: model.selectedTextEditShortcutStatus) {
-                MenuPicker(selection: $model.selectedTextEditShortcut,
-                           options: SelectedTextEditShortcut.allCases.map { ($0, $0.label) })
-            }
-            SettingsRow(title: "Silent capture", detail: "Hold to capture a word in Train or Silent Use.") {
-                MenuPicker(selection: $model.captureShortcut,
-                           options: CaptureShortcut.allCases.map { ($0, $0.label) })
-            }
-        }
-
         SettingsGroup(title: "App profiles",
                       footer: "In Automatic mode, profiles can set writing mode, vocabulary, language, snippets, corrections, filler cleanup and a writing style. App names stay on this Mac.") {
             DictationAppProfilesEditor()
         }
+    }
+}
 
+// MARK: - System
+
+private struct SystemSettings: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        @Bindable var model = model
+
+        SettingsGroup(title: "System", footer: model.launchAtLoginMessage) {
+            SettingsRow(title: "Launch at login",
+                        detail: "HushKey works from the menu bar with its window closed. Starting at login keeps fn ready.") {
+                RowToggle(isOn: Binding(get: { model.launchesAtLogin }, set: { model.setLaunchesAtLogin($0) }),
+                          label: "Launch HushKey at login")
+            }
+            SettingsRow(title: "Always show in Dock",
+                        detail: "Off keeps HushKey in the menu bar, with a Dock icon only while this window is open.") {
+                RowToggle(isOn: $model.showsInDock, label: "Always show HushKey in the Dock")
+            }
+            SettingsRow(title: "Mute audio while dictating",
+                        detail: "Music and videos go quiet while the mic is open, then come back.") {
+                RowToggle(isOn: $model.mutesAudioWhileDictating, label: "Mute audio while dictating")
+            }
+        }
+    }
+}
+
+// MARK: - Appearance
+
+private struct AppearanceSettings: View {
+    @AppStorage(AppearancePreference.storageKey) private var appearance: AppearancePreference = .light
+
+    var body: some View {
         SettingsGroup(title: "Appearance") {
             SettingsRow(title: "Theme", detail: "Fog by day, deep sage at night.") {
                 MenuPicker(selection: $appearance,
@@ -237,18 +334,13 @@ private struct GeneralSettings: View {
             }
         }
     }
-
-    private var microphoneDetail: String {
-        if let error = model.audio.error ?? model.transcriber.error { return error }
-        if let name = model.audio.activeDeviceName { return "Listening with \(name)." }
-        return "Used for dictation and meeting notes. Audio is never saved."
-    }
 }
 
 // MARK: - Insertion
 
 private struct InsertionSettings: View {
     @Environment(AppModel.self) private var model
+    @AppStorage("settingsSection") private var section: SettingsView.Section = .insertion
 
     var body: some View {
         @Bindable var insertion = model.insertion
@@ -260,19 +352,15 @@ private struct InsertionSettings: View {
             SettingsRow(title: "Type where your cursor is", detail: "Dictation goes straight into the text box you’re in.") {
                 RowToggle(isOn: enabled, label: "Type into the focused field")
             }
-            SettingsRow(title: "Insert shortcut", detail: "Types the last transcript or silent word again.") {
-                MenuPicker(selection: $insertion.shortcut,
-                           options: InsertionShortcut.allCases.map { ($0, $0.label) })
-            }
-            .disabled(!insertion.isEnabled)
-            .opacity(insertion.isEnabled ? 1 : 0.5)
             SettingsRow(title: "Paste when typing is blocked", detail: "Verifies the exact text field; restores the clipboard when safe.") {
                 RowToggle(isOn: $insertion.allowsPasteFallback, label: "Paste fallback")
             }
             .disabled(!insertion.isEnabled)
             .opacity(insertion.isEnabled ? 1 : 0.5)
-            SettingsRow(title: "Undo the last insertion", detail: "Right after, while the field is unchanged.") {
-                KeycapShortcut(label: "⌥⇧U", size: 13)
+            SettingsRow(title: "Insert again and undo",
+                        detail: "\(insertion.shortcut.label) types the last text again; \(TextInsertionService.undoShortcut.label) undoes it while the field is unchanged.") {
+                Button("Shortcuts") { section = .shortcuts }
+                    .buttonStyle(SecondaryButtonStyle(minWidth: 96))
             }
         }
     }
@@ -295,6 +383,15 @@ private struct DataSettings: View {
             SettingsRow(title: "Keep recent transcripts", detail: "Clear them any time from the Dictation page.") {
                 RowToggle(isOn: $model.savesDictationHistory, label: "Save recent transcripts")
             }
+            SettingsRow(title: "Delete transcripts after",
+                        detail: model.dictationHistoryRetention == .forever
+                            ? "Saved transcripts stay until you delete them."
+                            : "Older ones are deleted from this Mac, checked whenever HushKey is open.") {
+                MenuPicker(selection: $model.dictationHistoryRetention,
+                           options: DictationHistoryRetention.allCases.map { ($0, $0.label) })
+            }
+            .disabled(!model.savesDictationHistory)
+            .opacity(model.savesDictationHistory ? 1 : 0.5)
         }
 
         SettingsGroup(title: "Your files", footer: model.dataMessage) {

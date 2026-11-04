@@ -1,35 +1,29 @@
 import AppKit
+import Carbon.HIToolbox
 
 /// In-app recording shortcuts. HushKey never registers a global event tap.
-enum CaptureShortcut: String, CaseIterable, Identifiable {
-    case optionShiftM
-    case controlShiftM
-    case optionShiftReturn
+struct CaptureShortcut: RecordedShortcut {
+    let combo: KeyCombo
+    init(_ combo: KeyCombo) { self.combo = combo }
 
+    static let action = ShortcutAction.silentCapture
     static let preferenceKey = "captureShortcut"
-    static let `default` = CaptureShortcut.optionShiftM
+    static let `default` = CaptureShortcut(KeyCombo(.key(UInt32(kVK_ANSI_M)), modifiers: [.option, .shift]))
 
-    var id: String { rawValue }
+    /// Matched against local key events, which carry a `UInt16` code.
+    var keyCode: UInt16 { UInt16(truncatingIfNeeded: combo.keyCode) }
+    var modifiers: NSEvent.ModifierFlags { combo.modifiers.eventFlags }
+}
 
-    var keyCode: UInt16 {
-        switch self {
-        case .optionShiftReturn: 36
-        case .optionShiftM, .controlShiftM: 46
-        }
-    }
+/// Pastes the last dictation into the field it came from, from any app (Flow uses ⌃⌘V too).
+/// It can be turned off; the menu bar item stays either way.
+struct PasteLastShortcut: RecordedShortcut {
+    let combo: KeyCombo
+    init(_ combo: KeyCombo) { self.combo = combo }
 
-    var modifiers: NSEvent.ModifierFlags {
-        switch self {
-        case .optionShiftM, .optionShiftReturn: [.option, .shift]
-        case .controlShiftM: [.control, .shift]
-        }
-    }
-
-    var label: String {
-        switch self {
-        case .optionShiftM: "⌥⇧M"
-        case .controlShiftM: "⌃⇧M"
-        case .optionShiftReturn: "⌥⇧↩"
-        }
-    }
+    static let action = ShortcutAction.pasteLast
+    static let preferenceKey = "pasteLastShortcut"
+    static let `default` = PasteLastShortcut(KeyCombo(.key(UInt32(kVK_ANSI_V)), modifiers: [.control, .command]))
+    /// Stored when the person clears the shortcut, so the default doesn't come back.
+    static let offValue = "off"
 }

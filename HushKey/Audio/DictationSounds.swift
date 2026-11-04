@@ -60,21 +60,26 @@ enum DictationCue: CaseIterable {
     }
 }
 
-/// Plays `DictationCue`s. Players are built once and reused so a cue starts without delay.
-@MainActor
-final class DictationSoundPlayer {
+/// Plays `DictationCue`s. Players are built once and reused so a cue starts without delay, and
+/// they play on their own queue: starting audio output can take 30–100 ms, which on the main
+/// thread held up the pill's first listening frame.
+final class DictationSoundPlayer: @unchecked Sendable {
+    private let queue = DispatchQueue(label: "com.ruddvz.hushkey.cues", qos: .userInteractive)
+    /// Only touched on `queue`.
     private var players: [DictationCue: AVAudioPlayer] = [:]
 
     func play(_ cue: DictationCue, volume: Float = 0.6) {
-        let player = players[cue] ?? {
-            let made = try? AVAudioPlayer(data: cue.wavData)
-            made?.prepareToPlay()
-            players[cue] = made
-            return made
-        }()
-        guard let player else { return }
-        player.volume = volume
-        player.currentTime = 0
-        player.play()
+        queue.async { [self] in
+            let player = players[cue] ?? {
+                let made = try? AVAudioPlayer(data: cue.wavData)
+                made?.prepareToPlay()
+                players[cue] = made
+                return made
+            }()
+            guard let player else { return }
+            player.volume = volume
+            player.currentTime = 0
+            player.play()
+        }
     }
 }
