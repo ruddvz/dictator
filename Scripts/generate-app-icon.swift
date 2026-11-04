@@ -141,9 +141,8 @@ func drawAppIcon(_ context: CGContext, side: CGFloat) {
     context.restoreGState()
 }
 
-/// Template glyph: the ribbon alone. While dictating it opens into a fuller lens.
-func drawMenuBarMark(_ context: CGContext, scale: CGFloat, live: Bool) {
-    context.scaleBy(x: scale, y: scale)
+/// Template glyph: the ribbon alone, on an 18 pt canvas. While dictating it opens into a fuller lens.
+func drawMenuBarMark(_ context: CGContext, live: Bool) {
     context.setFillColor(hex(0x000000))
     context.addPath(ribbon(in: CGRect(x: 0.5, y: 2.5, width: 17, height: 13),
                            amplitude: live ? 0.14 : 0.23, thickness: live ? 0.36 : 0.28, taper: live ? 1 : 1.1))
@@ -155,21 +154,35 @@ for (filename, size) in appIconSizes {
         drawAppIcon($0, side: CGFloat(size))
     }
 }
+// The glyphs are vector PDFs, so the menu bar and the larger sidebar brand row both draw them crisply.
 for (url, name, live) in [(menuIconURL, "HushKeyMenuBar", false), (liveMenuIconURL, "HushKeyMenuBarLive", true)] {
-    for scale in [1, 2] {
-        let file = scale == 1 ? "\(name).png" : "\(name)@2x.png"
-        try renderPNG(width: 18 * scale, height: 18 * scale, to: url.appendingPathComponent(file)) {
-            drawMenuBarMark($0, scale: CGFloat(scale), live: live)
-        }
+    for old in ["\(name).png", "\(name)@2x.png"] {
+        try? FileManager.default.removeItem(at: url.appendingPathComponent(old))
+    }
+    var mediaBox = CGRect(x: 0, y: 0, width: 18, height: 18)
+    let data = NSMutableData()
+    let pdf = CGContext(consumer: CGDataConsumer(data: data)!, mediaBox: &mediaBox, nil)!
+    pdf.beginPDFPage(nil)
+    drawMenuBarMark(pdf, live: live)
+    pdf.endPDFPage()
+    pdf.closePDF()
+    // Quartz stamps each PDF with dates and an ID; rewrite only when the drawing changed, so
+    // packaging leaves the asset catalog clean.
+    let pdfURL = url.appendingPathComponent("\(name).pdf")
+    func drawing(_ pdf: Data) -> String {
+        String(decoding: pdf, as: UTF8.self)
+            .replacingOccurrences(of: #"/(CreationDate|ModDate)\s*\([^)]*\)|/ID\s*\[[^\]]*\]"#, with: "", options: .regularExpression)
+    }
+    if (try? Data(contentsOf: pdfURL)).map(drawing) != drawing(data as Data) {
+        try (data as Data).write(to: pdfURL, options: .atomic)
     }
     let contents = """
     {
       "images" : [
-        { "filename" : "\(name).png", "idiom" : "universal", "scale" : "1x" },
-        { "filename" : "\(name)@2x.png", "idiom" : "universal", "scale" : "2x" }
+        { "filename" : "\(name).pdf", "idiom" : "universal" }
       ],
       "info" : { "author" : "xcode", "version" : 1 },
-      "properties" : { "template-rendering-intent" : "template" }
+      "properties" : { "preserves-vector-representation" : true, "template-rendering-intent" : "template" }
     }
 
     """

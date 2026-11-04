@@ -1,8 +1,7 @@
 {
   "images" : [
-    { "filename" : "HushKeyMenuBarLive.png", "idiom" : "universal", "scale" : "1x" },
-    { "filename" : "HushKeyMenuBarLive@2x.png", "idiom" : "universal", "scale" : "2x" }
+    { "filename" : "HushKeyMenuBarLive.pdf", "idiom" : "universal" }
   ],
   "info" : { "author" : "xcode", "version" : 1 },
-  "properties" : { "template-rendering-intent" : "template" }
+  "properties" : { "preserves-vector-representation" : true, "template-rendering-intent" : "template" }
 }
