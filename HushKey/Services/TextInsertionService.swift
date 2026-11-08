@@ -110,14 +110,7 @@ final class TextInsertionService {
               app.bundleIdentifier != "com.ruddvz.hushkey" else { return [] }
         exposeWebContent(of: app)
 
-        let systemWide = AXUIElementCreateSystemWide()
-        var focusedValue: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedValue) == .success,
-              let focusedValue, CFGetTypeID(focusedValue) == AXUIElementGetTypeID() else { return [] }
-        let focused = focusedValue as! AXUIElement
-        var processIdentifier: pid_t = 0
-        guard AXUIElementGetPid(focused, &processIdentifier) == .success,
-              processIdentifier == app.processIdentifier else { return [] }
+        guard let focused = focusedElement(expectedProcessIdentifier: app.processIdentifier) else { return [] }
         let role = stringAttribute(kAXRoleAttribute, of: focused) ?? ""
         let subrole = stringAttribute(kAXSubroleAttribute, of: focused) ?? ""
         var isPassword: CFTypeRef?
@@ -146,14 +139,7 @@ final class TextInsertionService {
               app.processIdentifier != NSRunningApplication.current.processIdentifier,
               app.bundleIdentifier != "com.ruddvz.hushkey" else { return nil }
         exposeWebContent(of: app)
-        let systemWide = AXUIElementCreateSystemWide()
-        var focusedValue: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedValue) == .success,
-              let focusedValue, CFGetTypeID(focusedValue) == AXUIElementGetTypeID() else { return nil }
-        let focused = focusedValue as! AXUIElement
-        var focusedPID: pid_t = 0
-        guard AXUIElementGetPid(focused, &focusedPID) == .success,
-              focusedPID == app.processIdentifier else { return nil }
+        guard let focused = focusedElement(expectedProcessIdentifier: app.processIdentifier) else { return nil }
         let role = stringAttribute(kAXRoleAttribute, of: focused) ?? ""
         let subrole = stringAttribute(kAXSubroleAttribute, of: focused) ?? ""
         var isPassword: CFTypeRef?
@@ -247,18 +233,8 @@ final class TextInsertionService {
             return false
         }
 
-        let systemWide = AXUIElementCreateSystemWide()
-        var focusedValue: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedValue) == .success,
-              let focusedValue, CFGetTypeID(focusedValue) == AXUIElementGetTypeID() else {
+        guard let focused = focusedElement(expectedProcessIdentifier: app.processIdentifier) else {
             status = "Could not inspect the focused control. Nothing was inserted."
-            return false
-        }
-        let focused = focusedValue as! AXUIElement
-        var focusedPID: pid_t = 0
-        guard AXUIElementGetPid(focused, &focusedPID) == .success,
-              focusedPID == app.processIdentifier else {
-            status = "The focused control changed. Nothing was inserted."
             return false
         }
 
@@ -279,10 +255,12 @@ final class TextInsertionService {
         }
 
         // Re-check the frontmost process and exact focused element immediately before mutation.
-        var currentValue: CFTypeRef?
+        guard let current = focusedElement(expectedProcessIdentifier: app.processIdentifier) else {
+            status = "Focus changed before insertion. Nothing was inserted."
+            return false
+        }
         guard NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier,
-              AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &currentValue) == .success,
-              let currentValue, CFEqual(focused, currentValue) else {
+              CFEqual(focused, current) else {
             status = "Focus changed before insertion. Nothing was inserted."
             return false
         }
@@ -318,7 +296,8 @@ final class TextInsertionService {
             try? await Task.sleep(nanoseconds: 180_000_000)
         }
         guard NSWorkspace.shared.frontmostApplication?.processIdentifier == target.processIdentifier,
-              let focused = focusedElement(), CFEqual(target.element, focused),
+              let focused = focusedElement(expectedProcessIdentifier: target.processIdentifier),
+              CFEqual(target.element, focused),
               let role = stringAttribute(kAXRoleAttribute, of: focused),
               Self.isSupportedTextTarget(role: role, subrole: stringAttribute(kAXSubroleAttribute, of: focused) ?? ""),
               let currentValue = stringAttribute(kAXValueAttribute, of: focused),
@@ -337,7 +316,7 @@ final class TextInsertionService {
         guard NSWorkspace.shared.frontmostApplication?.processIdentifier == target.processIdentifier else {
             return (false, false)
         }
-        guard let focused = focusedElement() else { return (true, false) }
+        guard let focused = focusedElement(expectedProcessIdentifier: target.processIdentifier) else { return (true, false) }
         return (true, CFEqual(target.element, focused))
     }
 
@@ -345,7 +324,7 @@ final class TextInsertionService {
         guard NSWorkspace.shared.frontmostApplication?.processIdentifier == target.processIdentifier else {
             return (false, false)
         }
-        guard let focused = focusedElement() else { return (true, false) }
+        guard let focused = focusedElement(expectedProcessIdentifier: target.processIdentifier) else { return (true, false) }
         return (true, CFEqual(target.element, focused))
     }
 
@@ -369,7 +348,8 @@ final class TextInsertionService {
             return false
         }
         let state = focusState(of: target)
-        guard state.appIsFrontmost, state.fieldIsFocused, let focused = focusedElement() else {
+        guard state.appIsFrontmost, state.fieldIsFocused,
+              let focused = focusedElement(expectedProcessIdentifier: target.processIdentifier) else {
             status = "\(target.applicationName) or its text field is no longer focused. Nothing was inserted."
             return false
         }
@@ -384,7 +364,8 @@ final class TextInsertionService {
         guard isEnabled, allowsPasteFallback, AXIsProcessTrusted(), !app.isTerminated,
               NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier else { return nil }
         exposeWebContent(of: app)
-        guard let focused = focusedElement(), !isPasswordElement(focused) else { return nil }
+        guard let focused = focusedElement(expectedProcessIdentifier: app.processIdentifier),
+              !isPasswordElement(focused) else { return nil }
         var pid: pid_t = 0
         guard AXUIElementGetPid(focused, &pid) == .success, pid == app.processIdentifier else { return nil }
         let role = stringAttribute(kAXRoleAttribute, of: focused) ?? ""
@@ -413,7 +394,7 @@ final class TextInsertionService {
               app.bundleIdentifier != "com.ruddvz.hushkey" else { return false }
         exposeWebContent(of: app)
         let name = app.localizedName ?? "the app"
-        guard let focused = focusedElement() else {
+        guard let focused = focusedElement(expectedProcessIdentifier: app.processIdentifier) else {
             status = "Nothing has focus in \(name). Nothing was pasted."
             return false
         }
@@ -552,7 +533,8 @@ final class TextInsertionService {
         guard !app.isTerminated, app.processIdentifier == target.processIdentifier,
               app.bundleIdentifier == target.bundleIdentifier,
               NSWorkspace.shared.frontmostApplication?.processIdentifier == target.processIdentifier,
-              let current = focusedElement(), CFEqual(target.element, current) else { return nil }
+              let current = focusedElement(expectedProcessIdentifier: target.processIdentifier),
+              CFEqual(target.element, current) else { return nil }
         var pid: pid_t = 0
         guard AXUIElementGetPid(current, &pid) == .success, pid == target.processIdentifier,
               stringAttribute(kAXRoleAttribute, of: current) == target.role,
@@ -584,7 +566,7 @@ final class TextInsertionService {
     private func replacementFieldValue(_ target: PasteTarget, in app: NSRunningApplication) -> String? {
         var pid: pid_t = 0
         guard NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier,
-              let current = focusedElement(),
+              let current = focusedElement(expectedProcessIdentifier: target.processIdentifier),
               AXUIElementGetPid(current, &pid) == .success, pid == target.processIdentifier,
               stringAttribute(kAXRoleAttribute, of: current) == target.role else { return nil }
         return stringAttribute(kAXValueAttribute, of: current)
@@ -623,10 +605,8 @@ final class TextInsertionService {
             status = "Return to the same app and field before undoing. Nothing was changed."
             return false
         }
-        let systemWide = AXUIElementCreateSystemWide()
-        var currentValue: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &currentValue) == .success,
-              let currentValue, CFEqual(record.element, currentValue),
+        guard let current = focusedElement(expectedProcessIdentifier: record.processIdentifier),
+              CFEqual(record.element, current),
               stringAttribute(kAXValueAttribute, of: record.element).map(Self.fingerprint) == record.expectedFingerprint,
               NSWorkspace.shared.frontmostApplication?.bundleIdentifier == record.bundleIdentifier else {
             undoRecord = nil
@@ -753,7 +733,7 @@ final class TextInsertionService {
     func logFocus(_ moment: String) {
         let app = NSWorkspace.shared.frontmostApplication
         var line = "\(moment): enabled=\(isEnabled) trusted=\(AXIsProcessTrusted()) app=\(app?.bundleIdentifier ?? "none")"
-        if let focused = focusedElement() {
+        if let focused = focusedElement(expectedProcessIdentifier: app?.processIdentifier) {
             var settable = DarwinBoolean(false)
             let settableResult = AXUIElementIsAttributeSettable(focused, kAXSelectedTextAttribute as CFString, &settable)
             line += " role=\(stringAttribute(kAXRoleAttribute, of: focused) ?? "nil")"
@@ -762,10 +742,7 @@ final class TextInsertionService {
             line += " hasRange=\(selectedTextRange(of: focused) != nil)"
             line += " selectedTextSettable=\(settableResult.rawValue):\(settable.boolValue)"
         } else {
-            var value: CFTypeRef?
-            let result = AXUIElementCopyAttributeValue(AXUIElementCreateSystemWide(),
-                                                       kAXFocusedUIElementAttribute as CFString, &value)
-            line += " focused=none(\(result.rawValue))"
+            line += " focused=none"
         }
         log.notice("\(line, privacy: .public) status=\(self.status, privacy: .public)")
     }
@@ -777,12 +754,51 @@ final class TextInsertionService {
             && (value as? Bool) == true
     }
 
-    private func focusedElement() -> AXUIElement? {
+    private func focusedElement(expectedProcessIdentifier: pid_t? = nil) -> AXUIElement? {
         let systemWide = AXUIElementCreateSystemWide()
-        var focusedValue: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedValue) == .success,
-              let focusedValue, CFGetTypeID(focusedValue) == AXUIElementGetTypeID() else { return nil }
-        return (focusedValue as! AXUIElement)
+        let focusedApplication = accessibilityElement(kAXFocusedApplicationAttribute, of: systemWide)
+        let applicationFocus = focusedApplication.flatMap {
+            accessibilityElement(kAXFocusedUIElementAttribute, of: $0)
+        }
+        let systemWideFocus = accessibilityElement(kAXFocusedUIElementAttribute, of: systemWide)
+        let frontmostFocus: AXUIElement?
+        if let app = NSWorkspace.shared.frontmostApplication {
+            let appElement = AXUIElementCreateApplication(app.processIdentifier)
+            frontmostFocus = accessibilityElement(kAXFocusedUIElementAttribute, of: appElement)
+        } else {
+            frontmostFocus = nil
+        }
+        return Self.preferredFocusedElement(applicationFocusedElement: applicationFocus,
+                                            systemWideFocusedElement: systemWideFocus,
+                                            frontmostApplicationFocusedElement: frontmostFocus,
+                                            expectedProcessIdentifier: expectedProcessIdentifier,
+                                            processIdentifier: Self.processIdentifier(of:))
+    }
+
+    private func accessibilityElement(_ attribute: String, of parent: AXUIElement) -> AXUIElement? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(parent, attribute as CFString, &value) == .success,
+              let value, CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
+        return (value as! AXUIElement)
+    }
+
+    nonisolated static func preferredFocusedElement<Element>(applicationFocusedElement: Element?,
+                                                             systemWideFocusedElement: Element?,
+                                                             frontmostApplicationFocusedElement: Element?,
+                                                             expectedProcessIdentifier: pid_t?,
+                                                             processIdentifier: (Element) -> pid_t?) -> Element? {
+        for candidate in [applicationFocusedElement, systemWideFocusedElement,
+                          frontmostApplicationFocusedElement].compactMap({ $0 }) {
+            guard let expectedProcessIdentifier else { return candidate }
+            if processIdentifier(candidate) == expectedProcessIdentifier { return candidate }
+        }
+        return nil
+    }
+
+    nonisolated private static func processIdentifier(of element: AXUIElement) -> pid_t? {
+        var processIdentifier: pid_t = 0
+        guard AXUIElementGetPid(element, &processIdentifier) == .success else { return nil }
+        return processIdentifier
     }
 
     private func performInsertion(_ text: String, app: NSRunningApplication, element: AXUIElement,
@@ -792,7 +808,8 @@ final class TextInsertionService {
         var focusedPID: pid_t = 0
         var settable = DarwinBoolean(false)
         guard NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier,
-              let currentElement = focusedElement(), CFEqual(element, currentElement),
+              let currentElement = focusedElement(expectedProcessIdentifier: app.processIdentifier),
+              CFEqual(element, currentElement),
               AXUIElementGetPid(currentElement, &focusedPID) == .success,
               focusedPID == app.processIdentifier,
               Self.isSupportedTextTarget(role: stringAttribute(kAXRoleAttribute, of: currentElement) ?? "",

@@ -1,5 +1,12 @@
 # HushKey progress
 
+## Fixed: app-focused text insertion lookup (2026-11-08)
+
+- **Root cause:** HushKey asked the system-wide Accessibility object for the focused UI element. On this Mac, that query returned `AX no value` for focused text fields across apps, so dictation fell back to the “No text box selected” / Copy card.
+- **Fix:** resolve the focused application’s own focused element first, then use system-wide/frontmost fallbacks. Check candidate process IDs against the intended target before insertion. Added four resolver tests in `InsertionFocusResolutionTests.swift`.
+- **Verification:** 368 tests passed, 8 skipped, 0 failures. The Release build and packaged app passed strict signature verification at version 1.0.0 (1). A no-microphone live-typing rehearsal inserted and visibly verified text in a separate blank macOS test app.
+- **Open:** a real microphone dictation session still needs a hands-on check. GitHub Actions run #298 failed before a runner was allocated, with no job steps or logs. The existing Swift 6 `NSEvent` Sendable warning remains at `ShortcutRecorder.swift:57`.
+
 ## Verified: repository and launch review (2026-11-08)
 
 - Checkout is clean and current with `origin/main` at `ea01639`; `xcodegen generate` produced no source changes.
