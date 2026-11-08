@@ -24,7 +24,7 @@ A survey of the views before the redesign found 18 distinct padding values, 18 s
 
 | Code | Token | Value | Use |
 | --- | --- | --- | --- |
-| R1 | `Theme.r1` | 16 | page sheet, hero banner |
+| R1 | `Theme.r1` | 16 | page sheet |
 | R2 | `Theme.r2` | 12 | cards, lists, checklist |
 | R3 | `Theme.r3` | 8 | sidebar rows, icon buttons |
 | R4 | `Capsule` | h ÷ 2 | buttons, chips, search, pill |
@@ -60,11 +60,11 @@ Measured from Wispr Flow 1.6 (Electron) in a 1350 × 850 pt window with backgrou
 | Page title | 28 semibold sans; ~48 below the sheet top; actions right-aligned on the same line | `hkTitle1` 28 rounded semibold; `PageHeader` takes trailing actions |
 | Buttons | 36 high, radius ~10, 16 horizontal padding, 15–16 medium; primary filled dark, secondary neutral fill | 36, `controlRadius` 10, 16 padding, `hkControl` 15 medium; primary sage, secondary `hover` fill, destructive red text |
 | Tabs | Text tabs 16, 2 pt underline under the selected one, hairline under the bar | `UnderlineTabs` 15, 2 pt ink underline (matched geometry) |
-| Hero banner | ~895 × 208 dark card, radius 16, blurred photo, 32 serif title, white Start now button | `HeroCard`: `heroBase` panel (dark in both modes) with `AmbientField` and a `BreathRibbon` at 78 % across; 28 padding, `display(30)` title whose last words are `heroGlow`, `heroInk2` detail, `heroInk` button with `heroBase` text; min 200 high, matches the stats card |
+| Hero banner | ~895 × 208 dark card, radius 16, blurred photo, 32 serif title, white Start now button | `HeroCard`: `heroBase` panel (dark in both modes) with `AmbientField` and a `BreathRibbon` at 78 % across; radius `r2`, `s5` padding, `hkTitle1` title whose last words are `heroGlow`, `heroInk2` detail, `heroInk` button with `heroBase` text; min 200 high, matches the stats card |
 | Lists | Outlined container, radius 12, 1 pt hairline, rows 52–53, text 16, 16 padding | `ListGroup` / `ListRow`, `r2` 12, rows ≥ 52, `hkBody` 16, 16 padding, hover fill + actions |
 | History row | Time column 82 + 16 gap, time 14 gray, text 16 on 20 line | Same: time 14 `ink2`, 82 wide; text 16, 3 pt line spacing |
 | Stats card | 248 wide, 24 padding, numbers 28, labels 16 | 248, 24 padding, `display(28)`, labels 15 |
-| Settings | Modal: 208 nav (caps section headers 11, rows 36) + content; serif 26 title; grouped filled card radius 12, 20 side padding; rows ~88 for two lines; label 16 medium, description 15 gray; controls 164 × 36 right-aligned | In-page: 176 nav + content; `SettingsGroup` (`well`, `r2`, 20 side padding), `SettingsRow` (`hkRowTitle` 16 medium, `hkCallout` 15, control right), `MenuPicker` 196 × 36, `RowToggle` |
+| Settings | Modal: 208 nav (caps section headers 11, rows 36) + content; serif 26 title; grouped filled card radius 12, 20 side padding; rows ~88 for two lines; label 16 medium, description 15 gray; controls 164 × 36 right-aligned | In-page: 176 nav + content; `SettingsGroup` (`well`, `r2`, `s4` 16 side padding; detail column capped at `Theme.detailWidth` 440), `SettingsRow` (`hkRowTitle` 16 medium, `hkCallout` 15, control right), `MenuPicker` 196 × 36, `RowToggle` |
 | Transform cards | 3-column grid, ~210 × 165, shortcut chip, 16 semibold title, 14 gray description, dashed "Create your own" | `TransformCard` 3 columns, min 132 high, badge chip, `hkHeadline`, `hkCaption`; dashed create card |
 | Toolbar icons | 28 × 28 | `IconButtonStyle` 30 × 30 |
 | Row hover | Fill plus trailing actions (play, copy, more) appear on hover | `ListRow`: `well` fill, actions fade and slide in 6 pt |

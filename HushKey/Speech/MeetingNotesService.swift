@@ -254,12 +254,14 @@ final class MeetingNotesService {
                 try? MeetingNotesDraftStore.delete(at: draftURL)
                 activeDraftID = nil
                 lastDraftCheckpointAt = nil
-                message = "No speech was recognized, so no meeting note was saved."
                 // macOS gives silent Mac audio, not an error, when System Audio Recording is off.
-                if presentsResult {
-                    notice = route == .systemAudio
-                        ? "No speech was heard, so nothing was saved. If others were talking, allow HushKey in System Settings › Privacy & Security › System Audio Recording."
-                        : "No speech was heard, so nothing was saved."
+                // The pill card fits two short lines, so the full path goes on the page (Open).
+                if route == .systemAudio {
+                    message = "No speech was heard, so nothing was saved. If others were talking, allow HushKey in System Settings › Privacy & Security › System Audio Recording."
+                    if presentsResult { notice = "No Mac audio heard. Open for help." }
+                } else {
+                    message = "No speech was recognized, so no meeting note was saved."
+                    if presentsResult { notice = "No speech was heard, so nothing was saved." }
                 }
             }
 

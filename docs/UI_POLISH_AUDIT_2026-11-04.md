@@ -18,7 +18,7 @@ To review a screen, run `HubSnapshotTests` or `PillSnapshotTests` with `TEST_RUN
 6. Use … only when more input follows. Use curly ’ and “ ” throughout, and contractions ("Couldn’t").
 7. Say "on this Mac" once per screen, not in every row.
 
-## Naming (still to unify)
+## Naming (unified on 2026-11-08; Settings › Cleanup kept, to avoid two things called Style)
 
 | Concept | Use | Still varies in |
 |---|---|---|
@@ -33,7 +33,7 @@ To review a screen, run `HubSnapshotTests` or `PillSnapshotTests` with `TEST_RUN
 
 The sidebar name should match the page title.
 
-## Remaining visual fixes (ranked)
+## Visual fixes (ranked; all 14 done on 2026-11-08)
 
 1. **Insights:** the heatmap legend uses ink greys while the cells are sage. Use `signal.opacity(0.3 + 0.7·level)` (InsightsView ~160).
 2. **Transforms:** Make concise, Bullet points and Action items share one glyph (`.list`). Give each its own icon (LocalTransformService 19–22, HushIcons 74/79).

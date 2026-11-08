@@ -32,6 +32,8 @@ targets:
       path: HushKey/Info.plist
       properties:
         CFBundleDisplayName: HushKey
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSApplicationCategoryType: public.app-category.productivity
         NSMotionUsageDescription: HushKey reads processed head motion from compatible headphones for local silent-mouthing experiments.
         NSMicrophoneUsageDescription: HushKey listens only when you start local dictation, meeting notes, or an experiment recording.
