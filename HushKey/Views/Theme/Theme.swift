@@ -96,9 +96,11 @@ extension Font {
     static let hkCaption = Font.system(size: 13)                        // status lines
     static let hkMeta = Font.system(size: 12)                           // timestamps, counts
 
-    /// Rounded display face for page titles, hero copy, and big numbers.
-    static func display(_ size: CGFloat, weight: Font.Weight = .semibold) -> Font {
-        .system(size: size, weight: weight, design: .rounded)
+    /// HushKey's voice: New York (the system serif) at a regular weight for page titles and
+    /// big figures, so headings read as written, not generated. Everything else is SF Pro.
+    /// Figures take `.monospacedDigit()` where they compare.
+    static func display(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        .system(size: size, weight: weight, design: .serif)
     }
 }
 
@@ -195,8 +197,12 @@ struct SecondaryButtonStyle: ButtonStyle {
             .padding(.horizontal, Theme.s4)
             .frame(minWidth: minWidth)
             .frame(height: Theme.controlHeight)
-            .background(hovering && isEnabled ? Theme.selection : Theme.hover,
+            // `selection` sits a step above `well` in both modes, and the hairline keeps the edge
+            // visible on dark rows, where a fill alone fades into the group.
+            .background(hovering && isEnabled ? Theme.hairline : Theme.selection,
                         in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
+                .strokeBorder(Theme.hairline, lineWidth: 1))
             .contentShape(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .onHover { hovering = $0 }
@@ -500,10 +506,10 @@ struct SectionLabel: View {
     var title: String
 
     var body: some View {
-        Text(title.uppercased())
-            .font(.system(size: 12, weight: .semibold))
-            .tracking(0.8)
-            .foregroundStyle(Theme.ink3)
+        // Sentence case, untracked, the body face a step smaller (no tracked capitals).
+        Text(title)
+            .font(.hkCaption.weight(.medium))
+            .foregroundStyle(Theme.ink2)
     }
 }
 

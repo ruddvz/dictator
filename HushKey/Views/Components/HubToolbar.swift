@@ -197,11 +197,12 @@ struct ProfileAvatar: View {
 
     var body: some View {
         Text(initials)
-            .font(.system(size: size * 0.4, weight: .semibold, design: .rounded))
-            .foregroundStyle(Theme.signal)
+            // Initials in the serif voice on a quiet well, like a monogram; sage stays for state.
+            .font(.display(size * 0.44, weight: .medium))
+            .foregroundStyle(Theme.ink)
             .frame(width: size, height: size)
-            .background(Theme.signalSoft, in: Circle())
-            .overlay(Circle().strokeBorder(Theme.signal.opacity(0.25), lineWidth: 1))
+            .background(Theme.well, in: Circle())
+            .overlay(Circle().strokeBorder(Theme.hairline, lineWidth: 1))
     }
 }
 
@@ -317,11 +318,9 @@ private struct NoticesPopover: View {
 
             if notices.isEmpty {
                 VStack(spacing: Theme.s2) {
-                    Glyph(.check, size: 18)
+                    Glyph(.check, size: 20)
                         .foregroundStyle(Theme.signal)
-                        .frame(width: 36, height: 36)
-                        .background(Theme.signalSoft, in: Circle())
-                    Text("All quiet").font(.hkHeadline)
+                    Text("All quiet").font(.display(20))
                     Text("Nothing needs you right now.")
                         .font(.hkCallout)
                         .foregroundStyle(Theme.ink2)
@@ -396,7 +395,7 @@ private struct ProfilePopover: View {
                 ProfileAvatar(size: 44)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(ProfileAvatar.fullName).font(.hkHeadline)
-                    Label("Local profile · stays on this Mac", icon: .lock)
+                    Label("Local profile, kept on this Mac", icon: .lock)
                         .hushIconSize(12)
                         .font(.hkMeta)
                         .foregroundStyle(Theme.ink2)

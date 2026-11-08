@@ -61,7 +61,7 @@ struct EvaluateView: View {
                          detail: takesDetail,
                          complete: meetsTemplateProtocol)
             ReadinessRow(title: "2 sessions with every word",
-                         detail: "\(completeSessions) of 2 · each needs \(AppModel.sessionTakesPerWord)+ takes of every word",
+                         detail: "\(completeSessions) of 2, each needs \(AppModel.sessionTakesPerWord)+ takes of every word",
                          complete: completeSessions >= 2)
         }
     }
@@ -173,7 +173,7 @@ private struct EvaluationResultView: View {
                         .font(.hkCaption)
                         .foregroundStyle(Theme.ink2)
                 }
-                DisclosureGroup("Confusion matrix · \(result.templateCount) examples") {
+                DisclosureGroup("Confusion matrix, \(result.templateCount) examples") {
                     confusionMatrix
                         .padding(.top, 10)
                 }

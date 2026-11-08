@@ -125,8 +125,8 @@ final class DictationHistoryActionsTests: XCTestCase {
 
     func testMetaLineNamesTheAppDurationAndWords() {
         XCTAssertEqual(DictationHistoryEntry(text: "hello there friend", duration: 12.4, appName: "Slack").metaLine,
-                       "Slack · 12 s · 3 words")
-        XCTAssertEqual(DictationHistoryEntry(text: "one", duration: 75).metaLine, "1:15 · 1 word")
+                       "Slack, 12 s, 3 words")
+        XCTAssertEqual(DictationHistoryEntry(text: "one", duration: 75).metaLine, "1:15, 1 word")
         XCTAssertEqual(DictationHistoryEntry(text: "two words").metaLine, "2 words")
     }
 

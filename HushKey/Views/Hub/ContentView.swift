@@ -239,9 +239,10 @@ private struct BrandLockup: View {
                 .contentTransition(.opacity)
                 .animation(Theme.gentle, value: live)
             if !collapsed {
+                // The wordmark in the app's serif voice, like the page titles.
                 Text("HushKey")
-                    .font(.system(size: 20, weight: .bold))
-                    .tracking(-0.6)
+                    .font(.display(21, weight: .medium))
+                    .tracking(-0.2)
                     .fixedSize()
                     .transition(.opacity.combined(with: .offset(x: -6)))
             }

@@ -766,7 +766,7 @@ final class AppModel {
                 let count = templateCount(for: word, condition: trainingCondition)
                 silentFeedback = SilentCaptureFeedback(
                     kind: saved ? .saved : .problem,
-                    text: saved ? "Saved “\(word)” · \(min(count, Self.takesPerWord))/\(Self.takesPerWord)"
+                    text: saved ? "Saved “\(word)”: \(min(count, Self.takesPerWord))/\(Self.takesPerWord)"
                         : "Couldn’t save “\(word)” to this Mac")
                 if count == Self.takesPerWord { advanceTraining(from: word) }
             } else if recorder.isRecording {
@@ -790,11 +790,11 @@ final class AppModel {
             } else if prediction.best?.label == TemplateClassifier.restLabel {
                 silentFeedback = SilentCaptureFeedback(kind: .ignored, text: "Nothing to type")
             } else if !prediction.accepted {
-                silentFeedback = SilentCaptureFeedback(kind: .unsure, text: "Not sure · nothing typed")
+                silentFeedback = SilentCaptureFeedback(kind: .unsure, text: "Not sure, nothing typed")
             } else if typeSilentWordIfAllowed(word) {
                 silentFeedback = SilentCaptureFeedback(kind: .typed, text: word.text)
             } else {
-                silentFeedback = SilentCaptureFeedback(kind: .notTyped, text: "“\(word.text)” · not typed")
+                silentFeedback = SilentCaptureFeedback(kind: .notTyped, text: "“\(word.text)” not typed")
             }
         case .settings:
             recorder.logEvent(segment, kind: "segment", label: recorder.prompt, confidence: nil)

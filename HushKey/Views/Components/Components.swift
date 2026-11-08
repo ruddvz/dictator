@@ -6,7 +6,6 @@ struct PageHeader<Actions: View>: View {
     var title: String
     var subtitle: String
     @ViewBuilder var actions: Actions
-    @State private var hoveringMark = false
 
     var body: some View {
         // Trailing actions line up with the title line, not the middle of title + subtitle.
@@ -16,20 +15,12 @@ struct PageHeader<Actions: View>: View {
                 if eyebrow.hasPrefix("Step") {
                     SectionLabel(title: eyebrow)
                 }
-                HStack(spacing: Theme.s3) {
-                    // The page's glyph, as in the sidebar, filled in sage.
-                    Glyph(model.screen.icon, size: 22, active: true, hovering: hoveringMark)
-                        .foregroundStyle(Theme.signal)
-                        .frame(width: 38, height: 38)
-                        .background(Theme.signalSoft, in: RoundedRectangle(cornerRadius: Theme.r2 - 2, style: .continuous))
-                        .onHover { hoveringMark = $0 }
-                        .reveal(0, distance: 4)
-                    Text(title)
-                        .font(.hkTitle1)
-                        .tracking(-0.3)
-                        .accessibilityIdentifier("page.header")
-                }
-                .alignmentGuide(.pageTitle) { $0[VerticalAlignment.center] }
+                // The title alone: the sidebar already shows the page's glyph and selection,
+                // so no icon tile beside it.
+                Text(title)
+                    .font(.hkTitle1)
+                    .accessibilityIdentifier("page.header")
+                    .alignmentGuide(.pageTitle) { $0[VerticalAlignment.center] }
                 if !subtitle.isEmpty {
                     Text(subtitle)
                         .font(.hkCallout)
@@ -353,40 +344,34 @@ struct UnderlineTabs<Value: Hashable>: View {
     }
 }
 
-/// Centered empty state: a soft glyph, one line of title, one line of help.
+/// Centred empty state on the page itself: a quiet glyph, a serif title, one sentence of
+/// help and at most one action. No card, no tinted circle.
 struct EmptyState<Action: View>: View {
     var icon: HushIcon
     var title: String
     var message: String
     @ViewBuilder var action: Action
-    @State private var shown = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: Theme.s2) {
-            Glyph(icon, size: 24, active: true)
-                .foregroundStyle(Theme.signal)
-                .frame(width: 52, height: 52)
-                .background(Theme.signalSoft, in: Circle())
-                .overlay(Circle().strokeBorder(Theme.signal.opacity(shown ? 0 : 0.3), lineWidth: 1)
-                    .scaleEffect(shown ? 1.5 : 1))
-                .scaleEffect(shown ? 1 : 0.85)
+            Glyph(icon, size: 28)
+                .foregroundStyle(Theme.ink3)
                 .padding(.bottom, Theme.s1)
-            Text(title).font(.hkHeadline)
+            Text(title)
+                .font(.display(20))
+                .foregroundStyle(Theme.ink)
+                .multilineTextAlignment(.center)
             Text(message)
                 .font(.hkCallout)
                 .foregroundStyle(Theme.ink2)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 380)
+                .fixedSize(horizontal: false, vertical: true)
             action.padding(.top, Theme.s2)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, Theme.s6)
         .reveal()
-        .onAppear {
-            if reduceMotion { shown = true }
-            else { withAnimation(.easeOut(duration: 0.9).delay(0.1)) { shown = true } }
-        }
     }
 }
 
@@ -691,11 +676,11 @@ struct LabHero<Actions: View, Metrics: View>: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: Theme.s5) {
+            // The status glyph on its own, in its state colour: no tile behind it.
             SymbolGlyph(symbol, size: 30)
                 .foregroundStyle(tint)
                 .hushIconActive(true)
-                .frame(width: 60, height: 60)
-                .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
+                .frame(width: 36)
             VStack(alignment: .leading, spacing: 6) {
                 Text(title).font(.display(24)).tracking(-0.2)
                 Text(message)
@@ -711,7 +696,9 @@ struct LabHero<Actions: View, Metrics: View>: View {
         }
         .padding(Theme.s6 - 4)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.signalSoft, in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
+        .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
+            .strokeBorder(Theme.hairline, lineWidth: 1))
     }
 }
 

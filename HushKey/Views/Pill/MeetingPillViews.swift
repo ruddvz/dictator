@@ -129,10 +129,9 @@ struct MeetingResultCard: View {
 
     private var actionItems: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("ACTION ITEMS")
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(0.6)
-                .foregroundStyle(Theme.ink3)
+            Text("Action items")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Theme.ink2)
             ForEach(Array(items.prefix(Self.shownActionItems).enumerated()), id: \.offset) { _, item in
                 HStack(alignment: .firstTextBaseline, spacing: Theme.s2) {
                     Circle()

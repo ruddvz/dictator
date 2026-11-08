@@ -72,11 +72,8 @@ struct SettingsView: View {
             }
             .animation(Theme.snappy, value: section)
         }
-        .frame(maxWidth: Theme.pageWidth, maxHeight: .infinity, alignment: .topLeading)
-        .frame(maxWidth: Theme.homeWidth, alignment: .leading)
-        .padding(.horizontal, Theme.s7 - 8)
-        .padding(.top, Theme.s7)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .pageLayout()
     }
 }
 
@@ -514,37 +511,19 @@ private struct AboutSettings: View {
         ("Licenses and attribution", "Open-source code HushKey adapts.", "NOTICE", "md"),
         ("Argmax MIT license", "On-device speech model runtime.", "ARGMAX-MIT-LICENSE", "txt"),
         ("Third-party notices", "Bundled model notices.", "ARGMAX-NOTICES", "txt"),
+        ("Local speech models", "Accuracy and speed on this Mac.", "LOCAL_MODEL_EVALUATION", "md"),
     ]
-    /// Internal competitor research shows only in debug builds; people using HushKey see the
-    /// model evaluation, which explains the engine choice.
-    private var research: [(title: String, detail: String, name: String, ext: String)] {
-        var items = [("Local speech models", "Accuracy and speed on this Mac.", "LOCAL_MODEL_EVALUATION", "md")]
-        #if DEBUG
-        items += [
-            ("Wispr Flow vs TypeWhisper", "The supplied comparison report.", "Wispr_Flow_vs_TypeWhisper_Research_Report_2026-11-01", "pdf"),
-            ("Competitor notes", "What other dictation apps do.", "COMPETITOR_RESEARCH", "md"),
-            ("Dictation alternatives", "Follow-up research.", "COMPETITOR_RESEARCH_ADDENDUM_2026-11-01", "md"),
-        ]
-        #endif
-        return items
-    }
 
     var body: some View {
-        SettingsGroup(title: "HushKey") {
+        SettingsGroup(title: "HushKey", footer: status) {
             SettingsRow(title: "Version", detail: "Private, on-device dictation and silent input.") {
+                // Same column as the Open buttons below, so the value sits where their labels do.
                 Text(version)
-                    .font(.hkCallout.monospacedDigit())
+                    .font(.hkControl.monospacedDigit())
                     .foregroundStyle(Theme.ink2)
+                    .frame(minWidth: 96)
             }
             ForEach(documents, id: \.name) { item in
-                SettingsRow(title: item.title, detail: item.detail) {
-                    Button("Open") { open(item.name, item.ext) }
-                        .buttonStyle(SecondaryButtonStyle(minWidth: 96))
-                }
-            }
-        }
-        SettingsGroup(title: "Research", footer: status) {
-            ForEach(research, id: \.name) { item in
                 SettingsRow(title: item.title, detail: item.detail) {
                     Button("Open") { open(item.name, item.ext) }
                         .buttonStyle(SecondaryButtonStyle(minWidth: 96))
@@ -627,12 +606,12 @@ private struct DictationAppProfilesEditor: View {
 
     var body: some View {
         GroupRow {
-            Text("\(model.dictationAppProfiles.count) of \(HushKeyPersonalDataBackup.maximumAppProfiles) profiles · included in personal data backups")
+            Text("\(model.dictationAppProfiles.count) of \(HushKeyPersonalDataBackup.maximumAppProfiles) profiles, included in personal data backups")
                 .font(.hkCaption)
                 .foregroundStyle(Theme.ink2)
         }
         ForEach(model.dictationAppProfiles) { profile in
-            SettingsRow(title: profile.appName, detail: "\(profile.mode.rawValue) · \(profile.bundleIdentifier)") {
+            SettingsRow(title: profile.appName, detail: "\(profile.mode.rawValue), \(profile.bundleIdentifier)") {
                 HStack(spacing: 2) {
                     Button("Edit", icon: .edit) { load(profile) }
                         .buttonStyle(IconButtonStyle())

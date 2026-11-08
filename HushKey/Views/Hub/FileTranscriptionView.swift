@@ -146,33 +146,32 @@ struct FileTranscriptionView: View {
         })
     }
 
-    /// The file and its one action, like Wispr's hero cards: big, calm, obvious.
+    /// The page's signature: a generous dashed sage drop zone holding the file and its one
+    /// action. It fills with a sage tint only while a file is held over it.
     private var sourceCard: some View {
         @Bindable var whisper = model.whisperFileTranscriber
         let sourceName = workspace.selectedURL?.lastPathComponent ?? workspace.activeSourceName
         return HStack(spacing: Theme.s4) {
-            Glyph(.waveform)
-                .hushIconSize(28)
-                .foregroundStyle(Theme.signal)
-                .frame(width: 52, height: 52)
-                .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
-            VStack(alignment: .leading, spacing: 4) {
-                Text(sourceName ?? "Choose an audio or video file")
-                    .font(.hkTitle3)
+            VStack(alignment: .leading, spacing: Theme.s2) {
+                Text(sourceName ?? "Drop audio or video here")
+                    .font(.display(22))
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Group {
                     if let error = currentError {
                         Label(error, icon: .warning)
+                            .font(.hkCallout)
                             .foregroundStyle(Theme.danger)
                     } else if let status = currentStatus {
-                        Text(status).foregroundStyle(Theme.ink2)
-                    } else {
-                        Text("M4A, MP3, WAV, MOV and more. Choose a file or drop it here. Audio is never kept.")
+                        Text(status)
+                            .font(.hkCallout)
                             .foregroundStyle(Theme.ink2)
+                    } else {
+                        Text("M4A, MP3, WAV, MOV and more. Audio is never kept.")
+                            .font(.hkCaption)
+                            .foregroundStyle(Theme.ink3)
                     }
                 }
-                .font(.hkCallout)
                 .lineLimit(2)
             }
             Spacer(minLength: Theme.s4)
@@ -196,11 +195,16 @@ struct FileTranscriptionView: View {
                           (workspace.engine == .whisperKit && !whisper.selectedModelIsDownloaded))
             }
         }
-        .padding(Theme.s5)
+        .padding(.horizontal, Theme.s5)
+        .padding(.vertical, Theme.s6)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.signalSoft, in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
+        .background(isDropTargeted ? Theme.signalSoft : .clear,
+                    in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Theme.r1, style: .continuous)
-            .strokeBorder(isDropTargeted ? Theme.signal : Theme.hairline.opacity(0), lineWidth: 1.5))
+            .strokeBorder(Theme.signal.opacity(isDropTargeted ? 1 : 0.45),
+                          style: StrokeStyle(lineWidth: 1.5, dash: [7, 5])))
+        .animation(.easeOut(duration: 0.12), value: isDropTargeted)
+        .contentShape(RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
         .dropDestination(for: URL.self) { urls, _ in
             guard !isBusy, let url = urls.first, url.isFileURL else { return false }
             selectFile(url)
@@ -294,7 +298,6 @@ struct FileTranscriptionView: View {
                            title: historySearch.isEmpty ? "No file transcripts yet" : "No matches",
                            message: historySearch.isEmpty ? "Finished transcripts stay here, on this Mac."
                                : "Search by file name or words in the transcript.")
-                    .card(padding: 0, style: .outlined)
             } else {
                 ListGroup {
                     ForEach(filteredSessions) { session in

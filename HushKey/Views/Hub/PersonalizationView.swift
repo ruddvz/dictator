@@ -101,19 +101,21 @@ struct PersonalizationView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.s5) {
-                PageHeader(eyebrow: "", title: "Vocabulary", subtitle: "") {
+                PageHeader(eyebrow: "", title: "Vocabulary",
+                           subtitle: "Teach HushKey the words, shortcuts and fixes you use.") {
                     if section == .vocabulary {
                         Button("Import…", icon: .download) {
                             wordListMessage = model.importVocabularyWordList()
                         }
                         .buttonStyle(SecondaryButtonStyle())
                         .help("Add words from a text or CSV file, one per line or separated by commas")
-                        Button("Export…", icon: .share) {
-                            wordListMessage = model.exportVocabularyWordList()
+                        if !vocabulary.isEmpty {
+                            Button("Export…", icon: .share) {
+                                wordListMessage = model.exportVocabularyWordList()
+                            }
+                            .buttonStyle(SecondaryButtonStyle())
+                            .help("Save your vocabulary as a text file, one word per line")
                         }
-                        .buttonStyle(SecondaryButtonStyle())
-                        .disabled(vocabulary.isEmpty)
-                        .help("Save your vocabulary as a text file, one word per line")
                     }
                     Button(section.addTitle, icon: .plus) {
                         editor = PersonalizationEditorRequest(section: section, snippet: nil, term: nil)
@@ -128,8 +130,6 @@ struct PersonalizationView: View {
                     .onChange(of: section) { _, _ in query = "" }
                 }
                 .overlay(alignment: .topTrailing) { searchControl }
-
-                hero
 
                 Group {
                     switch section {
@@ -201,52 +201,6 @@ struct PersonalizationView: View {
         }
     }
 
-    /// One-time explanation in Wispr's banner position, with live examples from your own list.
-    private var hero: some View {
-        let examples: [String] = switch section {
-        case .vocabulary: Array(vocabulary.prefix(5))
-        case .snippets: snippets.prefix(3).map(\.cue)
-        case .corrections: corrections.prefix(3).map { "\($0.cue) → \($0.expansion)" }
-        }
-        let title = switch section {
-        case .vocabulary: "HushKey spells the way you do."
-        case .snippets: "Say a cue, get the whole thing."
-        case .corrections: "Fix a mishearing once."
-        }
-        let detail = switch section {
-        case .vocabulary: "Names, product terms and jargon are passed to on-device recognition, so they come out right."
-        case .snippets: "Your email, a sign-off or a long prompt, dropped in when you say its cue."
-        case .corrections: "When HushKey keeps hearing a phrase wrong, replace it with the one you meant."
-        }
-        return VStack(alignment: .leading, spacing: Theme.s3) {
-            Text(title)
-                .font(.hkTitle2)
-                .tracking(-0.3)
-            Text(detail)
-                .font(.hkCallout)
-                .foregroundStyle(Theme.ink2)
-                .fixedSize(horizontal: false, vertical: true)
-            if !examples.isEmpty {
-                HStack(spacing: Theme.s2) {
-                    ForEach(examples, id: \.self) { example in
-                        Text(example)
-                            .font(.hkControl)
-                            .lineLimit(1)
-                            .padding(.horizontal, Theme.s3)
-                            .frame(height: Theme.controlHeight)
-                            .background(Theme.sheet.opacity(0.7),
-                                        in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
-                    }
-                }
-                .padding(.top, Theme.s1)
-            }
-        }
-        .padding(Theme.s6 - 4)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.signalSoft, in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
-        .lineLimit(1)
-    }
-
     @ViewBuilder
     private var snippetList: some View {
         if filteredSnippets.isEmpty {
@@ -274,9 +228,19 @@ struct PersonalizationView: View {
 
     @ViewBuilder
     private var vocabularyList: some View {
-        if filteredVocabulary.isEmpty {
-            listEmpty(query.isEmpty ? "No words yet" : "No matching words",
-                      query.isEmpty ? "Add names, product terms or jargon." : "Try another search.")
+        if filteredVocabulary.isEmpty && query.isEmpty {
+            EmptyState(icon: .vocabulary, title: "No words yet",
+                       message: "Add names, product terms and jargon, and HushKey spells them the way you do.") {
+                HStack(spacing: Theme.s2) {
+                    ForEach(Self.sampleTerms, id: \.self) { term in
+                        Button { addSample(term) } label: { Label(term, icon: .plus) }
+                            .buttonStyle(SampleTermButtonStyle())
+                            .help("Add \(term) to your vocabulary")
+                    }
+                }
+            }
+        } else if filteredVocabulary.isEmpty {
+            listEmpty("No matching words", "Try another search.")
         } else {
             ListGroup {
                 ForEach(filteredVocabulary, id: \.self) { term in
@@ -320,7 +284,14 @@ struct PersonalizationView: View {
 
     private func listEmpty(_ title: String, _ message: String) -> some View {
         EmptyState(icon: query.isEmpty ? HushIcon(symbol: section.symbol) ?? .vocabulary : .search, title: title, message: message)
-            .card(padding: 0, style: .outlined)
+    }
+
+    /// Words people often teach a dictation app; one click adds one, which shows what the list is for.
+    private static let sampleTerms = ["HushKey", "SwiftUI", "Figma"]
+
+    private func addSample(_ term: String) {
+        notice = save(primary: term, secondary: nil,
+                      request: PersonalizationEditorRequest(section: .vocabulary, snippet: nil, term: nil))
     }
 
     private func rowAction(_ title: String, _ symbol: String, perform: @escaping () -> Void) -> some View {
@@ -343,7 +314,7 @@ struct PersonalizationView: View {
             let validation = DictationSnippetExpander.validation(for: model.dictationSnippets)
             Label(validation.invalidLines.isEmpty
                   ? "\(validation.validCount) ready"
-                  : "\(validation.validCount) ready · check line\(validation.invalidLines.count == 1 ? "" : "s") \(validation.invalidLines.map(String.init).joined(separator: ", "))",
+                  : "\(validation.validCount) ready. Check line\(validation.invalidLines.count == 1 ? "" : "s") \(validation.invalidLines.map(String.init).joined(separator: ", ")).",
                   icon: validation.invalidLines.isEmpty ? .checkCircle : .warning)
                 .font(.hkCaption)
                 .foregroundStyle(validation.invalidLines.isEmpty ? Theme.ink2 : Theme.danger)
@@ -368,7 +339,7 @@ struct PersonalizationView: View {
             let validation = DictationCorrectionRules.validation(for: model.dictationCorrectionRules)
             Label(validation.invalidLines.isEmpty
                   ? "\(validation.validCount) ready"
-                  : "\(validation.validCount) ready · check line\(validation.invalidLines.count == 1 ? "" : "s") \(validation.invalidLines.map(String.init).joined(separator: ", "))",
+                  : "\(validation.validCount) ready. Check line\(validation.invalidLines.count == 1 ? "" : "s") \(validation.invalidLines.map(String.init).joined(separator: ", ")).",
                   icon: validation.invalidLines.isEmpty ? .checkCircle : .warning)
                 .font(.hkCaption)
                 .foregroundStyle(validation.invalidLines.isEmpty ? Theme.ink2 : Theme.finishing)
@@ -540,5 +511,27 @@ private struct PersonalizationEntryEditor: View {
         case .vocabulary: initialTerm == nil ? "Add word" : "Edit word"
         case .corrections: initialSnippet == nil ? "New correction" : "Edit correction"
         }
+    }
+}
+
+/// A word you could add, drawn as a dashed sage outline so it reads as a suggestion, not an entry.
+private struct SampleTermButtonStyle: ButtonStyle {
+    @State private var hovering = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.hkControl)
+            .foregroundStyle(Theme.ink)
+            .hushIconSize(14)
+            .padding(.horizontal, Theme.s3)
+            .frame(height: Theme.controlHeight - 4)
+            .background(hovering ? Theme.signalSoft : .clear,
+                        in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
+                .strokeBorder(Theme.signal.opacity(0.55), style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
+            .contentShape(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .onHover { hovering = $0 }
+            .animation(.easeOut(duration: 0.12), value: hovering)
     }
 }

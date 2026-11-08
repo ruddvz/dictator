@@ -63,9 +63,9 @@ struct TransformView: View {
                 if model.canUndoLocalTransform { undoCard }
                 selectedTextEditCard
 
-                Label("Runs on Apple’s on-device model. No cloud fallback.", icon: .shield)
+                Text("Runs on Apple’s on-device model. No cloud fallback.")
                     .font(.hkCaption)
-                    .foregroundStyle(Theme.ink3)
+                    .foregroundStyle(Theme.ink2)
             }
             .pageLayout()
         }
@@ -171,7 +171,7 @@ struct TransformView: View {
 
                         if !model.selectedTextEditDraft.isEmpty {
                             if model.selectedTextEditApplied {
-                                Label("Applied once · undo with ⌥⇧U in the target field", icon: .checkCircle)
+                                Label("Applied once. Undo with ⌥⇧U in the target field.", icon: .checkCircle)
                                     .font(.hkCaption)
                                     .foregroundStyle(Theme.ink2)
                             } else {
@@ -187,7 +187,7 @@ struct TransformView: View {
 
                     if !model.selectedTextEditDraft.isEmpty {
                         VStack(alignment: .leading, spacing: 5) {
-                            Text("Preview · review before applying").font(.hkCaption.weight(.semibold)).foregroundStyle(Theme.ink2)
+                            Text("Preview, review before applying").font(.hkCaption.weight(.semibold)).foregroundStyle(Theme.ink2)
                             TextEditor(text: Binding(
                                 get: { model.selectedTextEditDraft },
                                 set: { model.updateSelectedTextEditDraft($0) }))
@@ -207,7 +207,7 @@ struct TransformView: View {
                 }
 
                 if !model.localTransformService.modelIsAvailable {
-                    Label(model.localTransformService.availabilityMessage, icon: .info)
+                    Text(model.localTransformService.availabilityMessage)
                         .font(.hkCaption)
                         .foregroundStyle(Theme.ink2)
                         .fixedSize(horizontal: false, vertical: true)
@@ -231,12 +231,15 @@ struct TransformView: View {
                 }
             }
             if currentText.isEmpty {
-                EmptyState(icon: .list, title: "Nothing to transform yet",
-                           message: "Dictate something, or pick a dictation from history to edit it again.") {
+                HStack(spacing: Theme.s4) {
+                    Text("Dictate or pick a dictation from History to transform.")
+                        .font(.hkCallout)
+                        .foregroundStyle(Theme.ink2)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: Theme.s2)
                     Button("Go to Home") { model.screen = .dictation }
                         .buttonStyle(SecondaryButtonStyle())
                 }
-                .card(padding: 0, style: .outlined)
             } else {
                 VStack(alignment: .leading, spacing: 0) {
                     TextEditor(text: transcriptBinding)
@@ -283,21 +286,25 @@ struct TransformView: View {
         Binding(get: { model.transcriber.text }, set: { model.editCurrentDictation($0) })
     }
 
-    /// Wispr-style card grid: built-in transforms, then your styles, then a "create" card.
+    /// Card grid: built-in transforms, then your own. "New transform" in the header adds one.
     private var transformPicker: some View {
         VStack(alignment: .leading, spacing: Theme.s3) {
             HStack {
                 Text("Choose a transform").font(.hkTitle3)
                 Spacer()
-                Text("\(model.writingStylePresets.count) of \(WritingStylePreset.maximumCount) custom")
-                    .font(.hkMeta.monospacedDigit())
-                    .foregroundStyle(Theme.ink3)
+                if !model.writingStylePresets.isEmpty {
+                    Text("\(model.writingStylePresets.count) of \(WritingStylePreset.maximumCount) custom")
+                        .font(.hkCaption.monospacedDigit())
+                        .foregroundStyle(Theme.ink2)
+                }
             }
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Theme.s3), count: 3),
                       alignment: .leading, spacing: Theme.s3) {
                 ForEach(LocalWritingTransform.allCases) { action in
-                    TransformCard(symbol: action.symbol, title: action.rawValue, detail: action.description,
-                                  badge: action.requiresLanguageModel ? "Model" : "Instant",
+                    TransformCard(symbol: action.symbol, title: action.rawValue,
+                                  detail: action.requiresLanguageModel && !model.localTransformService.modelIsAvailable
+                                      ? action.description + " Needs the on-device model."
+                                      : action.description,
                                   isSelected: selectedStyle == nil && selectedAction == action) {
                         selectedAction = action
                         selectedStyleID = nil
@@ -308,7 +315,7 @@ struct TransformView: View {
                 }
                 ForEach(model.writingStylePresets) { style in
                     TransformCard(symbol: "textformat", title: style.name, detail: style.instructions,
-                                  badge: "Custom", isSelected: selectedStyleID == style.id) {
+                                  isSelected: selectedStyleID == style.id) {
                         selectedStyleID = style.id
                         selectedStyleCameFromProfile = false
                         clearPreview()
@@ -323,36 +330,11 @@ struct TransformView: View {
                         }
                     }
                 }
-                if model.writingStylePresets.count < WritingStylePreset.maximumCount {
-                    Button {
-                        styleEditorRequest = WritingStyleEditorRequest(preset: nil)
-                    } label: {
-                        VStack(alignment: .leading, spacing: Theme.s2) {
-                            Glyph(.plus)
-                                .hushIconSize(18)
-                                .frame(width: 28, height: 28)
-                                .background(Theme.well, in: Circle())
-                            Spacer(minLength: Theme.s2)
-                            Text("Create your own").font(.hkHeadline)
-                            Text("A tone, format or translation you reuse.")
-                                .font(.hkCaption)
-                                .foregroundStyle(Theme.ink2)
-                                .lineLimit(2)
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 132, alignment: .topLeading)
-                        .padding(Theme.s4)
-                        .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
-                            .strokeBorder(Theme.hairline, style: StrokeStyle(lineWidth: 1, dash: [5, 4])))
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(model.localTransformService.isTransforming)
-                }
             }
             if !model.writingStylePresets.isEmpty {
                 Text("Right-click a custom transform to edit or delete it.")
                     .font(.hkCaption)
-                    .foregroundStyle(Theme.ink3)
+                    .foregroundStyle(Theme.ink2)
             }
         }
     }
@@ -579,12 +561,11 @@ private struct WritingStylePresetEditor: View {
     }
 }
 
-/// One transform choice, laid out like Wispr's transform cards: badge, title, short description.
+/// One transform choice: its own glyph beside a serif title, then a short description.
 private struct TransformCard: View {
     var symbol: String
     var title: String
     var detail: String
-    var badge: String
     var isSelected: Bool
     var action: () -> Void
     @State private var hovering = false
@@ -592,31 +573,24 @@ private struct TransformCard: View {
     var body: some View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: Theme.s2) {
-                HStack {
+                HStack(alignment: .firstTextBaseline, spacing: Theme.s2) {
                     SymbolGlyph(symbol, size: 17)
                         .hushIconActive(isSelected)
                         .hushIconHover(hovering)
-                        .foregroundStyle(isSelected ? Theme.signal : Theme.ink2)
-                        .frame(width: 28, height: 28)
-                        .background(isSelected ? Theme.sheet : Theme.well,
-                                    in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
-                    Spacer()
-                    Text(badge)
-                        .font(.hkMeta.weight(.medium))
-                        .foregroundStyle(Theme.ink2)
-                        .padding(.horizontal, Theme.s2)
-                        .frame(height: 20)
-                        .background(Theme.well, in: Capsule())
+                        .foregroundStyle(isSelected || hovering ? Theme.signal : Theme.ink2)
+                        .frame(width: 20)
+                    Text(title)
+                        .font(.display(19))
+                        .foregroundStyle(Theme.ink)
+                        .lineLimit(1)
                 }
-                Spacer(minLength: Theme.s2)
-                Text(title).font(.hkHeadline).foregroundStyle(Theme.ink)
                 Text(detail)
                     .font(.hkCaption)
                     .foregroundStyle(Theme.ink2)
-                    .lineLimit(2)
+                    .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .frame(maxWidth: .infinity, minHeight: 132, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 104, alignment: .topLeading)
             .padding(Theme.s4)
             .background(isSelected ? Theme.signalSoft : hovering ? Theme.well : Theme.sheet,
                         in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))

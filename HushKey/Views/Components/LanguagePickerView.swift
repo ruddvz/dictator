@@ -125,13 +125,10 @@ struct LanguagePickerSheet: View {
     private var selectedRow: some View {
         let language = DictationLanguage.named(choice)
         return HStack(spacing: Theme.s2) {
-            Text("SELECTED").font(.hkMeta.weight(.medium)).tracking(0.8).foregroundStyle(Theme.ink2)
+            Text("Selected").font(.hkCaption).foregroundStyle(Theme.ink2)
             Label(language.name, icon: .check)
                 .font(.hkCaption.weight(.medium))
                 .foregroundStyle(Theme.signal)
-                .padding(.horizontal, Theme.s2)
-                .padding(.vertical, Theme.s1)
-                .background(Capsule().fill(Theme.signalSoft))
             if choice != selection {
                 Text("was \(DictationLanguage.named(selection).name)")
                     .font(.hkCaption).foregroundStyle(Theme.ink3)

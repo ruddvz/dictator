@@ -8,110 +8,87 @@ struct InsightsView: View {
 
     private var ledger: UsageLedger { model.usageLedger }
 
+    private var subtitle: String {
+        let base = "Counted from finished dictations and kept by day, on this Mac."
+        guard ledger.totalDictations == 0 else { return base }
+        return base + (model.savesDictationHistory
+                       ? " Finish a dictation and your numbers start here."
+                       : " Insights are recorded only while saving history is on in Settings.")
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.s5) {
-                PageHeader(eyebrow: "", title: "Insights",
-                           subtitle: "Counted from finished dictations and kept by day, on this Mac.")
-                if ledger.totalDictations == 0 {
-                    Text(model.savesDictationHistory
-                         ? "Finish a dictation and your numbers start here."
-                         : "Insights are recorded only while saving history is on in Settings.")
-                        .font(.hkCallout)
-                        .foregroundStyle(Theme.ink2)
+                PageHeader(eyebrow: "", title: "Insights", subtitle: subtitle)
+                VStack(alignment: .leading, spacing: Theme.s3) {
+                    figureRow
+                    if ledger.totalWords > 0 {
+                        Text(summaryLine)
+                            .font(.hkCallout)
+                            .foregroundStyle(Theme.ink2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
-                HStack(alignment: .top, spacing: Theme.s4) {
-                    speedCard.reveal(1)
-                    cleanupCard.reveal(2)
-                    wordsCard.reveal(3)
-                }
-                .fixedSize(horizontal: false, vertical: true)
+                .reveal(1)
+                streakCard.reveal(2)
                 VoiceProfileSection(profile: VoiceProfile(entries: model.dictationHistory, ledger: ledger),
                                     savesHistory: model.savesDictationHistory)
-                    .reveal(4)
-                HStack(alignment: .top, spacing: Theme.s4) {
-                    categoriesCard.reveal(4)
-                    streakCard.reveal(5)
+                    .reveal(3)
+                categoriesCard.reveal(4)
+                if ledger.totalDictations > 0 {
+                    Button("Reset insights…") { confirmReset = true }
+                        .buttonStyle(.plain)
+                        .font(.hkCaption)
+                        .foregroundStyle(Theme.ink2)
+                        .confirmationDialog("Reset insights?", isPresented: $confirmReset) {
+                            Button("Reset", role: .destructive) { model.resetUsageInsights() }
+                        } message: {
+                            Text("Clears these totals and your streak. History is not changed.")
+                        }
                 }
-                .fixedSize(horizontal: false, vertical: true)
-                Button("Reset insights…") { confirmReset = true }
-                    .buttonStyle(.plain)
-                    .font(.hkCaption)
-                    .foregroundStyle(Theme.ink2)
-                    .disabled(ledger.totalDictations == 0)
-                    .confirmationDialog("Reset insights?", isPresented: $confirmReset) {
-                        Button("Reset", role: .destructive) { model.resetUsageInsights() }
-                    } message: {
-                        Text("Clears these totals and your streak. History is not changed.")
-                    }
             }
             .pageLayout(maxWidth: Theme.homeWidth)
         }
     }
 
-    // MARK: Cards
+    // MARK: Figures
 
-    private var speedCard: some View {
+    /// One row of figures, number over label, split by hairlines. No cards, no gauge.
+    private var figureRow: some View {
         let wpm = ledger.wordsPerMinute ?? 0
         let ratio = Double(wpm) / Double(UsageLedger.typingWordsPerMinute)
-        return InsightCard {
+        return HStack(alignment: .top, spacing: Theme.s5) {
+            Metric(value: ledger.totalWords.formatted(), label: wordsLabel, isLead: true)
+            figureDivider
+            Metric(value: ledger.totalDictations.formatted(), label: ledger.totalDictations == 1 ? "Dictation" : "Dictations")
+            figureDivider
             Metric(value: wpm == 0 ? "–" : wpm.formatted(), label: "Words per minute")
-            Rectangle().fill(Theme.hairline).frame(height: 1)
-            // The ratio sits on the arc's baseline, inside the half circle.
-            ZStack(alignment: .bottom) {
-                PaceArc(progress: min(1, Double(wpm) / 200))
-                    .frame(width: 150, height: 80)
-                VStack(spacing: 0) {
-                    Text(wpm == 0 ? "–" : ratio.formatted(.number.precision(.fractionLength(1))) + "×")
-                        .font(.hkTitle2)
-                    Text("typing speed").font(.hkCaption).foregroundStyle(Theme.ink2)
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .help("Compared with typing at about \(UsageLedger.typingWordsPerMinute) words per minute")
-            if let saved = VoiceProfile.timeSavedText(minutes: VoiceProfile.minutesSaved(ledger: ledger)) {
-                Rectangle().fill(Theme.hairline).frame(height: 1)
-                Label(saved.prefix(1).uppercased() + saved.dropFirst() + " vs typing", icon: .clock)
-                    .hushIconSize(14)
-                    .font(.hkCallout.weight(.medium))
-                    .foregroundStyle(Theme.ink2)
-                    .help("Words at \(VoiceProfile.typingWordsPerMinute) wpm typing, minus the time you spent speaking")
-            }
-        }
-    }
-
-    private var cleanupCard: some View {
-        InsightCard {
+            figureDivider
+            Metric(value: wpm == 0 ? "–" : ratio.formatted(.number.precision(.fractionLength(1))) + "×",
+                   label: "Typing speed")
+                .help("Compared with typing at about \(UsageLedger.typingWordsPerMinute) words per minute")
+            figureDivider
             Metric(value: ledger.wordsCleaned.formatted(), label: "Words cleaned up")
-            Rectangle().fill(Theme.hairline).frame(height: 1)
-            Text("across \(ledger.totalDictations.formatted()) dictation\(ledger.totalDictations == 1 ? "" : "s")")
-                .font(.hkBody)
-                .foregroundStyle(Theme.ink2)
-            Text("Fillers, spoken corrections and your rules, fixed on this Mac.")
-                .font(.hkCaption)
-                .foregroundStyle(Theme.ink2)
-                .fixedSize(horizontal: false, vertical: true)
+                .help("Fillers, spoken corrections and your rules, fixed on this Mac.")
         }
+        .fixedSize(horizontal: false, vertical: true)
     }
 
-    private var wordsCard: some View {
-        InsightCard {
-            HStack(alignment: .top) {
-                Metric(value: ledger.totalWords.formatted(), label: "Total words dictated")
-                Spacer(minLength: Theme.s2)
-                if let change = ledger.monthChange() {
-                    Label(change.formatted(.percent.precision(.fractionLength(0))) + " this month",
-                          icon: change >= 0 ? .arrowUpRight : .arrowDownRight)
-                        .font(.hkMeta.weight(.medium))
-                        .foregroundStyle(change >= 0 ? Theme.signal : Theme.ink2)
-                        .padding(.horizontal, Theme.s2)
-                        .padding(.vertical, Theme.s1)
-                        .background(Capsule().fill(Theme.signalSoft))
-                }
-            }
-            Rectangle().fill(Theme.hairline).frame(height: 1)
-            Text(bookComparison).font(.hkBody).fixedSize(horizontal: false, vertical: true)
+    private var figureDivider: some View {
+        Rectangle().fill(Theme.hairline).frame(width: 1).frame(maxHeight: .infinity)
+    }
+
+    private var wordsLabel: String {
+        guard let change = ledger.monthChange() else { return "Words dictated" }
+        let percent = abs(change).formatted(.percent.precision(.fractionLength(0)))
+        return "Words dictated, \(change >= 0 ? "up" : "down") \(percent) this month"
+    }
+
+    private var summaryLine: String {
+        guard let saved = VoiceProfile.timeSavedText(minutes: VoiceProfile.minutesSaved(ledger: ledger)) else {
+            return bookComparison
         }
+        return bookComparison + " Compared with typing, " + saved + "."
     }
 
     private var bookComparison: String {
@@ -122,14 +99,18 @@ struct InsightsView: View {
         return pages >= 1 ? "That's about \(pages) page\(pages == 1 ? "" : "s") of a novel." : "Your first page is on its way."
     }
 
+    // MARK: Cards
+
     private var categoriesCard: some View {
         let categories = ledger.categories
         return InsightCard {
             HStack(alignment: .firstTextBaseline) {
                 Text("Where you dictate").font(.display(22))
                 Spacer()
-                Text("\(categories.count) of \(UsageCategory.allCases.count) kinds")
-                    .font(.hkMeta.weight(.medium)).foregroundStyle(Theme.ink2)
+                if !categories.isEmpty {
+                    Text("\(categories.count) of \(UsageCategory.allCases.count) kinds")
+                        .font(.hkCaption.monospacedDigit()).foregroundStyle(Theme.ink2)
+                }
             }
             if categories.isEmpty {
                 Text("Shows up after your first dictation.").font(.hkCaption).foregroundStyle(Theme.ink2)
@@ -140,31 +121,41 @@ struct InsightsView: View {
             }
             if !categories.isEmpty {
                 Text("Older dictations, from before Insights, count as Other.")
-                    .font(.hkCaption).foregroundStyle(Theme.ink3)
+                    .font(.hkCaption).foregroundStyle(Theme.ink2)
             }
         }
     }
 
     private var streakCard: some View {
         let streak = ledger.currentStreak()
+        let longest = ledger.longestStreak()
         return InsightCard {
             HStack(alignment: .firstTextBaseline) {
-                Text("\(streak) day streak").font(.display(22))
+                Metric(value: streak.formatted(), label: "Day streak")
                 Spacer()
-                Text("Longest \(ledger.longestStreak()) days")
-                    .font(.hkMeta.weight(.medium)).foregroundStyle(Theme.ink2)
+                if longest > 0 {
+                    Text("Longest \(longest) day\(longest == 1 ? "" : "s")")
+                        .font(.hkCaption.monospacedDigit()).foregroundStyle(Theme.ink2)
+                }
             }
-            ActivityHeatmap(counts: ledger.dailyCounts(), weeks: 20)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            // As many weeks as the width holds, up to a year.
+            GeometryReader { geo in
+                InsightsHeatmap(counts: ledger.dailyCounts(), weeks: InsightsHeatmap.weeks(fitting: geo.size.width))
+            }
+            .frame(height: InsightsHeatmap.height)
             HStack(spacing: Theme.s1) {
+                Spacer()
                 Text("Less").font(.hkMeta).foregroundStyle(Theme.ink2)
-                ForEach([0.0, 0.3, 0.65, 1.0], id: \.self) { level in
-                    RoundedRectangle(cornerRadius: 2, style: .continuous)
-                        .fill(level == 0 ? Theme.hairline : Theme.signal.opacity(0.3 + 0.7 * level))
-                        .frame(width: 10, height: 10)
+                ForEach(0..<InsightsHeatmap.levels.count, id: \.self) { index in
+                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        .fill(InsightsHeatmap.fill(level: index))
+                        .overlay(RoundedRectangle(cornerRadius: 3, style: .continuous)
+                            .strokeBorder(index == 0 ? Theme.hairline : Color.clear, lineWidth: 1))
+                        .frame(width: 12, height: 12)
                 }
                 Text("More").font(.hkMeta).foregroundStyle(Theme.ink2)
             }
+            .accessibilityHidden(true)
         }
     }
 }
@@ -179,8 +170,10 @@ private struct VoiceProfileSection: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("Your voice").font(.display(22))
                 Spacer()
-                Text("\(profile.unlockedCards.count) of \(VoiceProfile.Card.allCases.count) cards")
-                    .font(.hkMeta.weight(.medium)).foregroundStyle(Theme.ink2)
+                if !profile.unlockedCards.isEmpty {
+                    Text("\(profile.unlockedCards.count) of \(VoiceProfile.Card.allCases.count) cards")
+                        .font(.hkCaption.monospacedDigit()).foregroundStyle(Theme.ink2)
+                }
             }
             if profile.unlockedCards.isEmpty {
                 lockedIntro
@@ -194,7 +187,7 @@ private struct VoiceProfileSection: View {
                     }
                 }
                 Text("Read from your last \(profile.historyCount) saved dictation\(profile.historyCount == 1 ? "" : "s") on this Mac.")
-                    .font(.hkCaption).foregroundStyle(Theme.ink3)
+                    .font(.hkCaption).foregroundStyle(Theme.ink2)
             }
         }
     }
@@ -210,7 +203,7 @@ private struct VoiceProfileSection: View {
             if savesHistory {
                 ProgressStrip(progress: Double(done) / Double(VoiceProfile.firstUnlock))
                 Text("\(done) of \(VoiceProfile.firstUnlock) dictations so far")
-                    .font(.hkCaption).foregroundStyle(Theme.ink2)
+                    .font(.hkCaption.monospacedDigit()).foregroundStyle(Theme.ink2)
             }
         }
         .accessibilityElement(children: .combine)
@@ -279,7 +272,7 @@ private struct LockedTile: View {
             Label("In \(remaining) more dictation\(remaining == 1 ? "" : "s")", icon: .lock)
                 .hushIconSize(14)
                 .font(.hkCallout)
-                .foregroundStyle(Theme.ink3)
+                .foregroundStyle(Theme.ink2)
         }
         .accessibilityElement(children: .combine)
     }
@@ -313,44 +306,94 @@ private struct InsightCard<Content: View>: View {
     }
 }
 
+/// A figure: a big New York number over a small label. The lead figure carries a short sage rule.
 private struct Metric: View {
     var value: String
     var label: String
+    var isLead = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.s1) {
-            Text(value).font(.display(28)).contentTransition(.numericText())
-            Text(label).font(.hkCallout).foregroundStyle(Theme.ink2)
+            Text(value)
+                .font(.display(36).monospacedDigit())
+                .foregroundStyle(Theme.ink)
+                .contentTransition(.numericText())
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            if isLead {
+                Capsule().fill(Theme.signal).frame(width: 32, height: 3)
+                    .padding(.bottom, Theme.s1)
+                    .accessibilityHidden(true)
+            }
+            Text(label).font(.hkCaption).foregroundStyle(Theme.ink2).fixedSize(horizontal: false, vertical: true)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
     }
 }
 
-/// A half-circle gauge: hairline track, sage progress.
-/// Typing-pace gauge; the sage arc sweeps up to the pace when the page opens.
-private struct PaceArc: View {
-    var progress: Double
-    @State private var shown = 0.0
+/// The page's signature: a year of days, one sage cell per day, deeper the more you dictated.
+/// Empty days are sunk to the window's paper tone with a hairline edge, so they read in light and dark.
+private struct InsightsHeatmap: View {
+    static let cell: CGFloat = 15
+    static let gap: CGFloat = 4
+    static let height = cell * 7 + gap * 6
 
-    var body: some View {
-        ZStack {
-            HalfCircle().stroke(Theme.hairline, style: StrokeStyle(lineWidth: 12, lineCap: .round))
-            HalfCircle().trim(from: 0, to: shown)
-                .stroke(Theme.signal, style: StrokeStyle(lineWidth: 12, lineCap: .round))
-        }
-        .onAppear { withAnimation(.spring(response: 1.1, dampingFraction: 0.85).delay(0.2)) { shown = progress } }
-        .onChange(of: progress) { _, new in withAnimation(Theme.gentle) { shown = new } }
-        .accessibilityHidden(true)
+    static func weeks(fitting width: CGFloat) -> Int {
+        max(8, min(53, Int((width + gap) / (cell + gap))))
+    }
+    /// Sage strengths for 1–4 activity levels; level 0 is the empty cell.
+    static let levels: [Double] = [0, 0.35, 0.6, 0.8, 1.0]
+
+    var counts: [Date: Int]
+    var weeks: Int
+    var now = Date()
+
+    static func fill(level: Int) -> AnyShapeStyle {
+        level == 0 ? AnyShapeStyle(Theme.paper) : AnyShapeStyle(Theme.signal.opacity(levels[min(level, levels.count - 1)]))
     }
 
-    private struct HalfCircle: Shape {
-        func path(in rect: CGRect) -> Path {
-            var path = Path()
-            let radius = min(rect.width / 2, rect.height) - 6
-            path.addArc(center: CGPoint(x: rect.midX, y: rect.maxY), radius: radius,
-                        startAngle: .degrees(180), endAngle: .degrees(0), clockwise: false)
-            return path
+    private static func level(count: Int, max maxCount: Int) -> Int {
+        guard count > 0 else { return 0 }
+        let steps = Double(levels.count - 1)
+        return max(1, min(levels.count - 1, Int((Double(count) / Double(maxCount) * steps).rounded(.up))))
+    }
+
+    var body: some View {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: now)
+        let weekdayOffset = (calendar.component(.weekday, from: today) - calendar.firstWeekday + 7) % 7
+        let lastColumnStart = calendar.date(byAdding: .day, value: -weekdayOffset, to: today) ?? today
+        let maxCount = max(1, counts.values.max() ?? 1)
+
+        HStack(alignment: .top, spacing: Self.gap) {
+            ForEach(0..<weeks, id: \.self) { column in
+                VStack(spacing: Self.gap) {
+                    ForEach(0..<7, id: \.self) { row in
+                        let start = calendar.date(byAdding: .day, value: (column - weeks + 1) * 7, to: lastColumnStart) ?? today
+                        let day = calendar.date(byAdding: .day, value: row, to: start) ?? today
+                        let count = counts[day] ?? 0
+                        let shape = RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        Group {
+                            if day > today {
+                                shape.fill(Color.clear)
+                            } else {
+                                shape.fill(Self.fill(level: Self.level(count: count, max: maxCount)))
+                                    .overlay(shape.strokeBorder(count == 0 ? Theme.hairline : Color.clear, lineWidth: 1))
+                            }
+                        }
+                        .frame(width: Self.cell, height: Self.cell)
+                        .help(day > today ? "" : "\(day.formatted(date: .abbreviated, time: .omitted)): \(count) dictation\(count == 1 ? "" : "s")")
+                        .accessibilityElement()
+                        .accessibilityHidden(day > today)
+                        .accessibilityLabel("\(day.formatted(date: .long, time: .omitted)): \(count) dictation\(count == 1 ? "" : "s")")
+                    }
+                }
+                .reveal(column / 4, distance: 4) // the weeks fill in left to right
+            }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Dictation activity for the last \(weeks) weeks")
     }
 }
 
@@ -381,12 +424,14 @@ private struct CategoryBar: View {
             .frame(height: 28)
             .background(Theme.hairline.opacity(0.5), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
             .onAppear { withAnimation(.spring(response: 0.9, dampingFraction: 0.86).delay(0.25)) { grown = true } }
-            Text("\(category.rawValue) · \(words.formatted())")
-                .font(.hkMeta.weight(.medium))
-                .foregroundStyle(Theme.ink2)
-                .lineLimit(1)
-                .fixedSize()
-                .frame(minWidth: 120, alignment: .leading)
+            HStack(spacing: Theme.s2) {
+                Text(category.rawValue).foregroundStyle(Theme.ink2)
+                Spacer(minLength: 0)
+                Text(words.formatted()).monospacedDigit().foregroundStyle(Theme.ink2)
+            }
+            .font(.hkCaption)
+            .lineLimit(1)
+            .frame(width: 128)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(category.rawValue): \(words) words, \(Int((share * 100).rounded())) percent")

@@ -135,13 +135,15 @@ struct TrainView: View {
             }
         }
         .padding(Theme.s6 - 4)
-        .background(Theme.signalSoft, in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
+        .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
+            .strokeBorder(Theme.hairline, lineWidth: 1))
     }
 
     private var sessionSummary: String {
         let takes = model.currentSessionTakeCount(condition: model.trainingCondition)
         let complete = model.completeSessionCount(condition: model.trainingCondition)
-        return "This session: \(takes) \(takes == 1 ? "take" : "takes") · \(complete) complete \(complete == 1 ? "session" : "sessions")"
+        return "This session: \(takes) \(takes == 1 ? "take" : "takes"), \(complete) complete \(complete == 1 ? "session" : "sessions")"
     }
 
     private var conditionGuidance: String {
@@ -165,7 +167,7 @@ struct TrainView: View {
             VStack(alignment: .leading, spacing: Theme.s3) {
                 HStack(spacing: Theme.s3) {
                     Text("Takes").font(.hkTitle3)
-                    Text(flagged > 0 ? "\(takes.count - flagged) used · \(flagged) not used" : "\(takes.count)")
+                    Text(flagged > 0 ? "\(takes.count - flagged) used, \(flagged) not used" : "\(takes.count)")
                         .font(.hkCallout.monospacedDigit())
                         .foregroundStyle(Theme.ink3)
                     Spacer()
@@ -289,7 +291,7 @@ private struct TakeTile: View {
                         .foregroundStyle(Theme.finishing)
                         .help(issue.message)
                 } else {
-                    Text(String(format: "%.2f s · %d samples", template.duration, template.samples.count))
+                    Text(String(format: "%.2f s, %d samples", template.duration, template.samples.count))
                         .font(.hkMeta.monospacedDigit())
                         .foregroundStyle(Theme.ink2)
                 }

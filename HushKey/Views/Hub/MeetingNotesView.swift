@@ -74,10 +74,9 @@ struct MeetingNotesView: View {
 
             if hasNoNotesYet {
                 // One empty state, not one per column.
-                EmptyState(icon: .document, title: "Your notes stay here",
-                           message: "Start a meeting. The transcript, summary and action items appear here, and nothing leaves this Mac.")
-                    .frame(maxWidth: .infinity, minHeight: 320)
-                    .card(padding: 0, style: .outlined)
+                EmptyState(icon: .meetings, title: "Your notes stay here",
+                           message: "Start a meeting and its transcript, summary and action items land here.")
+                    .padding(.top, Theme.s5)
                 Spacer(minLength: 0)
             } else {
                 HStack(alignment: .top, spacing: Theme.s5) {
@@ -90,11 +89,7 @@ struct MeetingNotesView: View {
                 .frame(minHeight: 390, maxHeight: .infinity)
             }
         }
-        .frame(maxWidth: Theme.homeWidth)
-        .padding(.horizontal, Theme.s7 - 8)
-        .padding(.top, Theme.s7)
-        .padding(.bottom, Theme.s5)
-        .frame(maxWidth: .infinity, alignment: .top)
+        .pageLayout(maxWidth: Theme.homeWidth)
         .fileExporter(isPresented: $isExporting, document: exportDocument,
                       contentType: .plainText, defaultFilename: exportFilename) { result in
             if case .failure(let error) = result {
@@ -156,18 +151,20 @@ struct MeetingNotesView: View {
         }
     }
 
+    /// The page's signature: a recorder-like control with a serif title, the source picker and
+    /// a sage Start. While capturing, the live waveform and level meter take the title's place.
     private var captureControls: some View {
         @Bindable var meeting = service
         return HStack(spacing: Theme.s4) {
-            Glyph(service.isCapturing ? .waveform : .meetings)
-                .hushIconSize(28)
-                .foregroundStyle(service.isCapturing ? Theme.listening : Theme.signal)
-                .symbolEffect(.variableColor.iterative, isActive: service.isCapturing)
-                .frame(width: 52, height: 52)
-                .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Theme.s2) {
                 if service.isCapturing {
-                    Text(captureStatusTitle).font(.hkTitle3)
+                    HStack(spacing: Theme.s2) {
+                        Glyph(.waveform)
+                            .hushIconSize(18)
+                            .foregroundStyle(Theme.listening)
+                            .symbolEffect(.variableColor.iterative, isActive: service.isCapturing)
+                        Text(captureStatusTitle).font(.display(22))
+                    }
                     HStack(spacing: Theme.s3) {
                         LevelMeter(value: Double(service.activeAudioLevel))
                             .frame(width: 120)
@@ -177,12 +174,12 @@ struct MeetingNotesView: View {
                             .foregroundStyle(Theme.ink2)
                     }
                 } else if service.isFinalizing || service.isStarting {
-                    Text(service.isFinalizing ? "Saving the transcript" : "Getting ready").font(.hkTitle3)
+                    Text(service.isFinalizing ? "Saving the transcript" : "Getting ready").font(.display(22))
                     Text(service.isFinalizing ? "Finishing on this Mac…" : "Preparing local speech recognition…")
                         .font(.hkCallout)
                         .foregroundStyle(Theme.ink2)
                 } else {
-                    Text("Start a meeting").font(.hkTitle3)
+                    Text("Start a meeting").font(.display(22))
                     Text(audioSourceDescription)
                         .font(.hkCallout)
                         .foregroundStyle(Theme.ink2)
@@ -214,9 +211,12 @@ struct MeetingNotesView: View {
                           : "Start local meeting capture")
             }
         }
-        .padding(Theme.s5)
+        .padding(.horizontal, Theme.s5)
+        .padding(.vertical, Theme.s5)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.signalSoft, in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
+        .background(Theme.well, in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.r1, style: .continuous)
+            .strokeBorder(service.isCapturing ? Theme.listening.opacity(0.6) : Theme.hairline, lineWidth: 1))
         .animation(Theme.snappy, value: service.isCapturing)
     }
 
@@ -224,7 +224,7 @@ struct MeetingNotesView: View {
         VStack(alignment: .leading, spacing: Theme.s3) {
             Label("Recovered unfinished meeting", icon: .undo)
                 .font(.hkTitle3)
-            Text("Partial transcript from \(draft.audioSource.rawValue.lowercased()) · started \(draft.startedAt.formatted(date: .abbreviated, time: .shortened)) · \(durationLabel(draft.duration)). Audio was not saved.")
+            Text("Partial transcript from \(draft.audioSource.rawValue.lowercased()), started \(draft.startedAt.formatted(date: .abbreviated, time: .shortened)), \(durationLabel(draft.duration)) long. Audio was not saved.")
                 .font(.hkCallout)
                 .foregroundStyle(Theme.ink2)
                 .fixedSize(horizontal: false, vertical: true)
@@ -233,8 +233,10 @@ struct MeetingNotesView: View {
                 .lineLimit(5)
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(Theme.s3)
-                .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
+                .padding(.leading, Theme.s3)
+                .overlay(alignment: .leading) {
+                    Rectangle().fill(Theme.signal.opacity(0.5)).frame(width: 2)
+                }
             HStack {
                 Spacer()
                 Button("Discard…", icon: .trash) { confirmDiscardRecoveredDraft = true }
@@ -272,7 +274,6 @@ struct MeetingNotesView: View {
                 EmptyState(icon: searchText.isEmpty ? .document : .search,
                            title: searchText.isEmpty ? "No notes yet" : "No matches",
                            message: searchText.isEmpty ? "Your meetings land here." : "Try another word.")
-                    .card(padding: 0, style: .outlined)
             } else {
                 ScrollView {
                     VStack(spacing: 2) {
@@ -332,9 +333,13 @@ struct MeetingNotesView: View {
                         TextField("Meeting title", text: binding(for: note, keyPath: \.title))
                             .font(.hkTitle2)
                             .textFieldStyle(.plain)
-                        Text("\(note.createdAt.formatted(date: .abbreviated, time: .shortened)) · \(durationLabel(note.duration)) · On this Mac")
-                            .font(.hkCallout)
-                            .foregroundStyle(Theme.ink2)
+                        HStack(spacing: Theme.s3) {
+                            Text(note.createdAt.formatted(date: .abbreviated, time: .shortened))
+                            Text(durationLabel(note.duration))
+                            Text("On this Mac")
+                        }
+                        .font(.hkCallout)
+                        .foregroundStyle(Theme.ink2)
                     }
                     Spacer(minLength: 4)
                     Menu {

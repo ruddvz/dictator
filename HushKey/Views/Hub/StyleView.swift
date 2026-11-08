@@ -96,9 +96,10 @@ struct StyleView: View {
                         localModelRow
                     }
 
-                    Label("HushKey never rewords or invents text. The polish pass only deletes fillers and refines punctuation. The raw transcript is always one click away in History.", icon: .shield)
+                    Text("HushKey never rewords or invents text. The polish pass only deletes fillers and refines punctuation. The raw transcript is always one click away in History.")
                         .font(.hkCaption)
                         .foregroundStyle(Theme.ink2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Rectangle().fill(Theme.hairline).frame(height: 1).padding(.vertical, Theme.s2)
@@ -115,7 +116,7 @@ struct StyleView: View {
                             }
                         }
                     }
-                    Label("Code mode is never restyled, and snippets keep the text you wrote.", icon: .info)
+                    Text("Code mode is never restyled, and snippets keep the text you wrote.")
                         .font(.hkCaption)
                         .foregroundStyle(Theme.ink2)
                 }
@@ -128,7 +129,7 @@ struct StyleView: View {
     private var localModelRow: some View {
         HStack(alignment: .center, spacing: Theme.s4) {
             Glyph(.sparkle, size: 17)
-                .foregroundStyle(Theme.signal)
+                .foregroundStyle(Theme.ink2)
             Text(LocalCleanupModel.shared.statusDescription)
                 .font(.hkCallout)
                 .foregroundStyle(isLocalModelFailed ? Theme.danger : Theme.ink2)
@@ -145,24 +146,46 @@ struct StyleView: View {
         return false
     }
 
+    /// "Applies in Messages, WhatsApp and Signal." as one plain sentence.
     private var appsRow: some View {
-        HStack(spacing: Theme.s2) {
-            SymbolGlyph(context.symbol, size: 17)
-                .foregroundStyle(Theme.signal)
-            Text("Applies in")
-                .font(.hkCallout)
-                .foregroundStyle(Theme.ink2)
-            ForEach(context.exampleApps, id: \.self) { app in
-                Text(app)
-                    .font(.hkCaption)
-                    .foregroundStyle(Theme.ink2)
-                    .padding(.horizontal, Theme.s2)
-                    .padding(.vertical, Theme.s1)
-                    .background(Capsule().fill(Theme.well))
-                    .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 1))
-            }
+        Text("Applies in \(context.exampleApps.formatted(.list(type: .and))).")
+            .font(.hkCallout)
+            .foregroundStyle(Theme.ink2)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// A short quoted sample set in the serif face, hung off a thin leading rule that turns sage when chosen.
+private struct VoiceSample: View {
+    var text: String
+    var isSelected: Bool
+
+    var body: some View {
+        HStack(alignment: .top, spacing: Theme.s3) {
+            Capsule()
+                .fill(isSelected ? Theme.signal : Theme.hairline)
+                .frame(width: 2)
+            Text("“\(text)”")
+                .font(.display(16))
+                .foregroundStyle(Theme.ink)
+                .lineSpacing(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .accessibilityElement(children: .combine)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// The selected card's one mark: a small sage check beside the title.
+private struct SelectedCheck: View {
+    var isSelected: Bool
+
+    var body: some View {
+        Glyph(.checkCircle, size: 16)
+            .foregroundStyle(Theme.signal)
+            .opacity(isSelected ? 1 : 0)
+            .scaleEffect(isSelected ? 1 : 0.6)
+            .accessibilityHidden(true)
     }
 }
 
@@ -177,26 +200,14 @@ private struct CleanupLevelCard: View {
         Button(action: onSelect) {
             VStack(alignment: .leading, spacing: Theme.s3) {
                 HStack {
-                    Text(level.rawValue).font(.hkHeadline).foregroundStyle(Theme.ink)
+                    Text(level.rawValue).font(.display(20)).foregroundStyle(Theme.ink)
                     Spacer()
-                    Glyph(isSelected ? .checkCircle : .ring)
-                        .foregroundStyle(isSelected ? Theme.signal : Theme.ink3)
-                        .contentTransition(.symbolEffect(.replace))
+                    SelectedCheck(isSelected: isSelected)
                 }
                 Text(level.detail).font(.hkCaption).foregroundStyle(Theme.ink2)
                     .fixedSize(horizontal: false, vertical: true)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Example:")
-                        .font(.hkMeta.weight(.semibold))
-                        .foregroundStyle(Theme.ink3)
-                    Text(level.sampleAfter(hasAI: hasAI))
-                        .font(.hkCallout)
-                        .foregroundStyle(Theme.ink)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(Theme.s3)
-                .background(RoundedRectangle(cornerRadius: Theme.r3, style: .continuous).fill(Theme.sheet))
+                Spacer(minLength: 0)
+                VoiceSample(text: level.sampleAfter(hasAI: hasAI), isSelected: isSelected)
             }
             .padding(Theme.s4)
             .frame(maxWidth: .infinity, minHeight: 190, maxHeight: .infinity, alignment: .topLeading)
@@ -209,6 +220,7 @@ private struct CleanupLevelCard: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .animation(Theme.snappy, value: hovering)
+        .animation(Theme.snappy, value: isSelected)
         .accessibilityLabel("\(level.rawValue). \(level.detail)")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
@@ -225,20 +237,14 @@ private struct ToneCard: View {
         Button(action: select) {
             VStack(alignment: .leading, spacing: Theme.s3) {
                 HStack {
-                    Text(tone.rawValue).font(.hkHeadline).foregroundStyle(Theme.ink)
+                    Text(tone.rawValue).font(.display(20)).foregroundStyle(Theme.ink)
                     Spacer()
-                    Glyph(isSelected ? .checkCircle : .ring)
-                        .foregroundStyle(isSelected ? Theme.signal : Theme.ink3)
-                        .contentTransition(.symbolEffect(.replace))
+                    SelectedCheck(isSelected: isSelected)
                 }
                 Text(tone.detail).font(.hkCaption).foregroundStyle(Theme.ink2)
-                Text(tone.apply(to: sample))
-                    .font(.hkCallout)
-                    .foregroundStyle(Theme.ink)
-                    .frame(maxWidth: .infinity, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(Theme.s3)
-                    .background(RoundedRectangle(cornerRadius: Theme.r3, style: .continuous).fill(Theme.sheet))
+                Spacer(minLength: 0)
+                VoiceSample(text: tone.apply(to: sample), isSelected: isSelected)
                     .contentTransition(.opacity)
             }
             .padding(Theme.s4)
@@ -252,6 +258,7 @@ private struct ToneCard: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .animation(Theme.snappy, value: hovering)
+        .animation(Theme.snappy, value: isSelected)
         .accessibilityLabel("\(tone.rawValue). \(tone.detail)")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }

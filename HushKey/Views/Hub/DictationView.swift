@@ -6,23 +6,26 @@ struct DictationView: View {
     @State private var confirmClearHistory = false
     @State private var historySearch = ""
     @State private var searching = false
+    @State private var hoveringFigures = false
     @State private var reader = HistoryReader()
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.s5) {
                 header.reveal(0)
-                HStack(alignment: .top, spacing: Theme.s4) {
-                    HeroCard().reveal(1)
-                    statsCard.frame(width: 248).reveal(2)
+                VoiceBand(holds: holds).reveal(1)
+                // Hallmark (app screens): the history is Home's signature object, so nothing
+                // above it competes: one quiet line of figures and, at most, one next step.
+                if model.usageLedger.totalWords > 0 {
+                    figuresLine.reveal(2)
                 }
-                .fixedSize(horizontal: false, vertical: true)
+                NextStepRow().reveal(3)
                 if showsComposer {
                     composer
                         .transition(.asymmetric(insertion: .opacity.combined(with: .move(edge: .top)),
                                                 removal: .opacity))
                 }
-                historySection.reveal(3)
+                historySection.reveal(4)
             }
             .pageLayout(maxWidth: Theme.homeWidth)
             .animation(Theme.gentle, value: showsComposer)
@@ -50,22 +53,10 @@ struct DictationView: View {
     private var header: some View {
         HStack(alignment: .pageTitle, spacing: Theme.s4) {
             VStack(alignment: .leading, spacing: Theme.s2) {
-                Text("\(greeting), \(firstName)")
+                Text("Home")
                     .font(.hkTitle1)
-                    .tracking(-0.3)
                     .accessibilityIdentifier("page.header")
                     .alignmentGuide(.pageTitle) { $0[VerticalAlignment.center] }
-                HStack(alignment: .center, spacing: 6) {
-                    Text(holds ? "Hold" : "Press")
-                    KeycapShortcut(label: model.dictationShortcut.label, size: 12)
-                    Text(model.dictationShortcut.usesFunctionKey
-                         ? "in any app and just talk. Double-tap for hands-free."
-                         : holds ? "in any app and just talk. Let go to finish."
-                         : "in any app to start, and again to finish.")
-                }
-                .font(.hkCallout)
-                .foregroundStyle(Theme.ink2)
-                .accessibilityElement(children: .combine)
                 if let problem {
                     HStack(spacing: Theme.s2) {
                         Label(problem, icon: .warning)
@@ -90,23 +81,8 @@ struct DictationView: View {
         }
     }
 
-    /// Good morning / afternoon / evening, by the clock on this Mac.
-    private var greeting: String {
-        switch Calendar.current.component(.hour, from: Date()) {
-        case 5..<12: "Good morning"
-        case 12..<17: "Good afternoon"
-        case 17..<22: "Good evening"
-        default: "Hey"
-        }
-    }
-
     private var holds: Bool {
         model.dictationShortcut.usesFunctionKey || model.dictationCaptureBehavior == .hold
-    }
-
-    private var firstName: String {
-        let full = NSFullUserName().trimmingCharacters(in: .whitespaces)
-        return full.split(separator: " ").first.map(String.init) ?? NSUserName()
     }
 
     /// The fn key needs Accessibility access, which only the person can grant.
@@ -274,91 +250,64 @@ struct DictationView: View {
 
     // MARK: Stats
 
-    /// Lifetime numbers from the same ledger as Insights, so the two always agree. They count
-    /// up from zero the first time Home appears, and roll digit by digit when a dictation lands.
-    private var statsCard: some View {
+    /// Lifetime figures from the same ledger as Insights, set as figure + label in tabular
+    /// numerals on one line. The whole line opens Insights.
+    private var figuresLine: some View {
         let ledger = model.usageLedger
         let streak = ledger.currentStreak()
         let today = ledger.days[UsageLedger.key(for: Date())]?.words ?? 0
+        let saved = VoiceProfile(entries: model.dictationHistory, ledger: ledger, readingText: false).timeSavedText
         return Button {
             withAnimation(Theme.snappy) { model.screen = .insights }
         } label: {
-            VStack(alignment: .leading, spacing: Theme.s3) {
-                VStack(alignment: .leading, spacing: 2) {
-                    statRow(value: ledger.totalWords, label: ledger.totalWords == 1 ? "word dictated" : "words dictated", order: 0)
-                    if today > 0 {
-                        Text("+\(today.formatted()) today")
-                            .font(.hkMeta.weight(.semibold))
-                            .foregroundStyle(Theme.signal)
-                            .contentTransition(.numericText(value: Double(today)))
-                            .transition(.opacity)
-                    }
+            HStack(alignment: .firstTextBaseline, spacing: Theme.s6) {
+                figure(ledger.totalWords, ledger.totalWords == 1 ? "word" : "words", order: 0)
+                if today > 0 { figure(today, "today", order: 1) }
+                figure(ledger.wordsPerMinute, "per minute", order: 2)
+                figure(streak, streak == 1 ? "day in a row" : "days in a row", order: 3)
+                if let saved {
+                    Text(saved.prefix(1).uppercased() + saved.dropFirst() + " saved")
+                        .font(.hkCallout)
+                        .foregroundStyle(Theme.ink2)
+                        .lineLimit(1)
+                        .help("Words at \(VoiceProfile.typingWordsPerMinute) wpm typing, minus the time you spent speaking")
                 }
-                statRow(value: ledger.wordsPerMinute, label: "words per minute", order: 1)
-                statRow(value: streak, label: "day streak", order: 2)
-                voiceLines(VoiceProfile(entries: model.dictationHistory, ledger: ledger, readingText: false))
-                Rectangle().fill(Theme.hairline).frame(height: 1)
-                VStack(alignment: .leading, spacing: Theme.s2) {
-                    HStack {
-                        SectionLabel(title: "Last 12 weeks")
-                        Spacer()
-                        Glyph(.arrowUpRight)
-                            .hushIconSize(12)
-                            .foregroundStyle(Theme.ink3)
-                    }
-                    ActivityHeatmap(counts: ledger.dailyCounts())
-                }
+                Spacer(minLength: Theme.s4)
+                Text("Insights")
+                    .font(.hkCallout.weight(.medium))
+                    .foregroundStyle(hoveringFigures ? Theme.ink : Theme.ink3)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(.vertical, Theme.s3)
+            .overlay(alignment: .top) { Rectangle().fill(Theme.hairline).frame(height: 1) }
+            .overlay(alignment: .bottom) { Rectangle().fill(Theme.hairline).frame(height: 1) }
             .contentShape(Rectangle())
         }
-        .buttonStyle(StatsCardStyle())
+        .buttonStyle(.plain)
+        .onHover { hoveringFigures = $0 }
         .help("Open Insights")
         .accessibilityElement(children: .combine)
         .accessibilityHint("Opens Insights")
     }
 
-    /// Time saved and the voice profile in two quiet lines; Insights has the full cards.
-    @ViewBuilder
-    private func voiceLines(_ profile: VoiceProfile) -> some View {
-        VStack(alignment: .leading, spacing: Theme.s1) {
-            if let saved = profile.timeSavedText {
-                Label(saved.prefix(1).uppercased() + saved.dropFirst() + " vs typing", icon: .clock)
-                    .help("Words at \(VoiceProfile.typingWordsPerMinute) wpm typing, minus the time you spent speaking")
-            }
-            if let next = profile.nextUnlock, next.card == .pace {
-                Label("Voice profile in \(next.remaining) more", icon: .waveform)
-                    .foregroundStyle(Theme.ink3)
-                    .help("After \(VoiceProfile.firstUnlock) dictations, Insights sketches how you talk, from the history on this Mac")
-            } else if let summary = Self.voiceSummary(profile) {
-                Label(summary, icon: .waveform)
-                    .help("Your voice profile, read from the history on this Mac. More in Insights.")
-            }
+    private func figure(_ value: Int?, _ label: String, order: Int) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            CountingNumber(value: value, delay: 0.15 + Double(order) * 0.08)
+                .font(.display(24))
+            Text(label)
+                .font(.hkCallout)
+                .foregroundStyle(Theme.ink2)
         }
-        .hushIconSize(14)
-        .font(.hkMeta.weight(.medium))
-        .foregroundStyle(Theme.ink2)
-        .lineLimit(1)
+        .fixedSize()
     }
 
-    /// "Steady voice · night owl", with only the parts that have unlocked and have data.
+    /// "Steady voice, night owl", with only the parts that have unlocked and have data.
     static func voiceSummary(_ profile: VoiceProfile) -> String? {
         var parts: [String] = []
         if let pace = profile.pace { parts.append("\(pace.rawValue) voice") }
         if profile.isUnlocked(.peakHours), let peak = profile.peakHours {
             parts.append(parts.isEmpty ? peak.timeOfDay.rawValue : peak.timeOfDay.rawValue.lowercased())
         }
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
-    }
-
-    private func statRow(value: Int?, label: String, order: Int) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: Theme.s2) {
-            CountingNumber(value: value, delay: 0.15 + Double(order) * 0.08)
-                .font(.display(28))
-            Text(label)
-                .font(.hkCallout)
-                .foregroundStyle(Theme.ink2)
-        }
+        return parts.isEmpty ? nil : parts.joined(separator: ", ")
     }
 
     // MARK: History
@@ -366,7 +315,8 @@ struct DictationView: View {
     private var historySection: some View {
         VStack(alignment: .leading, spacing: Theme.s3) {
             HStack(spacing: Theme.s2) {
-                SectionLabel(title: groupedHistory.first.map { dayTitle($0.day) } ?? "History")
+                Text(groupedHistory.first.map { dayTitle($0.day) } ?? "History")
+                    .font(.hkTitle3)
                 Spacer()
                 if !model.dictationHistory.isEmpty {
                     if searching || !historySearch.isEmpty {
@@ -423,22 +373,24 @@ struct DictationView: View {
                 ForEach(groupedHistory, id: \.day) { group in
                     VStack(alignment: .leading, spacing: Theme.s2) {
                         if group.day != groupedHistory.first?.day {
-                            SectionLabel(title: dayTitle(group.day))
-                                .padding(.top, Theme.s4)
+                            Text(dayTitle(group.day))
+                                .font(.hkTitle3)
+                                .padding(.top, Theme.s5)
                         }
+                        // A ruled list, not a boxed card: rows sit on the page between hairlines.
+                        // Rows keep their inner padding for the hover wash, so the list moves
+                        // out by it and the text lines up with the headings above.
                         VStack(spacing: 0) {
+                            Rectangle().fill(Theme.hairline).frame(height: 1).padding(.horizontal, Theme.s4)
                             ForEach(Array(group.entries.enumerated()), id: \.element.id) { index, entry in
                                 if index > 0 {
-                                    Rectangle().fill(Theme.hairline).frame(height: 1)
+                                    Rectangle().fill(Theme.hairline).frame(height: 1).padding(.horizontal, Theme.s4)
                                 }
                                 HistoryRow(entry: entry, isLocked: isBusy, reader: reader)
                                     .transition(.opacity.combined(with: .move(edge: .top)))
                             }
                         }
-                        .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
-                        .clipShape(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
-                            .strokeBorder(Theme.hairline, lineWidth: 1))
+                        .padding(.horizontal, -Theme.s4)
                     }
                 }
                 .animation(Theme.gentle, value: model.dictationHistory.map(\.id))
@@ -446,24 +398,22 @@ struct DictationView: View {
         }
     }
 
+    /// Empty history sits on the page under its heading: what will collect here and how.
     private var emptyHistory: some View {
-        VStack(spacing: Theme.s3) {
-            MorphIcon(phase: .idle, lineWidth: 2.4)
-                .frame(width: 36, height: 36)
-                .foregroundStyle(Theme.ink3)
-            Text(model.savesDictationHistory ? "Your dictations collect here" : "History is off")
+        VStack(alignment: .leading, spacing: Theme.s1) {
+            Text(model.savesDictationHistory ? "Nothing dictated yet" : "History is off")
                 .font(.hkHeadline)
             Text(model.savesDictationHistory
-                 ? "Each one is kept on this Mac, grouped by day, ready to copy or edit again."
-                 : "Turn it on in Settings to keep recent dictations on this Mac.")
+                 ? "Each dictation is kept here on this Mac, grouped by day, ready to copy or edit again."
+                 : "Turn it on in Settings › Data & privacy to keep recent dictations on this Mac.")
                 .font(.hkCallout)
                 .foregroundStyle(Theme.ink2)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 380)
+                .frame(maxWidth: 520, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, Theme.s6)
-        .card(style: .outlined)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, Theme.s4)
+        .overlay(alignment: .top) { Rectangle().fill(Theme.hairline).frame(height: 1) }
     }
 
     private var searchField: some View {
@@ -543,125 +493,96 @@ struct DictationView: View {
 
 /// The home hero: a deep panel with a slow ambient field, the next useful step on the left,
 /// and HushKey's breath ribbon on the right, which listens along whenever a dictation runs.
-private struct HeroCard: View {
+/// Home's signature: the voice band. The same dark sage field as the pill's world, with the
+/// breath ribbon resting on the right. It says how to dictate in HushKey's serif voice, and
+/// while you dictate it is the live instrument: the ribbon follows your voice and the line
+/// says what is happening. Motion is state: at rest the ribbon is drawn, not animated.
+private struct VoiceBand: View {
     @Environment(AppModel.self) private var model
-    @AppStorage("dismissedNextSteps") private var dismissedRaw = ""
+    var holds: Bool
     @State private var windowVisible = true
 
-    private struct Step {
-        var id: String
-        var title: String
-        /// Last words of the title, set in sage.
-        var accent: String
-        var detail: String
-        var action: String
-        var dismissable = true
-        var perform: (AppModel) -> Void
-    }
-
-    private var step: Step {
-        let dismissed = Set(dismissedRaw.split(separator: ",").map(String.init))
-        let candidates: [Step] = [
-            model.insertion.isEnabled ? nil : Step(
-                id: "insertion", title: "Type straight into", accent: "any app",
-                detail: "Turn on typing and finished dictations land where your cursor is.",
-                action: "Turn on typing") { model in
-                    UserDefaults.standard.set(SettingsView.Section.insertion.rawValue, forKey: "settingsSection")
-                    model.screen = .settings
-                },
-            !model.dictationToneSettings.tones.isEmpty ? nil : Step(
-                id: "style", title: "Make HushKey sound like", accent: "you",
-                detail: "Casual in Messages, formal in Mail. Pick a style for each kind of app.",
-                action: "Choose styles") { $0.screen = .style },
-            !model.dictationTerms.isEmpty || !model.dictationSnippets.isEmpty ? nil : Step(
-                id: "vocabulary", title: "Teach HushKey", accent: "your words",
-                detail: "Add names and jargon once. Recognition and spelling follow everywhere.",
-                action: "Add words") { $0.screen = .personalization },
-            Step(id: "silent", title: "Go quiet with", accent: "AirPods",
-                 detail: "Train a few words or head gestures in the Silent Lab and keep your hands free.",
-                 action: "Open Silent Lab") { $0.screen = .setup },
-        ].compactMap { $0 }
-        return candidates.first { !dismissed.contains($0.id) } ?? Step(
-            id: "whisper", title: "Whisper it.", accent: "HushKey still hears you.",
-            detail: "Quiet speech is transcribed on this Mac, and nothing leaves it.",
-            action: "Try a whisper", dismissable: false) { model in
-                Task { await model.toggleDictation() }
-            }
-    }
-
-    private var ribbonMode: BreathRibbon.Mode {
+    private var mode: BreathRibbon.Mode {
         if model.audio.isRunning { return .live }
         if model.isStartingDictation { return .waiting }
         if model.isFinalizingDictation || model.transcriber.isFinalizing { return .working }
         return .rest
     }
 
+    private var line: String {
+        switch mode {
+        case .live: "Listening."
+        case .waiting: "Opening the microphone…"
+        case .working: "Writing it down…"
+        default:
+            model.dictationShortcut.usesFunctionKey || holds
+                ? "Hold \(model.dictationShortcut.label) and talk."
+                : "Press \(model.dictationShortcut.label) and talk."
+        }
+    }
+
+    private var detail: String {
+        switch mode {
+        case .live: holds ? "Let go to finish. Esc cancels." : "Press the shortcut again to finish. Esc cancels."
+        case .waiting, .working: "Everything happens on this Mac."
+        default:
+            model.dictationShortcut.usesFunctionKey
+                ? "In any app. Double-tap for hands-free. Nothing leaves this Mac."
+                : holds ? "In any app. Let go to finish. Nothing leaves this Mac."
+                : "In any app, and again to finish. Nothing leaves this Mac."
+        }
+    }
+
     var body: some View {
-        let step = step
-        ZStack(alignment: .topTrailing) {
-            // Title at the top, action at the bottom, whatever height the stats card sets.
+        Button {
+            Task { await model.toggleDictation() }
+        } label: {
             VStack(alignment: .leading, spacing: Theme.s2) {
-                (Text(step.title + " ") + Text(step.accent).foregroundStyle(Theme.heroGlow))
-                    .font(.hkTitle1)
-                    .tracking(-0.4)
+                Text(line)
+                    .font(.display(34))
+                    .tracking(-0.5)
                     .foregroundStyle(Theme.heroInk)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(step.detail)
+                    .contentTransition(.opacity)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Text(detail)
                     .font(.hkCallout)
                     .foregroundStyle(Theme.heroInk2)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: Theme.s4)
-                Button(step.action) { step.perform(model) }
-                    .buttonStyle(PrimaryButtonStyle(tint: Theme.heroInk, foreground: Theme.heroBase))
+                    .contentTransition(.opacity)
             }
-            .frame(maxWidth: 420, maxHeight: .infinity, alignment: .topLeading)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(Theme.s5)
-            .id(step.id)
-            .transition(.opacity)
-
-            if step.dismissable {
-                Button("Dismiss", icon: .close) {
-                    withAnimation(Theme.gentle) {
-                        dismissedRaw = (dismissedRaw.isEmpty ? "" : dismissedRaw + ",") + step.id
-                    }
-                }
-                .labelStyle(.iconOnly)
-                .buttonStyle(.plain)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Theme.heroInk2)
-                .frame(width: 28, height: 28)
-                .contentShape(Rectangle())
-                .padding(Theme.s2)
-                .help("Hide this suggestion")
+            .frame(maxWidth: 440, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 148, alignment: .leading)
+            .padding(.horizontal, Theme.s6)
+            .padding(.vertical, Theme.s5)
+            .background {
+                IsolatedHost { LiveLevel(model.audio) { VoiceBandBackdrop(level: $0, mode: mode, visible: windowVisible) } }
             }
+            .clipShape(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
+                .strokeBorder(Theme.heroInk.opacity(0.08), lineWidth: 1))
+            .contentShape(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .frame(minHeight: 200)
-        .background {
-            IsolatedHost { LiveLevel(model.audio) { HeroBackdrop(level: $0, mode: ribbonMode, visible: windowVisible) } }
-        }
-        // r2, the same as the stats card beside it.
-        .clipShape(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
-            .strokeBorder(Theme.heroInk.opacity(0.08), lineWidth: 1))
+        .buttonStyle(.plain)
+        .disabled(mode == .working)
+        .animation(Theme.gentle, value: mode)
         .onWindowVisibilityChange { windowVisible = $0 }
-        .animation(Theme.gentle, value: step.id)
+        .help(model.audio.isRunning ? "Stop dictation" : "Start dictation")
+        .accessibilityLabel(line + " " + detail)
     }
 }
 
-/// The hero's moving layer: the ambient field, and the voice ribbon while a dictation runs.
-private struct HeroBackdrop: View {
+/// The band's moving layer: the ambient field with its resting ribbon, and the live ribbon
+/// while a dictation runs.
+private struct VoiceBandBackdrop: View {
     var level: Float
     var mode: BreathRibbon.Mode
     var visible: Bool
 
     var body: some View {
         GeometryReader { geo in
-            let focus = UnitPoint(x: 0.78, y: 0.5)
+            let focus = UnitPoint(x: 0.76, y: 0.5)
             let ribbon = AmbientField.ribbonRect(in: geo.size, focus: focus)
             ZStack {
-                // At rest the field draws the ribbon itself; a live one runs at 60 fps only while dictating.
                 AmbientField(focus: focus, paused: !visible,
                              restingRibbon: mode == .rest ? Theme.heroGlow : nil)
                 if mode != .rest {
@@ -671,6 +592,81 @@ private struct HeroBackdrop: View {
                         .transition(.opacity)
                 }
             }
+        }
+    }
+}
+
+/// One suggested next step, inline above the history: a plain sentence, one line of detail,
+/// a secondary button and a dismiss. Nothing when every step is done or dismissed, so the
+/// Dictate button stays the page's one primary action.
+private struct NextStepRow: View {
+    @Environment(AppModel.self) private var model
+    @AppStorage("dismissedNextSteps") private var dismissedRaw = ""
+
+    private struct Step {
+        var id: String
+        var title: String
+        var detail: String
+        var action: String
+        var perform: (AppModel) -> Void
+    }
+
+    private var step: Step? {
+        let dismissed = Set(dismissedRaw.split(separator: ",").map(String.init))
+        let candidates: [Step] = [
+            model.insertion.isEnabled ? nil : Step(
+                id: "insertion", title: "Type straight into any app",
+                detail: "Turn on typing and finished dictations land where your cursor is.",
+                action: "Turn on typing") { model in
+                    UserDefaults.standard.set(SettingsView.Section.insertion.rawValue, forKey: "settingsSection")
+                    model.screen = .settings
+                },
+            !model.dictationToneSettings.tones.isEmpty ? nil : Step(
+                id: "style", title: "Make HushKey sound like you",
+                detail: "Casual in Messages, formal in Mail. Pick a style for each kind of app.",
+                action: "Choose styles") { $0.screen = .style },
+            !model.dictationTerms.isEmpty || !model.dictationSnippets.isEmpty ? nil : Step(
+                id: "vocabulary", title: "Teach HushKey your words",
+                detail: "Add names and jargon once. Recognition and spelling follow everywhere.",
+                action: "Add words") { $0.screen = .personalization },
+            Step(id: "silent", title: "Go quiet with AirPods",
+                 detail: "Train a few words or head gestures in the Silent Lab.",
+                 action: "Open Silent Lab") { $0.screen = .setup },
+        ].compactMap { $0 }
+        return candidates.first { !dismissed.contains($0.id) }
+    }
+
+    var body: some View {
+        if let step {
+            HStack(alignment: .center, spacing: Theme.s4) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(step.title)
+                        .font(.hkHeadline)
+                        .foregroundStyle(Theme.ink)
+                    Text(step.detail)
+                        .font(.hkCallout)
+                        .foregroundStyle(Theme.ink2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: Theme.s4)
+                Button(step.action) { step.perform(model) }
+                    .buttonStyle(SecondaryButtonStyle())
+                Button("Dismiss", icon: .close) {
+                    withAnimation(Theme.gentle) {
+                        dismissedRaw = (dismissedRaw.isEmpty ? "" : dismissedRaw + ",") + step.id
+                    }
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(IconButtonStyle())
+                .help("Hide this suggestion")
+            }
+            .padding(Theme.s4)
+            .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
+                .strokeBorder(Theme.hairline, lineWidth: 1))
+            .id(step.id)
+            .transition(.opacity)
+            .animation(Theme.gentle, value: step.id)
         }
     }
 }
@@ -714,7 +710,7 @@ private struct HistoryRow: View {
         .padding(.horizontal, Theme.s4)
         .padding(.vertical, 15)
         .frame(minHeight: Theme.listRow)
-        .background(isHovering ? Theme.well : .clear)
+        .background(isHovering ? Theme.well : .clear, in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
         .overlay(alignment: .topTrailing) { actionPill.padding(Theme.s2) }
         .contentShape(Rectangle())
         .onTapGesture { if isLong { toggleExpanded() } }
@@ -759,12 +755,10 @@ private struct HistoryRow: View {
                 Button {
                     showsDiff = true
                 } label: {
-                    HStack(spacing: 3) {
-                        Glyph(.sparkle, size: 10)
-                        Text("Cleaned")
-                    }
-                    .font(.hkMeta.weight(.medium))
-                    .foregroundStyle(Theme.signal)
+                    Text("Cleaned")
+                        .font(.hkMeta.weight(.medium))
+                        .foregroundStyle(Theme.ink2)
+                        .underline(true, color: Theme.hairline)
                 }
                 .buttonStyle(.plain)
                 .help("View word diff against original recognition")
@@ -1024,22 +1018,6 @@ private struct CancelledDictationRow: View {
             .strokeBorder(Theme.hairline, style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Cancelled dictation, \(cancelled.durationLabel)")
-    }
-}
-
-/// The home stats card: a card that lifts slightly on hover and opens Insights.
-private struct StatsCardStyle: ButtonStyle {
-    @State private var hovering = false
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .card(padding: Theme.s5)
-            .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
-                .strokeBorder(Theme.hairline, lineWidth: hovering ? 1 : 0))
-            .scaleEffect(configuration.isPressed ? 0.99 : 1)
-            .onHover { hovering = $0 }
-            .animation(Theme.snappy, value: hovering)
-            .animation(Theme.snappy, value: configuration.isPressed)
     }
 }
 

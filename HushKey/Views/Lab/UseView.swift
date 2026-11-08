@@ -243,7 +243,7 @@ struct UseView: View {
                                 .frame(width: 40, alignment: .trailing)
                         }
                     }
-                    Text(String(format: "Confidence %.2f · %@", prediction.confidence,
+                    Text(String(format: "Confidence %.2f, %@", prediction.confidence,
                                 prediction.accepted ? "accepted" : "rejected"))
                         .font(.hkCaption)
                         .foregroundStyle(Theme.ink2)

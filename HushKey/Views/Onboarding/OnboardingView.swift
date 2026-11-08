@@ -298,12 +298,10 @@ private struct PermissionCard: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: Theme.s4) {
-            ZStack {
-                Circle().fill(status == .granted ? Theme.signalSoft : Theme.sheet)
-                Glyph(permission == .microphone ? .mic : .keyboard, size: 18)
-                    .foregroundStyle(status == .granted ? Theme.signal : Theme.ink2)
-            }
-            .frame(width: 40, height: 40)
+            // The glyph alone, sage once granted: no circle tile behind it.
+            Glyph(permission == .microphone ? .mic : .keyboard, size: 22)
+                .foregroundStyle(status == .granted ? Theme.signal : Theme.ink2)
+                .frame(width: 28, height: 28)
             VStack(alignment: .leading, spacing: 3) {
                 Text(permission.title).font(.hkHeadline)
                 Text(permission.reason)

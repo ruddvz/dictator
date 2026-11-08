@@ -60,7 +60,7 @@ struct ResearchRecordingSection: View {
     private var recordingDetail: String {
         let recorder = model.recorder
         if recorder.isRecording {
-            return "\(recorder.motionCount) samples · \(recorder.eventCount) marks"
+            return "\(recorder.motionCount) samples, \(recorder.eventCount) marks"
         }
         guard model.motion.status == .streaming else {
             return "Connect motion headphones before starting a capture."

@@ -59,7 +59,7 @@ extension DictationHistoryEntry {
             parts.append(seconds < 60 ? "\(seconds) s" : "\(seconds / 60):\(String(format: "%02d", seconds % 60))")
         }
         parts.append(wordCount == 1 ? "1 word" : "\(wordCount) words")
-        return parts.joined(separator: " · ")
+        return parts.joined(separator: ", ")
     }
 }
 

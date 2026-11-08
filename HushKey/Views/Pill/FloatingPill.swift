@@ -767,7 +767,7 @@ struct FloatingPillView: View {
         case .dictate?: return .init(title: "Dictate", shortcut: model.dictationShortcut.label)
         case .cancel?: return .init(title: "Cancel", shortcut: "esc")
         case .finish?: return .init(title: "Finish", shortcut: model.dictationShortcut.label)
-        case .notes?: return .init(title: "Record meeting · \(Self.sourceLabel(model.meetingNotes.audioSource))", shortcut: nil)
+        case .notes?: return .init(title: "Record meeting from \(Self.sourceLabel(model.meetingNotes.audioSource))", shortcut: nil)
         case .meeting?: return .init(title: "Open live transcript", shortcut: nil)
         case .stopMeeting?: return .init(title: "Stop and save", shortcut: nil)
         case .cancelMeeting?: return .init(title: "Cancel", shortcut: nil)
@@ -1241,14 +1241,10 @@ private struct TypedConfirmation: View {
                 .foregroundStyle(Theme.signal)
                 .scaleEffect(settled ? 1 : tickScale)
             HStack(spacing: 4) {
-                Text(verb)
-                    .font(.system(size: 12, weight: .semibold))
+                // One weight and one colour: no bold-plus-dim split.
+                Text(appName.map { "\(verb) into \($0)" } ?? verb)
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Theme.ink)
-                if let appName {
-                    Text("into \(appName)")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(Theme.ink2)
-                }
             }
             .lineLimit(1)
             .fixedSize()
