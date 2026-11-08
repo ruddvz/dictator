@@ -1,5 +1,12 @@
 # HushKey progress
 
+## Verified: repository and launch review (2026-11-08)
+
+- Checkout is clean and current with `origin/main` at `ea01639`; `xcodegen generate` produced no source changes.
+- **Verification:** 364 XCTest cases passed, 8 skipped, 0 failures; Release build succeeded. Packaged app reports 1.0.0 (1), passes strict signature verification, and opens to Home with navigation and Dictate visible. Read-only code audit found no actionable defect or remote audio/transcript path.
+- **Open:** GitHub Actions run [#297](https://github.com/ruddvz/hushkey/actions/runs/42459405140) failed before runner allocation (runner ID 0, no steps/logs). Release build still reports the Swift 6 `NSEvent` Sendable warning at `ShortcutRecorder.swift:57`. Live microphone dictation and insertion into another app were not exercised.
+- **Next:** resolve the Actions runner-startup failure and perform a live microphone/insertion check.
+
 ## Completed: Hallmark design pass, tokens, Home band polish (2026-11-08)
 
 - **Hallmark pass** (nutlope/hallmark, Fog & sage kept): removed icon tiles, card-in-card, tracked caps, middle-dot meta and decorative badges across hub, lab and onboarding; personality comes from signature pieces instead (serif `display` voice, the Home voice band, Style's serif voice samples, Insights heatmap, Files' sage drop zone, Meetings' instrument panel).
