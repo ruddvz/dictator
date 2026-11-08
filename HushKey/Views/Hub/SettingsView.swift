@@ -257,7 +257,7 @@ private struct CleanupSettings: View {
 
         SettingsGroup(title: "Cleanup") {
             SettingsRow(title: "Spoken corrections",
-                        detail: "Say “no, actually”, “I mean” or “scratch that” and only what you meant is typed: “at four, no actually five” becomes “at five”.") {
+                        detail: "Say “scratch that” or “no, actually” to keep the corrected words: “at four, no, actually five” becomes “at five”.") {
                 RowToggle(isOn: $model.appliesSpokenCorrections, label: "Apply spoken corrections")
             }
             SettingsRow(title: "Remove filler words", detail: "Drops um, uh, stutters and “you know”. Your words are never reworded.") {
@@ -293,7 +293,7 @@ private struct CleanupSettings: View {
         }
 
         SettingsGroup(title: "App profiles",
-                      footer: "In Automatic mode, profiles can set writing mode, vocabulary, language, snippets, corrections, filler cleanup and a writing style. App names stay on this Mac.") {
+                      footer: "Automatic profiles keep each app’s language, vocabulary, snippets, corrections, writing style, and filler cleanup on this Mac.") {
             DictationAppProfilesEditor()
         }
     }
@@ -358,7 +358,7 @@ private struct InsertionSettings: View {
                 RowToggle(isOn: enabled, label: "Type into the focused field")
             }
             SettingsRow(title: "Paste when typing is blocked", detail: "Verifies the exact text field; restores the clipboard when safe.") {
-                RowToggle(isOn: $insertion.allowsPasteFallback, label: "Paste fallback")
+                RowToggle(isOn: $insertion.allowsPasteFallback, label: "Paste if typing fails")
             }
             .disabled(!insertion.isEnabled)
             .opacity(insertion.isEnabled ? 1 : 0.5)
@@ -465,15 +465,27 @@ private struct DataSettings: View {
         } message: {
             if let backup = model.pendingPersonalDataBackup {
                 if model.dictationHistoryArchiveUnreadable {
-                    Text("The backup contains \(backup.summary) Replace affects dictations, vocabulary, snippets, corrections, writing styles and app profiles; file transcripts, meeting notes, Silent Lab templates and session logs stay on this Mac. Your unreadable dictation archive will be replaced, with a recovery copy preserved where possible. Merge keeps local conflicts and adds missing backup entries. Audio is not included.")
+                    backupImportMessage(backup.summary, unreadableHistory: true)
                 } else {
-                    Text("The backup contains \(backup.summary) Replace affects dictations, vocabulary, snippets, corrections, writing styles and app profiles; file transcripts, meeting notes, Silent Lab templates and session logs stay on this Mac. Merge keeps your current entries and adds missing backup entries. Audio is not included.")
+                    backupImportMessage(backup.summary, unreadableHistory: false)
                 }
             } else {
                 Text("The selected backup is no longer available.")
             }
         }
 
+    }
+
+    private func backupImportMessage(_ summary: String, unreadableHistory: Bool) -> some View {
+        VStack(alignment: .leading, spacing: Theme.s1) {
+            Text("Backup: \(summary).")
+            Text("Replace overwrites dictations, words, snippets, corrections, writing styles, and app profiles.")
+            Text("File transcripts, meeting notes, Silent Lab templates, and session logs stay on this Mac.")
+            if unreadableHistory {
+                Text("The unreadable dictation archive is replaced. HushKey keeps a recovery copy when possible.")
+            }
+            Text("Merge keeps local conflicts and adds missing entries. Audio is not included.")
+        }
     }
 }
 

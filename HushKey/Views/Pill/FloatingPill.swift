@@ -951,8 +951,8 @@ struct FloatingPillView: View {
             Button("Paste again") { Task { await model.pasteLastDictationAgain() } }
                 .buttonStyle(NoticeButtonStyle(prominent: !notice.canRetry && notice.missingPermission == nil))
                 .help(notice.message == "Check the field first"
-                      ? "Check \(model.capturedInsertionTargetName ?? "the original app") first. Retry only if the transcript is missing; it may already have arrived."
-                      : "Type it again, only if \(model.capturedInsertionTargetName ?? "the original app") still has focus")
+                      ? "It may already be there. Paste again only if it’s missing."
+                      : "Type it again only if \(model.capturedInsertionTargetName ?? "the original app") still has focus.")
         }
         if notice.kind == .cancelled {
             Button("Undo") { Task { await model.retryDictation() } }

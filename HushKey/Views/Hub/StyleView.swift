@@ -88,7 +88,7 @@ struct StyleView: View {
                         localModelRow
                     }
 
-                    Text("HushKey never rewords or invents text. The polish pass only deletes fillers and refines punctuation. The raw transcript is always one click away in History.")
+                    Text("Polish removes fillers and refines punctuation. Your raw transcript stays in History.")
                         .font(.hkCaption)
                         .foregroundStyle(Theme.ink2)
                         .fixedSize(horizontal: false, vertical: true)

@@ -124,6 +124,7 @@ final class ShortcutCaptureTests: XCTestCase {
     }
 }
 
+@MainActor
 final class ShortcutConflictTests: XCTestCase {
     private func key(_ code: Int, _ modifiers: KeyCombo.Modifiers) -> KeyCombo {
         KeyCombo(.key(UInt32(code)), modifiers: modifiers)

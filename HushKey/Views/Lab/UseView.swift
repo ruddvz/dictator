@@ -128,12 +128,21 @@ struct UseView: View {
                             ? (model.silentTypesIntoFrontApp
                                 ? "Accepted predictions type into the front field. This experimental feature has not been validated for your setup."
                                 : "Accepted predictions stay in HushKey. Enable direct typing only after testing it.")
-                            : "Turn on typing in Settings › Typing. Until then, words stay here.",
+                            : model.silentTypesIntoFrontApp
+                                ? "Typing is off in Settings › Typing. Turn this off to clear the saved preference."
+                                : "Turn on typing in Settings › Typing. Until then, words stay here.",
                         detailTint: model.insertion.isEnabled ? Theme.ink2 : Theme.finishing) {
                 Toggle("", isOn: $model.silentTypesIntoFrontApp)
                     .toggleStyle(.switch)
                     .labelsHidden()
                     .tint(Theme.signal)
+                    .disabled(!model.insertion.isEnabled && !model.silentTypesIntoFrontApp)
+                    .accessibilityLabel("Type accepted silent predictions into the front app")
+                    .accessibilityHint(model.insertion.isEnabled
+                        ? "Turn on only after testing text insertion in this app."
+                        : model.silentTypesIntoFrontApp
+                            ? "Typing is off. Turn this switch off to clear the saved preference."
+                            : "Turn on typing in Settings › Typing before enabling this option.")
             }
             SettingsRow(title: "Maximum distance", detail: "Lower is stricter.") {
                 HStack(spacing: Theme.s2) {

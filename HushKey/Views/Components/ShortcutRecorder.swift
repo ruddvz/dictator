@@ -54,19 +54,30 @@ private final class ShortcutRecorderSession {
         capture = ShortcutCapture()
         finish = onFinish
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged, .otherMouseDown]) { [weak self] event in
-            MainActor.assumeIsolated {
-                guard let self else { return event }
+            let eventType = event.type.rawValue
+            let keyCode = event.keyCode
+            let modifierFlags = event.modifierFlags.rawValue
+            let buttonNumber = event.buttonNumber
+            let outcome = MainActor.assumeIsolated { [weak self] () -> ShortcutCapture.Outcome? in
+                guard let self else { return nil }
                 let outcome: ShortcutCapture.Outcome
-                switch event.type {
-                case .keyDown: outcome = self.capture.keyDown(keyCode: event.keyCode, modifierFlags: event.modifierFlags)
-                case .flagsChanged: outcome = self.capture.flagsChanged(keyCode: event.keyCode, modifierFlags: event.modifierFlags)
-                case .otherMouseDown: outcome = self.capture.mouseDown(button: event.buttonNumber)
+                switch eventType {
+                case NSEvent.EventType.keyDown.rawValue:
+                    outcome = self.capture.keyDown(keyCode: keyCode,
+                                                   modifierFlags: NSEvent.ModifierFlags(rawValue: modifierFlags))
+                case NSEvent.EventType.flagsChanged.rawValue:
+                    outcome = self.capture.flagsChanged(keyCode: keyCode,
+                                                        modifierFlags: NSEvent.ModifierFlags(rawValue: modifierFlags))
+                case NSEvent.EventType.otherMouseDown.rawValue:
+                    outcome = self.capture.mouseDown(button: buttonNumber)
                 default: outcome = .listening
                 }
                 if outcome != .listening { self.end(with: outcome) }
-                // Swallow keys so ⌘Q or ⌘W are recorded instead of quitting or closing.
-                return event.type == .flagsChanged ? event : nil
+                return outcome
             }
+            guard outcome != nil else { return event }
+            // Swallow keys so ⌘Q or ⌘W are recorded instead of quitting or closing.
+            return eventType == NSEvent.EventType.flagsChanged.rawValue ? event : nil
         }
         // Switching apps mid-recording would leave every HushKey shortcut off.
         resignObserver = NotificationCenter.default.addObserver(

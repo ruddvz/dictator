@@ -4,7 +4,7 @@
 
 The app's Silent Use screen has a provisional readiness floor of three takes per label in each of two complete sessions. For research evaluation, collect at least 10 templates per word as specified below; passing the in-app floor is not evidence of production accuracy.
 
-- Use a Mac with compatible head-tracking headphones connected as its active audio output. Confirm that Setup shows **Streaming**, a nonzero sample rate, and changing motion plots in diagnostics.
+- Use a Mac with compatible head-tracking headphones connected as its active audio output. Confirm that Connect shows **Streaming**, a nonzero sample rate, and changing motion plots in diagnostics.
 - Record the headphone model as reported by the user or packaging. HushKey cannot identify the hardware model from Core Motion.
 - Choose five short, distinct words or commands and keep the same vocabulary for all conditions.
 - Choose a quiet location. Keep posture, headphone fit, microphone, and distance consistent. Record fit changes as separate sessions.

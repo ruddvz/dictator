@@ -504,7 +504,7 @@ struct KeyboardShortcutsSheet: View {
                         detail: holds ? "Hold, talk, let go" : "Press to start, again to stop",
                         keys: [model.dictationShortcut.label])]
         if fn {
-            rows.append(Row(icon: .waveform, title: "Hands-free", detail: "Double-tap, then talk as long as you like", keys: ["fn", "fn"]))
+            rows.append(Row(icon: .waveform, title: "Hands-free", detail: "Double-press, then talk as long as you like", keys: ["fn", "fn"]))
         }
         if let pasteLast = model.pasteLastShortcut {
             rows.append(Row(icon: .insert, title: "Paste last dictation", detail: "Pastes what you just dictated anywhere", keys: [pasteLast.label]))

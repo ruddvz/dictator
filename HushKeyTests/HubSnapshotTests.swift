@@ -14,13 +14,22 @@ final class HubSnapshotTests: XCTestCase {
         try FileManager.default.createDirectory(at: temp, withIntermediateDirectories: true)
         let model = AppModel(dictationHistoryURL: temp.appending(path: "h.json"),
                              fileTranscriptionHistoryURL: temp.appending(path: "f.json"))
-        let screens: [(String, AnyView)] = [
-            ("dictation", AnyView(DictationView())), ("transforms", AnyView(TransformView())),
-            ("files", AnyView(FileTranscriptionView())), ("meetings", AnyView(MeetingNotesView())),
-            ("personalization", AnyView(PersonalizationView())), ("style", AnyView(StyleView())),
-            ("insights", AnyView(InsightsView())), ("settings", AnyView(SettingsView())),
+        let screens: [(AppModel.Screen, String, AnyView)] = [
+            (.dictation, "dictation", AnyView(DictationView())),
+            (.transforms, "transforms", AnyView(TransformView())),
+            (.files, "files", AnyView(FileTranscriptionView())),
+            (.meetings, "meetings", AnyView(MeetingNotesView())),
+            (.personalization, "personalization", AnyView(PersonalizationView())),
+            (.style, "style", AnyView(StyleView())),
+            (.insights, "insights", AnyView(InsightsView())),
+            (.setup, "connect", AnyView(SetupView())),
+            (.train, "train", AnyView(TrainView())),
+            (.evaluate, "evaluate", AnyView(EvaluateView())),
+            (.use, "silent-use", AnyView(UseView())),
+            (.settings, "settings", AnyView(SettingsView())),
         ]
-        for (name, screen) in screens {
+        for (destination, name, screen) in screens {
+            model.screen = destination
             for scheme in [ColorScheme.light, .dark] {
                 let view = screen
                     .environment(model)

@@ -18,12 +18,16 @@ struct PageHeader<Detail: View, Actions: View>: View {
                 if eyebrow.hasPrefix("Step") {
                     SectionLabel(title: eyebrow)
                 }
-                // The title alone: the sidebar already shows the page's glyph and selection,
-                // so no icon tile beside it.
-                Text(title)
-                    .font(.hkTitle1)
-                    .accessibilityIdentifier("page.header")
-                    .alignmentGuide(.pageTitle) { $0[VerticalAlignment.center] }
+                // HushKey's voice ribbon is the page mark, kept separate from the navigation
+                // glyphs so the screens have a recognizable product signature without icon tiles.
+                HStack(alignment: .firstTextBaseline, spacing: Theme.s2) {
+                    RibbonMark()
+                        .alignmentGuide(.pageTitle) { $0[VerticalAlignment.center] }
+                    Text(title)
+                        .font(.hkTitle1)
+                        .accessibilityIdentifier("page.header")
+                        .alignmentGuide(.pageTitle) { $0[VerticalAlignment.center] }
+                }
                 if !subtitle.isEmpty {
                     Text(subtitle)
                         .font(.hkCallout)

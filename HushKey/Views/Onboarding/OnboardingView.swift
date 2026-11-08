@@ -457,7 +457,7 @@ private struct ShortcutStep: View {
     private var instructions: String {
         let key = shortcutPhrase(model)
         if model.dictationShortcut.usesFunctionKey {
-            return "Hold fn (the Globe key) and talk; let go and your words are typed. Double-tap fn to talk hands-free."
+            return "Hold fn (the Globe key) and talk; let go and your words are typed. Double-press fn to talk hands-free."
         }
         return model.dictationCaptureBehavior == .hold
             ? "Hold \(key) and talk; let go and your words are typed."

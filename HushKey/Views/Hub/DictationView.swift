@@ -34,7 +34,7 @@ struct DictationView: View {
         .confirmationDialog(!model.dictationHistoryArchiveUnreadable
                             ? "Delete all recent dictations?" : "Remove unreadable dictation archive?",
                             isPresented: $confirmClearHistory, titleVisibility: .visible) {
-            Button(!model.dictationHistoryArchiveUnreadable ? "Delete history" : "Remove archive",
+            Button(!model.dictationHistoryArchiveUnreadable ? "Delete all dictations" : "Remove archive",
                    role: .destructive) { model.clearDictationHistory() }
         } message: {
             if let recoveryCopyURL = model.dictationHistoryRecoveryCopyURL {
@@ -318,7 +318,7 @@ struct DictationView: View {
                 }
                 if !model.dictationHistory.isEmpty || model.dictationHistoryArchiveUnreadable {
                     Menu {
-                        Button(!model.dictationHistoryArchiveUnreadable ? "Delete all history…" : "Remove unreadable archive…",
+                        Button(!model.dictationHistoryArchiveUnreadable ? "Delete all dictations…" : "Remove unreadable archive…",
                                role: .destructive) { confirmClearHistory = true }
                     } label: {
                         Glyph(.more)
@@ -497,7 +497,7 @@ private struct VoiceBand: View {
         case .waiting, .working: "Everything happens on this Mac."
         default:
             model.dictationShortcut.usesFunctionKey
-                ? "In any app. Double-tap for hands-free. Nothing leaves this Mac."
+                ? "In any app. Double-press for hands-free. Nothing leaves this Mac."
                 : holds ? "In any app. Let go to finish. Nothing leaves this Mac."
                 : "In any app, and again to finish. Nothing leaves this Mac."
         }

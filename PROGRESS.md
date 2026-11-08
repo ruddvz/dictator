@@ -1,5 +1,14 @@
 # HushKey progress
 
+## Completed: project-wide quality audit and UI identity pass (2026-11-08)
+
+- Reviewed all 12 sections, active controls, current labels, safety gates, local data paths, tests, and light/dark page renders. No enabled no-op controls or shipping placeholders were found; disabled History actions explain why they are unavailable.
+- **Fixed:** Silent Use can no longer be pre-armed for direct typing while global typing is off; the saved-on state can still be cleared. Added the existing voice-ribbon mark to every section title, and normalized shortcut, deletion, typing-fallback, and help wording.
+- **Fixed:** shortcut recorder's Swift 6 `NSEvent` actor-isolation warning. Generated 24 current page snapshots (12 sections × 2 color schemes).
+- **Verification:** full XCTest suite 368 passed, 8 skipped, 0 failures; snapshot test passed; Release package 1.0.0 (1) built and passed strict signature verification. Existing no-mic rehearsal inserted text into a separate blank app.
+- **Open:** real microphone dictation, Meetings system-audio capture, the complete file picker→transcribe→export journey, live permissions, headphone capture, and VoiceOver were not verified. Shared card grids still feel generic; the ribbon mark is a first visual step, not a full redesign. See `docs/AUDIT_2026-11-08.md` and the audit screenshots in Codex outputs.
+- **Next fresh session:** complete live acceptance with the user speaking and clicking; then agree a visual direction for a per-page design pass.
+
 ## Fixed: app-focused text insertion lookup (2026-11-08)
 
 - **Root cause:** HushKey asked the system-wide Accessibility object for the focused UI element. On this Mac, that query returned `AX no value` for focused text fields across apps, so dictation fell back to the “No text box selected” / Copy card.

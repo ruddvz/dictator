@@ -123,7 +123,7 @@ Measured from Wispr Flow 1.6 (Electron) in a 1350 × 850 pt window with backgrou
 
 ## Color
 
-Each color has a light and dark value (`Theme.dynamic`). Light is the default; Settings → General → Appearance offers System / Light / Dark.
+Each color has a light and dark value (`Theme.dynamic`). Light is the default; Settings › Appearance offers System / Light / Dark.
 
 | Token | Light | Dark | Use |
 | --- | --- | --- | --- |

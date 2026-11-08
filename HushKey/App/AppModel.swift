@@ -27,7 +27,7 @@ final class AppModel {
         case transforms = "Transforms"
         case files = "Transcribe files"
         case meetings = "Meeting notes"
-        case setup = "Setup"
+        case setup = "Connect"
         case train = "Train"
         case evaluate = "Evaluate"
         case use = "Silent Use"
@@ -58,7 +58,6 @@ final class AppModel {
             case .files: "Files"
             case .personalization: "Vocabulary"
             case .settings: "Settings"
-            case .setup: "Connect"
             default: rawValue
             }
         }
@@ -3147,7 +3146,7 @@ final class AppModel {
         } else if let conflict = Self.globeKeyConflict {
             dictationShortcutStatus = "Set “Press 🌐 key to” to Do Nothing in Keyboard settings. It currently \(conflict)."
         } else {
-            dictationShortcutStatus = "Hold fn to dictate from any app. Double-tap fn for hands-free; tap again to stop."
+            dictationShortcutStatus = "Hold fn to dictate from any app. Double-press fn for hands-free; press again to stop."
         }
     }
 
