@@ -9,7 +9,8 @@ struct PageHeader<Actions: View>: View {
     @State private var hoveringMark = false
 
     var body: some View {
-        HStack(alignment: .center, spacing: Theme.s4) {
+        // Trailing actions line up with the title line, not the middle of title + subtitle.
+        HStack(alignment: .pageTitle, spacing: Theme.s4) {
             VStack(alignment: .leading, spacing: 6) {
                 // Only lab steps carry a visible eyebrow; elsewhere the sidebar already says where you are.
                 if eyebrow.hasPrefix("Step") {
@@ -28,6 +29,7 @@ struct PageHeader<Actions: View>: View {
                         .tracking(-0.3)
                         .accessibilityIdentifier("page.header")
                 }
+                .alignmentGuide(.pageTitle) { $0[VerticalAlignment.center] }
                 if !subtitle.isEmpty {
                     Text(subtitle)
                         .font(.hkCallout)
@@ -39,10 +41,19 @@ struct PageHeader<Actions: View>: View {
             }
             Spacer(minLength: Theme.s4)
             HStack(spacing: Theme.s2) { actions }
+                .alignmentGuide(.pageTitle) { $0[VerticalAlignment.center] }
         }
         .padding(.bottom, Theme.s2)
         .reveal(0)
     }
+}
+
+extension VerticalAlignment {
+    /// The centre of a `PageHeader`'s title line.
+    private enum PageTitle: AlignmentID {
+        static func defaultValue(in context: ViewDimensions) -> CGFloat { context[VerticalAlignment.center] }
+    }
+    static let pageTitle = VerticalAlignment(PageTitle.self)
 }
 
 extension PageHeader where Actions == EmptyView {
@@ -89,16 +100,15 @@ struct SettingsGroup<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Theme.s2 + 2) {
+        VStack(alignment: .leading, spacing: Theme.s2) {
             if let title {
                 Text(title)
                     .font(.hkTitle3)
                     .foregroundStyle(Theme.ink)
-                    
             }
             VStack(alignment: .leading, spacing: 0) { content }
                 .padding(.top, -1)
-                .padding(.horizontal, Theme.s5 - 4)
+                .padding(.horizontal, Theme.s4)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Theme.well, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
                 .clipShape(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
@@ -130,7 +140,7 @@ struct SettingsRow<Control: View>: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: Theme.s4) {
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: Theme.s1) {
                 Text(title)
                     .font(.hkRowTitle)
                     .foregroundStyle(Theme.ink)
@@ -142,10 +152,12 @@ struct SettingsRow<Control: View>: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+            // One measure for every row's detail, so lines wrap at the same place down a group.
+            .frame(maxWidth: Theme.detailWidth, alignment: .leading)
             Spacer(minLength: Theme.s4)
             control
         }
-        .padding(.vertical, 18)
+        .padding(.vertical, Theme.s4)
         .frame(minHeight: 64)
         .overlay(alignment: .top) { RowDivider() }
     }
@@ -163,7 +175,7 @@ struct GroupRow<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.s3) { content }
-            .padding(.vertical, 18)
+            .padding(.vertical, Theme.s4)
             .frame(maxWidth: .infinity, alignment: .leading)
             .overlay(alignment: .top) { RowDivider() }
     }
@@ -232,28 +244,47 @@ struct MenuPicker<Value: Hashable>: View {
                 }
             }
         } label: {
-            HStack(spacing: Theme.s2) {
-                Text(options.first(where: { $0.value == selection })?.title ?? "Choose")
-                    .lineLimit(1)
-                Spacer(minLength: 0)
-                Glyph(.chevronDown)
-                    .hushIconSize(14)
-                    .foregroundStyle(Theme.ink2)
-            }
-            .font(.system(size: 15))
-            .foregroundStyle(Theme.ink)
-            .padding(.horizontal, Theme.s3 + 2)
-            .frame(width: width, height: Theme.controlHeight)
-            .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
-                .strokeBorder(hovering ? Theme.ink3.opacity(0.6) : Theme.hairline, lineWidth: 1))
-            .contentShape(Rectangle())
+            MenuPickerLabel(title: options.first(where: { $0.value == selection })?.title ?? "Choose",
+                            width: width, hovering: hovering)
         }
         .menuStyle(.button)
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .fixedSize()
         .onHover { hovering = $0 }
+    }
+}
+
+/// The closed look of a `MenuPicker`: title, chevron, `sheet` fill and a hairline. Shared by
+/// controls that open something else, like the language grid, so every menu looks the same.
+struct MenuPickerLabel: View {
+    var title: String
+    var icon: HushIcon?
+    /// Fixed width; nil grows to fit the title, never narrower than a menu.
+    var width: CGFloat? = Theme.menuWidth
+    var hovering = false
+
+    var body: some View {
+        HStack(spacing: Theme.s2) {
+            if let icon {
+                Glyph(icon).hushIconSize(16).foregroundStyle(Theme.ink2)
+            }
+            Text(title)
+                .lineLimit(1)
+            Spacer(minLength: 0)
+            Glyph(.chevronDown)
+                .hushIconSize(14)
+                .foregroundStyle(Theme.ink2)
+        }
+        .font(.hkControl)
+        .foregroundStyle(Theme.ink)
+        .padding(.horizontal, Theme.s3)
+        .frame(width: width, height: Theme.controlHeight)
+        .frame(minWidth: width == nil ? Theme.menuWidth : nil)
+        .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
+            .strokeBorder(hovering ? Theme.ink3.opacity(0.6) : Theme.hairline, lineWidth: 1))
+        .contentShape(Rectangle())
     }
 }
 
@@ -275,6 +306,8 @@ struct RowToggle: View {
 struct UnderlineTabs<Value: Hashable>: View {
     @Binding var selection: Value
     var options: [(value: Value, title: String)]
+    /// An optional count after each title, in `ink3`; hidden at 0.
+    var count: ((Value) -> Int)? = nil
     @Namespace private var underline
 
     var body: some View {
@@ -286,9 +319,21 @@ struct UnderlineTabs<Value: Hashable>: View {
                     withAnimation(Theme.snappy) { selection = option.value }
                 } label: {
                     VStack(spacing: Theme.s2) {
-                        Text(option.title)
-                            .font(.system(size: 15, weight: selected ? .semibold : .regular))
-                            .foregroundStyle(selected ? Theme.ink : Theme.ink2)
+                        HStack(spacing: Theme.s1) {
+                            // The semibold title, hidden, reserves the width so selecting a tab doesn't reflow the bar.
+                            ZStack {
+                                Text(option.title).font(.hkCallout.weight(.semibold)).hidden()
+                                Text(option.title)
+                                    .font(.hkCallout.weight(selected ? .semibold : .regular))
+                                    .foregroundStyle(selected ? Theme.ink : Theme.ink2)
+                            }
+                            if let count = count?(option.value), count > 0 {
+                                Text(count.formatted())
+                                    .font(.hkCallout)
+                                    .monospacedDigit()
+                                    .foregroundStyle(Theme.ink3)
+                            }
+                        }
                         ZStack {
                             Capsule().fill(.clear).frame(height: 2)
                             if selected {
@@ -336,7 +381,7 @@ struct EmptyState<Action: View>: View {
             action.padding(.top, Theme.s2)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, Theme.s6 + 8)
+        .padding(.vertical, Theme.s6)
         .reveal()
         .onAppear {
             if reduceMotion { shown = true }
@@ -466,7 +511,7 @@ struct HoldToCaptureButton: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            Glyph(isCapturing ? .record : .record)
+            Glyph(.record)
                 .hushIconSize(38)
                 .symbolEffect(.pulse, isActive: isCapturing)
             Text(isCapturing ? "Capturing…" : title)

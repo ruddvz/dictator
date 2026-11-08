@@ -117,7 +117,7 @@ final class ParakeetDictationEngine {
         let size = ByteCountFormatter.string(fromByteCount: bytesOnDisk ?? model.approximateBytes, countStyle: .file)
         switch phase {
         case .notDownloaded:
-            return "A one-time download of about \(size). After that it runs offline on this Mac."
+            return "About \(size), downloaded once. Then it runs offline."
         case .downloaded:
             return "Downloaded · \(size) on this Mac. Loads when you next dictate."
         case .downloading:

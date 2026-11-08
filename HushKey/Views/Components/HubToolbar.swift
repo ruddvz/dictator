@@ -425,7 +425,7 @@ private struct ProfilePopover: View {
             RowDivider()
 
             VStack(spacing: 2) {
-                link("Vocabulary & snippets", .vocabulary) { $0.screen = .personalization }
+                link("Vocabulary", .vocabulary) { $0.screen = .personalization }
                 link("Insights", .insights) { $0.screen = .insights }
                 link("Keyboard shortcuts", .keyboard) { _ in showShortcuts() }
                 link("Data & privacy", .shield) { model in
@@ -506,17 +506,17 @@ struct KeyboardShortcutsSheet: View {
             rows.append(Row(icon: .waveform, title: "Hands-free", detail: "Double-tap, then talk as long as you like", keys: ["fn", "fn"]))
         }
         if let pasteLast = model.pasteLastShortcut {
-            rows.append(Row(icon: .insert, title: "Paste last transcript", detail: "Pastes what you just dictated anywhere", keys: [pasteLast.label]))
+            rows.append(Row(icon: .insert, title: "Paste last dictation", detail: "Pastes what you just dictated anywhere", keys: [pasteLast.label]))
         }
         rows += [
             Row(icon: .close, title: "Cancel", detail: "While dictating; Undo brings it back", keys: ["esc"]),
             Row(icon: .edit, title: "Edit selected text by voice", detail: "Select text, hold, say the change",
                 keys: [model.selectedTextEditShortcut.label]),
-            Row(icon: .cursor, title: "Insert again", detail: "Types the last output at your cursor",
+            Row(icon: .cursor, title: "Paste again", detail: "Types the last output at your cursor",
                 keys: [model.insertion.shortcut.label]),
             Row(icon: .undo, title: "Undo insertion", detail: "Replaces the original field contents",
                 keys: ["⌥⇧U"]),
-            Row(icon: .silent, title: "Silent capture", detail: "Silent lab: capture one mouthed word",
+            Row(icon: .silent, title: "Silent capture", detail: "Silent Lab: capture one mouthed word",
                 keys: [model.captureShortcut.label]),
             Row(icon: .sidebar, title: "Hide or show the sidebar", detail: "In this window", keys: ["⌃⌘S"]),
             Row(icon: .settings, title: "Settings", detail: "Open HushKey's settings", keys: ["⌘,"]),

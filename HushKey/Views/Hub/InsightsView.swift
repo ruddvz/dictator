@@ -12,7 +12,7 @@ struct InsightsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.s5) {
                 PageHeader(eyebrow: "", title: "Insights",
-                           subtitle: "Counted on this Mac from finished dictations. Totals are kept by day; Your voice reads the history you keep here.")
+                           subtitle: "Counted from finished dictations and kept by day, on this Mac.")
                 if ledger.totalDictations == 0 {
                     Text(model.savesDictationHistory
                          ? "Finish a dictation and your numbers start here."
@@ -55,16 +55,17 @@ struct InsightsView: View {
         let wpm = ledger.wordsPerMinute ?? 0
         let ratio = Double(wpm) / Double(UsageLedger.typingWordsPerMinute)
         return InsightCard {
-            Metric(value: wpm.formatted(), label: "Words per minute")
-            ZStack {
+            Metric(value: wpm == 0 ? "–" : wpm.formatted(), label: "Words per minute")
+            Rectangle().fill(Theme.hairline).frame(height: 1)
+            // The ratio sits on the arc's baseline, inside the half circle.
+            ZStack(alignment: .bottom) {
                 PaceArc(progress: min(1, Double(wpm) / 200))
                     .frame(width: 150, height: 80)
                 VStack(spacing: 0) {
                     Text(wpm == 0 ? "–" : ratio.formatted(.number.precision(.fractionLength(1))) + "×")
-                        .font(.display(22))
+                        .font(.hkTitle2)
                     Text("typing speed").font(.hkCaption).foregroundStyle(Theme.ink2)
                 }
-                .offset(y: 16)
             }
             .frame(maxWidth: .infinity)
             .help("Compared with typing at about \(UsageLedger.typingWordsPerMinute) words per minute")
@@ -127,8 +128,8 @@ struct InsightsView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("Where you dictate").font(.display(22))
                 Spacer()
-                Text("\(categories.count) of \(UsageCategory.allCases.count) kinds".uppercased())
-                    .font(.hkMeta.weight(.medium)).tracking(0.6).foregroundStyle(Theme.ink2)
+                Text("\(categories.count) of \(UsageCategory.allCases.count) kinds")
+                    .font(.hkMeta.weight(.medium)).foregroundStyle(Theme.ink2)
             }
             if categories.isEmpty {
                 Text("Shows up after your first dictation.").font(.hkCaption).foregroundStyle(Theme.ink2)
@@ -137,8 +138,10 @@ struct InsightsView: View {
                 CategoryBar(category: item.category, words: item.words, share: item.share,
                             emphasis: max(0.35, 1 - Double(rank) * 0.18))
             }
-            Text("Older dictations, from before Insights, count as Other.")
-                .font(.hkCaption).foregroundStyle(Theme.ink3)
+            if !categories.isEmpty {
+                Text("Older dictations, from before Insights, count as Other.")
+                    .font(.hkCaption).foregroundStyle(Theme.ink3)
+            }
         }
     }
 
@@ -148,8 +151,8 @@ struct InsightsView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("\(streak) day streak").font(.display(22))
                 Spacer()
-                Text("Longest \(ledger.longestStreak()) days".uppercased())
-                    .font(.hkMeta.weight(.medium)).tracking(0.6).foregroundStyle(Theme.ink2)
+                Text("Longest \(ledger.longestStreak()) days")
+                    .font(.hkMeta.weight(.medium)).foregroundStyle(Theme.ink2)
             }
             ActivityHeatmap(counts: ledger.dailyCounts(), weeks: 20)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -157,7 +160,7 @@ struct InsightsView: View {
                 Text("Less").font(.hkMeta).foregroundStyle(Theme.ink2)
                 ForEach([0.0, 0.3, 0.65, 1.0], id: \.self) { level in
                     RoundedRectangle(cornerRadius: 2, style: .continuous)
-                        .fill(level == 0 ? Theme.hairline : Theme.ink.opacity(level))
+                        .fill(level == 0 ? Theme.hairline : Theme.signal.opacity(0.3 + 0.7 * level))
                         .frame(width: 10, height: 10)
                 }
                 Text("More").font(.hkMeta).foregroundStyle(Theme.ink2)
@@ -176,8 +179,8 @@ private struct VoiceProfileSection: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("Your voice").font(.display(22))
                 Spacer()
-                Text("\(profile.unlockedCards.count) of \(VoiceProfile.Card.allCases.count) cards".uppercased())
-                    .font(.hkMeta.weight(.medium)).tracking(0.6).foregroundStyle(Theme.ink2)
+                Text("\(profile.unlockedCards.count) of \(VoiceProfile.Card.allCases.count) cards")
+                    .font(.hkMeta.weight(.medium)).foregroundStyle(Theme.ink2)
             }
             if profile.unlockedCards.isEmpty {
                 lockedIntro
@@ -317,7 +320,7 @@ private struct Metric: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.s1) {
             Text(value).font(.display(28)).contentTransition(.numericText())
-            Text(label.uppercased()).font(.hkMeta.weight(.medium)).tracking(0.8).foregroundStyle(Theme.ink2)
+            Text(label).font(.hkCallout).foregroundStyle(Theme.ink2)
         }
         .accessibilityElement(children: .combine)
     }
@@ -378,9 +381,9 @@ private struct CategoryBar: View {
             .frame(height: 28)
             .background(Theme.hairline.opacity(0.5), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
             .onAppear { withAnimation(.spring(response: 0.9, dampingFraction: 0.86).delay(0.25)) { grown = true } }
-            Text("\(words.formatted()) \(category.rawValue)".uppercased())
+            Text("\(category.rawValue) · \(words.formatted())")
                 .font(.hkMeta.weight(.medium))
-                .tracking(0.6)
+                .foregroundStyle(Theme.ink2)
                 .lineLimit(1)
                 .fixedSize()
                 .frame(minWidth: 120, alignment: .leading)

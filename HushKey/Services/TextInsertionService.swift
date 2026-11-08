@@ -61,7 +61,7 @@ final class TextInsertionService {
     var allowsPasteFallback = UserDefaults.standard.object(forKey: "allowsPasteFallback") as? Bool ?? true {
         didSet { UserDefaults.standard.set(allowsPasteFallback, forKey: "allowsPasteFallback") }
     }
-    private(set) var status = "Text insertion is off."
+    private(set) var status = "Typing is off."
     private(set) var contextAccessStatus = "Nearby text hints are off."
     var shortcut: InsertionShortcut = InsertionShortcut(
         rawValue: UserDefaults.standard.string(forKey: "insertionShortcut") ?? "") ?? .default {
@@ -211,7 +211,7 @@ final class TextInsertionService {
                 self?.onUndoShortcut?()
             }
             if undoStatus != noErr {
-                status = "Insertion is enabled, but ⌥⇧U could not be registered for safe undo."
+                status = "Typing is on, but ⌥⇧U couldn’t be set up for undo."
             }
         } else {
             status = "Allow HushKey in System Settings → Privacy & Security → Accessibility, then enable again."
@@ -224,7 +224,7 @@ final class TextInsertionService {
         hotKey.unregister()
         undoHotKey.unregister()
         undoRecord = nil
-        status = "Text insertion is off."
+        status = "Typing is off."
     }
 
     func report(_ message: String) { status = message }
@@ -233,7 +233,7 @@ final class TextInsertionService {
     func insert(_ text: String) -> Bool {
         requiresReviewAfterInsertion = false
         lastDeliveryVerified = true
-        guard isEnabled else { status = "Enable text insertion first."; return false }
+        guard isEnabled else { status = "Turn on typing first."; return false }
         guard AXIsProcessTrusted() else {
             isEnabled = false
             status = "Accessibility access is unavailable. Text was not inserted."

@@ -178,7 +178,7 @@ final class DictationHistoryActionsTests: XCTestCase {
         XCTAssertEqual(state(matches: false), .hidden, "An edited entry no longer matches what the field expects")
         XCTAssertEqual(state(busy: true), .unavailable("Cannot paste while dictating"))
         XCTAssertEqual(state(inserted: true), .unavailable("Already pasted once"))
-        XCTAssertEqual(state(enabled: false), .unavailable("Text insertion is off"))
+        XCTAssertEqual(state(enabled: false), .unavailable("Typing is off"))
     }
 
     @MainActor

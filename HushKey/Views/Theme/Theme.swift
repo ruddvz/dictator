@@ -31,6 +31,7 @@ enum Theme {
     static let controlHeight: CGFloat = 36
     static let controlRadius: CGFloat = 10
     static let menuWidth: CGFloat = 196
+    static let detailWidth: CGFloat = 440    // settings-row label + detail column
     static let listRow: CGFloat = 52
     static let icon: CGFloat = 18
 

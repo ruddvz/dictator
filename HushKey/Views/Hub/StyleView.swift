@@ -67,7 +67,7 @@ struct StyleView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.s5) {
-                PageHeader(eyebrow: "", title: "Style & Cleanup",
+                PageHeader(eyebrow: "", title: "Style",
                            subtitle: "Choose how dictation is refined and tone is shaped. Everything runs on this Mac.")
 
                 VStack(alignment: .leading, spacing: Theme.s3) {
@@ -196,7 +196,7 @@ private struct CleanupLevelCard: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(Theme.s3)
-                .background(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous).fill(Theme.sheet))
+                .background(RoundedRectangle(cornerRadius: Theme.r3, style: .continuous).fill(Theme.sheet))
             }
             .padding(Theme.s4)
             .frame(maxWidth: .infinity, minHeight: 190, maxHeight: .infinity, alignment: .topLeading)
@@ -238,7 +238,7 @@ private struct ToneCard: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(Theme.s3)
-                    .background(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous).fill(Theme.sheet))
+                    .background(RoundedRectangle(cornerRadius: Theme.r3, style: .continuous).fill(Theme.sheet))
                     .contentTransition(.opacity)
             }
             .padding(Theme.s4)

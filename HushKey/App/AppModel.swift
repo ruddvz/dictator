@@ -23,7 +23,7 @@ struct DecodedWord: Identifiable, Hashable {
 @MainActor @Observable
 final class AppModel {
     enum Screen: String, CaseIterable, Identifiable {
-        case dictation = "Dictation"
+        case dictation = "Home"
         case transforms = "Transforms"
         case files = "Transcribe files"
         case meetings = "Meeting notes"
@@ -31,10 +31,10 @@ final class AppModel {
         case train = "Train"
         case evaluate = "Evaluate"
         case use = "Silent Use"
-        case personalization = "Snippets & Vocabulary"
+        case personalization = "Vocabulary"
         case style = "Style"
         case insights = "Insights"
-        case settings = "Settings & Data"
+        case settings = "Settings"
         var id: String { rawValue }
         var symbol: String {
             switch self {
@@ -1431,7 +1431,7 @@ final class AppModel {
         case .silentPrediction:
             insertLatestPrediction()
         case .unavailable:
-            insertion.report("Open Dictation or Silent Use before inserting text.")
+            insertion.report("Open Home or Silent Use before typing text.")
         }
     }
 
@@ -1917,6 +1917,12 @@ final class AppModel {
         guard !isStartingDictation else { return }
         guard !isFinalizingDictation, !transcriber.isFinalizing else { return }
         guard !isStartingSelectedTextEdit, !isFinalizingSelectedTextEdit else { return }
+        // A meeting owns the microphone. Refuse here, before anything below clears the last
+        // dictation (Copy / Paste Again), and give the standard "not now" cue.
+        if meetingNotes.isStarting || meetingNotes.isCapturing || meetingNotes.isFinalizing {
+            NSSound.beep()
+            return
+        }
         if audio.isRunning {
             if isSelectedTextEditCapturing {
                 selectedTextEditShortcutHeld = false
@@ -2425,6 +2431,13 @@ final class AppModel {
                 didInsertCurrentDictation = true
                 return
             }
+            // The text was sent but couldn't be read back: it may already be in the field.
+            // Pasting now could type it twice, so ask the user to check instead.
+            if insertion.requiresReviewAfterInsertion {
+                didInsertCurrentDictation = true
+                dictationNotice = DictationRecovery.pasteUnconfirmed(insertion.status, canPasteAgain: false)
+                return
+            }
             // The same field is still focused but refused direct typing: paste instead.
             // If focus moved, never paste somewhere else; offer Paste again.
             if insertion.focusState(of: target).fieldIsFocused,
@@ -2653,6 +2666,12 @@ final class AppModel {
             didInsertCurrentDictation = true
             return true
         }
+        // Sent but unconfirmed: never paste on top, which could type it twice.
+        if capturedInsertionTarget != nil, insertion.requiresReviewAfterInsertion {
+            didInsertCurrentDictation = true
+            dictationNotice = DictationRecovery.pasteUnconfirmed(insertion.status, canPasteAgain: false)
+            return true
+        }
         if let pasteTarget = capturedPasteTarget {
             switch await insertion.paste(text, into: app, target: pasteTarget) {
             case .inserted, .unconfirmed:
@@ -2874,21 +2893,21 @@ final class AppModel {
         pasteLastHotKey.unregister()
         pasteLastMouseButton.uninstall()
         guard let shortcut = pasteLastShortcut else {
-            pasteLastShortcutStatus = "Off. The menu bar item still pastes the last transcript."
+            pasteLastShortcutStatus = "Off. The menu bar item still pastes the last dictation."
             return
         }
         if let button = shortcut.combo.mouseButton {
             pasteLastMouseButton.install(button: button) { [weak self] pressed in
                 if pressed { Task { @MainActor in await self?.pasteLastDictationAgain() } }
             }
-            pasteLastShortcutStatus = "Click \(shortcut.label) to paste your last transcript into the field it came from."
+            pasteLastShortcutStatus = "Click \(shortcut.label) to paste your last dictation into the field it came from."
             return
         }
         let status = pasteLastHotKey.register(keyCode: shortcut.keyCode, modifiers: shortcut.carbonModifiers) { [weak self] in
             Task { @MainActor in await self?.pasteLastDictationAgain() }
         }
         pasteLastShortcutStatus = status == noErr
-            ? "Press \(shortcut.label) to paste your last transcript into the field it came from."
+            ? "Press \(shortcut.label) to paste your last dictation into the field it came from."
             : "Could not register \(shortcut.label) (system status \(status)). Another app may use it."
     }
 
@@ -2993,7 +3012,7 @@ final class AppModel {
         guard !audio.isRunning, !isFinalizingDictation,
               !isFinalizingSelectedTextEdit, !isApplyingSelectedTextEdit else { return }
         guard insertion.isEnabled else {
-            selectedTextEditStatus = "Enable Accessibility text insertion in Settings before using voice edit."
+            selectedTextEditStatus = "Turn on typing in Settings › Typing to edit by voice."
             return
         }
         guard !meetingNotes.isStarting, !meetingNotes.isCapturing, !meetingNotes.isFinalizing,
@@ -3153,9 +3172,11 @@ final class AppModel {
         dictationStartGeneration += 1
         functionKey.reset()
         restoreOutputAfterDictation()
+        // While a dictation is only finishing, keep its live-typing session: finishing uses it
+        // to type just the untyped tail, so dropping it here would type everything twice.
+        guard wasStarting || wasListening else { return }
         // Phrases already typed stay in the field; nothing more is typed.
         endLiveTyping()
-        guard wasStarting || wasListening else { return }
         transcriber.cancelPendingAuthorization()
         audio.stop()
         let recorded = dictationStartedAt.map { Date().timeIntervalSince($0) } ?? 0
@@ -3400,6 +3421,8 @@ final class AppModel {
     /// Quitting mid-dictation must not leave the Mac muted or drop a pending history save.
     func prepareForTermination() {
         cancelPendingDictationHistorySave(flush: true)
+        // Save the meeting's latest words; the draft is otherwise written at most every 2 s.
+        if meetingNotes.isCapturing { _ = meetingNotes.checkpointActiveDraft() }
         cancelDictation(offersUndo: false)
         if isSelectedTextEditCapturing { stopSelectedTextEditCapture() }
         capture.cancel()

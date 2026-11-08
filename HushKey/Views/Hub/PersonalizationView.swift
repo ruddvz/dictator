@@ -122,9 +122,9 @@ struct PersonalizationView: View {
                 }
 
                 HStack(alignment: .bottom, spacing: Theme.s3) {
-                    UnderlineTabs(selection: $section, options: PersonalizationSection.allCases.map {
-                        ($0, "\($0.rawValue) \(count(for: $0))")
-                    })
+                    UnderlineTabs(selection: $section,
+                                  options: PersonalizationSection.allCases.map { ($0, $0.rawValue) },
+                                  count: { count(for: $0) })
                     .onChange(of: section) { _, _ in query = "" }
                 }
                 .overlay(alignment: .topTrailing) { searchControl }
@@ -220,7 +220,7 @@ struct PersonalizationView: View {
         }
         return VStack(alignment: .leading, spacing: Theme.s3) {
             Text(title)
-                .font(.display(26))
+                .font(.hkTitle2)
                 .tracking(-0.3)
             Text(detail)
                 .font(.hkCallout)

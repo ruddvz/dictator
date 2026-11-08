@@ -4,15 +4,17 @@ import SwiftUI
 struct LanguageButton: View {
     @Binding var selection: String
     @State private var choosing = false
+    @State private var hovering = false
 
     var body: some View {
         Button {
             choosing = true
         } label: {
-            Label(DictationLanguage.named(selection).name, icon: .globe)
-                .lineLimit(1)
+            MenuPickerLabel(title: DictationLanguage.named(selection).name, icon: .globe, width: nil, hovering: hovering)
         }
-        .buttonStyle(SecondaryButtonStyle())
+        .buttonStyle(PressStyle())
+        .fixedSize()
+        .onHover { hovering = $0 }
         .accessibilityHint("Opens the language list")
         .sheet(isPresented: $choosing) {
             LanguagePickerSheet(selection: $selection)

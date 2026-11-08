@@ -17,34 +17,39 @@ struct DictationEngineRows: View {
         if model.dictationEngine == .parakeet {
             SettingsRow(title: "Parakeet model", detail: modelDetail,
                         detailTint: needsAttention ? Theme.danger : Theme.ink2) {
-                MenuPicker(selection: $parakeet.model,
-                           options: ParakeetModel.allCases.map { ($0, $0.title) })
-                    .disabled(parakeet.isBusy || model.audio.isRunning || model.isFinalizingDictation)
+                HStack(spacing: Theme.s2) {
+                    MenuPicker(selection: $parakeet.model,
+                               options: ParakeetModel.allCases.map { ($0, $0.title) })
+                        .disabled(parakeet.isBusy || model.audio.isRunning || model.isFinalizingDictation)
+                    // Before a download, the download is this row's own control, not a row of its own.
+                    if needsDownload {
+                        Button(downloadTitle) { parakeet.download() }
+                            .buttonStyle(PrimaryButtonStyle())
+                    }
+                }
+                .fixedSize()
             }
-            GroupRow {
-                if parakeet.phase == .downloading {
-                    HStack(spacing: Theme.s3) {
-                        ProgressView(value: parakeet.downloadFraction)
-                            .tint(Theme.signal)
-                            .accessibilityLabel("Downloading the Parakeet model")
-                        Button("Cancel") { parakeet.cancelDownload() }
-                            .buttonStyle(SecondaryButtonStyle())
-                    }
-                } else if parakeet.phase == .warmingUp {
-                    HStack(spacing: Theme.s3) {
-                        ProgressView()
-                            .controlSize(.small)
-                            .accessibilityLabel("Warming up Parakeet")
-                        Text("First load compiles for the Neural Engine and can take a minute.")
-                            .font(.hkCaption)
-                            .foregroundStyle(Theme.ink2)
-                    }
-                } else {
-                    HStack(spacing: Theme.s2) {
-                        if !parakeet.isDownloaded {
-                            Button(downloadTitle) { parakeet.download() }
-                                .buttonStyle(PrimaryButtonStyle())
-                        } else {
+            if !needsDownload {
+                GroupRow {
+                    if parakeet.phase == .downloading {
+                        HStack(spacing: Theme.s3) {
+                            ProgressView(value: parakeet.downloadFraction)
+                                .tint(Theme.signal)
+                                .accessibilityLabel("Downloading the Parakeet model")
+                            Button("Cancel") { parakeet.cancelDownload() }
+                                .buttonStyle(SecondaryButtonStyle())
+                        }
+                    } else if parakeet.phase == .warmingUp {
+                        HStack(spacing: Theme.s3) {
+                            ProgressView()
+                                .controlSize(.small)
+                                .accessibilityLabel("Warming up Parakeet")
+                            Text("First load compiles for the Neural Engine and can take a minute.")
+                                .font(.hkCaption)
+                                .foregroundStyle(Theme.ink2)
+                        }
+                    } else {
+                        HStack(spacing: Theme.s2) {
                             if parakeet.isTranscribing {
                                 ProgressView()
                                     .controlSize(.small)
@@ -62,6 +67,12 @@ struct DictationEngineRows: View {
                 }
             }
         }
+    }
+
+    /// Not downloaded and not mid-download or warm-up: the row offers the download itself.
+    private var needsDownload: Bool {
+        let parakeet = model.parakeet
+        return !parakeet.isDownloaded && parakeet.phase != .downloading && parakeet.phase != .warmingUp
     }
 
     private var engineDetail: String {
@@ -90,6 +101,6 @@ struct DictationEngineRows: View {
 
     private var downloadTitle: String {
         if case .failed = model.parakeet.phase { return "Try again" }
-        return "Download model"
+        return "Download"
     }
 }

@@ -99,7 +99,14 @@ final class FloatingPillController {
         if let global = NSEvent.addGlobalMonitorForEvents(matching: .keyDown, handler: { _ = dismiss($0) }) {
             escapeMonitors.append(global)
         }
-        if let local = NSEvent.addLocalMonitorForEvents(matching: .keyDown, handler: { dismiss($0) ? nil : $0 }) {
+        // Inside HushKey, a Save panel, alert or sheet owns Esc (Export… from the meeting card).
+        let localDismiss: (NSEvent) -> NSEvent? = { event in
+            if NSApp.modalWindow != nil || NSApp.keyWindow?.isSheet == true || NSApp.keyWindow?.attachedSheet != nil {
+                return event
+            }
+            return dismiss(event) ? nil : event
+        }
+        if let local = NSEvent.addLocalMonitorForEvents(matching: .keyDown, handler: localDismiss) {
             escapeMonitors.append(local)
         }
     }

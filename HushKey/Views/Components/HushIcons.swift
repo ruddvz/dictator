@@ -20,7 +20,7 @@ enum HushIcon: String, CaseIterable, Identifiable {
     case chevronRight, chevronDown, arrowRight, arrowUpRight, arrowDownRight, download, share, refresh, insert
     // Things
     case warning, info, sparkle, flame, globe, folder, document, mic, waveform, record, ring, shield
-    case clock, window, list, grid, speaker, checkCircle, cursor
+    case clock, window, list, tasks, shorten, grid, speaker, checkCircle, cursor
     case mail, message, code, briefcase, quote, swap, minus
 
     var id: String { rawValue }
@@ -71,7 +71,7 @@ enum HushIcon: String, CaseIterable, Identifiable {
             "folder": .folder, "doc.richtext": .document, "note.text": .document, "waveform.path": .waveform,
             "waveform": .waveform, "record.circle": .record, "circle": .ring, "lock.shield": .shield,
             "checkmark.shield": .shield, "hourglass": .clock, "clock": .clock, "macwindow": .window,
-            "checklist": .list, "text.alignleft": .list, "square.grid.2x2": .grid,
+            "checklist": .tasks, "text.alignleft": .list, "arrow.down.right.and.arrow.up.left": .shorten, "square.grid.2x2": .grid,
             "speaker.wave.2": .speaker, "checkmark.circle": .checkCircle, "text.cursor": .cursor,
             "character.cursor.ibeam": .cursor, "slider.horizontal.3": .settings,
             "dot.radiowaves.left.and.right": .waveform, "mic.badge.plus": .mic,
@@ -374,6 +374,18 @@ enum HushIcon: String, CaseIterable, Identifiable {
         case .list:
             line { $0.move(9.5, 7); $0.to(20, 7); $0.move(9.5, 12); $0.to(20, 12); $0.move(9.5, 17); $0.to(16, 17) }
             solid { $0.circle(5, 7, r: 1.3); $0.circle(5, 12, r: 1.3); $0.circle(5, 17, r: 1.3) }
+
+        case .tasks:
+            accent { $0.rect(4, 4.5, 6.5, 6.5, r: 2) }
+            line {
+                $0.rect(4, 4.5, 6.5, 6.5, r: 2); $0.move(5.7, 7.9); $0.to(7, 9.2); $0.to(8.9, 6.5)
+                $0.rect(4, 13, 6.5, 6.5, r: 2)
+                $0.move(14, 7.75); $0.to(20, 7.75); $0.move(14, 16.25); $0.to(20, 16.25)
+            }
+
+        case .shorten:
+            line { $0.move(4, 6); $0.to(20, 6); $0.move(4, 12); $0.to(15, 12); $0.move(4, 18); $0.to(10, 18) }
+            line { $0.move(20, 14.5); $0.to(16.5, 18); $0.to(20, 21.5) }
 
         case .grid:
             accent { $0.rect(4, 4, 7, 7, r: 2) }

@@ -90,7 +90,7 @@ enum DictationHistoryPasteGate {
         guard isLatestDictation, hasTarget, textMatches else { return .hidden }
         if isBusy { return .unavailable("Cannot paste while dictating") }
         if alreadyInserted { return .unavailable("Already pasted once") }
-        if !insertionEnabled { return .unavailable("Text insertion is off") }
+        if !insertionEnabled { return .unavailable("Typing is off") }
         return .available
     }
 }

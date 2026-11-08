@@ -21,6 +21,9 @@ struct SettingsView: View {
         case about = "About"
         var id: String { rawValue }
 
+        /// The name shown in the nav. `rawValue` is saved in "settingsSection", so it stays put.
+        var title: String { self == .insertion ? "Typing" : rawValue }
+
         /// Where links to the old General section land.
         static var general: Section { .dictation }
 
@@ -95,7 +98,7 @@ private struct SettingsNav: View {
                             .foregroundStyle(selected || hovered == item ? Theme.ink : Theme.ink2)
                             .hushIconActive(selected)
                             .hushIconHover(hovered == item)
-                        Text(item.rawValue)
+                        Text(item.title)
                             .font(.system(size: 15, weight: selected ? .medium : .regular))
                             .foregroundStyle(Theme.ink)
                         Spacer(minLength: 0)
@@ -207,7 +210,7 @@ private struct ShortcutSettings: View {
                                options: DictationCaptureBehavior.allCases.map { ($0, $0.rawValue) })
                 }
             }
-            SettingsRow(title: "Paste last transcript", detail: model.pasteLastShortcutStatus) {
+            SettingsRow(title: "Paste last dictation", detail: model.pasteLastShortcutStatus) {
                 ShortcutRecorder(action: .pasteLast, combo: model.pasteLastShortcut?.combo,
                                  defaultCombo: PasteLastShortcut.default.combo, allowsTurningOff: true) {
                     model.pasteLastShortcut = $0.map(PasteLastShortcut.init)
@@ -222,9 +225,9 @@ private struct ShortcutSettings: View {
                     if let combo = $0 { model.selectedTextEditShortcut = SelectedTextEditShortcut(combo) }
                 }
             }
-            SettingsRow(title: "Insert again",
-                        detail: insertion.isEnabled ? "Types the last transcript or silent word again, from Dictation or Silent Use."
-                            : "Turn on typing in Insertion to use this.") {
+            SettingsRow(title: "Paste again",
+                        detail: insertion.isEnabled ? "Types the last dictation or silent word again, from Home or Silent Use."
+                            : "Turn on typing in Settings › Typing to use this.") {
                 ShortcutRecorder(action: .insertAgain, combo: insertion.shortcut.combo,
                                  defaultCombo: InsertionShortcut.default.combo) {
                     if let combo = $0 { insertion.shortcut = InsertionShortcut(combo) }
@@ -287,7 +290,7 @@ private struct CleanupSettings: View {
                         .buttonStyle(SecondaryButtonStyle())
                 }
             }
-            SettingsRow(title: "Vocabulary and snippets", detail: "Names, terms and phrases HushKey should know.") {
+            SettingsRow(title: "Vocabulary", detail: "Names, terms and phrases HushKey should know.") {
                 Button("Open") { model.screen = .personalization }
                     .buttonStyle(SecondaryButtonStyle(minWidth: 96))
             }
@@ -369,7 +372,7 @@ private struct InsertionSettings: View {
             }
             .disabled(!insertion.isEnabled)
             .opacity(insertion.isEnabled ? 1 : 0.5)
-            SettingsRow(title: "Insert again and undo",
+            SettingsRow(title: "Paste again and undo",
                         detail: "\(insertion.shortcut.label) types the last text again; \(TextInsertionService.undoShortcut.label) undoes it while the field is unchanged.") {
                 Button("Shortcuts") { section = .shortcuts }
                     .buttonStyle(SecondaryButtonStyle(minWidth: 96))
@@ -392,8 +395,8 @@ private struct DataSettings: View {
         PrivacyPromise()
 
         SettingsGroup(title: "History") {
-            SettingsRow(title: "Keep recent transcripts", detail: "Clear them any time from the Dictation page.") {
-                RowToggle(isOn: $model.savesDictationHistory, label: "Save recent transcripts")
+            SettingsRow(title: "Keep recent dictations", detail: "Clear them any time from Home.") {
+                RowToggle(isOn: $model.savesDictationHistory, label: "Save recent dictations")
             }
             SettingsRow(title: "Delete transcripts after",
                         detail: model.dictationHistoryRetention == .forever

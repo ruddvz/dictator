@@ -128,13 +128,13 @@ struct ContentView: View {
             }
             .buttonStyle(.plain)
             .padding(.vertical, Theme.s1)
-            .help(labIsOpen ? "Hide the Silent lab" : "Show the Silent lab")
+            .help(labIsOpen ? "Hide the Silent Lab" : "Show the Silent Lab")
         } else {
             Button {
                 withAnimation(Theme.snappy) { showsLab.toggle() }
             } label: {
                 HStack(spacing: Theme.s1) {
-                    SectionLabel(title: "Silent lab")
+                    SectionLabel(title: "Silent Lab")
                     Glyph(.chevronRight, size: 11)
                         .foregroundStyle(Theme.ink3)
                         .rotationEffect(.degrees(labIsOpen ? 90 : 0))
@@ -150,8 +150,8 @@ struct ContentView: View {
             .padding(.horizontal, Theme.s3 - 2)
             .padding(.top, Theme.s5)
             .padding(.bottom, 2)
-            .help(labIsOpen ? "Hide the Silent lab" : "Show the Silent lab: AirPods gestures and silent words")
-            .accessibilityLabel("Silent lab")
+            .help(labIsOpen ? "Hide the Silent Lab" : "Show the Silent Lab: AirPods gestures and silent words")
+            .accessibilityLabel("Silent Lab")
             .accessibilityValue(labIsOpen ? "Expanded" : "Collapsed")
         }
     }
@@ -365,7 +365,7 @@ private struct SetupChecklist: View {
             steps.append(Step(title: "Allow speech recognition", isDone: speechGranted,
                               opens: .dictation, permission: .speechRecognition))
         }
-        steps.append(Step(title: "Turn on text insertion", isDone: model.insertion.isEnabled,
+        steps.append(Step(title: "Turn on typing", isDone: model.insertion.isEnabled,
                           opens: .settings, settingsSection: .insertion))
         steps.append(Step(title: "Finish a first dictation", isDone: model.didCompleteFirstDictation,
                           opens: .dictation))

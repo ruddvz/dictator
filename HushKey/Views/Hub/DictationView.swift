@@ -48,12 +48,13 @@ struct DictationView: View {
     // MARK: Header
 
     private var header: some View {
-        HStack(alignment: .center, spacing: Theme.s4) {
+        HStack(alignment: .pageTitle, spacing: Theme.s4) {
             VStack(alignment: .leading, spacing: Theme.s2) {
                 Text("\(greeting), \(firstName)")
                     .font(.hkTitle1)
                     .tracking(-0.3)
                     .accessibilityIdentifier("page.header")
+                    .alignmentGuide(.pageTitle) { $0[VerticalAlignment.center] }
                 HStack(alignment: .center, spacing: 6) {
                     Text(holds ? "Hold" : "Press")
                     KeycapShortcut(label: model.dictationShortcut.label, size: 12)
@@ -85,6 +86,7 @@ struct DictationView: View {
             .animation(Theme.gentle, value: problem)
             Spacer(minLength: Theme.s4)
             recordButton
+                .alignmentGuide(.pageTitle) { $0[VerticalAlignment.center] }
         }
     }
 
@@ -198,7 +200,7 @@ struct DictationView: View {
                 Button("Insert", icon: .insert) { model.insertDictationText() }
                     .buttonStyle(PrimaryButtonStyle())
                     .disabled(!model.insertion.isEnabled || isBusy || !hasText)
-                    .help(model.insertion.isEnabled ? "Insert into the app you dictated from" : "Turn on insertion in Settings")
+                    .help(model.insertion.isEnabled ? "Insert into the app you dictated from" : "Turn on typing in Settings › Typing")
                 Button("Copy", icon: .copy) { model.copyDictationText() }
                     .buttonStyle(SecondaryButtonStyle())
                     .disabled(isBusy || !hasText)
@@ -281,7 +283,7 @@ struct DictationView: View {
         return Button {
             withAnimation(Theme.snappy) { model.screen = .insights }
         } label: {
-            VStack(alignment: .leading, spacing: Theme.s3 + 2) {
+            VStack(alignment: .leading, spacing: Theme.s3) {
                 VStack(alignment: .leading, spacing: 2) {
                     statRow(value: ledger.totalWords, label: ledger.totalWords == 1 ? "word dictated" : "words dictated", order: 0)
                     if today > 0 {
@@ -319,7 +321,7 @@ struct DictationView: View {
     /// Time saved and the voice profile in two quiet lines; Insights has the full cards.
     @ViewBuilder
     private func voiceLines(_ profile: VoiceProfile) -> some View {
-        VStack(alignment: .leading, spacing: Theme.s1 + 2) {
+        VStack(alignment: .leading, spacing: Theme.s1) {
             if let saved = profile.timeSavedText {
                 Label(saved.prefix(1).uppercased() + saved.dropFirst() + " vs typing", icon: .clock)
                     .help("Words at \(VoiceProfile.typingWordsPerMinute) wpm typing, minus the time you spent speaking")
@@ -562,8 +564,8 @@ private struct HeroCard: View {
         let candidates: [Step] = [
             model.insertion.isEnabled ? nil : Step(
                 id: "insertion", title: "Type straight into", accent: "any app",
-                detail: "Turn on insertion and finished dictations land where your cursor is.",
-                action: "Turn on insertion") { model in
+                detail: "Turn on typing and finished dictations land where your cursor is.",
+                action: "Turn on typing") { model in
                     UserDefaults.standard.set(SettingsView.Section.insertion.rawValue, forKey: "settingsSection")
                     model.screen = .settings
                 },
@@ -600,7 +602,7 @@ private struct HeroCard: View {
             // Title at the top, action at the bottom, whatever height the stats card sets.
             VStack(alignment: .leading, spacing: Theme.s2) {
                 (Text(step.title + " ") + Text(step.accent).foregroundStyle(Theme.heroGlow))
-                    .font(.display(30))
+                    .font(.hkTitle1)
                     .tracking(-0.4)
                     .foregroundStyle(Theme.heroInk)
                     .fixedSize(horizontal: false, vertical: true)
@@ -614,7 +616,7 @@ private struct HeroCard: View {
             }
             .frame(maxWidth: 420, maxHeight: .infinity, alignment: .topLeading)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(Theme.s6 - 4)
+            .padding(Theme.s5)
             .id(step.id)
             .transition(.opacity)
 
@@ -639,8 +641,9 @@ private struct HeroCard: View {
         .background {
             IsolatedHost { LiveLevel(model.audio) { HeroBackdrop(level: $0, mode: ribbonMode, visible: windowVisible) } }
         }
-        .clipShape(RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: Theme.r1, style: .continuous)
+        // r2, the same as the stats card beside it.
+        .clipShape(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
             .strokeBorder(Theme.heroInk.opacity(0.08), lineWidth: 1))
         .onWindowVisibilityChange { windowVisible = $0 }
         .animation(Theme.gentle, value: step.id)

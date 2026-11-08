@@ -32,7 +32,7 @@ struct FileTranscriptionView: View {
     var body: some View {
         @Bindable var whisper = model.whisperFileTranscriber
         ScrollView {
-            VStack(alignment: .leading, spacing: Theme.s6) {
+            VStack(alignment: .leading, spacing: Theme.s5) {
                 PageHeader(eyebrow: "", title: "Files",
                            subtitle: "Turn a recording into text and subtitles, on this Mac.") {
                     // The source card offers "Choose file…" until a file is picked.
@@ -151,7 +151,7 @@ struct FileTranscriptionView: View {
         @Bindable var whisper = model.whisperFileTranscriber
         let sourceName = workspace.selectedURL?.lastPathComponent ?? workspace.activeSourceName
         return HStack(spacing: Theme.s4) {
-            Glyph(sourceName == nil ? .waveform : .waveform)
+            Glyph(.waveform)
                 .hushIconSize(28)
                 .foregroundStyle(Theme.signal)
                 .frame(width: 52, height: 52)

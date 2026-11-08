@@ -127,8 +127,10 @@ private struct MenuBarLabel: View {
 
     var body: some View {
         HStack(spacing: 3) {
-            Image(model.audio.isRunning ? "HushKeyMenuBarLive" : "HushKeyMenuBar")
-            if model.audio.isRunning {
+            // Meetings record through their own audio service, so check them too.
+            let isLive = model.audio.isRunning || model.meetingNotes.isCapturing
+            Image(isLive ? "HushKeyMenuBarLive" : "HushKeyMenuBar")
+            if isLive {
                 Circle()
                     .fill(Theme.signal)
                     .frame(width: 5, height: 5)
@@ -174,19 +176,21 @@ private struct HushKeyMenu: View {
 
         // 2. Start / Stop
         Button(model.meetingNotes.isCapturing ? "Stop Meeting and Save" :
-               meetingBusy ? "Starting Meeting…" :
+               model.meetingNotes.isFinalizing ? "Saving Meeting…" :
+               model.meetingNotes.isStarting ? "Cancel Meeting Start" :
                model.isFinalizingSelectedTextEdit ? "Finishing Voice Edit…" :
                model.isSelectedTextEditCapturing ? "Stop Voice Edit" :
                model.isStartingSelectedTextEdit ? "Cancel Voice Edit" :
                isTranscribing ? "Finishing Dictation…" :
                model.audio.isRunning ? "Stop Dictation" : "Start Dictation") {
-            if model.meetingNotes.isCapturing {
+            if model.meetingNotes.isCapturing || model.meetingNotes.isStarting {
+                // stop() also cancels a meeting that is still starting.
                 model.meetingNotes.stop()
             } else {
                 Task { await model.toggleDictation() }
             }
         }
-        .disabled(meetingBusy || isTranscribing)
+        .disabled(model.meetingNotes.isFinalizing || isTranscribing)
         if !model.meetingNotes.isCapturing {
             Button("Record Meeting") { model.startMeeting() }
                 .disabled(meetingBusy || isTranscribing || model.audio.isRunning)
@@ -311,9 +315,9 @@ private struct HushKeyMenu: View {
     }
 
     private var statusLine: String {
-        if model.audio.isRunning {
-            return model.meetingNotes.isCapturing ? "Recording a meeting" : "Listening…"
-        }
+        if model.meetingNotes.isCapturing { return "Recording a meeting" }
+        if model.meetingNotes.isFinalizing { return "Saving meeting…" }
+        if model.audio.isRunning { return "Listening…" }
         if model.isFinalizingDictation || model.transcriber.isFinalizing {
             return "Transcribing…"
         }

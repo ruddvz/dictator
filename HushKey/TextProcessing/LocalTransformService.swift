@@ -16,7 +16,7 @@ enum LocalWritingTransform: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .polish: "wand.and.stars"
-        case .concise: "text.alignleft"
+        case .concise: "arrow.down.right.and.arrow.up.left"
         case .professional: "briefcase"
         case .bullets: "list.bullet"
         case .actionItems: "checklist"

@@ -52,7 +52,7 @@ final class ParakeetDictationEngineTests: XCTestCase {
         XCTAssertEqual(engine.model, .englishV2)
         XCTAssertEqual(engine.phase, .notDownloaded)
         XCTAssertFalse(engine.isDownloaded)
-        XCTAssertTrue(engine.statusDescription.contains("one-time download"))
+        XCTAssertTrue(engine.statusDescription.contains("downloaded once"))
         XCTAssertFalse(engine.warmUp().isCancelled)
     }
 

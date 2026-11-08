@@ -203,6 +203,7 @@ final class MeetingNotesService {
         isFinalizing = true
         cancelDraftCheckpoint()
         let stoppedAt = Date()
+        let route = activeAudioSource?.captureRoute
         transcriber.beginFinalization()
         switch activeAudioSource?.captureRoute {
         case .microphone:
@@ -254,7 +255,12 @@ final class MeetingNotesService {
                 activeDraftID = nil
                 lastDraftCheckpointAt = nil
                 message = "No speech was recognized, so no meeting note was saved."
-                if presentsResult { notice = "No speech was heard, so nothing was saved." }
+                // macOS gives silent Mac audio, not an error, when System Audio Recording is off.
+                if presentsResult {
+                    notice = route == .systemAudio
+                        ? "No speech was heard, so nothing was saved. If others were talking, allow HushKey in System Settings › Privacy & Security › System Audio Recording."
+                        : "No speech was heard, so nothing was saved."
+                }
             }
 
             isFinalizing = false

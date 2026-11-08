@@ -205,7 +205,7 @@ enum PasteAgainGate {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return .unavailable("There is no dictation to paste.")
         }
-        guard insertionEnabled else { return .unavailable("Turn on text insertion in Settings first.") }
+        guard insertionEnabled else { return .unavailable("Turn on typing in Settings › Typing first.") }
         guard hasTarget else {
             return .unavailable("This dictation has no saved target field. Use Insert in HushKey instead.")
         }

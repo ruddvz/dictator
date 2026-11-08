@@ -241,9 +241,9 @@ enum ShortcutAction: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .dictation: "Dictation"
-        case .pasteLast: "Paste last transcript"
+        case .pasteLast: "Paste last dictation"
         case .editSelection: "Edit selected text by voice"
-        case .insertAgain: "Insert again"
+        case .insertAgain: "Paste again"
         case .undoInsertion: "Undo the last insertion"
         case .silentCapture: "Silent capture"
         }

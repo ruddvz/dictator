@@ -1267,8 +1267,10 @@ final class SafetyAndStorageTests: XCTestCase {
     }
 
     func testWritingStyleValidationAndLocalPersistenceAreBounded() throws {
-        let suiteName = "HushKeyWritingStyleTests-\(UUID().uuidString)"
+        // A fixed name, cleared before and after, so test runs don't leave a new plist behind each time.
+        let suiteName = "HushKeyWritingStyleTests"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let style = WritingStylePreset(name: "Warm and concise", instructions: "Use a friendly tone and keep it brief.")

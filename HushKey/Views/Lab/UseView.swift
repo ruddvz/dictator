@@ -129,7 +129,7 @@ struct UseView: View {
                             ? (model.silentTypesIntoFrontApp
                                 ? "Accepted predictions type into the front field. This experimental feature has not been validated for your setup."
                                 : "Accepted predictions stay in HushKey. Enable direct typing only after testing it.")
-                            : "Turn on text insertion in Settings first. Until then words stay here.",
+                            : "Turn on typing in Settings › Typing. Until then, words stay here.",
                         detailTint: model.insertion.isEnabled ? Theme.ink2 : Theme.finishing) {
                 Toggle("", isOn: $model.silentTypesIntoFrontApp)
                     .toggleStyle(.switch)

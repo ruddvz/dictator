@@ -47,7 +47,7 @@ struct TransformView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Theme.s6) {
+            VStack(alignment: .leading, spacing: Theme.s5) {
                 PageHeader(eyebrow: "", title: "Transforms",
                            subtitle: "Rewrite a transcript or selected text on this Mac. You always see the result first.") {
                     Button("New transform", icon: .plus) {
@@ -104,7 +104,7 @@ struct TransformView: View {
             if model.selectedTextEditOriginal.isEmpty {
                 SettingsRow(title: "Select text anywhere, hold the shortcut, say the change",
                             detail: model.insertion.isEnabled ? model.selectedTextEditShortcutStatus
-                                : "Needs “Type where your cursor is” in Settings → Insertion.") {
+                                : "Needs “Type where your cursor is” in Settings › Typing.") {
                     if model.insertion.isEnabled {
                         KeycapShortcut(label: model.selectedTextEditShortcut.label, size: 13)
                     } else {
@@ -233,7 +233,7 @@ struct TransformView: View {
             if currentText.isEmpty {
                 EmptyState(icon: .list, title: "Nothing to transform yet",
                            message: "Dictate something, or pick a dictation from history to edit it again.") {
-                    Button("Go to Dictation") { model.screen = .dictation }
+                    Button("Go to Home") { model.screen = .dictation }
                         .buttonStyle(SecondaryButtonStyle())
                 }
                 .card(padding: 0, style: .outlined)
@@ -602,9 +602,9 @@ private struct TransformCard: View {
                                     in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
                     Spacer()
                     Text(badge)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Theme.ink3)
-                        .padding(.horizontal, 7)
+                        .font(.hkMeta.weight(.medium))
+                        .foregroundStyle(Theme.ink2)
+                        .padding(.horizontal, Theme.s2)
                         .frame(height: 20)
                         .background(Theme.well, in: Capsule())
                 }
