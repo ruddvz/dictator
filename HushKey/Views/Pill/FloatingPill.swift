@@ -60,6 +60,8 @@ final class FloatingPillController {
             _ = model.audio.isRunning
             _ = model.audio.isStarting
             _ = model.isStartingDictation
+            _ = model.meetingNotes.resultNoteID
+            _ = model.meetingNotes.notice
         } onChange: { [weak self] in
             Task { @MainActor in
                 self?.observe()
@@ -72,7 +74,8 @@ final class FloatingPillController {
         }
         wasCapturing = capturing
         model.showsFloatingPill ? show() : hide()
-        let cardIsUp = model.showsFloatingPill && model.showsFinishedTranscript
+        let meetingCardIsUp = model.meetingNotes.resultNoteID != nil || model.meetingNotes.notice != nil
+        let cardIsUp = model.showsFloatingPill && (model.showsFinishedTranscript || meetingCardIsUp)
         cardIsUp || model.audio.isRunning || model.isStartingDictation ? watchEscape() : stopWatchingEscape()
     }
 
@@ -86,7 +89,10 @@ final class FloatingPillController {
             Task { @MainActor in
                 guard let model = self?.model else { return }
                 if model.isStartingDictation || model.audio.isRunning { model.cancelDictation(offersUndo: true) }
-                else { model.dismissFinishedTranscript() }
+                else if model.showsFinishedTranscript { model.dismissFinishedTranscript() }
+                // Esc never stops a meeting; it only closes the meeting's cards.
+                else if model.meetingNotes.notice != nil { model.meetingNotes.dismissNotice() }
+                else { model.meetingNotes.dismissResult() }
             }
             return true
         }
@@ -327,13 +333,24 @@ struct FloatingPillView: View {
     static let finishedCountdown: TimeInterval = 8
     static let slowStartDelay: Duration = .milliseconds(600)
 
-    enum Phase: CaseIterable { case idle, hover, preparing, listening, finishing, error, done }
+    enum Phase: CaseIterable { case idle, hover, preparing, listening, finishing, error, done,
+                               meetingStarting, meeting, meetingSaving }
     /// Renders one fixed phase, for snapshot reviews of the pill's spacing and icons.
     var previewPhase: Phase? = nil
     var previewShowsControls = true
-    private enum PillControl { case dictate, cancel, finish, notes }
+    private enum PillControl { case dictate, cancel, finish, notes, meeting, stopMeeting, cancelMeeting }
 
     private var isFinishing: Bool { model.isFinalizingDictation || model.transcriber.isFinalizing }
+
+    private var isMeetingPhase: Bool { phase == .meetingStarting || phase == .meeting || phase == .meetingSaving }
+
+    /// The saved meeting to show above the pill, kept out of the way while a dictation runs.
+    private var meetingResult: MeetingNote? {
+        guard let id = model.meetingNotes.resultNoteID, cardState == .hidden,
+              phase == .idle || phase == .hover || phase == .done || phase == .error
+        else { return nil }
+        return model.meetingNotes.notes.first { $0.id == id }
+    }
 
     private var phase: Phase {
         if let previewPhase { return previewPhase }
@@ -341,6 +358,10 @@ struct FloatingPillView: View {
         // The microphone buffers while recognition gets ready, so show the live meter at once.
         if model.audio.isRunning { return .listening }
         if model.isStartingDictation { return .preparing }
+        // A meeting holds the pill until it is saved: the capture is the most important thing on screen.
+        if model.meetingNotes.isStarting { return .meetingStarting }
+        if model.meetingNotes.isCapturing { return .meeting }
+        if model.meetingNotes.isFinalizing { return .meetingSaving }
         if model.dictationNotice != nil { return .error }
         if showsDone { return .done }
         return isHovering ? .hover : .idle
@@ -364,6 +385,24 @@ struct FloatingPillView: View {
                 transcriptCard
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
+            if let note = meetingResult {
+                MeetingResultCard(note: note,
+                                  isDigesting: model.meetingNotes.digestingNoteID == note.id,
+                                  isFallback: model.meetingNotes.fallbackDigestNoteIDs.contains(note.id),
+                                  onOpen: { model.openMeetingNote(note.id) },
+                                  onCopy: { model.copyMeetingNote(note.id) },
+                                  onExport: { model.exportMeetingNote(note.id) },
+                                  onClose: { model.meetingNotes.dismissResult() },
+                                  isHovering: $isHoveringCard)
+                    .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .bottom))
+                        .combined(with: .offset(y: 6)))
+            } else if let notice = model.meetingNotes.notice, !isMeetingPhase, phase != .error {
+                MeetingNoticeCard(message: notice,
+                                  onOpen: { model.meetingNotes.dismissNotice(); model.openMeetingNotes() },
+                                  onClose: { model.meetingNotes.dismissNotice() },
+                                  isHovering: $isHoveringCard)
+                    .transition(.opacity.combined(with: .offset(y: 6)))
+            }
             if phase == .error, let notice = model.dictationNotice {
                 noticeCard(notice)
                     .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .bottom))
@@ -382,6 +421,8 @@ struct FloatingPillView: View {
             .animation(.spring(response: 0.34, dampingFraction: 0.78), value: cardState)
             .animation(.spring(response: 0.34, dampingFraction: 0.78), value: showsControls)
             .animation(Theme.snappy, value: hint)
+            .animation(.spring(response: 0.34, dampingFraction: 0.78), value: model.meetingNotes.resultNoteID)
+            .animation(.spring(response: 0.34, dampingFraction: 0.78), value: model.meetingNotes.notice)
             .transaction { transaction in
                 if reduceMotion {
                     transaction.disablesAnimations = true
@@ -438,10 +479,10 @@ struct FloatingPillView: View {
             }
             bar
             if isHover {
-                PillIconButton(systemImage: "person.2.fill", help: "Open Meeting notes", quiet: true,
+                PillIconButton(systemImage: "person.2.fill", help: "Record a meeting", quiet: true,
                                glyphSize: 11, size: Metrics.height,
                                onHover: { hoveredControl = $0 ? .notes : nil }) {
-                    model.openMeetingNotes()
+                    model.toggleMeetingFromPill()
                 }
                 // Same material as the pill beside it, so the two read as one control family.
                 .background(Circle().fill(Theme.paper))
@@ -466,7 +507,8 @@ struct FloatingPillView: View {
         .accessibilityLabel(accessibilityLabel)
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { // VoiceOver and other assistive presses, which can't miss
-            guard phase != .finishing, phase != .error else { return }
+            guard phase != .finishing, phase != .error, phase != .meetingSaving else { return }
+            if isMeetingPhase { model.toggleMeetingFromPill(); return }
             Task { await model.toggleDictation() }
         }
     }
@@ -485,6 +527,14 @@ struct FloatingPillView: View {
             return CGSize(width: base + timer, height: Self.height)
         case .done:
             return CGSize(width: doneWidth, height: Self.height)
+        case .meetingStarting:
+            return CGSize(width: Metrics.meetingStartingWidth, height: Self.height)
+        case .meeting:
+            // The clock has a fixed slot, wider past an hour, so the capsule never jumps mid-meeting.
+            let clock = meetingClockWidth
+            return CGSize(width: Metrics.meetingStartingWidth + clock + Metrics.gap, height: Self.height)
+        case .meetingSaving:
+            return CGSize(width: Metrics.meetingSavingWidth, height: Self.height)
         }
     }
 
@@ -516,6 +566,11 @@ struct FloatingPillView: View {
     }
 
     private func press() {
+        // A meeting's capsule opens its live transcript; stopping is the ■ button only.
+        if phase == .meeting || phase == .meetingSaving {
+            model.openMeetingNotes()
+            return
+        }
         // Only a resting bar starts dictation from a click. While recording, × and ✓ are the
         // only targets, so a click that just misses × can't finish and type the text instead;
         // an error goes away only through its own controls.
@@ -545,6 +600,8 @@ struct FloatingPillView: View {
                 .accessibilityLabel("Start dictation")
         case .preparing, .listening, .finishing:
             recorder
+        case .meetingStarting, .meeting, .meetingSaving:
+            meetingRecorder
         case .done:
             // Only shown when the words went in: the card above is the feedback otherwise.
             TypedConfirmation(verb: model.insertion.lastDeliveryVerified ? "Typed" : "Pasted",
@@ -587,6 +644,16 @@ struct FloatingPillView: View {
         static let recorderWidth = inset + control + gap + ribbonSize.width + gap + control + inset
         static let meterOnlyWidth = ribbonSize.width + 2 * 12
         static let timerWidth: CGFloat = 30
+        /// Meeting glyph · ribbon · ×, and glyph · ribbon while the meeting saves. Recording adds
+        /// the clock's slot before ■.
+        static let meetingStartingWidth = inset + control + gap + ribbonSize.width + gap + control + inset
+        static let meetingSavingWidth = inset + control + gap + ribbonSize.width + 12
+        static let meetingClockWidth: CGFloat = 34
+        static let meetingLongClockWidth: CGFloat = 48
+    }
+
+    private var meetingClockWidth: CGFloat {
+        model.meetingNotes.activeDuration >= 3600 ? Metrics.meetingLongClockWidth : Metrics.meetingClockWidth
     }
     private static let height = Metrics.height
     /// The recording meter: `BreathRibbon`, sized per docs/DESIGN_SYSTEM.md.
@@ -630,6 +697,62 @@ struct FloatingPillView: View {
 
     }
 
+    /// A meeting on the pill: the meeting glyph, the same breath ribbon as dictation (it waits,
+    /// listens, then works), the running clock, and one sage ■ to stop and save. Clicking the
+    /// capsule opens the live transcript; Esc and stray clicks never end a meeting.
+    private var meetingRecorder: some View {
+        let meeting = model.meetingNotes
+        let mode: BreathRibbon.Mode = switch phase {
+        case .meeting: .live
+        case .meetingStarting: .waiting
+        default: .working
+        }
+        return HStack(spacing: Metrics.gap) {
+            Image(systemName: "person.2.fill")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(Theme.signal)
+                .frame(width: Metrics.control, height: Metrics.control)
+            MeetingLevel(meeting: meeting) { level in
+                BreathRibbon(level: phase == .meeting ? level : 0, mode: mode, tint: Theme.ink)
+            }
+            .frame(width: Self.ribbonSize.width, height: Self.ribbonSize.height)
+            if phase == .meeting {
+                MeetingClock(startedAt: meeting.activeMeetingStartedAt)
+                    .frame(width: meetingClockWidth)
+                PillIconButton(systemImage: "stop.fill", help: "Stop and save the meeting", prominent: true,
+                               size: Metrics.control,
+                               onHover: { hoveredControl = $0 ? .stopMeeting : nil }) {
+                    meeting.stop()
+                }
+                .transition(.opacity.combined(with: .scale(scale: 0.6)))
+            } else if phase == .meetingStarting {
+                PillIconButton(systemImage: "xmark", help: "Cancel the meeting", solid: true, size: Metrics.control,
+                               onHover: { hoveredControl = $0 ? .cancelMeeting : nil }) {
+                    meeting.cancelStarting()
+                }
+                .transition(.opacity.combined(with: .scale(scale: 0.6)))
+            }
+        }
+        .padding(.leading, Metrics.inset)
+        .padding(.trailing, phase == .meetingSaving ? 12 : Metrics.inset)
+        .frame(height: Self.height)
+        .contentShape(Capsule())
+        .onHover { inside in
+            guard phase == .meeting else { return }
+            if inside { if hoveredControl == nil { hoveredControl = .meeting } }
+            else if hoveredControl == .meeting { hoveredControl = nil }
+        }
+        .transition(.opacity.combined(with: .scale(scale: 0.9)))
+    }
+
+    static func sourceLabel(_ source: MeetingAudioSource) -> String {
+        switch source {
+        case .microphone: "Mic"
+        case .systemAudio: "Mac audio"
+        case .both: "Mic + Mac audio"
+        }
+    }
+
     /// Short tooltip above the pill: what a hovered control does and its key, or what the pill
     /// is waiting for. Shown at once, unlike a system tooltip in a non-activating panel.
     private var hint: PillHint.Content? {
@@ -637,7 +760,10 @@ struct FloatingPillView: View {
         case .dictate?: return .init(title: "Dictate", shortcut: model.dictationShortcut.label)
         case .cancel?: return .init(title: "Cancel", shortcut: "esc")
         case .finish?: return .init(title: "Finish", shortcut: model.dictationShortcut.label)
-        case .notes?: return .init(title: "Meeting notes", shortcut: nil)
+        case .notes?: return .init(title: "Record meeting · \(Self.sourceLabel(model.meetingNotes.audioSource))", shortcut: nil)
+        case .meeting?: return .init(title: "Open live transcript", shortcut: nil)
+        case .stopMeeting?: return .init(title: "Stop and save", shortcut: nil)
+        case .cancelMeeting?: return .init(title: "Cancel", shortcut: nil)
         case nil: break
         }
         switch phase {
@@ -649,6 +775,13 @@ struct FloatingPillView: View {
             }
             guard isSlowStart else { return nil }
             return .init(title: model.audio.isStarting ? "Waiting for microphone…" : "Getting ready…", shortcut: nil)
+        case .meetingStarting:
+            let meeting = model.meetingNotes
+            if meeting.audio.isAwaitingPermission || meeting.transcriber.isAwaitingPermission {
+                return .init(title: "Allow access in the dialog", shortcut: nil)
+            }
+            return .init(title: "Starting meeting…", shortcut: nil)
+        case .meetingSaving: return .init(title: "Saving meeting…", shortcut: nil)
         default: return nil
         }
     }
@@ -851,11 +984,24 @@ struct FloatingPillView: View {
     @ViewBuilder
     private var pillMenu: some View {
         microphoneChoices
-        Toggle("Dictation sounds", isOn: Binding(get: { model.playsDictationSounds },
+        Toggle("Dictation Sounds", isOn: Binding(get: { model.playsDictationSounds },
                                                        set: { model.playsDictationSounds = $0 }))
         Divider()
         Button("Move to Center") { onCentre() }
-        Button("Meeting notes") { model.openMeetingNotes() }
+        if model.meetingNotes.isCapturing || model.meetingNotes.isStarting {
+            Button(model.meetingNotes.isStarting ? "Cancel Meeting Start" : "Stop Meeting and Save") {
+                model.meetingNotes.stop()
+            }
+        } else {
+            Button("Record Meeting") { model.startMeeting() }
+                .disabled(model.meetingNotes.isFinalizing)
+        }
+        Picker("Meeting Audio", selection: Binding(get: { model.meetingNotes.audioSource },
+                                                   set: { model.meetingNotes.audioSource = $0 })) {
+            ForEach(MeetingAudioSource.allCases) { Text($0.rawValue).tag($0) }
+        }
+        .disabled(model.meetingNotes.isCapturing || model.meetingNotes.isStarting)
+        Button("Open Meeting Notes") { model.openMeetingNotes() }
         Button("Open HushKey") {
             model.screen = .dictation
             model.openMainWindow?()
@@ -899,6 +1045,9 @@ struct FloatingPillView: View {
                     ? "Dictation cancelled. \(model.dictationNotice?.detail ?? "")"
                     : "Dictation problem: \(model.dictationNotice?.message ?? ""). \(model.dictationNotice?.detail ?? "")"
         case .done: "Dictation finished"
+        case .meetingStarting: "Starting meeting capture. Cancel"
+        case .meeting: "Recording meeting from \(Self.sourceLabel(model.meetingNotes.activeAudioSource ?? model.meetingNotes.audioSource)). Stop and save"
+        case .meetingSaving: "Saving the meeting"
         }
     }
 }

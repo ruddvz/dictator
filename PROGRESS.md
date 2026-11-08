@@ -27,6 +27,17 @@
 - **Verification:** full suite 340 tests passed, 6 skipped, on this Mac (macOS 27.0.1), after rebasing on f74b902. Model-backed eval ran in-process; the real pinned download + SHA-256 check passed (`TEST_RUNNER_HUSHKEY_LIVE_DOWNLOAD=1`). Packaged `dist/HushKey.app` builds with `llama.framework` and its licence. **Not checked live:** the Style/Settings download UI and a real dictation through the local model, because another worktree's HushKey was running; also not run on an actual macOS 14/15 Mac.
 - **Next:** live check with `open dist/HushKey.app --args -localCleanupOnly YES` (Style → Download → pick Polished → dictate "so I was like thinking we could move the demo"); then gap 3, speaker labels in meeting notes.
 
+## Completed: Meeting notes from the pill (2026-11-04)
+
+- **Before:** the people button beside the pill only opened the Meeting notes page. The pill never showed a meeting (its state followed dictation only), and summary and action items were manual and needed Apple Intelligence.
+- **Start from the pill:** hover the pill, click the people button: capture starts at once from the remembered source (hint "Record meeting · Mic"). Right-click the pill for Meeting audio (Mic / Mac audio / both), Record meeting and Open Meeting notes. The menu bar gains "Record meeting".
+- **Recording state on the pill (`FloatingPill.swift`):** new phases `meetingStarting` (glyph, waiting ribbon, ×), `meeting` (sage meeting glyph, the same `BreathRibbon` driven by the meeting level, a running clock, sage ■ Stop) and `meetingSaving` (working ribbon). Clicking the capsule opens the live transcript; Esc never stops a meeting. The dictation pill (fn-hold wave, finishing sweep) is unchanged.
+- **Finished card (`MeetingPillViews.swift`):** after Stop, a card above the pill shows the length, title, summary, up to three action items, and Copy (Markdown), Export… (.md file, revealed in Finder) and Open (selects the note in the hub). It stays until closed, opened or Esc. Start failures and "nothing heard" show a short notice with Open.
+- **On-device digest (`MeetingNotesService.digest`, `MeetingDigest.swift`):** after saving, an empty summary and action items are filled by Apple's on-device model when it is ready; otherwise key sentences and commitments are picked verbatim from the transcript (labelled "Picked from the transcript"). Your own edits are never replaced; meetings under 40 words are left as transcript only. Recovered drafts are digested too.
+- **Fixed:** opening the hub when it was already open (Open from the pill, menu bar items) stacked a second hub window; `openMainWindow` now brings the existing window forward.
+- Wispr Flow's Notetaker (cloud, calendar, Recap / Next steps / Decisions) and Muesli (MIT: floating indicator, Markdown export) informed the flow; no code copied.
+- **Verification:** see the end of this entry.
+
 ## Research: open-source dictation landscape (2026-11-04)
 
 - [docs/research/OPEN_SOURCE_LANDSCAPE_2026-11-04.md](docs/research/OPEN_SOURCE_LANDSCAPE_2026-11-04.md): dimastatz/whisper-flow (a Python server; only its partial-finalization rule is useful) and 20 other apps with their licences.

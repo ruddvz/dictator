@@ -142,7 +142,16 @@ private struct MenuBarLabel: View {
         .task {
             model.openMainWindow = {
                 model.isHubWindowOpen = true
-                openWindow(id: "main")
+                // Bring the hub back if it is already open: openWindow on a WindowGroup always
+                // makes another window, so Open from the pill used to stack a second hub.
+                if let hub = NSApp.windows.first(where: { window in
+                    !(window is NSPanel) && window.canBecomeMain && (window.isVisible || window.isMiniaturized)
+                }) {
+                    if hub.isMiniaturized { hub.deminiaturize(nil) }
+                    hub.makeKeyAndOrderFront(nil)
+                } else {
+                    openWindow(id: "main")
+                }
                 NSApp.activate(ignoringOtherApps: true)
             }
         }
@@ -164,12 +173,12 @@ private struct HushKeyMenu: View {
         Divider()
 
         // 2. Start / Stop
-        Button(model.meetingNotes.isCapturing ? "Stop Meeting Notes" :
+        Button(model.meetingNotes.isCapturing ? "Stop Meeting and Save" :
                meetingBusy ? "Starting Meeting…" :
-               model.isFinalizingSelectedTextEdit ? "Finishing voice edit…" :
-               model.isSelectedTextEditCapturing ? "Stop voice edit" :
-               model.isStartingSelectedTextEdit ? "Cancel voice edit start" :
-               isTranscribing ? "Finishing dictation…" :
+               model.isFinalizingSelectedTextEdit ? "Finishing Voice Edit…" :
+               model.isSelectedTextEditCapturing ? "Stop Voice Edit" :
+               model.isStartingSelectedTextEdit ? "Cancel Voice Edit" :
+               isTranscribing ? "Finishing Dictation…" :
                model.audio.isRunning ? "Stop Dictation" : "Start Dictation") {
             if model.meetingNotes.isCapturing {
                 model.meetingNotes.stop()
@@ -178,6 +187,10 @@ private struct HushKeyMenu: View {
             }
         }
         .disabled(meetingBusy || isTranscribing)
+        if !model.meetingNotes.isCapturing {
+            Button("Record Meeting") { model.startMeeting() }
+                .disabled(meetingBusy || isTranscribing || model.audio.isRunning)
+        }
 
         Divider()
 
@@ -203,7 +216,7 @@ private struct HushKeyMenu: View {
             }
             .pickerStyle(.inline)
             Divider()
-            Button("More languages…") {
+            Button("More Languages…") {
                 model.screen = .settings
                 UserDefaults.standard.set(SettingsView.Section.dictation.rawValue, forKey: "settingsSection")
                 model.openMainWindow?()
@@ -272,8 +285,8 @@ private struct HushKeyMenu: View {
         } else {
             Toggle("Show Dictation Bar", isOn: $model.showsFloatingPill)
         }
-        Toggle("Dictation sounds", isOn: $model.playsDictationSounds)
-        Toggle("Mute audio while dictating", isOn: $model.mutesAudioWhileDictating)
+        Toggle("Dictation Sounds", isOn: $model.playsDictationSounds)
+        Toggle("Mute Audio While Dictating", isOn: $model.mutesAudioWhileDictating)
 
         Divider()
 
