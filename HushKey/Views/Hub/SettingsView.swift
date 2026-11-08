@@ -44,12 +44,12 @@ struct SettingsView: View {
     var body: some View {
         // The title and section nav stay put; only the section's content scrolls, so the nav is
         // always in reach.
-        VStack(alignment: .leading, spacing: Theme.s5) {
-            PageHeader(eyebrow: "", title: "Settings", subtitle: "")
+        PageColumn {
+            PageHeader(title: "Settings")
 
             HStack(alignment: .top, spacing: Theme.s6) {
                 SettingsNav(section: $section)
-                    .frame(width: 176)
+                    .frame(width: Theme.settingsNavWidth)
                 ScrollView {
                     VStack(alignment: .leading, spacing: Theme.s6) {
                         switch section {
@@ -64,16 +64,15 @@ struct SettingsView: View {
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.bottom, Theme.s6)
+                    .padding(.bottom, Theme.pageBottom)
                     .id(section)
-                    .transition(.opacity.combined(with: .offset(y: 6)))
+                    .transition(.opacity.combined(with: .offset(y: Theme.figureGap)))
                 }
                 .scrollIndicators(.automatic)
             }
             .animation(Theme.snappy, value: section)
         }
         .frame(maxHeight: .infinity, alignment: .top)
-        .pageLayout()
     }
 }
 
@@ -83,24 +82,24 @@ private struct SettingsNav: View {
     @Namespace private var selection
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: Theme.s1) {
             ForEach(SettingsView.Section.allCases) { item in
                 let selected = item == section
                 Button {
                     withAnimation(Theme.snappy) { section = item }
                 } label: {
                     HStack(spacing: Theme.s3) {
-                        Glyph(item.icon, size: 18)
-                            .frame(width: 20)
+                        Glyph(item.icon, size: Theme.iconL)
+                            .frame(width: Theme.iconColumn)
                             .foregroundStyle(selected || hovered == item ? Theme.ink : Theme.ink2)
                             .hushIconActive(selected)
                             .hushIconHover(hovered == item)
                         Text(item.title)
-                            .font(.system(size: 15, weight: selected ? .medium : .regular))
+                            .font(.hkNav.weight(selected ? .medium : .regular))
                             .foregroundStyle(Theme.ink)
                         Spacer(minLength: 0)
                     }
-                    .padding(.horizontal, Theme.s3 - 2)
+                    .padding(.horizontal, Theme.s3)
                     .frame(height: Theme.sidebarRow)
                     .background {
                         if selected {
@@ -289,7 +288,7 @@ private struct CleanupSettings: View {
             }
             SettingsRow(title: "Vocabulary", detail: "Names, terms and phrases HushKey should know.") {
                 Button("Open") { model.screen = .personalization }
-                    .buttonStyle(SecondaryButtonStyle(minWidth: 96))
+                    .buttonStyle(SecondaryButtonStyle(minWidth: Theme.buttonMinWidth))
             }
         }
 
@@ -372,7 +371,7 @@ private struct InsertionSettings: View {
             SettingsRow(title: "Paste again and undo",
                         detail: "\(insertion.shortcut.label) types the last text again; \(TextInsertionService.undoShortcut.label) undoes it while the field is unchanged.") {
                 Button("Shortcuts") { section = .shortcuts }
-                    .buttonStyle(SecondaryButtonStyle(minWidth: 96))
+                    .buttonStyle(SecondaryButtonStyle(minWidth: Theme.buttonMinWidth))
             }
         }
     }
@@ -483,11 +482,11 @@ private struct PrivacyPromise: View {
     var body: some View {
         HStack(spacing: Theme.s4) {
             Glyph(.shield)
-                .hushIconSize(28)
+                .hushIconSize(Theme.iconXL)
                 .foregroundStyle(Theme.signal)
-                .frame(width: 48, height: 48)
+                .frame(width: Theme.s7, height: Theme.s7)
                 .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: Theme.s1) {
                 Text("Nothing leaves this Mac")
                     .font(.hkTitle3)
                 Text("Speech, motion, transcripts and templates are processed and stored locally. No account, no cloud.")
@@ -496,9 +495,7 @@ private struct PrivacyPromise: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(Theme.s5)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.signalSoft, in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
+        .card(padding: Theme.cardPaddingL, style: .soft)
     }
 }
 
@@ -521,12 +518,12 @@ private struct AboutSettings: View {
                 Text(version)
                     .font(.hkControl.monospacedDigit())
                     .foregroundStyle(Theme.ink2)
-                    .frame(minWidth: 96)
+                    .frame(minWidth: Theme.buttonMinWidth)
             }
             ForEach(documents, id: \.name) { item in
                 SettingsRow(title: item.title, detail: item.detail) {
                     Button("Open") { open(item.name, item.ext) }
-                        .buttonStyle(SecondaryButtonStyle(minWidth: 96))
+                        .buttonStyle(SecondaryButtonStyle(minWidth: Theme.buttonMinWidth))
                 }
             }
         }
@@ -612,7 +609,7 @@ private struct DictationAppProfilesEditor: View {
         }
         ForEach(model.dictationAppProfiles) { profile in
             SettingsRow(title: profile.appName, detail: "\(profile.mode.rawValue), \(profile.bundleIdentifier)") {
-                HStack(spacing: 2) {
+                HStack(spacing: Theme.s0) {
                     Button("Edit", icon: .edit) { load(profile) }
                         .buttonStyle(IconButtonStyle())
                         .help("Edit \(profile.appName) profile")
@@ -644,12 +641,12 @@ private struct DictationAppProfilesEditor: View {
             HStack(spacing: Theme.s2) {
                 MenuPicker(selection: $mode,
                            options: DictationMode.allCases.filter { $0 != .automatic }.map { ($0, $0.rawValue) },
-                           width: 160)
+                           width: Theme.menuWidthCompact)
                 field("Extra names or terms, comma separated", text: $vocabulary)
             }
             DisclosureGroup("Optional app-specific overrides") {
-                VStack(alignment: .leading, spacing: Theme.s3) {
-                    HStack(spacing: Theme.s2) {
+                VStack(alignment: .leading, spacing: Theme.stackGap) {
+                    HStack(spacing: Theme.controlGap) {
                         Menu {
                             Button("Use default language") { languageIdentifier = nil }
                             ForEach(DictationLanguage.onDevice) { language in
@@ -661,7 +658,7 @@ private struct DictationAppProfilesEditor: View {
                         .menuStyle(.button)
                         .buttonStyle(SecondaryButtonStyle())
                         MenuPicker(selection: $cleanupOverride,
-                                   options: CleanupOverride.allCases.map { ($0, $0.rawValue) }, width: 180)
+                                   options: CleanupOverride.allCases.map { ($0, $0.rawValue) }, width: Theme.menuWidthCompact)
                     }
                     Menu {
                         Button("Use global transform selection") { writingStylePresetID = nil }
@@ -678,7 +675,7 @@ private struct DictationAppProfilesEditor: View {
                     if usesAppSnippets {
                         TextEditor(text: $snippets)
                             .font(.hkBody.monospaced())
-                            .frame(minHeight: 70, maxHeight: 110)
+                            .frame(minHeight: Theme.editorShort, maxHeight: Theme.editorShortMax)
                             .editorField()
                         Text("One per line: spoken cue => expanded phrase. An empty list disables global snippets for this app.")
                             .font(.hkCaption)
@@ -689,7 +686,7 @@ private struct DictationAppProfilesEditor: View {
                     if usesAppCorrections {
                         TextEditor(text: $correctionRules)
                             .font(.hkBody.monospaced())
-                            .frame(minHeight: 70, maxHeight: 110)
+                            .frame(minHeight: Theme.editorShort, maxHeight: Theme.editorShortMax)
                             .editorField()
                         Text("One per line: recognized phrase => corrected phrase. The global correction switch remains the master control.")
                             .font(.hkCaption)
@@ -729,7 +726,7 @@ private struct DictationAppProfilesEditor: View {
             .frame(height: Theme.controlHeight)
             .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
-                .strokeBorder(Theme.hairline, lineWidth: 1))
+                .strokeBorder(Theme.hairline, lineWidth: Theme.hairlineWidth))
     }
 
     private func load(_ profile: DictationAppProfile) {

@@ -117,7 +117,7 @@ struct SilentCaptureHUDView: View {
 
     var body: some View {
         HStack(spacing: Theme.s2) {
-            SymbolGlyph(symbol, size: 16)
+            SymbolGlyph(symbol, size: Theme.iconM)
                 .foregroundStyle(tint)
                 .symbolEffect(.pulse, isActive: isCapturing)
             Text(text)
@@ -125,12 +125,12 @@ struct SilentCaptureHUDView: View {
                 .foregroundStyle(isQuiet ? Theme.ink2 : Theme.ink)
                 .lineLimit(1)
         }
-        .padding(.horizontal, Theme.s3 + 2)
-        .frame(height: 32)
+        .padding(.horizontal, Theme.s3)
+        .frame(height: Theme.fieldHeight)
         .background(Theme.sheet, in: Capsule())
-        .overlay(Capsule().strokeBorder(isCapturing ? Theme.signal.opacity(0.6) : Theme.hairline, lineWidth: 1))
+        .overlay(Capsule().strokeBorder(isCapturing ? Theme.signalEdge : Theme.hairline, lineWidth: Theme.hairlineWidth))
         .fixedSize()
-        .padding(4) // room for the border
+        .padding(Theme.s1) // room for the border
         .accessibilityElement(children: .combine)
     }
 

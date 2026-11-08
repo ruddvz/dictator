@@ -29,7 +29,7 @@ struct HubToolbar: View {
             .keyboardShortcut("s", modifiers: [.control, .command])
             .help(collapsed ? "Show sidebar (⌃⌘S)" : "Hide sidebar (⌃⌘S)")
             .accessibilityLabel(collapsed ? "Show sidebar" : "Hide sidebar")
-            .padding(.leading, 85) // clears the window controls; centred 99 pt in
+            .padding(.leading, Theme.trafficLightClearance) // clears the window controls; centred 99 pt in
 
             LiveActivityChip()
 
@@ -101,11 +101,12 @@ struct HubToolbar: View {
         let count = notices.attentionCount
         if count > 0 {
             Text("\(count)")
+                // Badge geometry is the dot's own: it sits on the toolbar glyph's corner.
                 .font(.system(size: 9, weight: .bold).monospacedDigit())
                 .foregroundStyle(Theme.inverseInk)
-                .frame(minWidth: 14, minHeight: 14)
+                .frame(minWidth: Theme.iconS, minHeight: Theme.iconS)
                 .background(notices.hasError ? Theme.danger : Theme.signal, in: Capsule())
-                .overlay(Capsule().strokeBorder(Theme.paper, lineWidth: 1.5))
+                .overlay(Capsule().strokeBorder(Theme.paper, lineWidth: Theme.selectedStroke))
                 .offset(x: 3, y: -1)
                 .transition(.scale(scale: 0.4).combined(with: .opacity))
                 .allowsHitTesting(false)
@@ -137,17 +138,17 @@ private struct LiveActivityChip: View {
                         LiveLevel(model.audio) { level in
                             BreathRibbon(level: level, mode: activity == .finishing ? .working : .live, tint: Theme.signal)
                         }
-                        .frame(width: 30, height: 12)
+                        .frame(width: Theme.s6, height: Theme.iconXS)
                         Text(activity == .meeting ? "Recording meeting"
                              : activity == .finishing ? "Transcribing" : "Listening")
-                            .font(.system(size: 12.5, weight: .medium))
+                            .font(.hkMeta.weight(.medium))
                             .contentTransition(.interpolate)
                     }
                     .foregroundStyle(Theme.ink)
-                    .padding(.horizontal, Theme.s3 - 2)
-                    .frame(height: 24)
+                    .padding(.horizontal, Theme.s3)
+                    .frame(height: Theme.chipHeight)
                     .background(Theme.signalSoft, in: Capsule())
-                    .overlay(Capsule().strokeBorder(Theme.signal.opacity(0.35), lineWidth: 1))
+                    .overlay(Capsule().strokeBorder(Theme.signalEdge, lineWidth: Theme.hairlineWidth))
                 }
                 .buttonStyle(PressStyle(scale: 0.96))
                 .help(activity == .meeting ? "Open Meeting notes" : "Open Home")
@@ -166,11 +167,11 @@ struct ToolbarButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .labelStyle(.iconOnly)
-            .font(.system(size: 15, weight: .regular))
+            .font(.hkNav)
             .foregroundStyle(hovering || active ? Theme.ink : Theme.ink2)
-            .hushIconSize(18)
+            .hushIconSize(Theme.iconL)
             .hushIconHover(hovering)
-            .frame(width: 28, height: 28)
+            .frame(width: Theme.toolbarButton, height: Theme.toolbarButton)
             .background(hovering || active ? Theme.hover : .clear,
                         in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
             .contentShape(Rectangle())
@@ -202,7 +203,7 @@ struct ProfileAvatar: View {
             .foregroundStyle(Theme.ink)
             .frame(width: size, height: size)
             .background(Theme.well, in: Circle())
-            .overlay(Circle().strokeBorder(Theme.hairline, lineWidth: 1))
+            .overlay(Circle().strokeBorder(Theme.hairline, lineWidth: Theme.hairlineWidth))
     }
 }
 
@@ -318,9 +319,9 @@ private struct NoticesPopover: View {
 
             if notices.isEmpty {
                 VStack(spacing: Theme.s2) {
-                    Glyph(.check, size: 20)
+                    Glyph(.check, size: Theme.iconL)
                         .foregroundStyle(Theme.signal)
-                    Text("All quiet").font(.display(20))
+                    Text("All quiet").font(.hkCardTitle)
                     Text("Nothing needs you right now.")
                         .font(.hkCallout)
                         .foregroundStyle(Theme.ink2)
@@ -330,27 +331,27 @@ private struct NoticesPopover: View {
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(notices.enumerated()), id: \.element.id) { index, notice in
-                        if index > 0 { RowDivider().padding(.leading, 56) }
-                        row(notice).reveal(index, distance: 6)
+                        if index > 0 { RowDivider().padding(.leading, Theme.s4 + Theme.iconTile + Theme.s3) }
+                        row(notice).reveal(index, distance: Theme.figureGap)
                     }
                 }
                 .padding(.vertical, Theme.s1)
             }
         }
-        .frame(width: 340)
+        .frame(width: Theme.popoverWidth)
         .background(Theme.sheet)
     }
 
     private func row(_ notice: Notice) -> some View {
         HStack(alignment: .top, spacing: Theme.s3) {
-            Glyph(notice.icon, size: 16, active: notice.kind == .milestone)
+            Glyph(notice.icon, size: Theme.iconM, active: notice.kind == .milestone)
                 .foregroundStyle(tint(notice.kind))
-                .frame(width: 30, height: 30)
+                .frame(width: Theme.iconTile, height: Theme.iconTile)
                 .background(tint(notice.kind).opacity(0.12), in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
-            VStack(alignment: .leading, spacing: 3) {
-                Text(notice.title).font(.system(size: 14, weight: .semibold))
+            VStack(alignment: .leading, spacing: Theme.s0) {
+                Text(notice.title).font(.hkSubhead.weight(.semibold))
                 Text(notice.detail)
-                    .font(.system(size: 13))
+                    .font(.hkCaption)
                     .foregroundStyle(Theme.ink2)
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
@@ -360,9 +361,9 @@ private struct NoticesPopover: View {
                         dismiss()
                     }
                     .buttonStyle(.plain)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.hkCaption.weight(.semibold))
                     .foregroundStyle(Theme.signal)
-                    .padding(.top, 2)
+                    .padding(.top, Theme.s0)
                 }
             }
             Spacer(minLength: 0)
@@ -393,10 +394,10 @@ private struct ProfilePopover: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: Theme.s3) {
                 ProfileAvatar(size: 44)
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: Theme.s0) {
                     Text(ProfileAvatar.fullName).font(.hkHeadline)
                     Label("Local profile, kept on this Mac", icon: .lock)
-                        .hushIconSize(12)
+                        .hushIconSize(Theme.iconXS)
                         .font(.hkMeta)
                         .foregroundStyle(Theme.ink2)
                 }
@@ -423,7 +424,7 @@ private struct ProfilePopover: View {
 
             RowDivider()
 
-            VStack(spacing: 2) {
+            VStack(spacing: Theme.s0) {
                 link("Vocabulary", .vocabulary) { $0.screen = .personalization }
                 link("Insights", .insights) { $0.screen = .insights }
                 link("Keyboard shortcuts", .keyboard) { _ in showShortcuts() }
@@ -437,13 +438,13 @@ private struct ProfilePopover: View {
             }
             .padding(Theme.s2)
         }
-        .frame(width: 300)
+        .frame(width: Theme.popoverWidth)
         .background(Theme.sheet)
     }
 
     private func stat(_ value: String, _ label: String) -> some View {
-        VStack(spacing: 2) {
-            Text(value).font(.display(18)).monospacedDigit()
+        VStack(spacing: Theme.s0) {
+            Text(value).font(.hkDisplayS).monospacedDigit()
             Text(label).font(.hkMeta).foregroundStyle(Theme.ink2)
         }
         .frame(maxWidth: .infinity)
@@ -455,8 +456,8 @@ private struct ProfilePopover: View {
             withAnimation(Theme.snappy) { perform(model) }
         } label: {
             Label(title, icon: icon)
-                .font(.system(size: 14))
-                .hushIconSize(16)
+                .font(.hkSubhead)
+                .hushIconSize(Theme.iconM)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .buttonStyle(PopoverRowStyle())
@@ -471,9 +472,10 @@ struct PopoverRowStyle: ButtonStyle {
         configuration.label
             .foregroundStyle(Theme.ink)
             .hushIconHover(hovering)
-            .padding(.horizontal, Theme.s3 - 2)
-            .frame(height: 32)
-            .background(hovering ? Theme.hover : .clear, in: RoundedRectangle(cornerRadius: Theme.r3 - 2, style: .continuous))
+            .padding(.horizontal, Theme.s3)
+            .frame(height: Theme.fieldHeight)
+            .background(hovering ? Theme.hover : .clear,
+                        in: RoundedRectangle(cornerRadius: Theme.inner(Theme.r3, padding: Theme.s0), style: .continuous))
             .contentShape(Rectangle())
             .onHover { hovering = $0 }
             .opacity(configuration.isPressed ? 0.7 : 1)
@@ -527,7 +529,7 @@ struct KeyboardShortcutsSheet: View {
         VStack(alignment: .leading, spacing: Theme.s5) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: Theme.s1) {
-                    Text("Keyboard shortcuts").font(.display(24))
+                    Text("Keyboard shortcuts").font(.hkSheetTitle)
                     Text("Change them in Settings → Shortcuts.").font(.hkCaption).foregroundStyle(Theme.ink2)
                 }
                 Spacer()
@@ -538,12 +540,12 @@ struct KeyboardShortcutsSheet: View {
             VStack(spacing: 0) {
                 ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
                     HStack(spacing: Theme.s3) {
-                        Glyph(row.icon, size: 18)
+                        Glyph(row.icon, size: Theme.iconL)
                             .foregroundStyle(Theme.ink2)
-                            .frame(width: 22)
-                        VStack(alignment: .leading, spacing: 2) {
+                            .frame(width: Theme.iconColumn)
+                        VStack(alignment: .leading, spacing: Theme.s0) {
                             Text(row.title).font(.hkRowTitle)
-                            Text(row.detail).font(.system(size: 13)).foregroundStyle(Theme.ink2)
+                            Text(row.detail).font(.hkCaption).foregroundStyle(Theme.ink2)
                         }
                         Spacer()
                         HStack(spacing: Theme.s1) {
@@ -554,9 +556,9 @@ struct KeyboardShortcutsSheet: View {
                         }
                     }
                     .padding(.vertical, Theme.s3)
-                    .padding(.horizontal, Theme.s4)
+                    .padding(.horizontal, Theme.rowPaddingH)
                     .overlay(alignment: .top) { if index > 0 { RowDivider() } }
-                    .reveal(index, distance: 6)
+                    .reveal(index, distance: Theme.figureGap)
                 }
             }
             .background(Theme.well, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
@@ -570,8 +572,8 @@ struct KeyboardShortcutsSheet: View {
                 .buttonStyle(SecondaryButtonStyle())
             }
         }
-        .padding(Theme.s5)
-        .frame(width: 520)
+        .padding(Theme.cardPaddingL)
+        .frame(width: Theme.sheetWidth)
         .background(Theme.sheet)
     }
 }

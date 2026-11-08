@@ -20,12 +20,12 @@ struct EvaluateView: View {
     var body: some View {
         @Bindable var model = model
         ScrollView {
-            VStack(alignment: .leading, spacing: Theme.s5) {
-                PageHeader(eyebrow: "", title: "Evaluate",
+            PageColumn {
+                PageHeader(title: "Evaluate",
                            subtitle: "Does the motion really tell your words apart? Tested against chance and held-out sessions.") {
                     MenuPicker(selection: $model.trainingCondition,
                                options: SessionRecorder.Condition.allCases.map { ($0, $0.rawValue) },
-                               width: 176)
+                               width: Theme.menuWidthCompact)
                 }
                 LabProgress()
 
@@ -45,7 +45,6 @@ struct EvaluateView: View {
                 evaluationControls
                 readinessCard
             }
-            .pageLayout()
         }
     }
 
@@ -104,7 +103,7 @@ private struct ReadinessRow: View {
     var body: some View {
         SettingsRow(title: title, detail: detail) {
             Glyph(complete ? .checkCircle : .record)
-                .hushIconSize(25)
+                .hushIconSize(Theme.iconXL)
                 .foregroundStyle(complete ? Theme.signal : Theme.ink3)
                 .accessibilityLabel(complete ? "Done" : "Not yet")
         }
@@ -123,16 +122,16 @@ private struct FeatureToggle: View {
         Button {
             if on { model.featureSet.remove(option) } else { model.featureSet.insert(option) }
         } label: {
-            HStack(spacing: 5) {
-                if on { Glyph(.check).hushIconSize(12) }
+            HStack(spacing: Theme.s1) {
+                if on { Glyph(.check).hushIconSize(Theme.iconXS) }
                 Text(title)
             }
-            .font(.system(size: 13, weight: .medium))
+            .font(.hkCaption.weight(.medium))
             .foregroundStyle(on ? Theme.signal : Theme.ink2)
-            .padding(.horizontal, Theme.s3 - 2)
-            .frame(height: 30)
+            .padding(.horizontal, Theme.s3)
+            .frame(height: Theme.fieldHeight)
             .background(on ? Theme.signalSoft : Theme.sheet, in: Capsule())
-            .overlay(Capsule().strokeBorder(on ? Theme.signal.opacity(0.5) : Theme.hairline, lineWidth: 1))
+            .overlay(Capsule().strokeBorder(on ? Theme.signalEdge : Theme.hairline, lineWidth: Theme.hairlineWidth))
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -148,7 +147,7 @@ private struct EvaluationResultView: View {
         VStack(alignment: .leading, spacing: Theme.s4) {
                 HStack(spacing: Theme.s3) {
                     Glyph(passesAllChecks ? .checkCircle : .warning)
-                        .hushIconSize(28)
+                        .hushIconSize(Theme.iconXL)
                         .foregroundStyle(passesAllChecks ? Theme.signal : Theme.finishing)
                     Text(verdict)
                         .font(.hkRowTitle)
@@ -175,13 +174,13 @@ private struct EvaluationResultView: View {
                 }
                 DisclosureGroup("Confusion matrix, \(result.templateCount) examples") {
                     confusionMatrix
-                        .padding(.top, 10)
+                        .padding(.top, Theme.s2)
                 }
                 .font(.hkCallout.weight(.medium))
                 .tint(Theme.ink2)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(Theme.s6 - 4)
+            .padding(Theme.cardPaddingL)
             .background(passesAllChecks ? Theme.signalSoft : Theme.well,
                         in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
     }
@@ -200,7 +199,7 @@ private struct EvaluationResultView: View {
                         let count = result.confusion[row][col]
                         Text("\(count)")
                             .font(.hkCaption.monospacedDigit())
-                            .frame(minWidth: 36, minHeight: 24)
+                            .frame(minWidth: Theme.controlHeight, minHeight: Theme.chipHeight)
                             .background((row == col ? Theme.success : Theme.danger)
                                 .opacity(Double(count) / Double(total) * 0.7))
                     }
@@ -238,10 +237,10 @@ private struct EvaluationResultView: View {
     }
 
     private func metric(_ title: String, _ value: String, highlight: Bool = false) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: Theme.s0) {
             Text(title).font(.hkCaption).foregroundStyle(Theme.ink2)
             Text(value)
-                .font(highlight ? .display(28).monospacedDigit() : .display(22, weight: .medium).monospacedDigit())
+                .font(highlight ? .hkFigureM.monospacedDigit() : .hkTitle2.monospacedDigit())
                 .foregroundStyle(highlight ? Theme.ink : Theme.ink2)
         }
     }

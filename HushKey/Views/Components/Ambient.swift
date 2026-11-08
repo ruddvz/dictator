@@ -17,6 +17,10 @@ struct BreathRibbon: View {
     var frameRate: Double = 120
     /// Stops the clock, for example while the window is hidden.
     var paused = false
+    /// Seconds added to the clock, so ribbons drawn together breathe out of step (Chorus).
+    var phase: Double = 0
+    /// A feathered halo in graded steps instead of one flat band, for large ribbons on a page.
+    var softHalo = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -41,9 +45,10 @@ struct BreathRibbon: View {
             Canvas { graphics, size in
                 let energy = mode == .live ? advance(to: time) : 0
                 // Reduce Motion: nothing travels or pulses; the live voice level still shapes the line.
-                let flow = reduceMotion ? 0 : time
+                let flow = reduceMotion ? phase : time + phase
                 let fade = reduceMotion ? 0.78 : 1
-                Self.draw(in: graphics, size: size, energy: energy, mode: mode, time: flow, tint: tint, opacity: fade)
+                Self.draw(in: graphics, size: size, energy: energy, mode: mode, time: flow, tint: tint,
+                          opacity: fade, softHalo: softHalo)
             }
         }
         .onChange(of: level) { _, newValue in
@@ -54,6 +59,11 @@ struct BreathRibbon: View {
             if newMode == .rest {
                 smoother.target = 0
             }
+        }
+        // Already live when it appears (Home opened mid-dictation): start from the current level.
+        .onAppear {
+            guard mode == .live else { return }
+            smoother.target = Double(smoother.envelope.amount(for: level, at: Date.timeIntervalSinceReferenceDate))
         }
         .accessibilityHidden(true)
     }
@@ -114,13 +124,21 @@ struct BreathRibbon: View {
     }
 
     static func draw(in graphics: GraphicsContext, size: CGSize, energy: Double, mode: Mode,
-                     time: TimeInterval, tint: Color, opacity: Double = 1) {
+                     time: TimeInterval, tint: Color, opacity: Double = 1, softHalo: Bool = false) {
         let tint = tint.flattened(in: graphics.environment)
         let midY = size.height / 2
         let fill = GraphicsContext.Shading.linearGradient(
             Gradient(colors: [tint.opacity(0.45 * opacity), tint.opacity(opacity), tint.opacity(0.45 * opacity)]),
             startPoint: CGPoint(x: 0, y: midY), endPoint: CGPoint(x: size.width, y: midY))
-        if mode == .live || mode == .working {
+        if softHalo, mode != .rest {
+            // Widening veils that follow the ribbon's own shape, each faint: together they feather
+            // the edge into the field instead of drawing a second, harder band.
+            let veil = 0.035 + 0.06 * energy
+            for pad in [0.42, 0.3, 0.2, 0.12, 0.06] {
+                graphics.fill(path(in: size, energy: energy, mode: mode, time: time, pad: pad),
+                              with: .color(tint.opacity(veil * opacity)))
+            }
+        } else if mode == .live || mode == .working {
             // A soft halo around the ribbon, brighter with the voice, so quiet speech still glows.
             let halo = 0.1 + 0.2 * energy
             graphics.fill(path(in: size, energy: energy, mode: mode, time: time, spread: 1.8),
@@ -130,7 +148,10 @@ struct BreathRibbon: View {
     }
 
     /// The ribbon's outline: along the top edge, back along the bottom, smoothed between samples.
-    static func path(in size: CGSize, energy: Double, mode: Mode, time: TimeInterval, spread: Double = 1) -> Path {
+    /// `spread` scales the thickness (the pill's halo); `pad` adds a margin, as a fraction of half
+    /// the height, that keeps the ribbon's shape (the page ribbons' feathered veils).
+    static func path(in size: CGSize, energy: Double, mode: Mode, time: TimeInterval,
+                     spread: Double = 1, pad: Double = 0) -> Path {
         let samples = max(16, Int(size.width / 3))
         let half = size.height / 2
         var top: [CGPoint] = [], bottom: [CGPoint] = []
@@ -140,7 +161,9 @@ struct BreathRibbon: View {
             let x = Double(index) / Double(samples)
             let centre = half + CGFloat(spine(at: x, energy: energy, time: time)) * half
             let taper = CGFloat(sqrt(max(0, sin(.pi * x))))
-            let edge = max(0.75 * taper, CGFloat(min(1, thickness(at: x, energy: energy, mode: mode, time: time) * spread)) * half * 0.86)
+            let body = CGFloat(min(1, thickness(at: x, energy: energy, mode: mode, time: time) * spread)) * half * 0.86
+            let margin = CGFloat(pad) * half * CGFloat(sin(.pi * x))
+            let edge = min(half, max(0.75 * taper, body + margin))
             let px = CGFloat(x) * size.width
             top.append(CGPoint(x: px, y: centre - edge))
             bottom.append(CGPoint(x: px, y: centre + edge))
@@ -177,15 +200,18 @@ struct AmbientField: NSViewRepresentable {
     var focus = UnitPoint(x: 0.78, y: 0.5)
     var paused = false
     /// Draws the resting `BreathRibbon` at the focus in this colour. Nil while a live ribbon is
-    /// shown on top instead.
+    /// shown on top instead; the resting one then fades out under it.
     var restingRibbon: Color?
+    /// 0…1: how brightly the voice lights the field around the ribbon (the mic level while you
+    /// speak, a steady glow while HushKey works, 0 at rest, where it only breathes).
+    var bloom: Double = 0
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func makeNSView(context: Context) -> AmbientFieldView { AmbientFieldView() }
 
     func updateNSView(_ view: AmbientFieldView, context: Context) {
-        view.configure(focus: focus, ribbon: restingRibbon.map { NSColor($0) },
+        view.configure(focus: focus, ribbon: restingRibbon.map { NSColor($0) }, bloom: bloom,
                        animated: !reduceMotion, paused: paused)
     }
 
@@ -217,6 +243,15 @@ struct AmbientField: NSViewRepresentable {
     }
 
     static let lineCount = 7
+
+    /// The light the voice casts: an ellipse this many ribbon-sizes across, centred on the ribbon.
+    static let bloomSpread = CGSize(width: 2.2, height: 3.4)
+    /// Bloom opacity at rest (it breathes with the ribbon) and the extra a full voice adds.
+    static let bloomRest: Float = 0.24, bloomVoice: Float = 0.6
+    /// The faint lines fade to this behind the words on the left, so the type sits on calm ground.
+    static let linesUnderWords: Float = 0.3
+    /// How much lighter the top of the field is: a sheen, as if lit from above.
+    static let sheen: CGFloat = 0.06
 
     /// One of the seven faint ribbons that pinch toward the focus, like sound gathering at the voice.
     static func line(_ line: Int, in size: CGSize, focus: UnitPoint, time: TimeInterval) -> CGPath {
@@ -257,11 +292,18 @@ final class AmbientFieldView: NSView {
     private let lineLayers = (0..<AmbientField.lineCount).map { _ in CAShapeLayer() }
     private let ribbonLayer = CAGradientLayer()
     private let ribbonMask = CAShapeLayer()
+    private let linesHost = CALayer()
+    private let linesMask = CAGradientLayer()
+    private let bloomHost = CALayer()
+    private let bloomLayer = CAGradientLayer()
+    private let sheenLayer = CAGradientLayer()
     /// Our own top-down root, so shapes use SwiftUI's coordinates and pausing leaves AppKit's layer alone.
     private let root = CALayer()
 
     private var focus = UnitPoint(x: 0.78, y: 0.5)
     private var ribbonColor: NSColor?
+    private var ribbonShown = false
+    private var bloom: Double = -1
     private var animated = true
     private var paused = false
     private var builtSize: CGSize = .zero
@@ -279,23 +321,66 @@ final class AmbientFieldView: NSView {
             glow.endPoint = CGPoint(x: 1, y: 1)
             root.addSublayer(glow)
         }
-        lineLayers.forEach { root.addSublayer($0) }
+        // Lines sit in a host masked lighter on the left, behind the words.
+        linesMask.startPoint = CGPoint(x: 0, y: 0.5)
+        linesMask.endPoint = CGPoint(x: 1, y: 0.5)
+        let under = NSColor.black.withAlphaComponent(CGFloat(AmbientField.linesUnderWords)).cgColor
+        linesMask.colors = [under, under, NSColor.black.cgColor]
+        linesMask.locations = [0, 0.3, 0.6]
+        linesHost.mask = linesMask
+        lineLayers.forEach { linesHost.addSublayer($0) }
+        root.addSublayer(linesHost)
+        bloomLayer.type = .radial
+        bloomLayer.startPoint = CGPoint(x: 0.5, y: 0.5)
+        bloomLayer.endPoint = CGPoint(x: 1, y: 1)
+        bloomHost.addSublayer(bloomLayer)
+        root.addSublayer(bloomHost)
+        sheenLayer.startPoint = CGPoint(x: 0.5, y: 0)
+        sheenLayer.endPoint = CGPoint(x: 0.5, y: 0.5)
+        root.addSublayer(sheenLayer)
         ribbonLayer.startPoint = CGPoint(x: 0, y: 0.5)
         ribbonLayer.endPoint = CGPoint(x: 1, y: 0.5)
         ribbonLayer.mask = ribbonMask
+        ribbonLayer.opacity = 0
         root.addSublayer(ribbonLayer)
     }
 
     required init?(coder: NSCoder) { nil }
 
-    func configure(focus: UnitPoint, ribbon: NSColor?, animated: Bool, paused: Bool) {
+    func configure(focus: UnitPoint, ribbon: NSColor?, bloom: Double, animated: Bool, paused: Bool) {
         let rebuild = focus != self.focus || animated != builtAnimated
         self.focus = focus
-        ribbonColor = ribbon
         self.animated = animated
-        applyColors()
+        if let ribbon, ribbon != ribbonColor {
+            ribbonColor = ribbon
+            applyColors()
+        }
+        setRibbonShown(ribbon != nil)
+        setBloom(bloom)
         if rebuild { builtSize = .zero; needsLayout = true }
         setPaused(paused)
+    }
+
+    /// The resting ribbon hands over to the live one (and back) with a short crossfade, not a cut.
+    private func setRibbonShown(_ shown: Bool) {
+        guard shown != ribbonShown else { return }
+        ribbonShown = shown
+        CATransaction.begin()
+        CATransaction.setAnimationDuration(animated ? Motion.handover : 0)
+        ribbonLayer.opacity = shown ? 1 : 0
+        CATransaction.commit()
+    }
+
+    /// Eased toward the voice: quick enough to follow syllables, never a flicker.
+    private func setBloom(_ value: Double) {
+        let value = min(1, max(0, value))
+        guard abs(value - bloom) > 0.01 else { return }
+        bloom = value
+        CATransaction.begin()
+        CATransaction.setAnimationDuration(animated ? 0.18 : 0)
+        CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeOut))
+        bloomHost.opacity = AmbientField.bloomRest + AmbientField.bloomVoice * Float(value)
+        CATransaction.commit()
     }
 
     override func layout() {
@@ -327,8 +412,12 @@ final class AmbientFieldView: NSView {
                 ribbonLayer.colors = [ribbonColor.withAlphaComponent(0.45).cgColor, ribbonColor.cgColor,
                                       ribbonColor.withAlphaComponent(0.45).cgColor]
             }
+            let glow = NSColor(Theme.heroGlow)
+            bloomLayer.colors = [glow.cgColor, glow.withAlphaComponent(0.35).cgColor, glow.withAlphaComponent(0).cgColor]
+            bloomLayer.locations = [0, 0.35, 1]
+            let lit = NSColor(Theme.heroInk)
+            sheenLayer.colors = [lit.withAlphaComponent(AmbientField.sheen).cgColor, lit.withAlphaComponent(0).cgColor]
         }
-        ribbonLayer.isHidden = ribbonColor == nil
     }
 
     /// Lays out every layer at its still frame and, unless motion is off, adds looping keyframes.
@@ -339,6 +428,11 @@ final class AmbientFieldView: NSView {
         CATransaction.setDisableActions(true)
         defer { CATransaction.commit() }
         root.frame = CGRect(origin: .zero, size: size)
+        applyColors()
+        linesHost.frame = root.bounds
+        linesMask.frame = root.bounds
+        sheenLayer.frame = root.bounds
+        bloomHost.frame = root.bounds
         let still = AmbientField.stillTime
 
         for (glow, spec) in zip(glowLayers, AmbientField.glows) {
@@ -366,6 +460,17 @@ final class AmbientFieldView: NSView {
         }
 
         let rect = AmbientField.ribbonRect(in: size, focus: focus)
+        // The bloom breathes with the resting ribbon; the voice raises the host's opacity on top.
+        let spread = AmbientField.bloomSpread
+        bloomLayer.bounds = CGRect(x: 0, y: 0, width: rect.width * spread.width, height: rect.height * spread.height)
+        bloomLayer.position = CGPoint(x: rect.midX, y: rect.midY)
+        bloomLayer.removeAllAnimations()
+        bloomLayer.opacity = 0.85
+        if animated {
+            bloomLayer.add(loop(keyPath: "opacity", duration: BreathRibbon.restLoop, frames: 40) {
+                NSNumber(value: 0.7 + 0.3 * (0.5 + 0.5 * sin($0 * 2 * .pi / BreathRibbon.restLoop)))
+            }, forKey: "breath")
+        }
         ribbonLayer.frame = rect
         ribbonMask.frame = CGRect(origin: .zero, size: rect.size)
         ribbonMask.removeAllAnimations()

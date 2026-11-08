@@ -1,6 +1,6 @@
 # HushKey design system
 
-_Fog & sage (replaced Warm editorial, which read too close to Wispr Flow). Layout measured against Wispr Flow 1.6 on 2026-11-01. Source of truth: `HushKey/Views/Theme.swift` and `HushKey/Views/Components.swift`._
+_Fog & sage (replaced Warm editorial, which read too close to Wispr Flow). Layout measured against Wispr Flow 1.6 on 2026-11-01; tokens completed 2026-11-08. Source of truth: `HushKey/Views/Theme/Theme.swift` and `HushKey/Views/Components/Components.swift`._
 
 The codes follow the dimensional-drawing convention (S spacing, R radius, H/I sizes, W width) so a spec sheet of any component can reference them directly. Values are points.
 
@@ -10,43 +10,94 @@ A survey of the views before the redesign found 18 distinct padding values, 18 s
 
 ## Spacing
 
+A 4-pt grid. Views use the role tokens below the steps, so a page can't pick its own gap.
+
 | Code | Token | Value | Use |
 | --- | --- | --- | --- |
-| S1 | `Theme.s1` | 4 | icon ↔ label in tight chips |
-| S2 | `Theme.s2` | 8 | sheet inset from window, row gaps, control gaps |
-| S3 | `Theme.s3` | 12 | card padding (grouped), sidebar row inset |
-| S4 | `Theme.s4` | 16 | card padding (primary), column gap |
-| S5 | `Theme.s5` | 24 | section gap on a page, banner padding |
-| S6 | `Theme.s6` | 32 | page side and bottom margin |
+| S0 | `Theme.s0` | 2 | hairline-thin nudges: row label ↔ detail, icon-button clusters |
+| S1 | `Theme.s1` | 4 | icon ↔ label in tight chips, small offsets |
+| S2 | `Theme.s2` | 8 | sheet inset from window, control gaps |
+| S3 | `Theme.s3` | 12 | section title → content, items in a stack, chip padding |
+| S4 | `Theme.s4` | 16 | card padding, row padding, grid gutter |
+| S5 | `Theme.s5` | 24 | between sections on a page, roomy card padding |
+| S6 | `Theme.s6` | 32 | page header → first section, page bottom margin |
 | S7 | `Theme.s7` | 48 | page top margin |
+| S8 | `Theme.s8` | 64 | large plots and label columns |
+
+| Role token | Value | Use |
+| --- | --- | --- |
+| `pageGutter` | 40 | page column inset from the sheet's sides (`pageLayout`) |
+| `pageTop` / `pageBottom` | S7 / S6 | sheet top → page title; below the last section |
+| `headerGap` | S6 | page header → first section (owned by `PageHeader`) |
+| `sectionGap` | S5 | between sections (owned by `PageColumn`) |
+| `sectionTitleGap` | S3 | section title → its content (`PageSection`, `SettingsGroup`) |
+| `titleGap` | S2 | title → subtitle in `PageHeader` and `LabHero` |
+| `stackGap` | S3 | items inside a card or section |
+| `gridGap` | S4 | gutter between cards in a `CardGrid`, both ways |
+| `cardPadding` / `cardPaddingL` | S4 / S5 | inside a card / roomy cards (insights, banners, sheets) |
+| `rowPaddingV` / `rowPaddingH` | S4 / S4 | settings, group and list rows |
+| `controlGap` / `iconGap` | S2 / S2 | buttons in a row / glyph ↔ label |
+| `figureGap` | 6 | figure ↔ its unit label |
+| `leading` | 3 | extra line spacing for reading text and transcripts |
 
 ## Radius
 
 | Code | Token | Value | Use |
 | --- | --- | --- | --- |
-| R1 | `Theme.r1` | 16 | page sheet |
-| R2 | `Theme.r2` | 12 | cards, lists, checklist |
-| R3 | `Theme.r3` | 8 | sidebar rows, icon buttons |
-| R4 | `Capsule` | h ÷ 2 | buttons, chips, search, pill |
+| R1 | `Theme.r1` | 16 | page sheet only |
+| R2 | `Theme.r2` | 12 | cards, lists, option cards, drop zone |
+| R3 | `Theme.r3` | 8 | rows inside cards, sidebar rows, icon buttons, bars |
+| R4 | `Theme.r4` | 4 | small marks and pill key caps |
+| RC | `Theme.controlRadius` | 10 | buttons, menus, fields |
+| — | `Capsule` | h ÷ 2 | chips, pill, step strip |
 
-Nested corners: a card inside the sheet sits at least S4 from the sheet edge, so `R2 ≤ R1 − S2` holds and corners never look pinched.
+Nested corners are concentric: `Theme.inner(outer, padding:)` gives `outer − padding`, never under R4. Cards (R2) sit at least S4 inside the sheet (R1), so their corners never pinch.
+
+## Strokes
+
+| Token | Value | Use |
+| --- | --- | --- |
+| `hairlineWidth` | 1 | borders, dividers (`RowDivider`, `SectionRule`) |
+| `selectedStroke` | 1.5 | selected cards, focused fields, drop zone |
+| `ruleWidth` | 2 | tab underline, quote rule, accent bars |
+| `dash` | [6, 4] | dashed drop zone and suggestion chips |
 
 ## Size
 
 | Code | Token | Value | Use |
 | --- | --- | --- | --- |
+| H1 | `Theme.controlHeight` | 36 | buttons, menus, form fields (macOS large) |
+| H2 | `Theme.fieldHeight` | 32 | inline search fields, `IconButtonStyle`, step strip |
+| H3 | `Theme.toolbarButton` | 28 | toolbar icon controls |
+| H4 | `Theme.chipHeight` | 24 | chips, compact menus, category bars |
+| H5 | `Theme.sidebarRow` | 36 | sidebar and settings-nav rows, 4 pt apart |
+| H6 | `Theme.listRow` | 52 | minimum list row |
+| H7 | `Theme.rowMinHeight` | 64 | settings row: label + description + control |
+| H8 | `Theme.optionCardHeight` | 136 | `SelectableCard` minimum |
+| — | `editorShort` / `editorMedium` / `editorTall` | 72 / 140 / 220 | inline editors' minimum heights |
+| — | `editorShortMax` / `editorTallMax` | 120 / 260 | where editors stop growing |
+| — | `progressHeight` / `dot` | 4 / 8 | thin progress tracks / status dots |
+| I1 | `Theme.iconXS` | 12 | chevrons, tiny checks |
+| I2 | `Theme.iconS` | 14 | chips, meta lines, arrows |
+| I3 | `Theme.iconM` | 16 | buttons, inline glyphs, the selected check |
+| I4 | `Theme.iconL` | 18 | sidebar, nav, option cards, notices |
+| I5 | `Theme.iconXL` | 28 | empty states, feature glyphs, brand mark |
+| — | `iconColumn` / `iconTile` | 20 / 32 | fixed glyph slot so labels line up / tinted notice tile |
 | W | `Theme.pageWidth` | 800 | page column, left edge shared with home (see `pageLayout`) |
-| WH | `Theme.homeWidth` | 1040 | Dictation home, Train, Meeting notes (main column + 248 side card) |
+| WH | `Theme.homeWidth` | 1040 | Home, Insights, Train, Meeting notes |
+| WC | `Theme.sideColumn` | 280 | side list beside a home-width column (notes, Train words) |
+| WS | `Theme.sidebarWidth` | 216 | fixed sidebar (68 collapsed) |
+| WN | `Theme.settingsNavWidth` | 176 | settings section nav |
+| WM | `Theme.menuWidth` / `menuWidthCompact` | 196 / 160 | menus in settings rows / menus sharing a line |
+| WB | `Theme.buttonMinWidth` | 96 | trailing buttons in a settings column |
+| WD | `Theme.detailWidth` | 440 | settings-row label + detail column |
+| WR | `Theme.readingWidth` | 560 | subtitles and paragraphs |
+| WE | `Theme.noteWidth` | 384 | centred empty-state messages |
+| WT | `Theme.sheetWidth` / `sheetWidthWide` | 520 / 620 | editor sheets / grid sheets (languages) |
+| WP | `Theme.popoverWidth` | 320 | toolbar popovers |
+| — | `searchWidth` / `timeColumn` / `valueWidth` / `meterWidth` | 180 / 80 / 48 / 120 | search text, history time column, numeric readouts, level meters |
 
 `pageLayout` centres a 1040 frame and anchors each page's column to its left edge, so a page title sits at the same x on every screen. Narrower pages end earlier on the right instead of shifting left and right.
-| WS | `Theme.sidebarWidth` | 216 | fixed sidebar |
-| H1 | `Theme.sidebarRow` | 36 | sidebar and settings-nav rows, 4 pt apart |
-| H2 | `Theme.controlHeight` | 36 | buttons, menus, search fields |
-| H3 | `Theme.listRow` | 52 | minimum list row |
-| H4 | settings row | ≥ 64 | label + description + control, 18 pt vertical padding |
-| WM | `Theme.menuWidth` | 196 | right-aligned menus in settings rows |
-| RC | `Theme.controlRadius` | 10 | buttons, menus, fields |
-| I1 | `Theme.icon` | 18 | inline icons |
 
 ## Wispr Flow measurements
 
@@ -57,16 +108,16 @@ Measured from Wispr Flow 1.6 (Electron) in a 1350 × 850 pt window with backgrou
 | Sidebar | 216 wide; rows 192 × 36 at x 12, 40 pitch; icon 18; label ~15.5 regular | 216; rows 36, 4 gap; icon 16 regular; label 15 regular, semibold when selected |
 | Content sheet | Inset 8 from window edge, radius ~16, starts below a 45 pt toolbar strip | Inset 8, `r1` 16 |
 | Page column | 800 centered (Dictionary, Snippets, Transforms); home spans ~1040 with 40 margins | `pageWidth` 800; `homeWidth` 1040 |
-| Page title | 28 semibold sans; ~48 below the sheet top; actions right-aligned on the same line | `hkTitle1` 28 rounded semibold; `PageHeader` takes trailing actions |
+| Page title | 28 semibold sans; ~48 below the sheet top; actions right-aligned on the same line | `hkTitle1` 28 serif, `pageTop` 48 below the sheet top; `PageHeader` centres trailing actions on the title line; first section `headerGap` 32 below |
 | Buttons | 36 high, radius ~10, 16 horizontal padding, 15–16 medium; primary filled dark, secondary neutral fill | 36, `controlRadius` 10, 16 padding, `hkControl` 15 medium; primary sage, secondary `hover` fill, destructive red text |
 | Tabs | Text tabs 16, 2 pt underline under the selected one, hairline under the bar | `UnderlineTabs` 15, 2 pt ink underline (matched geometry) |
 | Hero banner | ~895 × 208 dark card, radius 16, blurred photo, 32 serif title, white Start now button | `HeroCard`: `heroBase` panel (dark in both modes) with `AmbientField` and a `BreathRibbon` at 78 % across; radius `r2`, `s5` padding, `hkTitle1` title whose last words are `heroGlow`, `heroInk2` detail, `heroInk` button with `heroBase` text; min 200 high, matches the stats card |
 | Lists | Outlined container, radius 12, 1 pt hairline, rows 52–53, text 16, 16 padding | `ListGroup` / `ListRow`, `r2` 12, rows ≥ 52, `hkBody` 16, 16 padding, hover fill + actions |
-| History row | Time column 82 + 16 gap, time 14 gray, text 16 on 20 line | Same: time 14 `ink2`, 82 wide; text 16, 3 pt line spacing |
-| Stats card | 248 wide, 24 padding, numbers 28, labels 16 | 248, 24 padding, `display(28)`, labels 15 |
+| History row | Time column 82 + 16 gap, time 14 gray, text 16 on 20 line | `timeColumn` 80 + 16 gap, time `hkSubhead` 14 `ink2`; text 16, `leading` 3; `rowPaddingV` 16 |
+| Stats card | 248 wide, 24 padding, numbers 28, labels 16 | Home: one figures line, `hkDisplayBand` 24 figures; Insights: `InsightCard` `cardPaddingL` 24, `hkFigureXL` 36 |
 | Settings | Modal: 208 nav (caps section headers 11, rows 36) + content; serif 26 title; grouped filled card radius 12, 20 side padding; rows ~88 for two lines; label 16 medium, description 15 gray; controls 164 × 36 right-aligned | In-page: 176 nav + content; `SettingsGroup` (`well`, `r2`, `s4` 16 side padding; detail column capped at `Theme.detailWidth` 440), `SettingsRow` (`hkRowTitle` 16 medium, `hkCallout` 15, control right), `MenuPicker` 196 × 36, `RowToggle` |
-| Transform cards | 3-column grid, ~210 × 165, shortcut chip, 16 semibold title, 14 gray description, dashed "Create your own" | `TransformCard` 3 columns, min 132 high, badge chip, `hkHeadline`, `hkCaption`; dashed create card |
-| Toolbar icons | 28 × 28 | `IconButtonStyle` 30 × 30 |
+| Transform cards | 3-column grid, ~210 × 165, shortcut chip, 16 semibold title, 14 gray description, dashed "Create your own" | `SelectableCard` in a 3-column `CardGrid` (equal row heights, `gridGap` 16), min `optionCardHeight` 136, glyph + `hkCardTitle`, `hkCaption`; "New transform" lives in the header |
+| Toolbar icons | 28 × 28 | `ToolbarButtonStyle` 28 × 28; in-page `IconButtonStyle` 32 × 32 (= `fieldHeight`, level with search fields) |
 | Row hover | Fill plus trailing actions (play, copy, more) appear on hover | `ListRow`: `well` fill, actions fade and slide in 6 pt |
 | Idle dictation bar | ~40 × 8 capsule centered ~20 above the screen bottom | 46 × 13 sage-on-dark capsule |
 
@@ -97,22 +148,33 @@ The pill panel is forced dark, so the pill and its card use the dark values of `
 
 ## Type
 
-Matched to Wispr's measured sizes; SF Pro / SF Pro Rounded instead of Wispr's sans and serif.
+New York (`Font.display`, the system serif) at a regular weight for titles and figures; SF Pro for everything else. Views never call `.system(size:)` or `.display(_:)` directly.
 
-| Token | Size / weight | Use |
+| Token | Face / size / weight | Use |
 | --- | --- | --- |
-| `hkTitle1` | 28 rounded semibold | page titles, greeting |
-| `hkTitle2` | 22 rounded semibold | note titles, large values |
-| `hkTitle3` | 18 semibold | group and section titles |
-| `hkHeadline` | 16 semibold | card titles |
+| `hkFigureXL` | serif 36 | the lead figure on a card (Insights) |
+| `hkFigureL` | serif 34 | home band headline |
+| `hkTitle1` | serif 28 | page titles, the word being trained |
+| `hkFigureM` | serif 28 | stat figures beside a label |
+| `hkSheetTitle` | serif 26 | sheet titles, hero metrics |
+| `hkDisplayBand` | serif 24 | banner titles, inline figures |
+| `hkTitle2` | serif 22 | card titles, large values |
+| `hkCardTitle` | serif 20 | option cards, empty states, the wordmark (medium) |
+| `hkDisplayS` | serif 18 | small serif values |
+| `hkQuote` | serif 16 | quoted samples |
+| `hkTitle3` | 18 semibold | section titles (`SectionTitle`) |
+| `hkHeadline` | 16 semibold | emphasised row titles |
 | `hkRowTitle` | 16 medium | settings and list row labels |
 | `hkBody` | 16 | reading text, list rows, editors |
+| `hkTranscript` | 17 | the live transcript |
 | `hkCallout` | 15 | row descriptions, subtitles |
 | `hkControl` | 15 medium | buttons, menus |
-| `hkCaption` | 13 | status lines |
+| `hkNav` | 15 | sidebar and settings nav (medium when selected) |
+| `hkSubhead` | 14 | time column, notice titles, step strip |
+| `hkCaption` | 13 | status lines, card descriptions |
 | `hkMeta` | 12 | timestamps, counts |
+| `hkBadge` | 11 semibold | step numbers |
 
-- **Display:** `Font.display` (SF Pro Rounded) for titles, hero copy and big numbers. The serif stays Wispr's.
 - Descriptions are one line, two at most. If a control needs a paragraph, the control is wrong.
 
 ## Motion
@@ -125,6 +187,8 @@ Matched to Wispr's measured sizes; SF Pro / SF Pro Rounded instead of Wispr's sa
 - **Page switch:** fade + 8 pt rise on insert, fade on removal.
 - **Breath ribbon (`BreathRibbon`):** HushKey's voice form, used instead of level bars because HushKey also hears whispers and mouthed speech. One filled ribbon, tapered at both ends: at rest a thin line (half-thickness 0.14) that breathes once every 5 s (`restLoop`); with speech it swells by speech^0.45 (a whisper at energy 0.06 already doubles it), shaped by three slow travelling lobes and a faint halo, and its spine undulates a little. Rises 24/s, falls 6/s. Waiting and working send a bead of breath along the line (0.35 and 0.8 traversals a second). Reduce Motion stops travel; the voice still swells it, and waiting/working fade in place. Used in the pill (58 × 18, `ink`), the home hero (`heroGlow`; drawn by `AmbientField` at rest, 60 fps while dictating), and as `MorphIcon`'s listening state.
 - **Ambient field (`AmbientField`):** the hero's backdrop, built from Core Animation layers: three radial glows (`heroGlow`, `heroMist`) on 40–70 s Lissajous loops, seven faint `heroInk` ribbons that pinch toward the voice ribbon with swells drifting along them (one 40 s loop), and the resting `BreathRibbon` (one 5 s breath). Every shape is a precomputed keyframe loop that the render server plays, so the app does no per-frame work (a per-frame SwiftUI `Canvas` re-laid out the whole window, about a fifth of a core). Paused while the window is hidden, minimised or fully covered (`onWindowVisibilityChange`); a fixed still frame with Reduce Motion. The live ribbon replaces the resting one only while a dictation runs, in its own `IsolatedHost`.
+- **Home voice band (`VoiceBandBackdrop`, `Motion.swift`):** the one Home band (Field). Over the ambient field: a soft `heroGlow` bloom ellipse (2.2 × 3.4 ribbon sizes) that breathes with the resting ribbon (opacity 0.24) and rises with the voice (+0.6 at full level, eased 0.18 s); hovering the band lifts it a little (`bandBloomInvite`), waiting and working hold it at 0.25 and 0.4. The faint lines fade to 30 % behind the words on the left; a 6 % `heroInk` sheen lights the top edge. The resting ribbon crossfades to the live one in 0.3 s (`Motion.handover`), and the live ribbon's halo is five shape-following veils (`softHalo`) instead of one flat band. Tokens live in `Motion` and `AmbientField`.
+- **Other motion pieces (`Motion.swift`):** `RibbonMark` (the small breathing mark, 30 fps), `ChorusRibbons` (several out-of-step ribbons, for several voices), `waveIn` (staggered entrances).
 - **Morph icon (`MorphIcon`):** one 33-point stroked line that blends between hush → breath lens → spinner → check over 0.45 s (ease-out cubic). At rest it is the app icon's ribbon, traced along its top edge and back along its bottom a hair apart so the stroke tapers, and listening opens it into the ribbon's lens. Used in the Dictate button, the composer header, the empty history state, and the floating pill.
 - **Speech envelope (`SpeechEnvelope`):** the ribbon and the morph icon both measure speech the same way: level above a room-noise floor that falls at once and rises 0.02 per second, gate 0.06, span 0.4. Silence stays calm; a long sentence keeps moving.
 - **Pill:** see `docs/PILL_UX_ANALYSIS.md`. Idle: a 44 × 13 `paper` capsule (82 %, hairline, faint shadow so it reads on light desktops) holding a short sage line → hover: the same capsule opens to 28 pt with the hush glyph, "Dictate" and the shortcut as a `PillKey`, a hairline, then a quiet Meeting notes button (no fill until hovered). The capsule clips its contents while it grows and they fade in after it opens; the panel grows at once and shrinks only after the closing animation, so nothing clips or flickers → recording: a 28 pt capsule with × · `BreathRibbon` · ✓ (filled `signal`). While the shortcut is held, it is the meter only. The timer appears after 30 s. Preparing and transcribing keep the same capsule: the meter sweeps while it waits (a hint names the wait) and runs a brisker highlight while it works. Done shows only the check for 0.8 s; the success cue says it landed (start, success and error cues: `DictationCue`). Idle shrinks to a dot after 5 s. Right-click opens a mic / sounds / hide menu, and drag slides the pill along the bottom edge (remembered). Cancel shows a neutral "Cancelled · Undo" for 5 s. A silent mic shows "We couldn't hear you" with Mic and Sound settings. Hovering × or ✓ (or Meeting notes) shows "Cancel · esc", "Finish · fn" or "Meeting notes" in a 24 pt `PillHint` above, straight away. Errors use the `Theme.danger` icon, a short message and dismiss ×, plus Retry and/or Paste again as titled `PillIconButton` capsules, and stay until handled. **Transcript card:** only when there is no text box to type into, or typing failed. Before any words, a one-line strip (glyph, hint, ×). With text, a 320 pt `paper` card (radius `r2`) with the last three lines at 16 pt. The finished no-target card adds a sage Copy (⌘C) and, when typing into apps is off, "Type for me next time". **Meter:** the `BreathRibbon` (see above), 58 × 18 in `ink`.
@@ -134,18 +198,22 @@ Matched to Wispr's measured sizes; SF Pro / SF Pro Rounded instead of Wispr's sa
 
 ## Components
 
-- **Surfaces:** `card(style: .well | .outlined)`, `SettingsGroup`, `GroupRow`, `ListGroup`, `RowDivider`.
-- **Rows:** `SettingsRow` (label, one-line detail, right-aligned control), `ListRow` (hover fill and actions).
-- **Controls:** `PrimaryButtonStyle(tint:foreground:)`, `SecondaryButtonStyle(minWidth:)`, `DestructiveButtonStyle`, `IconButtonStyle`, `MenuPicker`, `RowToggle`, `UnderlineTabs`, `Keycap` / `KeycapShortcut`.
-- **Style page:** `StyleView`: `UnderlineTabs` for the four contexts, plain app chips, and three `ToneCard`s (`well`, or `signalSoft` with a 1.5 pt `signal` border when selected) whose previews run through `DictationTone.apply`.
-- **Insights page:** `InsightsView`: `InsightCard`s on `well` with a hairline border, display-font metrics with uppercase `ink2` labels, a `PaceArc` gauge (hairline track, `signal` progress), category bars in `signal` at falling opacity with `inverseInk` percentages, and the shared `ActivityHeatmap`.
-- **Languages sheet:** `LanguagePickerSheet` on `sheet`: a `well` search field, a `signalSoft` "Selected" chip, and a 3-column grid of `LanguageTile`s (language on top, native name and region in `ink2` below; selected tiles match `ToneCard`).
-- **Sheets:** `EditorSheet` (display title, subtitle, close, footer note, Cancel + primary), `SheetField` (`well`, hairline, `signal` focus ring), `SheetNotice` (`danger`); inline `TextEditor`s use `.editorField()`.
+- **Page:** every hub and lab page is `PageColumn(maxWidth:) { PageHeader(…); sections }`. `PageColumn` spaces sections by `sectionGap` and applies `pageLayout`; `PageHeader` (title, optional subtitle or custom `detail` line, trailing actions centred on the title line) adds the rest of `headerGap`, so content starts the same distance below every title. Home uses `PageHeader`'s `detail` slot for its warning line.
+- **Sections:** `SectionTitle(_:subtitle:trailing:)` is the one in-page heading (`hkTitle3`, at least `fieldHeight` tall so a search field or icon button beside it never changes the row). `PageSection` adds its content `sectionTitleGap` below; `SettingsGroup` titles use `SectionTitle` too. `SectionRule` is the hairline between sections.
+- **Surfaces:** `surface(_ style:radius:)` draws fill + edge; `card(padding:style:)` adds `cardPadding` and full width. Styles: `.well`, `.outlined`, `.wellOutlined`, `.selected`, `.tinted`, `.soft`. Also `SettingsGroup`, `GroupRow`, `ListGroup`, `RowDivider`.
+- **Selectable cards:** `SelectableCard` (optional glyph, `hkCardTitle`, sage check when chosen, `hkCaption` description, optional footer pinned to the bottom; `well` → `hover` → `signalSoft` with a `selectedStroke` `signal` edge) inside `CardGrid`, a `Grid` whose rows take their tallest card's height with `gridGap` gutters. Used by Style's cleanup and tone cards and the Transforms tiles; Insights' voice tiles use `CardGrid` with `InsightCard`.
+- **Rows:** `SettingsRow` (label, one-line detail capped at `detailWidth`, right-aligned control, ≥ `rowMinHeight`), `GroupRow`, `ListRow` (hover fill and actions, ≥ `listRow`).
+- **Controls:** `PrimaryButtonStyle(tint:foreground:)`, `SecondaryButtonStyle(minWidth:)`, `DestructiveButtonStyle`, `IconButtonStyle` (`fieldHeight` square), `ToolbarButtonStyle`, `MenuPicker`, `RowToggle`, `UnderlineTabs`, `SearchField` (Home history, Files, Meeting notes), `Keycap` / `KeycapShortcut`.
+- **Insights page:** `InsightCard`s (`.wellOutlined`, `cardPaddingL`), `hkFigureXL` metrics, `CategoryBar`s in `signal` at falling opacity over a `track`, and `InsightsHeatmap` (its cell geometry is chart-local).
+- **Languages sheet:** `LanguagePickerSheet` on `sheet`: a `well` search field, a `signalSoft` "Selected" chip, and a 3-column grid of `LanguageTile`s.
+- **Sheets:** `EditorSheet` (`hkSheetTitle`, subtitle, close, footer note, Cancel + primary; `sheetWidth`), `SheetField` (`well`, hairline, `signal` focus ring), `SheetNotice` (`danger`); inline `TextEditor`s use `.editorField()`.
 - **Live level:** `LiveLevel` reads the mic level in its own body; never read `audio.level` in a page body.
-- **Page:** `PageHeader` (title, optional subtitle, trailing actions), `pageLayout(maxWidth:)`, `EmptyState`.
-- **Silent Lab:** `LabProgress` (Connect → Train → Evaluate → Silent Use strip on every lab page), `LabHero`, `HeroMetric`.
+- **Silent Lab:** `LabProgress`, `LabHero`, `HeroMetric`.
 - **Motion:** `MorphIcon`, `BreathRibbon`, `AmbientField` (`Ambient.swift`), `StatusChip`, `SectionLabel`, `ActivityHeatmap`.
-- **Home:** greeting "Hey Name, hold [fn] and just talk" (`hkTitle1`, keycap 17) with one `ink2` line under it; `HeroCard` + stats card; history whose first day label ("TODAY") carries search and the options menu.
+
+### Literals that stay
+
+Only these keep numbers of their own: motion maths (`Ambient.swift`, `Motion*.swift`, spring and stagger values, `Reveal` distance), drawn glyphs and illustrations (`HushIcons.swift`, `MorphIcon`, `Keycap` proportions, Onboarding's large `LiveKeycap`), chart geometry (`ActivityHeatmap`, `InsightsHeatmap`, `CategoryBar`, `SignalPlot`), the toolbar's notice badge, colour opacities that encode data (heatmap levels, category emphasis), and the pill, whose `FloatingPill.Metrics` grid is its own token source.
 
 ## Open items
 

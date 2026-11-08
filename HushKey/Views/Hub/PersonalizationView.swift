@@ -100,8 +100,8 @@ struct PersonalizationView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Theme.s5) {
-                PageHeader(eyebrow: "", title: "Vocabulary",
+            PageColumn {
+                PageHeader(title: "Vocabulary",
                            subtitle: "Teach HushKey the words, shortcuts and fixes you use.") {
                     if section == .vocabulary {
                         Button("Import…", icon: .download) {
@@ -123,7 +123,7 @@ struct PersonalizationView: View {
                     .buttonStyle(PrimaryButtonStyle())
                 }
 
-                HStack(alignment: .bottom, spacing: Theme.s3) {
+                HStack(alignment: .bottom, spacing: Theme.stackGap) {
                     UnderlineTabs(selection: $section,
                                   options: PersonalizationSection.allCases.map { ($0, $0.rawValue) },
                                   count: { count(for: $0) })
@@ -146,7 +146,6 @@ struct PersonalizationView: View {
                 case .vocabulary: EmptyView()
                 }
             }
-            .pageLayout()
         }
         .sheet(item: $editor) { request in
             PersonalizationEntryEditor(
@@ -185,7 +184,7 @@ struct PersonalizationView: View {
                 TextField("Search \(section.rawValue.lowercased())", text: $query)
                     .textFieldStyle(.plain)
                     .font(.hkCallout)
-                    .frame(width: 180)
+                    .frame(width: Theme.searchWidth)
                     .accessibilityLabel("Search \(section.rawValue.lowercased())")
                     .onExitCommand { query = ""; searching = false }
                     .transition(.opacity.combined(with: .move(edge: .trailing)))
@@ -212,7 +211,7 @@ struct PersonalizationView: View {
                     ListRow {
                         HStack(spacing: Theme.s2) {
                             Text(entry.cue).font(.hkBody.weight(.medium))
-                            Glyph(.arrowRight).hushIconSize(15).foregroundStyle(Theme.ink3)
+                            Glyph(.arrowRight).hushIconSize(Theme.iconS).foregroundStyle(Theme.ink3)
                             Text(entry.expansion).font(.hkBody).foregroundStyle(Theme.ink2).lineLimit(1)
                         }
                     } actions: {
@@ -268,7 +267,7 @@ struct PersonalizationView: View {
                     ListRow {
                         HStack(spacing: Theme.s2) {
                             Text(rule.cue).font(.hkBody).foregroundStyle(Theme.ink2).strikethrough(color: Theme.ink3)
-                            Glyph(.arrowRight).hushIconSize(15).foregroundStyle(Theme.ink3)
+                            Glyph(.arrowRight).hushIconSize(Theme.iconS).foregroundStyle(Theme.ink3)
                             Text(rule.expansion).font(.hkBody.weight(.medium)).lineLimit(1)
                         }
                     } actions: {
@@ -305,7 +304,7 @@ struct PersonalizationView: View {
         return DisclosureGroup("Edit as text") {
             TextEditor(text: $model.dictationSnippets)
                 .font(.hkBody.monospaced())
-                .frame(minHeight: 90)
+                .frame(minHeight: Theme.editorShort)
                 .editorField()
                 .padding(.top, Theme.s2)
             Text("One per line: spoken cue => expanded phrase. Use this editor to repair malformed older entries.")
@@ -321,8 +320,7 @@ struct PersonalizationView: View {
         }
         .font(.hkCallout)
         .tint(Theme.ink2)
-        .padding(Theme.s4)
-        .background(Theme.well, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
+        .card()
     }
 
     private var advancedCorrectionEditor: some View {
@@ -330,7 +328,7 @@ struct PersonalizationView: View {
         return DisclosureGroup("Edit as text") {
             TextEditor(text: $model.dictationCorrectionRules)
                 .font(.hkBody.monospaced())
-                .frame(minHeight: 90)
+                .frame(minHeight: Theme.editorShort)
                 .editorField()
                 .padding(.top, Theme.s2)
             Text("One per line: recognized phrase => corrected phrase. Matches are case-insensitive and respect whole-word boundaries. Raw recognition remains available to restore.")
@@ -346,8 +344,7 @@ struct PersonalizationView: View {
         }
         .font(.hkCallout)
         .tint(Theme.ink2)
-        .padding(Theme.s4)
-        .background(Theme.well, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
+        .card()
     }
 
     private func save(primary: String, secondary: String?, request: PersonalizationEditorRequest) -> String? {
@@ -462,7 +459,7 @@ private struct PersonalizationEntryEditor: View {
     var body: some View {
         EditorSheet(title: editorTitle, subtitle: editorSubtitle,
                     note: section == .vocabulary ? "Stays on this Mac." : nil,
-                    primaryTitle: "Save", canSave: canSave, width: 480, onSave: save) {
+                    primaryTitle: "Save", canSave: canSave, onSave: save) {
             if section == .vocabulary {
                 SheetField(label: "Word or phrase", prompt: "For example: HushKey", text: $term,
                            hint: "Used as an on-device recognition hint.", autofocus: true)
@@ -522,13 +519,13 @@ private struct SampleTermButtonStyle: ButtonStyle {
         configuration.label
             .font(.hkControl)
             .foregroundStyle(Theme.ink)
-            .hushIconSize(14)
+            .hushIconSize(Theme.iconS)
             .padding(.horizontal, Theme.s3)
-            .frame(height: Theme.controlHeight - 4)
+            .frame(height: Theme.fieldHeight)
             .background(hovering ? Theme.signalSoft : .clear,
                         in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
-                .strokeBorder(Theme.signal.opacity(0.55), style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
+                .strokeBorder(Theme.signalEdge, style: StrokeStyle(lineWidth: Theme.hairlineWidth, dash: Theme.dash)))
             .contentShape(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .onHover { hovering = $0 }

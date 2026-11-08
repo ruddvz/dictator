@@ -11,8 +11,8 @@ struct DictationView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Theme.s5) {
-                header.reveal(0)
+            PageColumn(maxWidth: Theme.homeWidth) {
+                header
                 VoiceBand(holds: holds).reveal(1)
                 // Hallmark (app screens): the history is Home's signature object, so nothing
                 // above it competes: one quiet line of figures and, at most, one next step.
@@ -27,7 +27,6 @@ struct DictationView: View {
                 }
                 historySection.reveal(4)
             }
-            .pageLayout(maxWidth: Theme.homeWidth)
             .animation(Theme.gentle, value: showsComposer)
         }
         .onDisappear { reader.stop() }
@@ -51,34 +50,27 @@ struct DictationView: View {
     // MARK: Header
 
     private var header: some View {
-        HStack(alignment: .pageTitle, spacing: Theme.s4) {
-            VStack(alignment: .leading, spacing: Theme.s2) {
-                Text("Home")
-                    .font(.hkTitle1)
-                    .accessibilityIdentifier("page.header")
-                    .alignmentGuide(.pageTitle) { $0[VerticalAlignment.center] }
-                if let problem {
-                    HStack(spacing: Theme.s2) {
-                        Label(problem, icon: .warning)
-                            .font(.hkCallout.weight(.medium))
-                            .foregroundStyle(Theme.finishing)
-                            .fixedSize(horizontal: false, vertical: true)
-                        if problemIsAccessibility {
-                            Button("Open Settings") {
-                                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
-                            }
-                            .buttonStyle(SecondaryButtonStyle())
-                            .controlSize(.small)
+        PageHeader(title: "Home") {
+            if let problem {
+                HStack(spacing: Theme.s2) {
+                    Label(problem, icon: .warning)
+                        .font(.hkCallout.weight(.medium))
+                        .foregroundStyle(Theme.finishing)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if problemIsAccessibility {
+                        Button("Open Settings") {
+                            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
                         }
+                        .buttonStyle(SecondaryButtonStyle())
+                        .controlSize(.small)
                     }
-                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
-            }
-            .animation(Theme.gentle, value: problem)
-            Spacer(minLength: Theme.s4)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+        } actions: {
             recordButton
-                .alignmentGuide(.pageTitle) { $0[VerticalAlignment.center] }
         }
+        .animation(Theme.gentle, value: problem)
     }
 
     private var holds: Bool {
@@ -101,15 +93,15 @@ struct DictationView: View {
             Task { await model.toggleDictation() }
         } label: {
             HStack(spacing: Theme.s2) {
-                LiveLevel(model.audio) { MorphIcon(phase: morphPhase, level: $0, lineWidth: 1.8) }
-                    .frame(width: 20, height: 20)
+                LiveLevel(model.audio) { MorphIcon(phase: morphPhase, level: $0, lineWidth: Theme.ruleWidth) }
+                    .frame(width: Theme.iconColumn, height: Theme.iconColumn)
                 Text(isFinishing ? "Transcribing"
                      : model.audio.isRunning ? "Stop"
                      : model.isStartingDictation || model.isStartingSelectedTextEdit ? "Cancel"
                      : "Dictate")
                     .contentTransition(.interpolate)
             }
-            .frame(minWidth: 96)
+            .frame(minWidth: Theme.buttonMinWidth)
         }
         .buttonStyle(PrimaryButtonStyle(tint: model.audio.isRunning ? Theme.ink : Theme.signal))
         .disabled(isFinishing)
@@ -148,15 +140,15 @@ struct DictationView: View {
     private var composer: some View {
         VStack(alignment: .leading, spacing: Theme.s3) {
             HStack(spacing: Theme.s2) {
-                LiveLevel(model.audio) { MorphIcon(phase: morphPhase == .idle ? .done : morphPhase, level: $0, lineWidth: 2) }
-                    .frame(width: 18, height: 18)
+                LiveLevel(model.audio) { MorphIcon(phase: morphPhase == .idle ? .done : morphPhase, level: $0, lineWidth: Theme.ruleWidth) }
+                    .frame(width: Theme.iconL, height: Theme.iconL)
                     .foregroundStyle(model.audio.isRunning ? Theme.listening : Theme.ink)
                 Text(model.isSelectedTextEditCapturing ? "Listening for your edit"
                      : model.isFinalizingSelectedTextEdit ? "Applying your edit"
                      : model.isStartingDictation
                         ? (model.audio.isStarting ? "Waiting for microphone…" : "Getting ready…")
                      : model.audio.isRunning ? "Listening" : isFinishing ? "Transcribing" : "Latest dictation")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.hkCallout.weight(.semibold))
                 modeMenu
                 if !model.rawDictationText.isEmpty, let target = model.activeDictationTarget {
                     StatusChip(title: target, icon: .window)
@@ -188,7 +180,7 @@ struct DictationView: View {
                 Spacer()
                 if !model.insertion.status.isEmpty {
                     Text(model.insertion.status)
-                        .font(.system(size: 13))
+                        .font(.hkCaption)
                         .foregroundStyle(Theme.ink3)
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -211,15 +203,15 @@ struct DictationView: View {
             }
             .pickerStyle(.inline)
         } label: {
-            Label { Text(model.dictationMode.rawValue) } icon: { SymbolGlyph(model.dictationMode.symbol, size: 14) }
-                .font(.system(size: 13, weight: .medium))
+            Label { Text(model.dictationMode.rawValue) } icon: { SymbolGlyph(model.dictationMode.symbol, size: Theme.iconS) }
+                .font(.hkCaption.weight(.medium))
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
-        .padding(.horizontal, Theme.s2 + 2)
-        .frame(height: 24)
+        .padding(.horizontal, Theme.s3)
+        .frame(height: Theme.chipHeight)
         .background(Theme.well, in: Capsule())
-        .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 1))
+        .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: Theme.hairlineWidth))
         .disabled(isBusy)
         .help(modeDescription(model.dictationMode))
     }
@@ -231,20 +223,20 @@ struct DictationView: View {
                 Text(model.transcriber.text.isEmpty
                      ? (isFinishing ? "Finishing up…" : "Start talking…")
                      : model.transcriber.text)
-                    .font(.system(size: 17))
-                    .lineSpacing(3)
+                    .font(.hkTranscript)
+                    .lineSpacing(Theme.leading)
                     .foregroundStyle(model.transcriber.text.isEmpty ? Theme.ink3 : Theme.ink)
                     .frame(maxWidth: .infinity, alignment: .topLeading)
                     .textSelection(.enabled)
             }
-            .frame(minHeight: 72, maxHeight: 220)
+            .frame(minHeight: Theme.editorShort, maxHeight: Theme.editorTall)
         } else {
             TextEditor(text: transcriptBinding)
-                .font(.system(size: 17))
-                .lineSpacing(3)
+                .font(.hkTranscript)
+                .lineSpacing(Theme.leading)
                 .scrollContentBackground(.hidden)
-                .frame(minHeight: 72, maxHeight: 220)
-                .padding(.horizontal, -5) // align TextEditor's inset text with the header
+                .frame(minHeight: Theme.editorShort, maxHeight: Theme.editorTall)
+                .padding(.horizontal, -Theme.textEditorInset) // align TextEditor's inset text with the header
         }
     }
 
@@ -266,7 +258,7 @@ struct DictationView: View {
                 figure(ledger.wordsPerMinute, "per minute", order: 2)
                 figure(streak, streak == 1 ? "day in a row" : "days in a row", order: 3)
                 if let saved {
-                    Text(saved.prefix(1).uppercased() + saved.dropFirst() + " saved")
+                    Text(saved.prefix(1).uppercased() + saved.dropFirst())
                         .font(.hkCallout)
                         .foregroundStyle(Theme.ink2)
                         .lineLimit(1)
@@ -278,8 +270,8 @@ struct DictationView: View {
                     .foregroundStyle(hoveringFigures ? Theme.ink : Theme.ink3)
             }
             .padding(.vertical, Theme.s3)
-            .overlay(alignment: .top) { Rectangle().fill(Theme.hairline).frame(height: 1) }
-            .overlay(alignment: .bottom) { Rectangle().fill(Theme.hairline).frame(height: 1) }
+            .overlay(alignment: .top) { RowDivider() }
+            .overlay(alignment: .bottom) { RowDivider() }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -290,9 +282,9 @@ struct DictationView: View {
     }
 
     private func figure(_ value: Int?, _ label: String, order: Int) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
+        HStack(alignment: .firstTextBaseline, spacing: Theme.figureGap) {
             CountingNumber(value: value, delay: 0.15 + Double(order) * 0.08)
-                .font(.display(24))
+                .font(.hkDisplayBand)
             Text(label)
                 .font(.hkCallout)
                 .foregroundStyle(Theme.ink2)
@@ -314,10 +306,7 @@ struct DictationView: View {
 
     private var historySection: some View {
         VStack(alignment: .leading, spacing: Theme.s3) {
-            HStack(spacing: Theme.s2) {
-                Text(groupedHistory.first.map { dayTitle($0.day) } ?? "History")
-                    .font(.hkTitle3)
-                Spacer()
+            SectionTitle(groupedHistory.first.map { dayTitle($0.day) } ?? "History") {
                 if !model.dictationHistory.isEmpty {
                     if searching || !historySearch.isEmpty {
                         searchField.transition(.opacity.combined(with: .move(edge: .trailing)))
@@ -347,7 +336,7 @@ struct DictationView: View {
 
             if let message = model.dictationHistoryMessage {
                 Text(message)
-                    .font(.system(size: 13))
+                    .font(.hkCaption)
                     .foregroundStyle(message.hasPrefix("Could not") || message.hasPrefix("This transcript")
                                      ? Theme.finishing : Theme.ink3)
                     .textSelection(.enabled)
@@ -367,30 +356,29 @@ struct DictationView: View {
                 emptyHistory
             } else if groupedHistory.isEmpty {
                 ContentUnavailableView.search(text: historySearch)
-                    .frame(maxWidth: .infinity, minHeight: 140)
+                    .frame(maxWidth: .infinity, minHeight: Theme.editorMedium)
                     .card(style: .outlined)
             } else {
                 ForEach(groupedHistory, id: \.day) { group in
                     VStack(alignment: .leading, spacing: Theme.s2) {
                         if group.day != groupedHistory.first?.day {
-                            Text(dayTitle(group.day))
-                                .font(.hkTitle3)
-                                .padding(.top, Theme.s5)
+                            SectionTitle(dayTitle(group.day))
+                                .padding(.top, Theme.sectionGap)
                         }
                         // A ruled list, not a boxed card: rows sit on the page between hairlines.
                         // Rows keep their inner padding for the hover wash, so the list moves
                         // out by it and the text lines up with the headings above.
                         VStack(spacing: 0) {
-                            Rectangle().fill(Theme.hairline).frame(height: 1).padding(.horizontal, Theme.s4)
+                            RowDivider().padding(.horizontal, Theme.rowPaddingH)
                             ForEach(Array(group.entries.enumerated()), id: \.element.id) { index, entry in
                                 if index > 0 {
-                                    Rectangle().fill(Theme.hairline).frame(height: 1).padding(.horizontal, Theme.s4)
+                                    RowDivider().padding(.horizontal, Theme.rowPaddingH)
                                 }
                                 HistoryRow(entry: entry, isLocked: isBusy, reader: reader)
                                     .transition(.opacity.combined(with: .move(edge: .top)))
                             }
                         }
-                        .padding(.horizontal, -Theme.s4)
+                        .padding(.horizontal, -Theme.rowPaddingH)
                     }
                 }
                 .animation(Theme.gentle, value: model.dictationHistory.map(\.id))
@@ -408,39 +396,20 @@ struct DictationView: View {
                  : "Turn it on in Settings › Data & privacy to keep recent dictations on this Mac.")
                 .font(.hkCallout)
                 .foregroundStyle(Theme.ink2)
-                .frame(maxWidth: 520, alignment: .leading)
+                .frame(maxWidth: Theme.readingWidth, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, Theme.s4)
-        .overlay(alignment: .top) { Rectangle().fill(Theme.hairline).frame(height: 1) }
+        .padding(.vertical, Theme.rowPaddingV)
+        .overlay(alignment: .top) { RowDivider() }
     }
 
     private var searchField: some View {
-        HStack(spacing: Theme.s2) {
-            Glyph(.search).foregroundStyle(Theme.ink3)
-            TextField("Search history", text: $historySearch)
-                .textFieldStyle(.plain)
-                .frame(width: 180)
-                .accessibilityLabel("Search saved dictations")
-                .onExitCommand {
-                    historySearch = ""
-                    searching = false
-                }
-            Button("Close search", icon: .close) {
-                historySearch = ""
-                searching = false
-            }
-            .labelStyle(.iconOnly)
-            .buttonStyle(.plain)
-            .foregroundStyle(Theme.ink3)
+        SearchField(prompt: "Search history", text: $historySearch,
+                    accessibilityLabel: "Search saved dictations") {
+            historySearch = ""
+            searching = false
         }
-        .font(.hkCallout)
-        .padding(.horizontal, Theme.s3)
-        .frame(height: Theme.controlHeight - 4)
-        .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
-            .strokeBorder(Theme.hairline, lineWidth: 1))
     }
 
     private struct DayGroup {
@@ -501,6 +470,7 @@ private struct VoiceBand: View {
     @Environment(AppModel.self) private var model
     var holds: Bool
     @State private var windowVisible = true
+    @State private var hovering = false
 
     private var mode: BreathRibbon.Mode {
         if model.audio.isRunning { return .live }
@@ -555,7 +525,11 @@ private struct VoiceBand: View {
             .padding(.horizontal, Theme.s6)
             .padding(.vertical, Theme.s5)
             .background {
-                IsolatedHost { LiveLevel(model.audio) { VoiceBandBackdrop(level: $0, mode: mode, visible: windowVisible) } }
+                IsolatedHost {
+                    LiveLevel(model.audio) {
+                        VoiceBandBackdrop(level: $0, mode: mode, visible: windowVisible, inviting: hovering)
+                    }
+                }
             }
             .clipShape(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
@@ -563,36 +537,12 @@ private struct VoiceBand: View {
             .contentShape(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
         }
         .buttonStyle(.plain)
+        .onHover { hovering = $0 }
         .disabled(mode == .working)
         .animation(Theme.gentle, value: mode)
         .onWindowVisibilityChange { windowVisible = $0 }
         .help(model.audio.isRunning ? "Stop dictation" : "Start dictation")
         .accessibilityLabel(line + " " + detail)
-    }
-}
-
-/// The band's moving layer: the ambient field with its resting ribbon, and the live ribbon
-/// while a dictation runs.
-private struct VoiceBandBackdrop: View {
-    var level: Float
-    var mode: BreathRibbon.Mode
-    var visible: Bool
-
-    var body: some View {
-        GeometryReader { geo in
-            let focus = UnitPoint(x: 0.76, y: 0.5)
-            let ribbon = AmbientField.ribbonRect(in: geo.size, focus: focus)
-            ZStack {
-                AmbientField(focus: focus, paused: !visible,
-                             restingRibbon: mode == .rest ? Theme.heroGlow : nil)
-                if mode != .rest {
-                    BreathRibbon(level: level, mode: mode, tint: Theme.heroGlow, paused: !visible)
-                        .frame(width: ribbon.width, height: ribbon.height)
-                        .position(x: ribbon.midX, y: ribbon.midY)
-                        .transition(.opacity)
-                }
-            }
-        }
     }
 }
 
@@ -699,16 +649,16 @@ private struct HistoryRow: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: Theme.s4) {
             Text(entry.createdAt.formatted(date: .omitted, time: .shortened))
-                .font(.system(size: 14).monospacedDigit())
+                .font(.hkSubhead.monospacedDigit())
                 .foregroundStyle(isHovering ? Theme.ink : Theme.ink2)
-                .frame(width: 82, alignment: .leading)
-            VStack(alignment: .leading, spacing: 6) {
+                .frame(width: Theme.timeColumn, alignment: .leading)
+            VStack(alignment: .leading, spacing: Theme.figureGap) {
                 entryText
                 metaLine
             }
         }
-        .padding(.horizontal, Theme.s4)
-        .padding(.vertical, 15)
+        .padding(.horizontal, Theme.rowPaddingH)
+        .padding(.vertical, Theme.rowPaddingV)
         .frame(minHeight: Theme.listRow)
         .background(isHovering ? Theme.well : .clear, in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
         .overlay(alignment: .topTrailing) { actionPill.padding(Theme.s2) }
@@ -728,7 +678,7 @@ private struct HistoryRow: View {
     private var entryText: some View {
         let text = Text(entry.text)
             .font(.hkBody)
-            .lineSpacing(3)
+            .lineSpacing(Theme.leading)
             .lineLimit(isLong && !expanded ? 3 : nil)
             .frame(maxWidth: .infinity, alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)
@@ -769,9 +719,9 @@ private struct HistoryRow: View {
             }
             if isLong {
                 Button(action: toggleExpanded) {
-                    HStack(spacing: 3) {
+                    HStack(spacing: Theme.s0) {
                         Text(expanded ? "Show less" : "Show more")
-                        Glyph(.chevronDown, size: 12)
+                        Glyph(.chevronDown, size: Theme.iconXS)
                             .rotationEffect(.degrees(expanded ? 180 : 0))
                     }
                 }
@@ -811,12 +761,12 @@ private struct HistoryRow: View {
                 .opacity(showsActions ? 1 : 0)
                 .animation(Theme.snappy.delay(showsActions ? 2 * 0.03 : 0), value: showsActions)
         }
-        .padding(2)
+        .padding(Theme.s0)
         .background(Theme.sheet, in: Capsule())
-        .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 1))
-        .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
+        .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: Theme.hairlineWidth))
+        .shadow(color: .black.opacity(0.06), radius: Theme.figureGap, y: Theme.s0)
         .opacity(showsActions ? 1 : 0)
-        .offset(x: showsActions ? 0 : 6)
+        .offset(x: showsActions ? 0 : Theme.figureGap)
         .animation(.easeOut(duration: 0.12), value: showsActions)
         .allowsHitTesting(showsActions)
     }
@@ -896,22 +846,22 @@ private struct DeletedDictationBar: View {
 
     var body: some View {
         HStack(spacing: Theme.s2) {
-            Glyph(.trash, size: 14).foregroundStyle(Theme.ink3)
+            Glyph(.trash, size: Theme.iconS).foregroundStyle(Theme.ink3)
             Text("Dictation deleted")
-                .font(.system(size: 13))
+                .font(.hkCaption)
                 .foregroundStyle(Theme.ink2)
             Spacer()
             Button("Undo") { withAnimation(Theme.gentle) { model.undoDeleteDictation() } }
                 .buttonStyle(.plain)
-                .font(.system(size: 13, weight: .medium))
+                .font(.hkCaption.weight(.medium))
                 .foregroundStyle(Theme.signal)
                 .help("Put this dictation back")
         }
         .padding(.horizontal, Theme.s4)
-        .padding(.vertical, 10)
+        .padding(.vertical, Theme.s2)
         .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
-            .strokeBorder(Theme.hairline, lineWidth: 1))
+            .strokeBorder(Theme.hairline, lineWidth: Theme.hairlineWidth))
         .task(id: deleted.entry.id) {
             try? await Task.sleep(for: .seconds(DeletedDictation.undoSeconds))
             guard !Task.isCancelled else { return }
@@ -988,10 +938,10 @@ private struct CancelledDictationRow: View {
     var body: some View {
         HStack(alignment: .center, spacing: Theme.s4) {
             Text(cancelled.cancelledAt, style: .time)
-                .font(.system(size: 14))
+                .font(.hkSubhead)
                 .foregroundStyle(Theme.ink2)
-                .frame(width: 82, alignment: .leading)
-            VStack(alignment: .leading, spacing: 2) {
+                .frame(width: Theme.timeColumn, alignment: .leading)
+            VStack(alignment: .leading, spacing: Theme.s0) {
                 Text("You cancelled a \(cancelled.durationLabel) dictation\(cancelled.appName.map { " in \($0)" } ?? "").")
                     .font(.hkBody)
                     .foregroundStyle(Theme.ink2)
@@ -1015,7 +965,7 @@ private struct CancelledDictationRow: View {
         .frame(minHeight: Theme.listRow)
         .background(Theme.well, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
-            .strokeBorder(Theme.hairline, style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
+            .strokeBorder(Theme.hairline, style: StrokeStyle(lineWidth: Theme.hairlineWidth, dash: [4, 3])))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Cancelled dictation, \(cancelled.durationLabel)")
     }
@@ -1095,12 +1045,12 @@ private struct HistoryDiffSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.s5) {
             HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: Theme.s1) {
                     HStack(spacing: Theme.s2) {
-                        Glyph(.sparkle, size: 20)
+                        Glyph(.sparkle, size: Theme.iconL)
                             .foregroundStyle(Theme.signal)
                         Text("Cleanup changes")
-                            .font(.display(20))
+                            .font(.hkCardTitle)
                     }
                     Text("Local rules and Apple Intelligence only ever remove hesitations and format text. Your spoken words are never reworded.")
                         .font(.hkCallout)
@@ -1116,27 +1066,27 @@ private struct HistoryDiffSheet: View {
             VStack(alignment: .leading, spacing: Theme.s3) {
                 ScrollView {
                     diffContent
-                        .font(.system(size: 16))
-                        .lineSpacing(4)
+                        .font(.hkBody)
+                        .lineSpacing(Theme.leading)
                         .frame(maxWidth: .infinity, alignment: .topLeading)
                         .textSelection(.enabled)
                         .padding(Theme.s4)
                 }
-                .frame(minHeight: 120, maxHeight: 220)
+                .frame(minHeight: Theme.editorShortMax, maxHeight: Theme.editorTall)
                 .background(Theme.well, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
-                    .strokeBorder(Theme.hairline, lineWidth: 1))
+                    .strokeBorder(Theme.hairline, lineWidth: Theme.hairlineWidth))
 
                 HStack(spacing: Theme.s4) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: Theme.figureGap) {
                         Text("removed").strikethrough(true, color: Theme.ink3).foregroundColor(Theme.ink3).font(.hkCaption)
                         Text("hesitation / stutter").font(.hkCaption).foregroundStyle(Theme.ink2)
                     }
-                    HStack(spacing: 6) {
+                    HStack(spacing: Theme.figureGap) {
                         Text("adjusted").foregroundColor(Theme.signal).bold().font(.hkCaption)
                         Text("replacement / snap").font(.hkCaption).foregroundStyle(Theme.ink2)
                     }
-                    HStack(spacing: 6) {
+                    HStack(spacing: Theme.figureGap) {
                         Text("kept").foregroundColor(Theme.ink).font(.hkCaption)
                         Text("spoken text").font(.hkCaption).foregroundStyle(Theme.ink2)
                     }
@@ -1173,11 +1123,11 @@ private struct HistoryDiffSheet: View {
 
                 Button("Done") { dismiss() }
                     .buttonStyle(PrimaryButtonStyle())
-                    .frame(minWidth: 80)
+                    .frame(minWidth: Theme.buttonMinWidth)
             }
         }
-        .padding(Theme.s6)
-        .frame(width: 520)
+        .padding(Theme.cardPaddingL)
+        .frame(width: Theme.sheetWidth)
         .background(Theme.sheet)
     }
 }

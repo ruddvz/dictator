@@ -6,8 +6,8 @@ struct UseView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Theme.s5) {
-                PageHeader(eyebrow: "", title: "Silent Use",
+            PageColumn {
+                PageHeader(title: "Silent Use",
                            subtitle: "Experimental motion commands. AirPods do not read lips; uncertain matches stay in HushKey.") {
                     if model.insertion.isEnabled {
                         StatusChip(title: model.silentTypesIntoFrontApp ? "Direct typing on" : "Direct typing off",
@@ -40,7 +40,6 @@ struct UseView: View {
                     lastPredictionPanel
                 }
             }
-            .pageLayout()
         }
     }
 
@@ -138,14 +137,14 @@ struct UseView: View {
             }
             SettingsRow(title: "Maximum distance", detail: "Lower is stricter.") {
                 HStack(spacing: Theme.s2) {
-                    Slider(value: $model.maxDistance, in: 0.2...4).frame(width: 150).tint(Theme.signal)
-                    Text(String(format: "%.2f", model.maxDistance)).font(.hkCallout.monospacedDigit()).frame(width: 40)
+                    Slider(value: $model.maxDistance, in: 0.2...4).frame(width: Theme.menuWidthCompact).tint(Theme.signal)
+                    Text(String(format: "%.2f", model.maxDistance)).font(.hkCallout.monospacedDigit()).frame(width: Theme.valueWidth)
                 }
             }
             SettingsRow(title: "Minimum confidence", detail: "Higher rejects more.") {
                 HStack(spacing: Theme.s2) {
-                    Slider(value: $model.minConfidence, in: 0...0.5).frame(width: 150).tint(Theme.signal)
-                    Text(String(format: "%.2f", model.minConfidence)).font(.hkCallout.monospacedDigit()).frame(width: 40)
+                    Slider(value: $model.minConfidence, in: 0...0.5).frame(width: Theme.menuWidthCompact).tint(Theme.signal)
+                    Text(String(format: "%.2f", model.minConfidence)).font(.hkCallout.monospacedDigit()).frame(width: Theme.valueWidth)
                 }
             }
         }
@@ -154,7 +153,7 @@ struct UseView: View {
     private var autoControls: some View {
         @Bindable var capture = model.capture
         let scaleMax = max((capture.threshold ?? 0.05) * 2, 0.02)
-        return VStack(alignment: .leading, spacing: 8) {
+        return VStack(alignment: .leading, spacing: Theme.s2) {
             HStack {
                 Button(capture.isCalibrating ? "Calibrating… stay still" : "Calibrate") {
                     capture.calibrate()
@@ -166,8 +165,8 @@ struct UseView: View {
                 }
                 Spacer()
                 Circle()
-                    .fill(capture.isCapturing ? Theme.signal : Theme.ink2.opacity(0.3))
-                    .frame(width: 10, height: 10)
+                    .fill(capture.isCapturing ? Theme.signal : Theme.hairline)
+                    .frame(width: Theme.dot, height: Theme.dot)
                 Text(capture.isCapturing ? "Capturing" : "Listening")
                     .font(.hkCaption)
             }
@@ -175,7 +174,7 @@ struct UseView: View {
                        marker: capture.threshold.map { $0 / scaleMax },
                        tint: capture.isCapturing ? Theme.listening : Theme.finishing)
             LabeledContent("Trigger × floor") {
-                Slider(value: $capture.triggerRatio, in: 1.5...10).frame(width: 160).tint(Theme.signal)
+                Slider(value: $capture.triggerRatio, in: 1.5...10).frame(width: Theme.menuWidthCompact).tint(Theme.signal)
                 Text(String(format: "%.1f×", capture.triggerRatio)).monospacedDigit()
             }
             .font(.hkCallout)
@@ -190,10 +189,8 @@ struct UseView: View {
     // MARK: Transcript
 
     private var transcriptPanel: some View {
-        VStack(alignment: .leading, spacing: Theme.s3) {
-            HStack {
-                Text("Transcript").font(.hkTitle3)
-                Spacer()
+        VStack(alignment: .leading, spacing: Theme.sectionTitleGap) {
+            SectionTitle("Transcript") {
                 Button("Clear", action: model.clearDecoded)
                     .buttonStyle(SecondaryButtonStyle())
                     .disabled(model.decoded.isEmpty)
@@ -206,11 +203,10 @@ struct UseView: View {
                     decodedText.textSelection(.enabled)
                 }
             }
-            .font(.display(24, weight: .medium))
-            .frame(maxWidth: .infinity, minHeight: 96, alignment: .topLeading)
-            .padding(Theme.s5 - 4)
-            .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
+            .font(.hkDisplayBand)
+            .frame(maxWidth: .infinity, minHeight: Theme.editorShort, alignment: .topLeading)
+            .padding(Theme.cardPadding)
+            .surface(.outlined)
         }
     }
 
@@ -222,7 +218,7 @@ struct UseView: View {
     private var decodedText: Text {
         model.decoded.filter { !isRest($0) }.reduce(Text("")) { text, word in
             let piece = Text(word.text + " ")
-            return text + (word.prediction.accepted ? piece : piece.foregroundColor(Theme.ink3.opacity(0.6)))
+            return text + (word.prediction.accepted ? piece : piece.foregroundColor(Theme.ink3))
         }
     }
 
@@ -230,17 +226,17 @@ struct UseView: View {
 
     private var lastPredictionPanel: some View {
         GroupRow {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: Theme.s2) {
                 if let prediction = model.decoded.last?.prediction {
                     let worst = prediction.ranked.last?.distance ?? 1
                     ForEach(prediction.ranked) { candidate in
                         HStack {
-                            Text(candidate.label).frame(width: 70, alignment: .leading)
+                            Text(candidate.label).frame(width: Theme.s8, alignment: .leading)
                             LevelMeter(value: 1 - candidate.distance / max(worst * 1.2, 1e-6),
                                        tint: candidate == prediction.best ? Theme.signal : Theme.ink3)
                             Text(String(format: "%.2f", candidate.distance))
                                 .font(.hkCaption.monospacedDigit())
-                                .frame(width: 40, alignment: .trailing)
+                                .frame(width: Theme.valueWidth, alignment: .trailing)
                         }
                     }
                     Text(String(format: "Confidence %.2f, %@", prediction.confidence,
@@ -253,7 +249,7 @@ struct UseView: View {
                             .foregroundStyle(Theme.finishing)
                     }
                     SignalPlot(title: "Rotation rate", samples: model.lastSegment,
-                               channels: SignalPlot.rotation, minScale: 0.05, height: 60)
+                               channels: SignalPlot.rotation, minScale: 0.05, height: Theme.s8)
                 } else {
                     Text("After a capture, each word’s match distance shows here.")
                         .font(.hkCaption)

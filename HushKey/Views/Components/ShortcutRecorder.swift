@@ -101,7 +101,7 @@ struct ShortcutRecorder: View {
     @State private var problem: ShortcutProblem?
 
     var body: some View {
-        VStack(alignment: .trailing, spacing: 6) {
+        VStack(alignment: .trailing, spacing: Theme.figureGap) {
             HStack(spacing: Theme.s2) {
                 Button(action: toggleRecording) {
                     Group {
@@ -118,7 +118,7 @@ struct ShortcutRecorder: View {
                         }
                     }
                     .padding(.horizontal, Theme.s3)
-                    .frame(minWidth: 120, minHeight: Theme.controlHeight)
+                    .frame(minWidth: Theme.meterWidth, minHeight: Theme.controlHeight)
                     .background(Theme.well, in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
                         .strokeBorder(isRecording ? Theme.signal : Theme.hairline, lineWidth: isRecording ? 1.5 : 1))
@@ -148,7 +148,7 @@ struct ShortcutRecorder: View {
                     .font(.hkCaption)
                     .foregroundStyle(problem.blocksSaving ? Theme.danger : Theme.ink2)
                     .multilineTextAlignment(.trailing)
-                    .frame(maxWidth: 300, alignment: .trailing)
+                    .frame(maxWidth: Theme.popoverWidth, alignment: .trailing)
                     .fixedSize(horizontal: false, vertical: true)
                     .transition(.opacity)
             }

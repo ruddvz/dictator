@@ -26,8 +26,8 @@ struct ContentView: View {
             page
                 .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: Theme.r1, style: .continuous)
-                    .strokeBorder(Theme.hairline, lineWidth: 1))
-                .shadow(color: .black.opacity(0.04), radius: 8, y: 2)
+                    .strokeBorder(Theme.hairline, lineWidth: Theme.hairlineWidth))
+                .shadow(color: .black.opacity(0.04), radius: Theme.s2, y: Theme.s0)
                 .padding([.trailing, .bottom], Theme.s2)
         }
         .padding(.top, Theme.toolbarHeight)
@@ -82,7 +82,7 @@ struct ContentView: View {
             BrandLockup(collapsed: collapsed, live: model.audio.isRunning)
                 .padding(.top, Theme.s2)
                 .padding(.horizontal, Theme.s3)
-                .padding(.bottom, Theme.s5 - 4)
+                .padding(.bottom, Theme.s4)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.s1) {
@@ -122,8 +122,8 @@ struct ContentView: View {
                 withAnimation(Theme.snappy) { showsLab.toggle() }
             } label: {
                 Rectangle().fill(Theme.hairline)
-                    .frame(width: 20, height: 1)
-                    .frame(maxWidth: .infinity, minHeight: 24)
+                    .frame(width: Theme.iconColumn, height: Theme.hairlineWidth)
+                    .frame(maxWidth: .infinity, minHeight: Theme.chipHeight)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -135,21 +135,21 @@ struct ContentView: View {
             } label: {
                 HStack(spacing: Theme.s1) {
                     SectionLabel(title: "Silent Lab")
-                    Glyph(.chevronRight, size: 11)
+                    Glyph(.chevronRight, size: Theme.iconXS)
                         .foregroundStyle(Theme.ink3)
                         .rotationEffect(.degrees(labIsOpen ? 90 : 0))
                     Spacer()
                     if model.motion.isConnected {
-                        Circle().fill(Theme.success).frame(width: 6, height: 6)
+                        Circle().fill(Theme.success).frame(width: Theme.dot, height: Theme.dot)
                             .help(model.motion.status.label)
                     }
                 }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .padding(.horizontal, Theme.s3 - 2)
+            .padding(.horizontal, Theme.s3)
             .padding(.top, Theme.s5)
-            .padding(.bottom, 2)
+            .padding(.bottom, Theme.s0)
             .help(labIsOpen ? "Hide the Silent Lab" : "Show the Silent Lab: AirPods gestures and silent words")
             .accessibilityLabel("Silent Lab")
             .accessibilityValue(labIsOpen ? "Expanded" : "Collapsed")
@@ -192,9 +192,9 @@ struct ContentView: View {
 
             if Self.labScreens.contains(model.screen) {
                 MotionStatusBadge(status: model.motion.status, rate: model.motion.sampleRate)
-                    .font(.system(size: 13))
+                    .font(.hkCaption)
                     .padding(.horizontal, Theme.s3)
-                    .frame(height: 26)
+                    .frame(height: Theme.chipHeight)
                     .background(Theme.well, in: Capsule())
                     .padding(Theme.s4)
             }
@@ -231,25 +231,25 @@ private struct BrandLockup: View {
     var live: Bool
 
     var body: some View {
-        HStack(spacing: 7) {
+        HStack(spacing: Theme.s2) {
             Image(live ? "HushKeyMenuBarLive" : "HushKeyMenuBar")
                 .resizable()
-                .frame(width: 28, height: 28)
+                .frame(width: Theme.iconXL, height: Theme.iconXL)
                 .foregroundStyle(Theme.signal)
                 .contentTransition(.opacity)
                 .animation(Theme.gentle, value: live)
             if !collapsed {
                 // The wordmark in the app's serif voice, like the page titles.
                 Text("HushKey")
-                    .font(.display(21, weight: .medium))
+                    .font(.hkCardTitle.weight(.medium))
                     .tracking(-0.2)
                     .fixedSize()
-                    .transition(.opacity.combined(with: .offset(x: -6)))
+                    .transition(.opacity.combined(with: .offset(x: -Theme.figureGap)))
             }
         }
-        .padding(.leading, collapsed ? 0 : 5)
+        .padding(.leading, collapsed ? 0 : Theme.s1)
         .frame(maxWidth: .infinity, alignment: collapsed ? .center : .leading)
-        .frame(height: 32)
+        .frame(height: Theme.fieldHeight)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("HushKey")
     }
@@ -302,12 +302,12 @@ private struct SidebarItem: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: Theme.s3) {
-                Glyph(icon, size: 19)
+                Glyph(icon, size: Theme.iconL)
                     .foregroundStyle(isSelected || hovering ? Theme.ink : Theme.ink2)
-                    .frame(width: 22)
+                    .frame(width: Theme.iconColumn)
                 if !collapsed {
                     Text(title)
-                        .font(.system(size: 15.5, weight: isSelected ? .medium : .regular))
+                        .font(.hkNav.weight(isSelected ? .medium : .regular))
                         .foregroundStyle(Theme.ink)
                         .lineLimit(1)
                         .fixedSize()
@@ -317,7 +317,7 @@ private struct SidebarItem: View {
             }
             .hushIconHover(hovering)
             .hushIconActive(isSelected)
-            .padding(.horizontal, collapsed ? 0 : Theme.s3 - 2)
+            .padding(.horizontal, collapsed ? 0 : Theme.s3)
             .frame(maxWidth: .infinity, alignment: collapsed ? .center : .leading)
             .frame(height: Theme.sidebarRow)
             .background {
@@ -385,10 +385,10 @@ private struct SetupChecklist: View {
             if completed < steps.count {
                 VStack(alignment: .leading, spacing: Theme.s2) {
                     HStack {
-                        Text("Get set up").font(.system(size: 13.5, weight: .semibold))
+                        Text("Get set up").font(.hkCaption.weight(.semibold))
                         Spacer()
                         Text("\(completed) of \(steps.count)")
-                            .font(.system(size: 12, weight: .medium).monospacedDigit())
+                            .font(.hkMeta.weight(.medium).monospacedDigit())
                             .foregroundStyle(Theme.ink3)
                             .contentTransition(.numericText(value: Double(completed)))
                     }
@@ -399,7 +399,7 @@ private struct SetupChecklist: View {
                                 .frame(width: geo.size.width * CGFloat(completed) / CGFloat(steps.count))
                         }
                     }
-                    .frame(height: 3)
+                    .frame(height: Theme.progressHeight)
                     ForEach(steps) { step in
                         ChecklistStep(title: step.title, isDone: step.isDone) {
                             if let permission = step.permission {
@@ -416,20 +416,18 @@ private struct SetupChecklist: View {
                         model.openOnboarding()
                     } label: {
                         HStack(spacing: Theme.s1) {
-                            Glyph(.play, size: 11)
+                            Glyph(.play, size: Theme.iconXS)
                             Text("Take the 60-second tour")
                         }
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.hkMeta.weight(.medium))
                         .foregroundStyle(Theme.ink2)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .padding(.top, 2)
+                    .padding(.top, Theme.s0)
                 }
                 .padding(Theme.s3)
-                .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
-                    .strokeBorder(Theme.hairline, lineWidth: 1))
+                .surface(.outlined)
                 .transition(.opacity.combined(with: .scale(scale: 0.96)))
             }
         }
@@ -475,24 +473,24 @@ private struct ChecklistStep: View {
             HStack(spacing: Theme.s2) {
                 ZStack {
                     Circle()
-                        .strokeBorder(isDone ? Theme.signal : hovering ? Theme.ink2 : Theme.ink3, lineWidth: 1.3)
+                        .strokeBorder(isDone ? Theme.signal : hovering ? Theme.ink2 : Theme.ink3, lineWidth: Theme.selectedStroke)
                     Circle().fill(Theme.signal).scaleEffect(isDone ? 1 : 0.2).opacity(isDone ? 1 : 0)
                     CheckStroke()
                         .trim(from: 0, to: isDone ? 1 : 0)
-                        .stroke(Theme.inverseInk, style: StrokeStyle(lineWidth: 1.6, lineCap: .round, lineJoin: .round))
-                        .padding(3.5)
+                        .stroke(Theme.inverseInk, style: StrokeStyle(lineWidth: Theme.selectedStroke, lineCap: .round, lineJoin: .round))
+                        .padding(Theme.s1)
                 }
-                .frame(width: 15, height: 15)
+                .frame(width: Theme.iconM, height: Theme.iconM)
                 Text(title)
-                    .font(.system(size: 13))
+                    .font(.hkCaption)
                     .foregroundStyle(isDone ? Theme.ink3 : Theme.ink)
                     .strikethrough(isDone, color: Theme.ink3)
                 Spacer(minLength: 0)
                 if !isDone {
-                    Glyph(.chevronRight, size: 11)
+                    Glyph(.chevronRight, size: Theme.iconXS)
                         .foregroundStyle(Theme.ink3)
                         .opacity(hovering ? 1 : 0)
-                        .offset(x: hovering ? 0 : -4)
+                        .offset(x: hovering ? 0 : -Theme.s1)
                 }
             }
             .contentShape(Rectangle())

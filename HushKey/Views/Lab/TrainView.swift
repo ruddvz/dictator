@@ -7,20 +7,19 @@ struct TrainView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Theme.s5) {
-                PageHeader(eyebrow: "", title: "Train",
+            PageColumn(maxWidth: Theme.homeWidth) {
+                PageHeader(title: "Train",
                            subtitle: "Ten takes of each word, five words or more. Keep sessions separate for a fair test.")
                 LabProgress()
-                HStack(alignment: .top, spacing: Theme.s5) {
-                    vocabulary.frame(width: 260)
-                    VStack(alignment: .leading, spacing: Theme.s5) {
+                HStack(alignment: .top, spacing: Theme.sectionGap) {
+                    vocabulary.frame(width: Theme.sideColumn)
+                    VStack(alignment: .leading, spacing: Theme.sectionGap) {
                         capturePanel
                         takes
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            .pageLayout(maxWidth: Theme.homeWidth)
         }
         .confirmationDialog("Delete “\(wordToDelete ?? "")” and its takes?",
                             isPresented: Binding(get: { wordToDelete != nil }, set: { if !$0 { wordToDelete = nil } })) {
@@ -35,10 +34,8 @@ struct TrainView: View {
 
     private var vocabulary: some View {
         @Bindable var model = model
-        return VStack(alignment: .leading, spacing: Theme.s3) {
-            HStack {
-                Text("Words").font(.hkTitle3)
-                Spacer()
+        return VStack(alignment: .leading, spacing: Theme.sectionTitleGap) {
+            SectionTitle("Words") {
                 Text("\(model.dataset.vocabulary.count)")
                     .font(.hkCallout.monospacedDigit())
                     .foregroundStyle(Theme.ink3)
@@ -54,11 +51,11 @@ struct TrainView: View {
                     .disabled(newWord.trimmingCharacters(in: .whitespaces).isEmpty)
             }
             .padding(.leading, Theme.s3)
-            .padding(.trailing, 3)
+            .padding(.trailing, Theme.s1)
             .frame(height: Theme.controlHeight)
             .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
-                .strokeBorder(Theme.hairline, lineWidth: 1))
+                .strokeBorder(Theme.hairline, lineWidth: Theme.hairlineWidth))
 
             if model.dataset.vocabulary.isEmpty {
                 Text("Short, distinct words work best: yes, no, stop, next, send.")
@@ -66,7 +63,7 @@ struct TrainView: View {
                     .foregroundStyle(Theme.ink2)
                     .padding(.top, Theme.s1)
             } else {
-                VStack(spacing: 2) {
+                VStack(spacing: Theme.s0) {
                     ForEach(model.dataset.vocabulary, id: \.self) { word in
                         WordRow(word: word,
                                 count: model.templateCount(for: word, condition: model.trainingCondition),
@@ -87,8 +84,8 @@ struct TrainView: View {
         let word = model.selectedWord ?? "a word"
         return VStack(alignment: .leading, spacing: Theme.s4) {
             HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("“\(word)”").font(.display(28)).tracking(-0.3)
+                VStack(alignment: .leading, spacing: Theme.s1) {
+                    Text("“\(word)”").font(.hkTitle1).tracking(-0.3)
                     Text(conditionGuidance)
                         .font(.hkCallout)
                         .foregroundStyle(Theme.ink2)
@@ -97,7 +94,7 @@ struct TrainView: View {
                 Spacer(minLength: Theme.s3)
                 MenuPicker(selection: $model.trainingCondition,
                            options: SessionRecorder.Condition.allCases.map { ($0, $0.rawValue) },
-                           width: 176)
+                           width: Theme.menuWidthCompact)
             }
             HoldToCaptureButton(
                 title: "Capture “\(word)”",
@@ -134,10 +131,8 @@ struct TrainView: View {
                     .help("Start a separate sitting, for example after taking your AirPods out and back in.")
             }
         }
-        .padding(Theme.s6 - 4)
-        .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
-            .strokeBorder(Theme.hairline, lineWidth: 1))
+        .padding(Theme.cardPaddingL)
+        .surface(.outlined)
     }
 
     private var sessionSummary: String {
@@ -164,13 +159,11 @@ struct TrainView: View {
         if let word = model.selectedWord {
             let takes = model.templates(for: word, condition: model.trainingCondition).reversed()
             let flagged = model.flaggedTakes(for: word, condition: model.trainingCondition).count
-            VStack(alignment: .leading, spacing: Theme.s3) {
-                HStack(spacing: Theme.s3) {
-                    Text("Takes").font(.hkTitle3)
+            VStack(alignment: .leading, spacing: Theme.sectionTitleGap) {
+                SectionTitle("Takes") {
                     Text(flagged > 0 ? "\(takes.count - flagged) used, \(flagged) not used" : "\(takes.count)")
                         .font(.hkCallout.monospacedDigit())
                         .foregroundStyle(Theme.ink3)
-                    Spacer()
                     if flagged > 0 {
                         Button("Remove \(flagged) flagged", icon: .trash) {
                             model.removeFlaggedTakes(for: word, condition: model.trainingCondition)
@@ -221,7 +214,7 @@ private struct WordRow: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: Theme.figureGap) {
                 HStack {
                     Text(word).font(.hkBody.weight(isSelected ? .semibold : .regular))
                     if word == TemplateClassifier.restLabel {
@@ -241,7 +234,7 @@ private struct WordRow: View {
                     }
                     .opacity(hovering ? 0 : 1)
                 }
-                .frame(height: 22)
+                .frame(height: Theme.chipHeight)
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
                         Capsule().fill(Theme.hairline)
@@ -249,10 +242,10 @@ private struct WordRow: View {
                             .frame(width: geo.size.width * min(CGFloat(count), CGFloat(goal)) / CGFloat(goal))
                     }
                 }
-                .frame(height: 3)
+                .frame(height: Theme.progressHeight)
             }
             .padding(.horizontal, Theme.s3)
-            .padding(.vertical, Theme.s2 + 2)
+            .padding(.vertical, Theme.s3)
             .background(isSelected ? Theme.selection : hovering ? Theme.hover : .clear,
                         in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
             .contentShape(Rectangle())
@@ -263,7 +256,7 @@ private struct WordRow: View {
                 Button("Delete “\(word)”", icon: .trash, action: onDelete)
                     .buttonStyle(IconButtonStyle())
                     .padding(.trailing, Theme.s2)
-                    .padding(.top, 3)
+                    .padding(.top, Theme.s1)
             }
         }
         .onHover { hovering = $0 }
@@ -280,9 +273,9 @@ private struct TakeTile: View {
     @State private var hovering = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: Theme.figureGap) {
             SignalPlot(title: "", samples: template.samples, channels: SignalPlot.rotation,
-                       minScale: 0.05, height: 44, showsHeader: false)
+                       minScale: 0.05, height: Theme.s7, showsHeader: false)
                 .opacity(issue == nil ? 1 : 0.5)
             HStack {
                 if let issue {
@@ -301,11 +294,11 @@ private struct TakeTile: View {
                     .opacity(hovering ? 1 : 0)
             }
         }
-        .padding(Theme.s2 + 2)
+        .padding(Theme.s3)
         .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
-            .strokeBorder(isNew ? Theme.signal : issue != nil ? Theme.finishing.opacity(0.6) : Theme.hairline,
-                          lineWidth: isNew ? 1.5 : 1))
+            .strokeBorder(isNew ? Theme.signal : issue != nil ? Theme.finishing : Theme.hairline,
+                          lineWidth: isNew ? Theme.selectedStroke : Theme.hairlineWidth))
         .onHover { hovering = $0 }
         .animation(.easeOut(duration: 0.12), value: hovering)
     }

@@ -9,8 +9,8 @@ struct SetupView: View {
         let span = motion.latest.map { ($0.t - 8)...$0.t }
 
         ScrollView {
-            VStack(alignment: .leading, spacing: Theme.s5) {
-                PageHeader(eyebrow: "", title: "Connect",
+            PageColumn {
+                PageHeader(title: "Connect",
                            subtitle: "Test whether AirPods head-motion data can separate a few mouth movements. It does not read lips.")
                 LabProgress()
 
@@ -44,7 +44,6 @@ struct SetupView: View {
 
                 ResearchRecordingSection()
             }
-            .pageLayout()
         }
     }
 

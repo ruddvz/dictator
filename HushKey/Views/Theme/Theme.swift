@@ -5,7 +5,8 @@ import SwiftUI
 
 /// HushKey's warm editorial design system. Codes in comments match docs/DESIGN_SYSTEM.md.
 enum Theme {
-    // Spacing scale (S1–S7)
+    // MARK: Spacing (S0–S8, a 4-pt grid; S0 is the 2-pt nudge for hairline-thin gaps)
+    static let s0: CGFloat = 2
     static let s1: CGFloat = 4
     static let s2: CGFloat = 8
     static let s3: CGFloat = 12
@@ -13,27 +14,100 @@ enum Theme {
     static let s5: CGFloat = 24
     static let s6: CGFloat = 32
     static let s7: CGFloat = 48
+    static let s8: CGFloat = 64
 
-    // Radii: R1 sheet, R2 card, R3 control; pills use Capsule
+    // MARK: Layout roles (what the spacing steps are for, so every page uses the same ones)
+    static let pageGutter: CGFloat = 40      // page column inset from the sheet's sides
+    static let pageTop = s7                  // sheet top → page title
+    static let pageBottom = s6
+    static let headerGap = s6                // page header → first section
+    static let sectionGap = s5               // between sections on a page
+    static let sectionTitleGap = s3          // section title → its content
+    static let titleGap = s2                 // title → subtitle, in page headers and sections
+    static let stackGap = s3                 // items inside a card or section
+    static let gridGap = s4                  // gutter between cards in a grid, both ways
+    static let cardPadding = s4              // inside a card or option card
+    static let cardPaddingL = s5             // roomy cards: insights, banners, sheets
+    static let rowPaddingV = s4              // settings rows and group rows
+    static let rowPaddingH = s4              // list and group rows' side inset
+    static let controlGap = s2               // between buttons in a row
+    static let iconGap = s2                  // glyph ↔ label
+    static let figureGap: CGFloat = 6        // figure ↔ its unit label, title ↔ hero line
+
+    static let leading: CGFloat = 3          // extra line spacing for reading text and transcripts
+
+    // MARK: Radii (R1 sheet, R2 card, R3 inner/row, R4 small, RC control; pills use Capsule)
     static let r1: CGFloat = 16
     static let r2: CGFloat = 12
     static let r3: CGFloat = 8
-    static let cardRadius = r2
+    static let r4: CGFloat = 4
+    static let controlRadius: CGFloat = 10
+    /// Concentric corner for something inset `padding` inside a shape of radius `outer`,
+    /// never tighter than R4.
+    static func inner(_ outer: CGFloat, padding: CGFloat) -> CGFloat { max(r4, outer - padding) }
 
-    // Sizes: W page column, H1 sidebar row, H2 control, I1 icon
-    static let pageWidth: CGFloat = 800
-    static let homeWidth: CGFloat = 1040     // Wispr's home: 770 column + 24 gap + 248 stats
-    static let sidebarWidth: CGFloat = 216
-    static let sidebarCollapsedWidth: CGFloat = 68
+    // MARK: Strokes
+    static let hairlineWidth: CGFloat = 1
+    static let selectedStroke: CGFloat = 1.5 // selected cards, focused fields
+    static let ruleWidth: CGFloat = 2        // underlines, quote rules, accent bars
+    static let dash: [CGFloat] = [6, 4]      // dashed drop zones and "add" tiles
+
+    // MARK: Control heights (H)
+    static let controlHeight: CGFloat = 36   // buttons, menus, fields (macOS large)
+    static let fieldHeight: CGFloat = 32     // inline search fields, icon buttons
+    static let chipHeight: CGFloat = 24      // chips, compact menus
+    static let toolbarButton: CGFloat = 28   // toolbar icon controls (Wispr's size)
+    static let sidebarRow: CGFloat = 36
+    static let listRow: CGFloat = 52         // minimum list row
+    static let rowMinHeight: CGFloat = 64    // settings row: label + description + control
+    static let optionCardHeight: CGFloat = 136 // selectable option cards (Style, Transforms)
+    static let editorShort: CGFloat = 72     // inline editors: minimum heights…
+    static let editorMedium: CGFloat = 140
+    static let editorTall: CGFloat = 220
+    static let editorShortMax: CGFloat = 120 // …and the heights they stop growing at
+    static let editorTallMax: CGFloat = 260
+    static let textEditorInset: CGFloat = 5  // NSTextView's own line-fragment padding, matched by placeholders
+    static let notesMinHeight: CGFloat = 384 // meeting notes list + editor
+    static let meterWidth: CGFloat = 120     // inline level meters
+    static let valueWidth: CGFloat = 48      // numeric readouts beside sliders and bars
+    static let progressHeight: CGFloat = 4   // thin progress tracks
+    static let dot: CGFloat = 8              // status dots
     static let toolbarHeight: CGFloat = 46   // window-control strip above the sheet (Flow: sheet ~46 pt down)
     static let titlebarHeight: CGFloat = 42  // traffic lights and toolbar icons centre 21 pt down, as in Flow
-    static let sidebarRow: CGFloat = 36
-    static let controlHeight: CGFloat = 36
-    static let controlRadius: CGFloat = 10
+    static let trafficLightClearance: CGFloat = 85 // toolbar's first control, clear of the window buttons
+    static let listMaxHeight: CGFloat = 320  // scrolling lists inside sheets
+
+    // MARK: Icons (I)
+    static let iconXS: CGFloat = 12          // chevrons, tiny checks
+    static let iconS: CGFloat = 14           // chips, meta lines
+    static let iconM: CGFloat = 16           // buttons, inline
+    static let iconL: CGFloat = 18           // sidebar, nav, cards
+    static let iconXL: CGFloat = 28          // empty states, feature tiles
+    static let iconColumn: CGFloat = 20      // fixed slot so labels beside icons line up
+    static let iconTile: CGFloat = 32        // tinted square behind a notice glyph
+
+    // MARK: Widths (W)
+    static let pageWidth: CGFloat = 800
+    static let homeWidth: CGFloat = 1040     // Wispr's home: 770 column + 24 gap + 248 stats
+    static let sideColumn: CGFloat = 280     // side card beside a home-width column
+    static let sidebarWidth: CGFloat = 216
+    static let sidebarCollapsedWidth: CGFloat = 68
+    static let settingsNavWidth: CGFloat = 176
     static let menuWidth: CGFloat = 196
+    static let menuWidthCompact: CGFloat = 160 // menus that share a line with a field
+    static let buttonMinWidth: CGFloat = 96  // trailing buttons in a settings column
     static let detailWidth: CGFloat = 440    // settings-row label + detail column
-    static let listRow: CGFloat = 52
-    static let icon: CGFloat = 18
+    static let readingWidth: CGFloat = 560   // subtitles and paragraphs
+    static let noteWidth: CGFloat = 384      // centred empty-state messages
+    static let sheetWidth: CGFloat = 520     // modal editor sheets
+    static let sheetWidthWide: CGFloat = 620 // grid sheets (languages)
+    static let popoverWidth: CGFloat = 320   // toolbar popovers
+    static let searchWidth: CGFloat = 180    // inline search field's text
+    static let timeColumn: CGFloat = 80      // history rows' time column
+    static let onboardingSize = CGSize(width: 640, height: 600)
+
+    // MARK: Opacity
+    static let disabledOpacity: Double = 0.4
 
     // Color: warm paper and ink, each with a dark counterpart
     // Fog & sage: cool fog surfaces, charcoal text, one calm sage signal.
@@ -55,6 +129,14 @@ enum Theme {
     static let finishing = dynamic(light: 0x6F8796, dark: 0x9AB2C0)   // slate: working, not alarming
     static let success = dynamic(light: 0x3F7A5C, dark: 0x8CC4A5)
     static let danger = dynamic(light: 0xB5534A, dark: 0xE0877E)
+
+    // Derived surfaces and edges (named so views never mix their own opacities)
+    static let rowHover = well.opacity(0.7)            // list row under the pointer
+    static let signalWash = signalSoft.opacity(0.5)    // preview and draft cards
+    static let signalEdge = signal.opacity(0.5)        // tinted borders and rules
+    static let dangerSoft = danger.opacity(0.12)       // destructive hover fill
+    static let track = hairline.opacity(0.5)           // bar and meter tracks
+    static let fieldEdgeHover = ink3.opacity(0.6)      // menu and field border under the pointer
 
     // Hero: a deep fog-green panel, the same in both modes, with sage and fog glows drifting in it.
     static let heroBase = dynamic(light: 0x18201C, dark: 0x0E1311)
@@ -85,16 +167,31 @@ enum Theme {
 /// HushKey's type scale. macOS defaults (13 pt body, 10 pt captions) read small in a
 /// full-window app, so every view uses these steps instead of system text styles.
 extension Font {
+    // Display (New York serif): titles and figures
+    static let hkFigureXL = Font.display(36)                            // the one big figure on a card
+    static let hkFigureL = Font.display(34)                             // home band headline
     static let hkTitle1 = Font.display(28)                              // page titles
-    static let hkTitle2 = Font.display(22)                              // section titles, large values
-    static let hkTitle3 = Font.system(size: 18, weight: .semibold)      // card titles
+    static let hkFigureM = Font.display(28)                             // stat figures beside a label
+    static let hkSheetTitle = Font.display(26)                          // modal sheet titles, hero metrics
+    static let hkDisplayBand = Font.display(24)                         // banner titles, inline figures
+    static let hkTitle2 = Font.display(22)                              // card titles, large values
+    static let hkCardTitle = Font.display(20)                           // option-card and empty-state titles
+    static let hkDisplayS = Font.display(18)                            // small serif labels
+    static let hkQuote = Font.display(16)                               // quoted samples
+
+    // UI (SF Pro)
+    static let hkTitle3 = Font.system(size: 18, weight: .semibold)      // section titles
     static let hkHeadline = Font.system(size: 16, weight: .semibold)    // emphasised row titles
     static let hkRowTitle = Font.system(size: 16, weight: .medium)      // settings and list row labels
     static let hkBody = Font.system(size: 16)                           // reading text, list rows
+    static let hkTranscript = Font.system(size: 17)                     // the live transcript
     static let hkCallout = Font.system(size: 15)                        // row descriptions, secondary text
     static let hkControl = Font.system(size: 15, weight: .medium)       // buttons, menus, tabs
+    static let hkNav = Font.system(size: 15)                            // sidebar and settings nav rows
+    static let hkSubhead = Font.system(size: 14)                        // time column, notice text
     static let hkCaption = Font.system(size: 13)                        // status lines
     static let hkMeta = Font.system(size: 12)                           // timestamps, counts
+    static let hkBadge = Font.system(size: 11, weight: .semibold)       // step numbers, tiny badges
 
     /// HushKey's voice: New York (the system serif) at a regular weight for page titles and
     /// big figures, so headings read as written, not generated. Everything else is SF Pro.
@@ -133,25 +230,62 @@ extension View {
 
 // MARK: - Surfaces
 
-struct CardBackground: ViewModifier {
-    enum Style { case well, outlined }
-    var padding: CGFloat = Theme.s4
-    var style: Style = .well
+/// The card surfaces, one recipe each. `surface` draws only the fill and edge, for shapes that
+/// lay out their own content; `card` adds the standard padding and full width.
+enum SurfaceStyle {
+    /// `well` fill, no edge: grouped content on the sheet.
+    case well
+    /// `sheet` fill with a hairline: lists, editors, outlined cards.
+    case outlined
+    /// `well` fill with a hairline: insight and stat cards.
+    case wellOutlined
+    /// `signalSoft` fill with a `signal` edge: the chosen option.
+    case selected
+    /// Washed `signalSoft` with a soft `signal` edge: previews and drafts.
+    case tinted
+    /// `signalSoft` fill, no edge: a promise or notice.
+    case soft
 
-    func body(content: Content) -> some View {
-        content
-            .padding(padding)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(style == .well ? Theme.well : Theme.sheet,
-                        in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
-                .strokeBorder(Theme.hairline, lineWidth: style == .outlined ? 1 : 0))
+    var fill: Color {
+        switch self {
+        case .well, .wellOutlined: Theme.well
+        case .outlined: Theme.sheet
+        case .selected, .soft: Theme.signalSoft
+        case .tinted: Theme.signalWash
+        }
+    }
+
+    var edge: Color {
+        switch self {
+        case .well, .soft: .clear
+        case .outlined, .wellOutlined: Theme.hairline
+        case .selected: Theme.signal
+        case .tinted: Theme.signalEdge
+        }
+    }
+
+    var edgeWidth: CGFloat {
+        switch self {
+        case .well, .soft: 0
+        case .selected: Theme.selectedStroke
+        default: Theme.hairlineWidth
+        }
     }
 }
 
 extension View {
-    func card(padding: CGFloat = Theme.s4, style: CardBackground.Style = .well) -> some View {
-        modifier(CardBackground(padding: padding, style: style))
+    /// Fill and edge of a card surface at `radius`, without padding.
+    func surface(_ style: SurfaceStyle, radius: CGFloat = Theme.r2) -> some View {
+        background(style.fill, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .strokeBorder(style.edge, lineWidth: style.edgeWidth))
+    }
+
+    /// A full-width card: `cardPadding` inside, `r2` corners.
+    func card(padding: CGFloat = Theme.cardPadding, style: SurfaceStyle = .well) -> some View {
+        self.padding(padding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .surface(style)
     }
 }
 
@@ -168,11 +302,11 @@ struct PrimaryButtonStyle: ButtonStyle {
         configuration.label
             .font(.hkControl)
             .foregroundStyle(foreground)
-            .hushIconSize(16)
+            .hushIconSize(Theme.iconM)
             .hushIconHover(hovering && isEnabled)
             .padding(.horizontal, Theme.s4)
             .frame(height: Theme.controlHeight)
-            .background(tint.opacity(isEnabled ? (hovering ? 0.88 : 1) : 0.35),
+            .background(tint.opacity(isEnabled ? (hovering ? 0.88 : 1) : Theme.disabledOpacity),
                         in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
             .contentShape(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
@@ -191,8 +325,8 @@ struct SecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.hkControl)
-            .foregroundStyle(Theme.ink.opacity(isEnabled ? 1 : 0.4))
-            .hushIconSize(16)
+            .foregroundStyle(Theme.ink.opacity(isEnabled ? 1 : Theme.disabledOpacity))
+            .hushIconSize(Theme.iconM)
             .hushIconHover(hovering && isEnabled)
             .padding(.horizontal, Theme.s4)
             .frame(minWidth: minWidth)
@@ -202,7 +336,7 @@ struct SecondaryButtonStyle: ButtonStyle {
             .background(hovering && isEnabled ? Theme.hairline : Theme.selection,
                         in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
-                .strokeBorder(Theme.hairline, lineWidth: 1))
+                .strokeBorder(Theme.hairline, lineWidth: Theme.hairlineWidth))
             .contentShape(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .onHover { hovering = $0 }
@@ -219,12 +353,12 @@ struct DestructiveButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.hkControl)
-            .foregroundStyle(Theme.danger.opacity(isEnabled ? 1 : 0.4))
-            .hushIconSize(16)
+            .foregroundStyle(Theme.danger.opacity(isEnabled ? 1 : Theme.disabledOpacity))
+            .hushIconSize(Theme.iconM)
             .hushIconHover(hovering && isEnabled)
             .padding(.horizontal, Theme.s4)
             .frame(height: Theme.controlHeight)
-            .background(hovering && isEnabled ? Theme.danger.opacity(0.12) : Theme.hover,
+            .background(hovering && isEnabled ? Theme.dangerSoft : Theme.hover,
                         in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
             .contentShape(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
@@ -240,11 +374,11 @@ struct IconButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .labelStyle(.iconOnly)
-            .font(.system(size: 15, weight: .medium))
+            .font(.hkControl)
             .foregroundStyle(hovering ? Theme.ink : Theme.ink2)
-            .hushIconSize(17)
+            .hushIconSize(Theme.iconM)
             .hushIconHover(hovering)
-            .frame(width: 30, height: 30)
+            .frame(width: Theme.fieldHeight, height: Theme.fieldHeight)
             .background(hovering ? Theme.hover : .clear, in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
             .contentShape(Rectangle())
             .scaleEffect(configuration.isPressed ? 0.9 : 1)
@@ -277,18 +411,18 @@ struct Keycap: View {
             .font(.system(size: size, weight: .semibold, design: .rounded))
             .foregroundStyle(Theme.ink)
             .frame(minWidth: size * 1.85, minHeight: size * 1.85)
-            .padding(.horizontal, glyph.count > 1 ? 6 : 0)
+            .padding(.horizontal, glyph.count > 1 ? size * 0.46 : 0)
             .background {
                 ZStack {
                     RoundedRectangle(cornerRadius: size * 0.42, style: .continuous)
                         .fill(Theme.keycapEdge)
-                        .offset(y: 1.5)
+                        .offset(y: size * 0.115)
                     RoundedRectangle(cornerRadius: size * 0.42, style: .continuous)
                         .fill(Theme.keycap)
                 }
             }
             .overlay(RoundedRectangle(cornerRadius: size * 0.42, style: .continuous)
-                .strokeBorder(Theme.keycapEdge, lineWidth: 1))
+                .strokeBorder(Theme.keycapEdge, lineWidth: Theme.hairlineWidth))
     }
 }
 
@@ -491,13 +625,13 @@ struct StatusChip: View {
 
     var body: some View {
         Label(title, icon: icon)
-            .hushIconSize(14)
-            .font(.system(size: 13, weight: .medium))
+            .hushIconSize(Theme.iconS)
+            .font(.hkCaption.weight(.medium))
             .foregroundStyle(tint)
-            .padding(.horizontal, Theme.s2 + 2)
-            .frame(height: 24)
+            .padding(.horizontal, Theme.s3)
+            .frame(height: Theme.chipHeight)
             .background(Theme.well, in: Capsule())
-            .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 1))
+            .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: Theme.hairlineWidth))
     }
 }
 
@@ -519,6 +653,10 @@ struct ActivityHeatmap: View {
     var counts: [Date: Int]
     var weeks = 12
     var now = Date()
+    /// Chart geometry: twelve compact weeks fit beside a stat, so cells are their own measure.
+    private static let cell: CGFloat = 10
+    private static let gap: CGFloat = 3
+    private static let radius: CGFloat = 2
 
     init(entries: [DictationHistoryEntry], weeks: Int = 12, now: Date = Date()) {
         counts = Dictionary(grouping: entries) { Calendar.current.startOfDay(for: $0.createdAt) }.mapValues(\.count)
@@ -540,18 +678,18 @@ struct ActivityHeatmap: View {
         let lastColumnStart = calendar.date(byAdding: .day, value: -weekdayOffset, to: today) ?? today
         let maxCount = max(1, counts.values.max() ?? 1)
 
-        HStack(spacing: 3) {
+        HStack(spacing: Self.gap) {
             ForEach(0..<weeks, id: \.self) { column in
-                VStack(spacing: 3) {
+                VStack(spacing: Self.gap) {
                     ForEach(0..<7, id: \.self) { row in
                         let start = calendar.date(byAdding: .day, value: (column - weeks + 1) * 7, to: lastColumnStart) ?? today
                         let day = calendar.date(byAdding: .day, value: row, to: start) ?? today
                         let count = counts[day] ?? 0
-                        RoundedRectangle(cornerRadius: 2, style: .continuous)
+                        RoundedRectangle(cornerRadius: Self.radius, style: .continuous)
                             .fill(day > today ? Color.clear
                                   : count == 0 ? Theme.hairline
                                   : Theme.signal.opacity(0.3 + 0.7 * Double(count) / Double(maxCount)))
-                            .frame(width: 10, height: 10)
+                            .frame(width: Self.cell, height: Self.cell)
                             .help(day > today ? "" : "\(day.formatted(date: .abbreviated, time: .omitted)): \(count) dictation\(count == 1 ? "" : "s")")
                             .accessibilityElement()
                             .accessibilityHidden(day > today)

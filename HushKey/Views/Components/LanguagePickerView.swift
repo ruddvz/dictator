@@ -46,7 +46,7 @@ struct LanguagePickerSheet: View {
         VStack(alignment: .leading, spacing: Theme.s4) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: Theme.s1) {
-                    Text("Language").font(.display(26))
+                    Text("Language").font(.hkSheetTitle)
                     Text("Recognized on this Mac. One language at a time.")
                         .font(.hkCaption).foregroundStyle(Theme.ink2)
                 }
@@ -63,7 +63,7 @@ struct LanguagePickerSheet: View {
                 languageGrid
                 ScrollView { languageGrid }
             }
-            .frame(maxHeight: 300, alignment: .top)
+            .frame(maxHeight: Theme.listMaxHeight, alignment: .top)
             HStack {
                 Text("Missing a language? Add it in System Settings › Keyboard › Dictation.")
                     .font(.hkCaption).foregroundStyle(Theme.ink3)
@@ -76,8 +76,8 @@ struct LanguagePickerSheet: View {
                 .keyboardShortcut(.defaultAction)
             }
         }
-        .padding(Theme.s5)
-        .frame(width: 620)
+        .padding(Theme.cardPaddingL)
+        .frame(width: Theme.sheetWidthWide)
         .background(Theme.sheet)
         .onAppear { searchFocused = true }
     }
@@ -91,7 +91,7 @@ struct LanguagePickerSheet: View {
                     }
                 }
             }
-            .padding(1)
+            .padding(Theme.hairlineWidth)
             if results.isEmpty {
                 Text("No on-device language matches “\(query)”.")
                     .font(.hkCallout).foregroundStyle(Theme.ink2)
@@ -119,7 +119,7 @@ struct LanguagePickerSheet: View {
         .padding(.horizontal, Theme.s3)
         .padding(.vertical, Theme.s2)
         .background(Theme.well, in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: Theme.r3, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: Theme.r3, style: .continuous).strokeBorder(Theme.hairline, lineWidth: Theme.hairlineWidth))
     }
 
     private var selectedRow: some View {
@@ -147,7 +147,7 @@ private struct LanguageTile: View {
     var body: some View {
         Button(action: select) {
             HStack(spacing: Theme.s2) {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: Theme.s0) {
                     Text(language.languageName)
                         .font(.hkCallout.weight(.medium))
                         .foregroundStyle(Theme.ink)
@@ -164,7 +164,7 @@ private struct LanguageTile: View {
                 }
             }
             .padding(.horizontal, Theme.s3)
-            .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: Theme.listRow, alignment: .leading)
             .background(RoundedRectangle(cornerRadius: Theme.r3, style: .continuous)
                 .fill(isSelected ? Theme.signalSoft : hovering ? Theme.hover : Theme.well))
             .overlay(RoundedRectangle(cornerRadius: Theme.r3, style: .continuous)

@@ -649,12 +649,12 @@ struct FloatingPillView: View {
         static let hover = CGSize(width: 60, height: height)
         /// × · ribbon · ✓, and the ribbon alone while the shortcut is held.
         static let recorderWidth = inset + control + gap + ribbonSize.width + gap + control + inset
-        static let meterOnlyWidth = ribbonSize.width + 2 * 12
+        static let meterOnlyWidth = ribbonSize.width + 2 * Theme.s3
         static let timerWidth: CGFloat = 30
         /// Meeting glyph · ribbon · ×, and glyph · ribbon while the meeting saves. Recording adds
         /// the clock's slot before ■.
         static let meetingStartingWidth = inset + control + gap + ribbonSize.width + gap + control + inset
-        static let meetingSavingWidth = inset + control + gap + ribbonSize.width + 12
+        static let meetingSavingWidth = inset + control + gap + ribbonSize.width + Theme.s3
         static let meetingClockWidth: CGFloat = 34
         static let meetingLongClockWidth: CGFloat = 48
     }
@@ -922,7 +922,7 @@ struct FloatingPillView: View {
         .padding(.bottom, Theme.s4)
         .frame(width: 340, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: Theme.r1, style: .continuous).fill(Theme.heroBase))
-        .overlay(RoundedRectangle(cornerRadius: Theme.r1, style: .continuous).strokeBorder(Theme.ink.opacity(0.08), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: Theme.r1, style: .continuous).strokeBorder(Theme.ink.opacity(0.08), lineWidth: Theme.hairlineWidth))
         .shadow(color: .black.opacity(0.28), radius: 14, y: 6)
         .onHover { isHoveringCard = $0 }
         // Dark in both modes, so the shared tokens resolve to their dark values here.
@@ -1094,10 +1094,10 @@ private struct PillKey: View {
         Text(label)
             .font(.system(size: 10, weight: .semibold, design: .rounded))
             .foregroundStyle(Theme.ink)
-            .padding(.horizontal, 4)
+            .padding(.horizontal, Theme.s1)
             .frame(minWidth: 16, minHeight: 16)
-            .background(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(Theme.keycap))
-            .overlay(RoundedRectangle(cornerRadius: 4, style: .continuous).strokeBorder(Theme.keycapEdge, lineWidth: 0.5))
+            .background(RoundedRectangle(cornerRadius: Theme.r4, style: .continuous).fill(Theme.keycap))
+            .overlay(RoundedRectangle(cornerRadius: Theme.r4, style: .continuous).strokeBorder(Theme.keycapEdge, lineWidth: 0.5))
             .accessibilityLabel("Shortcut \(label)")
     }
 }
@@ -1127,7 +1127,7 @@ private struct PillIconButton: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 4) {
+            HStack(spacing: Theme.s1) {
                 Image(systemName: systemImage)
                     .font(.system(size: glyphSize ?? (quiet ? 11 : (size * 0.45).rounded()), weight: quiet || glyphSize != nil ? .semibold : .bold))
                 if let title {
@@ -1168,7 +1168,7 @@ private struct NoticeButtonStyle: ButtonStyle {
             .padding(.horizontal, 14)
             .frame(height: 30)
             .background(Capsule().fill(prominent ? Theme.ink : Color.clear))
-            .overlay(Capsule().strokeBorder(Theme.ink.opacity(prominent ? 0 : 0.28), lineWidth: 1))
+            .overlay(Capsule().strokeBorder(Theme.ink.opacity(prominent ? 0 : 0.28), lineWidth: Theme.hairlineWidth))
             .contentShape(Capsule())
             .opacity(configuration.isPressed ? 0.8 : 1)
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
@@ -1240,7 +1240,7 @@ private struct TypedConfirmation: View {
                 .frame(width: 14, height: 14)
                 .foregroundStyle(Theme.signal)
                 .scaleEffect(settled ? 1 : tickScale)
-            HStack(spacing: 4) {
+            HStack(spacing: Theme.s1) {
                 // One weight and one colour: no bold-plus-dim split.
                 Text(appName.map { "\(verb) into \($0)" } ?? verb)
                     .font(.system(size: 12, weight: .medium))
@@ -1251,7 +1251,7 @@ private struct TypedConfirmation: View {
             .opacity(settled || showsText ? 1 : 0)
             .offset(x: settled || showsText ? 0 : -4)
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, Theme.s3)
         .onAppear {
             guard !reduceMotion else { icon = .done; showsText = true; tickScale = 1; return }
             icon = .done

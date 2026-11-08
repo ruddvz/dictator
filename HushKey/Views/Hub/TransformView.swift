@@ -47,8 +47,8 @@ struct TransformView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Theme.s5) {
-                PageHeader(eyebrow: "", title: "Transforms",
+            PageColumn {
+                PageHeader(title: "Transforms",
                            subtitle: "Rewrite a transcript or selected text on this Mac. You always see the result first.") {
                     Button("New transform", icon: .plus) {
                         styleEditorRequest = WritingStyleEditorRequest(preset: nil)
@@ -67,7 +67,6 @@ struct TransformView: View {
                     .font(.hkCaption)
                     .foregroundStyle(Theme.ink2)
             }
-            .pageLayout()
         }
         .alert(errorTitle, isPresented: Binding(
             get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
@@ -112,12 +111,12 @@ struct TransformView: View {
                             UserDefaults.standard.set(SettingsView.Section.insertion.rawValue, forKey: "settingsSection")
                             model.screen = .settings
                         }
-                        .buttonStyle(SecondaryButtonStyle(minWidth: 96))
+                        .buttonStyle(SecondaryButtonStyle(minWidth: Theme.buttonMinWidth))
                     }
                 }
             } else {
             GroupRow {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: Theme.stackGap) {
                 Group {
                     HStack {
                         Label("Selection from \(model.selectedTextEditTargetName ?? "another app")", icon: .cursor)
@@ -129,37 +128,37 @@ struct TransformView: View {
                             .disabled(model.isSelectedTextEditCapturing || model.isFinalizingSelectedTextEdit || model.isApplyingSelectedTextEdit)
                     }
 
-                    VStack(alignment: .leading, spacing: 5) {
+                    VStack(alignment: .leading, spacing: Theme.s1) {
                         Text("Original selection").font(.hkCaption.weight(.semibold)).foregroundStyle(Theme.ink2)
                         Text(model.selectedTextEditOriginal)
                             .textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(10)
-                            .background(Theme.sheet, in: RoundedRectangle(cornerRadius: 8))
+                            .padding(Theme.s3)
+                            .surface(.outlined, radius: Theme.controlRadius)
                     }
 
-                    VStack(alignment: .leading, spacing: 5) {
+                    VStack(alignment: .leading, spacing: Theme.s1) {
                         Text(model.isSelectedTextEditCapturing ? "Live edit instruction" : "Edit instruction")
                             .font(.hkCaption.weight(.semibold)).foregroundStyle(Theme.ink2)
                         if model.isSelectedTextEditCapturing {
                             Text(model.selectedTextEditLiveInstruction.isEmpty
                                  ? "Listening…"
                                  : model.selectedTextEditLiveInstruction)
-                                .frame(maxWidth: .infinity, minHeight: 54, alignment: .topLeading)
-                                .padding(10)
-                                .background(Theme.sheet, in: RoundedRectangle(cornerRadius: 8))
+                                .frame(maxWidth: .infinity, minHeight: Theme.editorShort, alignment: .topLeading)
+                                .padding(Theme.s3)
+                                .surface(.outlined, radius: Theme.controlRadius)
                         } else {
                             TextEditor(text: Binding(
                                 get: { model.selectedTextEditInstruction },
                                 set: { model.updateSelectedTextEditInstruction($0) }))
                                 .font(.hkBody)
-                                .frame(minHeight: 75, maxHeight: 120)
+                                .frame(minHeight: Theme.editorShort, maxHeight: Theme.editorShortMax)
                                 .disabled(model.isFinalizingSelectedTextEdit || model.isGeneratingSelectedTextEdit || model.isApplyingSelectedTextEdit)
                                 .editorField()
                         }
                     }
 
-                    HStack(spacing: 10) {
+                    HStack(spacing: Theme.controlGap) {
                         Button {
                             Task { await model.previewSelectedTextEdit() }
                         } label: {
@@ -186,13 +185,13 @@ struct TransformView: View {
                     }
 
                     if !model.selectedTextEditDraft.isEmpty {
-                        VStack(alignment: .leading, spacing: 5) {
+                        VStack(alignment: .leading, spacing: Theme.s1) {
                             Text("Preview, review before applying").font(.hkCaption.weight(.semibold)).foregroundStyle(Theme.ink2)
                             TextEditor(text: Binding(
                                 get: { model.selectedTextEditDraft },
                                 set: { model.updateSelectedTextEditDraft($0) }))
                                 .font(.hkBody)
-                                .frame(minHeight: 90, maxHeight: 180)
+                                .frame(minHeight: Theme.editorShort, maxHeight: Theme.editorTall)
                                 .disabled(model.isApplyingSelectedTextEdit || model.selectedTextEditApplied)
                                 .editorField()
                         }
@@ -220,16 +219,13 @@ struct TransformView: View {
     }
 
     private var transcriptCard: some View {
-        VStack(alignment: .leading, spacing: Theme.s3) {
-            HStack {
-                Text("Your text").font(.hkTitle3)
-                Spacer()
-                if !currentText.isEmpty {
-                    Text("\(currentText.count.formatted()) characters")
-                        .font(.hkMeta.monospacedDigit())
-                        .foregroundStyle(Theme.ink3)
-                }
+        PageSection("Your text") {
+            if !currentText.isEmpty {
+                Text("\(currentText.count.formatted()) characters")
+                    .font(.hkMeta.monospacedDigit())
+                    .foregroundStyle(Theme.ink3)
             }
+        } content: {
             if currentText.isEmpty {
                 HStack(spacing: Theme.s4) {
                     Text("Dictate or pick a dictation from History to transform.")
@@ -244,9 +240,9 @@ struct TransformView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     TextEditor(text: transcriptBinding)
                         .font(.hkBody)
-                        .lineSpacing(3)
+                        .lineSpacing(Theme.leading)
                         .scrollContentBackground(.hidden)
-                        .frame(minHeight: 140, maxHeight: 260)
+                        .frame(minHeight: Theme.editorMedium, maxHeight: Theme.editorTallMax)
                         .disabled(isBusy)
                         .padding(Theme.s3)
                     RowDivider()
@@ -272,12 +268,10 @@ struct TransformView: View {
                         .buttonStyle(PrimaryButtonStyle())
                         .disabled(!canGenerate)
                     }
-                    .padding(.horizontal, Theme.s4)
+                    .padding(.horizontal, Theme.rowPaddingH)
                     .padding(.vertical, Theme.s3)
                 }
-                .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
-                    .strokeBorder(Theme.hairline, lineWidth: 1))
+                .surface(.outlined)
             }
         }
     }
@@ -286,36 +280,51 @@ struct TransformView: View {
         Binding(get: { model.transcriber.text }, set: { model.editCurrentDictation($0) })
     }
 
+    /// One tile in the transform grid: a built-in transform or one of yours.
+    private enum TransformChoice: Identifiable {
+        case builtIn(LocalWritingTransform)
+        case custom(WritingStylePreset)
+
+        var id: String {
+            switch self {
+            case .builtIn(let action): "builtin-\(action.rawValue)"
+            case .custom(let style): style.id.uuidString
+            }
+        }
+    }
+
+    private var transformChoices: [TransformChoice] {
+        LocalWritingTransform.allCases.map(TransformChoice.builtIn) + model.writingStylePresets.map(TransformChoice.custom)
+    }
+
     /// Card grid: built-in transforms, then your own. "New transform" in the header adds one.
     private var transformPicker: some View {
-        VStack(alignment: .leading, spacing: Theme.s3) {
-            HStack {
-                Text("Choose a transform").font(.hkTitle3)
-                Spacer()
-                if !model.writingStylePresets.isEmpty {
-                    Text("\(model.writingStylePresets.count) of \(WritingStylePreset.maximumCount) custom")
-                        .font(.hkCaption.monospacedDigit())
-                        .foregroundStyle(Theme.ink2)
-                }
+        PageSection("Choose a transform") {
+            if !model.writingStylePresets.isEmpty {
+                Text("\(model.writingStylePresets.count) of \(WritingStylePreset.maximumCount) custom")
+                    .font(.hkCaption.monospacedDigit())
+                    .foregroundStyle(Theme.ink2)
             }
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Theme.s3), count: 3),
-                      alignment: .leading, spacing: Theme.s3) {
-                ForEach(LocalWritingTransform.allCases) { action in
-                    TransformCard(symbol: action.symbol, title: action.rawValue,
-                                  detail: action.requiresLanguageModel && !model.localTransformService.modelIsAvailable
-                                      ? action.description + " Needs the on-device model."
-                                      : action.description,
-                                  isSelected: selectedStyle == nil && selectedAction == action) {
+        } content: {
+            CardGrid(items: transformChoices) { choice in
+                switch choice {
+                case .builtIn(let action):
+                    SelectableCard(title: action.rawValue,
+                                   detail: action.requiresLanguageModel && !model.localTransformService.modelIsAvailable
+                                       ? action.description + " Needs the on-device model."
+                                       : action.description,
+                                   symbol: action.symbol,
+                                   isSelected: selectedStyle == nil && selectedAction == action,
+                                   detailLines: 3) {
                         selectedAction = action
                         selectedStyleID = nil
                         selectedStyleCameFromProfile = false
                         clearPreview()
                     }
                     .disabled(model.localTransformService.isTransforming)
-                }
-                ForEach(model.writingStylePresets) { style in
-                    TransformCard(symbol: "textformat", title: style.name, detail: style.instructions,
-                                  isSelected: selectedStyleID == style.id) {
+                case .custom(let style):
+                    SelectableCard(title: style.name, detail: style.instructions, symbol: "textformat",
+                                   isSelected: selectedStyleID == style.id, detailLines: 3) {
                         selectedStyleID = style.id
                         selectedStyleCameFromProfile = false
                         clearPreview()
@@ -340,20 +349,17 @@ struct TransformView: View {
     }
 
     private var previewCard: some View {
-        VStack(alignment: .leading, spacing: Theme.s3) {
-            HStack {
-                Text("Preview").font(.hkTitle3)
-                Text(previewLabel ?? (previewAction ?? selectedAction).rawValue)
-                    .font(.hkCallout)
-                    .foregroundStyle(Theme.ink2)
-                Spacer()
-            }
+        PageSection("Preview") {
+            Text(previewLabel ?? (previewAction ?? selectedAction).rawValue)
+                .font(.hkCallout)
+                .foregroundStyle(Theme.ink2)
+        } content: {
             VStack(alignment: .leading, spacing: 0) {
                 TextEditor(text: $draft)
                     .font(.hkBody)
-                    .lineSpacing(3)
+                    .lineSpacing(Theme.leading)
                     .scrollContentBackground(.hidden)
-                    .frame(minHeight: 160)
+                    .frame(minHeight: Theme.editorMedium)
                     .padding(Theme.s3)
                 RowDivider()
                 HStack(spacing: Theme.s2) {
@@ -389,12 +395,10 @@ struct TransformView: View {
                     .buttonStyle(PrimaryButtonStyle())
                     .disabled(!canApplyPreview)
                 }
-                .padding(.horizontal, Theme.s4)
+                .padding(.horizontal, Theme.rowPaddingH)
                 .padding(.vertical, Theme.s3)
             }
-            .background(Theme.signalSoft.opacity(0.5), in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
-                .strokeBorder(Theme.signal.opacity(0.35), lineWidth: 1))
+            .surface(.tinted)
         }
         .transition(.opacity.combined(with: .move(edge: .top)))
     }
@@ -536,7 +540,7 @@ private struct WritingStylePresetEditor: View {
         EditorSheet(title: isNew ? "New transform" : "Edit transform",
                     subtitle: "Rewrites text on this Mac with your instruction.",
                     note: "Name up to 32 characters, instruction up to 500.",
-                    primaryTitle: isNew ? "Create" : "Save", canSave: canSave, width: 540, onSave: save) {
+                    primaryTitle: isNew ? "Create" : "Save", canSave: canSave, onSave: save) {
             SheetField(label: "Name", prompt: "For example: Warm and concise", text: $name, autofocus: isNew)
             SheetField(label: "Instruction",
                        prompt: "Describe the tone or format",
@@ -558,50 +562,5 @@ private struct WritingStylePresetEditor: View {
     private func save() {
         validationMessage = onSave(name, instructions)
         if validationMessage == nil { dismiss() }
-    }
-}
-
-/// One transform choice: its own glyph beside a serif title, then a short description.
-private struct TransformCard: View {
-    var symbol: String
-    var title: String
-    var detail: String
-    var isSelected: Bool
-    var action: () -> Void
-    @State private var hovering = false
-
-    var body: some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: Theme.s2) {
-                HStack(alignment: .firstTextBaseline, spacing: Theme.s2) {
-                    SymbolGlyph(symbol, size: 17)
-                        .hushIconActive(isSelected)
-                        .hushIconHover(hovering)
-                        .foregroundStyle(isSelected || hovering ? Theme.signal : Theme.ink2)
-                        .frame(width: 20)
-                    Text(title)
-                        .font(.display(19))
-                        .foregroundStyle(Theme.ink)
-                        .lineLimit(1)
-                }
-                Text(detail)
-                    .font(.hkCaption)
-                    .foregroundStyle(Theme.ink2)
-                    .lineLimit(3)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity, minHeight: 104, alignment: .topLeading)
-            .padding(Theme.s4)
-            .background(isSelected ? Theme.signalSoft : hovering ? Theme.well : Theme.sheet,
-                        in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
-                .strokeBorder(isSelected ? Theme.signal : Theme.hairline, lineWidth: isSelected ? 1.5 : 1))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .animation(Theme.snappy, value: isSelected)
-        .animation(.easeOut(duration: 0.12), value: hovering)
-        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 }

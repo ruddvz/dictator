@@ -98,10 +98,10 @@ struct MeetingResultCard: View {
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Theme.ink2)
             }
-            .padding(.vertical, 2)
+            .padding(.vertical, Theme.s0)
             .transition(.opacity)
         } else if tooShort {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Theme.s1) {
                 Text(note.transcript)
                     .font(.system(size: 13))
                     .foregroundStyle(Theme.ink)
@@ -254,7 +254,7 @@ struct CardOutlineButtonStyle: ButtonStyle {
             .foregroundStyle(prominent ? Theme.paper : Theme.ink)
             .lineLimit(1)
             .fixedSize()
-            .padding(.horizontal, 12)
+            .padding(.horizontal, Theme.s3)
             .frame(height: 26)
             .background(Capsule().fill(prominent ? Theme.signal.opacity(hovering ? 0.88 : 1)
                                        : Theme.ink.opacity(hovering ? 0.12 : 0.06)))

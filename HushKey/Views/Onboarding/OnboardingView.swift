@@ -30,7 +30,7 @@ struct OnboardingView: View {
             .clipped()
             footer
         }
-        .frame(width: 640, height: 600)
+        .frame(width: Theme.onboardingSize.width, height: Theme.onboardingSize.height)
         .background(Theme.sheet)
         .foregroundStyle(Theme.ink)
         .font(.hkBody)
@@ -53,7 +53,7 @@ struct OnboardingView: View {
 
     private var header: some View {
         HStack(spacing: Theme.s3) {
-            HStack(spacing: 6) {
+            HStack(spacing: Theme.figureGap) {
                 ForEach(OnboardingStep.allCases) { step in
                     let reached = step.rawValue <= flow.index
                     Button {
@@ -62,7 +62,7 @@ struct OnboardingView: View {
                         Capsule()
                             .fill(step == flow.step || flow.completed.contains(step) ? Theme.signal
                                   : reached ? Theme.ink3 : Theme.hairline)
-                            .frame(width: step == flow.step ? 22 : 8, height: 8)
+                            .frame(width: step == flow.step ? Theme.s5 : Theme.dot, height: Theme.dot)
                             .contentShape(Rectangle().inset(by: -4))
                     }
                     .buttonStyle(.plain)
@@ -109,7 +109,7 @@ struct OnboardingView: View {
         .animation(Theme.snappy, value: flow.currentStepPassed)
         .padding(.horizontal, Theme.s6)
         .padding(.vertical, Theme.s4)
-        .overlay(alignment: .top) { Rectangle().fill(Theme.hairline).frame(height: 1) }
+        .overlay(alignment: .top) { RowDivider() }
     }
 
     private var stepTransition: AnyTransition {
@@ -192,7 +192,7 @@ private struct PassedLine: View {
 
     var body: some View {
         HStack(spacing: Theme.s2) {
-            Glyph(.checkCircle, size: 16).foregroundStyle(Theme.signal)
+            Glyph(.checkCircle, size: Theme.iconM).foregroundStyle(Theme.signal)
             Text(text).font(.hkCallout)
         }
         .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .leading)))
@@ -299,25 +299,25 @@ private struct PermissionCard: View {
     var body: some View {
         HStack(alignment: .center, spacing: Theme.s4) {
             // The glyph alone, sage once granted: no circle tile behind it.
-            Glyph(permission == .microphone ? .mic : .keyboard, size: 22)
+            Glyph(permission == .microphone ? .mic : .keyboard, size: Theme.iconL)
                 .foregroundStyle(status == .granted ? Theme.signal : Theme.ink2)
-                .frame(width: 28, height: 28)
-            VStack(alignment: .leading, spacing: 3) {
+                .frame(width: Theme.iconXL, height: Theme.iconXL)
+            VStack(alignment: .leading, spacing: Theme.s0) {
                 Text(permission.title).font(.hkHeadline)
                 Text(permission.reason)
                     .font(.hkCaption)
                     .foregroundStyle(Theme.ink2)
                     .fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: 5) {
+                HStack(spacing: Theme.s1) {
                     Circle()
                         .fill(status == .granted ? Theme.signal : status == .off ? Theme.danger : Theme.ink3)
-                        .frame(width: 6, height: 6)
+                        .frame(width: Theme.dot, height: Theme.dot)
                     Text(permission.statusLine(for: status))
                         .font(.hkMeta)
                         .foregroundStyle(status == .off ? Theme.danger : Theme.ink3)
                         .contentTransition(.opacity)
                 }
-                .padding(.top, 2)
+                .padding(.top, Theme.s0)
             }
             Spacer(minLength: Theme.s3)
             if let title = permission.buttonTitle(for: status) {
@@ -325,7 +325,7 @@ private struct PermissionCard: View {
                     .buttonStyle(PrimaryButtonStyle())
                     .transition(.opacity)
             } else {
-                Glyph(.check, size: 18)
+                Glyph(.check, size: Theme.iconL)
                     .foregroundStyle(Theme.signal)
                     .transition(.opacity.combined(with: .scale(scale: 0.6)))
                     .accessibilityLabel("On")
@@ -355,7 +355,7 @@ private struct MicTestStep: View {
             VoiceRibbon(level: meter.level, mode: meter.isRunning ? .live : meter.isStarting ? .waiting : .rest)
                 .reveal(1)
             HStack(spacing: Theme.s2) {
-                Glyph(.mic, size: 14).foregroundStyle(Theme.ink3)
+                Glyph(.mic, size: Theme.iconS).foregroundStyle(Theme.ink3)
                 Text(meter.activeDeviceName ?? (micAllowed ? "Starting the microphone…" : "The microphone is off"))
                     .font(.hkCaption)
                     .foregroundStyle(Theme.ink2)
@@ -502,9 +502,9 @@ private struct LiveKeycap: View {
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
-        VStack(alignment: glyph == "fn" ? .leading : .center, spacing: 6) {
+        VStack(alignment: glyph == "fn" ? .leading : .center, spacing: Theme.figureGap) {
             if glyph == "fn" {
-                Glyph(.globe, size: 16)
+                Glyph(.globe, size: Theme.iconM)
                 Text("fn").font(.system(size: 20, weight: .semibold, design: .rounded))
             } else {
                 Text(glyph).font(.system(size: 30, weight: .semibold, design: .rounded))
@@ -519,7 +519,7 @@ private struct LiveKeycap: View {
                 shape.fill(lit ? Theme.signal : Theme.keycap)
             }
         }
-        .overlay(shape.strokeBorder(lit ? Theme.signal : Theme.keycapEdge, lineWidth: 1))
+        .overlay(shape.strokeBorder(lit ? Theme.signal : Theme.keycapEdge, lineWidth: Theme.hairlineWidth))
         .offset(y: lit && !reduceMotion ? 3 : 0)
         .animation(.easeOut(duration: 0.08), value: lit)
     }
@@ -548,7 +548,7 @@ private struct PracticeStep: View {
             VStack(alignment: .leading, spacing: Theme.s2) {
                 if model.audio.isRunning || model.isFinalizingDictation {
                     BreathRibbon(level: model.audio.level, mode: model.audio.isRunning ? .live : .working)
-                        .frame(height: 28)
+                        .frame(height: Theme.toolbarButton)
                         .transition(.opacity)
                         .accessibilityHidden(true)
                 }
@@ -558,15 +558,15 @@ private struct PracticeStep: View {
                     .lineLimit(2...4)
                     .focused($fieldFocused)
             }
-            .card(padding: Theme.s4, style: .outlined)
+            .card(style: .outlined)
             .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
-                .strokeBorder(fieldFocused ? Theme.signal : .clear, lineWidth: 1.5))
+                .strokeBorder(fieldFocused ? Theme.signal : .clear, lineWidth: Theme.selectedStroke))
             .reveal(2)
 
             if !spoken.isEmpty {
                 CleanupDiff(spoken: spoken, cleaned: cleaned, isExample: isExample)
                     .padding(.top, Theme.s4)
-                    .transition(.opacity.combined(with: .offset(y: 6)))
+                    .transition(.opacity.combined(with: .offset(y: Theme.figureGap)))
             } else {
                 Button("No mic handy? Show an example") { showExample() }
                     .buttonStyle(.plain)
@@ -649,7 +649,7 @@ private struct WhisperStep: View {
                 .reveal(1)
             VoiceRibbon(level: model.audio.level,
                         mode: model.audio.isRunning ? .live : model.isFinalizingDictation ? .working : .rest,
-                        height: 56)
+                        height: Theme.s8)
                 .reveal(2)
 
             Group {

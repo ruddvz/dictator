@@ -32,8 +32,8 @@ struct FileTranscriptionView: View {
     var body: some View {
         @Bindable var whisper = model.whisperFileTranscriber
         ScrollView {
-            VStack(alignment: .leading, spacing: Theme.s5) {
-                PageHeader(eyebrow: "", title: "Files",
+            PageColumn {
+                PageHeader(title: "Files",
                            subtitle: "Turn a recording into text and subtitles, on this Mac.") {
                     // The source card offers "Choose file…" until a file is picked.
                     if workspace.selectedURL != nil {
@@ -106,7 +106,6 @@ struct FileTranscriptionView: View {
 
                 recentSessionsCard
             }
-            .pageLayout()
         }
         .onAppear {
             if workspace.shouldRestoreLatest(isBusy: isBusy), let latest = historySessions.first {
@@ -154,7 +153,7 @@ struct FileTranscriptionView: View {
         return HStack(spacing: Theme.s4) {
             VStack(alignment: .leading, spacing: Theme.s2) {
                 Text(sourceName ?? "Drop audio or video here")
-                    .font(.display(22))
+                    .font(.hkTitle2)
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Group {
@@ -195,16 +194,16 @@ struct FileTranscriptionView: View {
                           (workspace.engine == .whisperKit && !whisper.selectedModelIsDownloaded))
             }
         }
-        .padding(.horizontal, Theme.s5)
+        .padding(.horizontal, Theme.cardPaddingL)
         .padding(.vertical, Theme.s6)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(isDropTargeted ? Theme.signalSoft : .clear,
-                    in: RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: Theme.r1, style: .continuous)
-            .strokeBorder(Theme.signal.opacity(isDropTargeted ? 1 : 0.45),
-                          style: StrokeStyle(lineWidth: 1.5, dash: [7, 5])))
+                    in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
+            .strokeBorder(isDropTargeted ? Theme.signal : Theme.signalEdge,
+                          style: StrokeStyle(lineWidth: Theme.selectedStroke, dash: Theme.dash)))
         .animation(.easeOut(duration: 0.12), value: isDropTargeted)
-        .contentShape(RoundedRectangle(cornerRadius: Theme.r1, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
         .dropDestination(for: URL.self) { urls, _ in
             guard !isBusy, let url = urls.first, url.isFileURL else { return false }
             selectFile(url)
@@ -213,20 +212,17 @@ struct FileTranscriptionView: View {
     }
 
     private var transcriptCard: some View {
-        VStack(alignment: .leading, spacing: Theme.s3) {
-            HStack {
-                Text("Transcript").font(.hkTitle3)
-                Spacer()
-                Text("\(currentCues.count) timed segments")
-                    .font(.hkMeta.monospacedDigit())
-                    .foregroundStyle(Theme.ink3)
-            }
+        PageSection("Transcript") {
+            Text("\(currentCues.count) timed segments")
+                .font(.hkMeta.monospacedDigit())
+                .foregroundStyle(Theme.ink3)
+        } content: {
             VStack(alignment: .leading, spacing: 0) {
                 TextEditor(text: transcriptBinding)
                     .font(.hkBody)
-                    .lineSpacing(3)
+                    .lineSpacing(Theme.leading)
                     .scrollContentBackground(.hidden)
-                    .frame(minHeight: 220)
+                    .frame(minHeight: Theme.editorTall)
                     .disabled(isBusy)
                     .padding(Theme.s3)
                 RowDivider()
@@ -247,33 +243,18 @@ struct FileTranscriptionView: View {
                     Button("Save text…", icon: .download) { save(content: currentText, fileExtension: "txt", type: .plainText) }
                         .buttonStyle(PrimaryButtonStyle())
                 }
-                .padding(.horizontal, Theme.s4)
+                .padding(.horizontal, Theme.rowPaddingH)
                 .padding(.vertical, Theme.s3)
             }
-            .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
-                .strokeBorder(Theme.hairline, lineWidth: 1))
+            .surface(.outlined)
         }
     }
 
     private var recentSessionsCard: some View {
-        VStack(alignment: .leading, spacing: Theme.s3) {
-            HStack(spacing: Theme.s2) {
-                Text("Recent").font(.hkTitle3)
-                Spacer()
+        PageSection("Recent") {
                 if !historySessions.isEmpty {
-                    HStack(spacing: Theme.s2) {
-                        Glyph(.search).foregroundStyle(Theme.ink3)
-                        TextField("Search", text: $historySearch)
-                            .textFieldStyle(.plain)
-                            .frame(width: 160)
-                    }
-                    .font(.hkCallout)
-                    .padding(.horizontal, Theme.s3)
-                    .frame(height: Theme.controlHeight - 4)
-                    .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
-                        .strokeBorder(Theme.hairline, lineWidth: 1))
+                    SearchField(prompt: "Search", text: $historySearch,
+                                accessibilityLabel: "Search file transcripts")
                 }
                 if !historySessions.isEmpty || model.fileTranscriptionHistoryArchiveUnreadable {
                     Menu {
@@ -288,7 +269,7 @@ struct FileTranscriptionView: View {
                     .fixedSize()
                     .help("More")
                 }
-            }
+        } content: {
             if let message = model.fileTranscriptionHistoryMessage {
                 Label(message, icon: .warning)
                     .font(.hkCaption).foregroundStyle(Theme.finishing)
@@ -304,13 +285,13 @@ struct FileTranscriptionView: View {
                         ListRow {
                             Button { restore(session) } label: {
                                 HStack(alignment: .firstTextBaseline, spacing: Theme.s4) {
-                                    VStack(alignment: .leading, spacing: 3) {
+                                    VStack(alignment: .leading, spacing: Theme.s0) {
                                         Text(session.sourceName).font(.hkRowTitle).lineLimit(1)
                                         Text(session.text).font(.hkCallout).foregroundStyle(Theme.ink2).lineLimit(1)
                                     }
                                     Spacer(minLength: Theme.s2)
                                     Text(session.createdAt.formatted(date: .abbreviated, time: .shortened))
-                                        .font(.system(size: 14).monospacedDigit())
+                                        .font(.hkSubhead.monospacedDigit())
                                         .foregroundStyle(Theme.ink3)
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)

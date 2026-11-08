@@ -1,5 +1,14 @@
 # HushKey progress
 
+## Completed: Hallmark design pass, tokens, Home band polish (2026-11-08)
+
+- **Hallmark pass** (nutlope/hallmark, Fog & sage kept): removed icon tiles, card-in-card, tracked caps, middle-dot meta and decorative badges across hub, lab and onboarding; personality comes from signature pieces instead (serif `display` voice, the Home voice band, Style's serif voice samples, Insights heatmap, Files' sage drop zone, Meetings' instrument panel).
+- **Tokens:** every hub and lab page takes spacing, type, radii, strokes, heights and widths from `Theme.swift` roles and shared components (`PageHeader` + `PageColumn`, `SectionTitle`, `surface`/`card`, `SelectableCard` + `CardGrid`, `SearchField`). Title edges, header gaps (32), grid gutters (16) and card corners (r2) now match on every page. Tables in `docs/DESIGN_SYSTEM.md`.
+- **Home band:** Field is the only style (the Tide/Chorus/Horizon trial and its picker are gone). It now has a voice-lit bloom, a hover lift, a rest-to-live crossfade, a feathered live halo, calmer lines under the words and a top sheen (`Motion.swift`, `Ambient.swift`). `MotionSnapshotTests` renders it in six states, light and dark.
+- **Fixed:** Home's figures line said "about 1 h saved saved".
+- **Verification:** full suite 364 tests, 8 skipped, 0 failures on this Mac. Packaged `dist/HushKey.app` launched; Home checked live (band at rest, figures line). The band's hover, waiting, live and working states were checked in rendered snapshots only. **Not checked live:** a spoken dictation through the mic.
+- **Next:** carry the ribbon onto other tabs (`RibbonMark` in `PageHeader`, Files drop zone, Meetings while recording, Transforms while running, Insights `waveIn`).
+
 ## Completed: 1.0.0 release-readiness pass (2026-11-08)
 
 - **One copy:** merged `claude/meeting-pill` (meetings from the pill) into `main`; removed the `HushKey-meeting-pill` and `HushKey-ui-polish` worktrees and branches; deleted stray builds (Codex copy's `.build`/`build`, old scratch and harness builds) and unregistered ~210 dead HushKey paths from Launch Services. Only `dist/HushKey.app` is registered and running. The Codex source copy at `~/Documents/Codex/2026-11-01/referenced-chatgpt-conversation-this-is-an/outputs/HushKey` still exists (it has uncommitted Nov 1 edits, all its commits are on `main`); delete it once you don't need those edits. A stale `dev.hushkey.app` preferences file (old bundle id, only an onboarding window frame) is also left.

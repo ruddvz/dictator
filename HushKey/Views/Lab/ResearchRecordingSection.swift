@@ -26,7 +26,7 @@ struct ResearchRecordingSection: View {
                     .frame(width: Theme.menuWidth, height: Theme.controlHeight)
                     .background(Theme.sheet, in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
-                        .strokeBorder(Theme.hairline, lineWidth: 1))
+                        .strokeBorder(Theme.hairline, lineWidth: Theme.hairlineWidth))
             }
             .disabled(recorder.isRecording)
 
