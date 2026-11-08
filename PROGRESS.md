@@ -6,7 +6,8 @@
 - **Fixed:** Silent Use can no longer be pre-armed for direct typing while global typing is off; the saved-on state can still be cleared. Added the existing voice-ribbon mark to every section title, and normalized shortcut, deletion, typing-fallback, and help wording.
 - **Fixed:** shortcut recorder's Swift 6 `NSEvent` actor-isolation warning. Generated 24 current page snapshots (12 sections × 2 color schemes).
 - **Verification:** full XCTest suite 368 passed, 8 skipped, 0 failures; snapshot test passed; Release package 1.0.0 (1) built and passed strict signature verification. Existing no-mic rehearsal inserted text into a separate blank app.
-- **Open:** real microphone dictation, Meetings system-audio capture, the complete file picker→transcribe→export journey, live permissions, headphone capture, and VoiceOver were not verified. Shared card grids still feel generic; the ribbon mark is a first visual step, not a full redesign. See `docs/AUDIT_2026-11-08.md` and the audit screenshots in Codex outputs.
+- **CI:** GitHub Actions run [#42473602232](https://github.com/ruddvz/hushkey/actions/runs/42473602232) failed before any job steps and has no logs; it does not show a code test failure.
+- **Open:** real microphone dictation, Meetings system-audio capture, the complete file picker→transcribe→export journey, live permissions, headphone capture, and VoiceOver were not verified. The computer-use surface reported the Mac locked during this audit, so I did not inspect the packaged app interactively. Shared card grids still feel generic; the ribbon mark is a first visual step, not a full redesign. See `docs/AUDIT_2026-11-08.md` and the audit screenshots in Codex outputs.
 - **Next fresh session:** complete live acceptance with the user speaking and clicking; then agree a visual direction for a per-page design pass.
 
 ## Fixed: app-focused text insertion lookup (2026-11-08)
