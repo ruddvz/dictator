@@ -1,5 +1,14 @@
 # HushKey progress
 
+## Fixed and packaged: Codex delivery, dictation polish, and scrolling (2026-11-20)
+
+- The screenshots show HushKey recognized a transcript, but at least one attempt fell back to the Copy card instead of inserting into Codex. The current source adds a bounded Accessibility descendant scan (300 ms / 96 nodes) and a one-shot Cmd+V fallback only when Codex remains frontmost and no unsupported or ambiguous focused control was observed. The app labels this delivery unverified and preserves the clipboard if it has not changed.
+- Added `HushKey` as a built-in recognition hint and corrects the observed “Hushki” Parakeet spelling. On-device punctuation/filler polish now defaults on for people without a saved choice. Nearby-field name hints remain opt-in; only extracted terms are used transiently.
+- Replaced inconsistent icon variants with a consistent native SF Symbols set, restored selected-state distinctions and the mic-responsive listening glyph, retained the HushKey ribbon mark, and made long history and meeting-note lists lazy to reduce scroll layout work.
+- **Verification:** 368 passed, 8 skipped, 0 failed on macOS 27.0.1; `git diff --check` passed. Release 1.0.0 (1) packaged, strict code-signature verification passed, and the updated `dist/HushKey.app` was relaunched.
+- **Still open:** live microphone accuracy for this user's speech, exact-once insertion into a real Codex composer, and scroll frame-rate profiling were not independently verified. Desktop-control tools were unavailable. Meetings audio/export, selected-text editing, file import-to-export, live permission flows, headphone motion, and VoiceOver still need acceptance.
+- Next fresh session: dictate one short sentence into a blank Codex composer with the updated app, confirm it appears once, then continue the remaining device-level acceptance items in `docs/TESTING_PROTOCOL.md`.
+
 ## Investigated: Codex insertion and end-to-end status (2026-11-19)
 
 - Unified logs for the attached 17:18–17:19 screenshots show HushKey had Accessibility permission, but both dictation starts captured `insertTarget=false` and `pasteTarget=false`; at finish, Codex (`com.openai.codex`) returned `focused=none`. HushKey therefore showed the transcript card with Copy instead of inserting. The text was retained; this was a missing Accessibility focus target, not truncated recognition.
