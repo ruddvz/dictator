@@ -1,6 +1,6 @@
 # Recording pill: UX gap analysis against Wispr Flow
 
-_2026-11-02. Sources: the user's screenshots of HushKey (idle, recording) and Wispr Flow (hover, Notetaker hover, recording), Wispr's help center, and the existing measurements in `docs/DESIGN_SYSTEM.md`. Only behaviour and proportions are compared. No Wispr assets, code or copy are reused._
+_2026-11-02. Sources: the user's screenshots of Dictator (idle, recording) and Wispr Flow (hover, Notetaker hover, recording), Wispr's help center, and the existing measurements in `docs/DESIGN_SYSTEM.md`. Only behaviour and proportions are compared. No Wispr assets, code or copy are reused._
 
 ## What Wispr Flow does
 
@@ -16,9 +16,9 @@ _2026-11-02. Sources: the user's screenshots of HushKey (idle, recording) and Wi
 | Mic picker | Right-click the bar, then Microphone. |
 | Long sessions | Warns at 19 min and stops at 20, then transcribes what it has. |
 
-## Where HushKey falls short
+## Where Dictator falls short
 
-| Area | HushKey today | Gap |
+| Area | Dictator today | Gap |
 | --- | --- | --- |
 | **Size** | The recording pill is about 200 × 32: ×, a 92 pt ribbon, a timer and a stop button. With no text field focused, a 340 pt card sits on top of it. | Roughly 2.5× Wispr's footprint. It covers the content you are dictating into, and reads as a panel instead of an indicator. |
 | **Waveform responsiveness** | `VoiceRibbon` draws three thin sine lines that are tapered to zero at both ends, with at most ±9 pt of travel. Ordinary speech moves the centre by 2–4 pt. | This is the main complaint: "the waveform barely moves". The taper hides motion at the edges, the thin strokes have low contrast on dark, and a 1:1 energy curve keeps quiet speech nearly flat. |
@@ -28,7 +28,7 @@ _2026-11-02. Sources: the user's screenshots of HushKey (idle, recording) and Wi
 | **Confirm affordance** | A grey square stop at 65 % opacity. | Wispr's ✓ reads as "done, type it". A stop square reads as media playback and doesn't stand out from ×. |
 | **Hover affordances** | Hover expands into a full sentence, "Hold fn or click to talk". Button help uses `.help`, which shows late and inconsistently in a non-activating panel. | Wispr gives a compact control plus a short tooltip that names the shortcut. Ours gives a sentence and slow tooltips. |
 | **Placement** | Centred on `NSScreen.main`, 10 pt above the Dock/visible bottom. It can't be moved or shrunk. | Close enough to Wispr. A drag-to-edge or auto-shrink option is a nice extra, not a gap that hurts. |
-| **Dismissal** | × and Esc cancel; the finished card closes with × or Esc. | At parity. There is no Undo after cancel (Wispr pastes the last transcript); HushKey's Paste again only covers failed inserts. |
+| **Dismissal** | × and Esc cancel; the finished card closes with × or Esc. | At parity. There is no Undo after cancel (Wispr pastes the last transcript); Dictator's Paste again only covers failed inserts. |
 | **Problems** | The pill error state is already in place (danger icon, short message, Retry / Paste again / dismiss). | At parity on structure. There's no dedicated "we couldn't hear you" or "mic unavailable" action that opens Sound settings or a mic picker. |
 | **Tokens** | The pill hard-codes `#141B17` and `#9CCBB4` in `FloatingPill.swift`. | This breaks the design-system rule of no hard-coded colours. |
 
@@ -36,7 +36,7 @@ _2026-11-02. Sources: the user's screenshots of HushKey (idle, recording) and Wi
 
 **P0, done in this pass**
 
-1. ~~**Level bars instead of the ribbon** (`PillMeter`).~~ Reverted 2026-11-04: the bars made the pill the one place without HushKey's wave. The pill meter is the `BreathRibbon` again (58 × 18, `ink`), the same form as the hub chip, the hero and the app icon, and it reads whispers better than bars.
+1. ~~**Level bars instead of the ribbon** (`PillMeter`).~~ Reverted 2026-11-04: the bars made the pill the one place without Dictator's wave. The pill meter is the `BreathRibbon` again (58 × 18, `ink`), the same form as the hub chip, the hero and the app icon, and it reads whispers better than bars.
 2. **Compact recording capsule**, 28 pt tall: × · ribbon · ✓. The ✓ is a filled sage `signal` circle, the one primary action. The timer only appears after 30 s, when it starts to help.
 3. **Hold mode shows the ribbon only.** While fn (or the custom shortcut) is held, the pill is just the meter, about 80 pt wide. Click or hands-free dictation shows the × and ✓ controls.
 4. **One shape through the dictation.** Preparing and finishing keep the recording capsule and animate the ribbon instead: a soft sweep while waiting for the mic, and a travelling highlight while transcribing. A short hint bubble above the pill names the wait ("Waiting for microphone", "Preparing locally").
@@ -48,7 +48,7 @@ _2026-11-02. Sources: the user's screenshots of HushKey (idle, recording) and Wi
 
 - **"We couldn't hear you".** An empty result from a recording whose peak level never rose above −54 dBFS is blamed on the input, not the speaker. It, and "Mic didn't start", offer a **Mic** menu (inputs, with the current one checked) and a **Sound settings** button.
 - **Undo after cancel.** × or Esc on a recording of a second or more shows a neutral "Cancelled · Undo" for 5 s. Undo transcribes the in-memory audio and types it as usual; otherwise the audio is dropped.
-- **Right-click menu** on the pill: choose the microphone, start/stop sounds, Meeting notes, Open HushKey, and hide the bar.
+- **Right-click menu** on the pill: choose the microphone, start/stop sounds, Meeting notes, Open Dictator, and hide the bar.
 - **Start and stop sounds**: optional and off by default (Settings → Dictation, the menu bar and the pill menu).
 - **Idle dot.** After 5 quiet seconds the idle bar shrinks to a dot; hovering expands it.
 - **Drag to place.** Drag the pill along the bottom edge; the position is remembered. It never goes past either side.
@@ -65,4 +65,4 @@ _2026-11-02. Sources: the user's screenshots of HushKey (idle, recording) and Wi
 
 **Still open**
 
-- A long-session warning. HushKey has no recording limit; Retry stops being available after 5 minutes because longer audio is not kept, which the pill doesn't say.
+- A long-session warning. Dictator has no recording limit; Retry stops being available after 5 minutes because longer audio is not kept, which the pill doesn't say.

@@ -14,4 +14,4 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
       - name: Build and test
-        run: xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath build CODE_SIGNING_ALLOWED=NO test
+        run: xcodebuild -project Dictator.xcodeproj -scheme Dictator -derivedDataPath build CODE_SIGNING_ALLOWED=NO test

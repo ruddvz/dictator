@@ -1,4 +1,4 @@
-# HushKey product and interface plan
+# Dictator product and interface plan
 
 ## Product goal
 
@@ -30,7 +30,7 @@ Make ordinary voice and whispered dictation usable locally on a Mac, while keepi
 2. **Transforms** — Create an editable preview for polish, concise, professional, bullet, action-item, or up to 12 user-defined writing styles with Apple's on-device Foundation Model on macOS 26+ when available. Styles can describe tone, format, or translation and are stored on this Mac. Deterministic filler removal also works without the model. Applying requires explicit user action; undo restores the prior transcript.
 3. **Vocabulary** — Search, add, edit, and remove personal expansions, local recognition hints, and whole-word correction rules for repeat transcription mistakes.
 4. **Transcribe files** — Import one audio file, choose Apple on-device Speech or an explicitly downloaded WhisperKit model, edit and export TXT/SRT/WebVTT, and search or restore up to 50 local transcript jobs. Save transcript text and timed cues only; never copy the source audio.
-5. **Meeting notes** — Start microphone, system-audio, or combined capture explicitly; stream only to on-device recognition and checkpoint partial transcript text locally during capture for crash recovery. Promote the checkpoint to a searchable note at stop, then remove the temporary draft. Create reviewable on-device summaries and action items. Search/edit/export/delete locally. Audio is transient and HushKey does not provide speaker identification.
+5. **Meeting notes** — Start microphone, system-audio, or combined capture explicitly; stream only to on-device recognition and checkpoint partial transcript text locally during capture for crash recovery. Promote the checkpoint to a searchable note at stop, then remove the temporary draft. Create reviewable on-device summaries and action items. Search/edit/export/delete locally. Audio is transient and Dictator does not provide speaker identification.
 6. **Connect** — Entered only when the user opens the Silent Lab. Motion support, permission/connection status, live sample rate, and a brief next-step guide; detailed plots stay collapsed.
 7. **Train** — Choose normal voice, whisper, or silent mouthing as an experiment condition; select a word; capture, inspect, and remove motion templates.
 8. **Evaluate** — Select a condition and feature set; check study readiness; see leave-one-out results, majority baseline, permutation result, session holdout, and confusion matrix.
@@ -39,20 +39,20 @@ Make ordinary voice and whispered dictation usable locally on a Mac, while keepi
 
 ## File map
 
-- `HushKey/App/` — app lifecycle, shared state, screen routing, shortcuts.
-- `HushKey/Motion/` — Core Motion access and normalized samples.
-- `HushKey/Audio/` — local microphone input, exclusive capture coordination, on-device speech recognition, meeting note generation, file transcription, and local text transforms.
-- `HushKey/Decoding/` — features, capture segmentation, DTW classifier, templates.
-- `HushKey/Recording/` — local synchronized experiment sessions, recent dictation history, and searchable meeting notes.
-- `HushKey/Services/` — Accessibility insertion and system hotkey handling.
-- `HushKey/Views/` — one view file per workflow plus shared visual components.
-- `HushKey/Assets.xcassets/` — HushKey's app icon and bundled visual assets.
-- `HushKeyTests/` — classifier, permission-state, insertion-safety, and local storage tests.
+- `Dictator/App/` — app lifecycle, shared state, screen routing, shortcuts.
+- `Dictator/Motion/` — Core Motion access and normalized samples.
+- `Dictator/Audio/` — local microphone input, exclusive capture coordination, on-device speech recognition, meeting note generation, file transcription, and local text transforms.
+- `Dictator/Decoding/` — features, capture segmentation, DTW classifier, templates.
+- `Dictator/Recording/` — local synchronized experiment sessions, recent dictation history, and searchable meeting notes.
+- `Dictator/Services/` — Accessibility insertion and system hotkey handling.
+- `Dictator/Views/` — one view file per workflow plus shared visual components.
+- `Dictator/Assets.xcassets/` — Dictator's app icon and bundled visual assets.
+- `DictatorTests/` — classifier, permission-state, insertion-safety, and local storage tests.
 - `docs/` — user build instructions, testing protocol, product plan, and licensing notices.
-- `docs/research/` — the supplied Wispr Flow vs TypeWhisper PDF and a short index linking both research reports to HushKey decisions.
-- `Scripts/` — deterministic icon generation and app packaging helpers; the package script builds in a temporary directory and publishes only `dist/HushKey.app`.
+- `docs/research/` — the supplied Wispr Flow vs TypeWhisper PDF and a short index linking both research reports to Dictator decisions.
+- `Scripts/` — deterministic icon generation and app packaging helpers; the package script builds in a temporary directory and publishes only `dist/Dictator.app`.
 - `.build/` — hidden local Xcode test/build output; excluded from source control and cleared by packaging to prevent stale app copies.
-- `dist/HushKey.app` — the one packaged app to open.
+- `dist/Dictator.app` — the one packaged app to open.
 
 ## Current delivery sequence
 

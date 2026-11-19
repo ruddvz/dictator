@@ -1,4 +1,4 @@
-# Open-source dictation apps: landscape and HushKey gaps (4 November 2026)
+# Open-source dictation apps: landscape and Dictator gaps (4 November 2026)
 
 Web research only: nothing was cloned, built or run. Star counts are approximate. Release dates marked *unverified* couldn't be confirmed from release pages, and proprietary features are vendor claims. Recheck licences before adapting anything. **GPL/AGPL: ideas only, no code. MIT/Apache: may be adapted with attribution in `NOTICE.md`.**
 
@@ -7,7 +7,7 @@ Already covered in earlier reports: FreeFlow, OpenWhispr, OpenTypeless, Handy, T
 ## The app the user asked about: dimastatz/whisper-flow
 
 - [dimastatz/whisper-flow](https://github.com/dimastatz/whisper-flow) is a **Python library with a FastAPI WebSocket server**, not an app. It takes 16 kHz PCM and returns partial and final transcripts using tumbling windows over OpenAI Whisper (`tiny.en` by default). MIT, about 1k stars, release 1.4.0 on 2026-11-01.
-- **No code in it fits HushKey's native Swift app.** The one useful idea is its rule for when to finalize a partial: after a pause, once the text stops changing, or when the window hits its cap. That could guide live typing (gap 1 below).
+- **No code in it fits Dictator's native Swift app.** The one useful idea is its rule for when to finalize a partial: after a pause, once the text stops changing, or when the window hits its cap. That could guide live typing (gap 1 below).
 
 ## Projects
 
@@ -35,9 +35,9 @@ Already covered in earlier reports: FreeFlow, OpenWhispr, OpenTypeless, Handy, T
 | [moinulmoin/voicetypr](https://github.com/moinulmoin/voicetypr) | AGPL-3 | Tauri | Whisper, Parakeet | LAN transcription server |
 | [EpicenterHQ/epicenter](https://github.com/EpicenterHQ/epicenter) (Whispering) | AGPL-3 | Tauri | API endpoints | Transformations; git-versioned data |
 
-## What HushKey already has (no work needed)
+## What Dictator already has (no work needed)
 
-The research lists these as gaps, but HushKey already has them, or a version of them:
+The research lists these as gaps, but Dictator already has them, or a version of them:
 
 - mouse-button push-to-talk (`MouseButtonMonitor`)
 - muting output while recording
@@ -51,7 +51,7 @@ The research lists these as gaps, but HushKey already has them, or a version of 
 
 1. **Typing the words live, as you speak.** Today words are typed only at the end. Use partials from Apple SpeechAnalyzer (macOS 26) or Nemotron streaming in FluidAudio. Finalize a phrase after a pause or once it stops changing (whisper-flow's idea, MIT). Rewrite only the unfinalized tail. Ideas from yap and Pindrop (MIT); FluidVoice is GPL.
 2. **Local LLM cleanup before macOS 26.** Ghost Pepper uses LLM.swift with a small Qwen model (MIT), so Polished could work on macOS 14–15 too. It would be an optional download. Check the licences of LLM.swift, llama.cpp and the Qwen weights.
-3. **Speaker labels in meeting notes.** FluidAudio already ships pyannote diarization, which HushKey currently builds with that trait off. Muesli (MIT) shows how to wire it. Recheck the model licence and the GPL trait boundary in `NOTICE.md`.
+3. **Speaker labels in meeting notes.** FluidAudio already ships pyannote diarization, which Dictator currently builds with that trait off. Muesli (MIT) shows how to wire it. Recheck the model licence and the GPL trait boundary in `NOTICE.md`.
 4. **Learning from corrections.** When you edit a typed word soon after dictating, offer to add it to your vocabulary or correction rules. Ideas from BetterWispr (Apache) and Pindrop (MIT).
 5. **Screen context with OCR.** This adds Apple Vision OCR on the focused window, for apps where reading nearby text through Accessibility gets nothing (Electron, remote desktops), so names get spelled right. Idea from Ghost Pepper (MIT). Skip password fields and keep it off by default.
 6. **Translate while dictating.** Apple's Translation framework is on-device. Talkify (MIT) has a separate shortcut for it.

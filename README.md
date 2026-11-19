@@ -1,20 +1,20 @@
-# HushKey
+# Dictator
 
-HushKey is a native macOS dictation app with a separate experimental Silent Lab. Live speech uses Apple's on-device recognizer by default, with an optional downloaded Parakeet model that also runs locally. Silent motion decoding is limited to a small, user-trained vocabulary and is not general lip reading.
+Dictator is a native macOS dictation app with a separate experimental Silent Lab. Live speech uses Apple's on-device recognizer by default, with an optional downloaded Parakeet model that also runs locally. Silent motion decoding is limited to a small, user-trained vocabulary and is not general lip reading.
 
 ## Current status
 
 - macOS 14 or later; designed for Apple Silicon and Intel Macs.
-- The app opens to Voice & Whisper dictation. Use the button, hold the configurable global shortcut (`⌥⇧D` by default), or choose press-to-toggle; then review/edit, copy, or optionally insert a complete phrase into a supported text field. For the one-click Insert button, start with the shortcut while the destination field is focused; HushKey keeps that target in memory and rechecks it before returning to insert.
-- The **Speech engine** setting offers Apple's built-in on-device Speech framework or a user-downloaded Parakeet model for local Neural Engine recognition. Apple Speech streams words as you talk; Parakeet returns text when you finish. If Parakeet is missing or does not support the selected language, dictation falls back to Apple Speech. HushKey does not send audio to a remote service.
+- The app opens to Voice & Whisper dictation. Use the button, hold the configurable global shortcut (`⌥⇧D` by default), or choose press-to-toggle; then review/edit, copy, or optionally insert a complete phrase into a supported text field. For the one-click Insert button, start with the shortcut while the destination field is focused; Dictator keeps that target in memory and rechecks it before returning to insert.
+- The **Speech engine** setting offers Apple's built-in on-device Speech framework or a user-downloaded Parakeet model for local Neural Engine recognition. Apple Speech streams words as you talk; Parakeet returns text when you finish. If Parakeet is missing or does not support the selected language, dictation falls back to Apple Speech. Dictator does not send audio to a remote service.
 - Dictation includes Natural, Message, Email, Code, and Automatic modes; explicit spoken corrections with raw-transcript restore; local recognition hints, snippets, and deterministic correction rules; and a one-step guarded insertion undo. Automatic mode maps common Mac apps and supports local per-app overrides for writing mode, vocabulary, on-device language, snippets, correction rules, filler cleanup, and an optional Transform style. Explicit modes use the global preferences.
-- **Transforms** offers review-first local polish, concise, professional, bullets, and action-item drafts using Apple's on-device Foundation Model when available (macOS 26+); conservative filler removal works without a model on macOS 14+. Create up to 12 local writing styles for tone, format, or translation. Every generated draft stays reviewable and can be undone; HushKey has no cloud fallback.
-- **Voice edit selected text** lets you select text in another app, hold `⌥⇧E` (configurable), and speak an edit instruction. HushKey reads the selection only after that shortcut, creates an on-device preview, and rechecks the original app, field, text, and selection before Apply. The instruction and selection are not added to dictation history. This flow requires Accessibility insertion and Apple's on-device Foundation Model (macOS 26+).
+- **Transforms** offers review-first local polish, concise, professional, bullets, and action-item drafts using Apple's on-device Foundation Model when available (macOS 26+); conservative filler removal works without a model on macOS 14+. Create up to 12 local writing styles for tone, format, or translation. Every generated draft stays reviewable and can be undone; Dictator has no cloud fallback.
+- **Voice edit selected text** lets you select text in another app, hold `⌥⇧E` (configurable), and speak an edit instruction. Dictator reads the selection only after that shortcut, creates an on-device preview, and rechecks the original app, field, text, and selection before Apply. The instruction and selection are not added to dictation history. This flow requires Accessibility insertion and Apple's on-device Foundation Model (macOS 26+).
 - Optional local filler cleanup removes only standalone “um”, “uh”, and “erm”; it is off by default. Snippet settings report malformed lines instead of silently ignoring them.
 - **Transcribe files** accepts one audio file at a time and exports editable text, SRT, or WebVTT captions. Choose Apple Speech for zero-download on-device recognition where supported, or explicitly download a WhisperKit model for offline inference after setup. Model downloads require internet; audio files are not uploaded.
-- **Meeting notes** provides explicit microphone, system-audio, or combined capture, a searchable local transcript archive, editable transcripts, and TXT export. Choose **Both sides** to combine your selected microphone with Mac app audio; macOS may request separate microphone and System Audio Recording permissions. System audio requires macOS 14.2+. Meeting audio is streamed to on-device Speech and is not saved; the transcript is stored when capture stops. Summary and action-item drafts use Apple's on-device Foundation Model (macOS 26+), with no cloud fallback. HushKey does not identify speakers.
-- Optional nearby-text hints are off by default. After a separate Accessibility opt-in, HushKey reads only a bounded slice around the cursor in a supported text field to extract local recognition terms; it discards the slice and does not store it.
-- Recent transcripts can be saved on this Mac (enabled by default and switchable in Settings). HushKey does not save microphone audio during ordinary dictation. The latest dictation's audio stays in memory only (never on disk) until the next dictation starts, history or session audio is deleted, or HushKey quits, so History can re-transcribe it with the other speech engine. Deleting a History entry can be undone for a few seconds.
+- **Meeting notes** provides explicit microphone, system-audio, or combined capture, a searchable local transcript archive, editable transcripts, and TXT export. Choose **Both sides** to combine your selected microphone with Mac app audio; macOS may request separate microphone and System Audio Recording permissions. System audio requires macOS 14.2+. Meeting audio is streamed to on-device Speech and is not saved; the transcript is stored when capture stops. Summary and action-item drafts use Apple's on-device Foundation Model (macOS 26+), with no cloud fallback. Dictator does not identify speakers.
+- Optional nearby-text hints are off by default. After a separate Accessibility opt-in, Dictator reads only a bounded slice around the cursor in a supported text field to extract local recognition terms; it discards the slice and does not store it.
+- Recent transcripts can be saved on this Mac (enabled by default and switchable in Settings). Dictator does not save microphone audio during ordinary dictation. The latest dictation's audio stays in memory only (never on disk) until the next dictation starts, history or session audio is deleted, or Dictator quits, so History can re-transcribe it with the other speech engine. Deleting a History entry can be undone for a few seconds.
 - **Personal data backup** in Settings exports/imports recent dictations (processed and raw text), vocabulary, snippets, correction rules, custom writing styles, and Automatic app profiles as local JSON. Import is validated and offers Merge or Replace; version-1 and version-2 backups remain supported, and audio is not included. See the [backup guide](docs/PERSONAL_DATA_BACKUP.md).
 - Motion input uses Apple's `CMHeadphoneMotionManager`. It sees processed head motion from compatible head-tracking headphones, not an inward-facing speech sensor or the AirPods speech-detecting accelerometer.
 - Motion permission is requested only when you open **Silent Lab → Connect**. Connect checks live motion availability, permission, connection, and sample rate. It cannot identify the exact AirPods model. Apple documents headphone motion in [Core Motion](https://developer.apple.com/documentation/coremotion/cmheadphonemotionmanager) and its [headphone motion sample](https://developer.apple.com/documentation/CoreMotion/getting-motion-activity-from-headphones); the headphones must be connected and selected as the Mac's audio output.
@@ -28,17 +28,17 @@ Requirements: Xcode with the macOS SDK and XcodeGen.
 ```sh
 brew install xcodegen
 ./Scripts/package-app.sh
-open dist/HushKey.app
+open dist/Dictator.app
 ```
 
 Run the tests:
 
 ```sh
 xcodegen generate
-xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build test
+xcodebuild -project Dictator.xcodeproj -scheme Dictator -derivedDataPath .build test
 ```
 
-Run the local dictation eval (dev and holdout splits, Apple on-device Speech plus any WhisperKit model already downloaded in HushKey):
+Run the local dictation eval (dev and holdout splits, Apple on-device Speech plus any WhisperKit model already downloaded in Dictator):
 
 ```sh
 ./Scripts/eval.sh
@@ -46,13 +46,13 @@ Run the local dictation eval (dev and holdout splits, Apple on-device Speech plu
 
 It writes [docs/eval/report.md](docs/eval/report.md) and `report.json`. Processor checks are deterministic and also run in `xcodebuild test`; recognition scores are reported, not gated. The first run asks for Speech recognition permission for the test host. Fixtures, splits, and how to add consented recordings are described in [Fixtures/eval/README.md](Fixtures/eval/README.md).
 
-HushKey opens as a normal Mac app window and also offers a menu-bar shortcut. Voice dictation does not require AirPods or Motion permission. To try the Silent Lab, open **Connect**, connect compatible headphones, choose them as the Mac's active audio output, and check for a live stream. If Motion access is denied, change it in **System Settings → Privacy & Security → Motion**.
+Dictator opens as a normal Mac app window and also offers a menu-bar shortcut. Voice dictation does not require AirPods or Motion permission. To try the Silent Lab, open **Connect**, connect compatible headphones, choose them as the Mac's active audio output, and check for a live stream. If Motion access is denied, change it in **System Settings → Privacy & Security → Motion**.
 
-The packaged app is at `dist/HushKey.app`. The packaging script builds in an isolated temporary directory and replaces only this app bundle; it leaves other Xcode build products untouched.
+The packaged app is at `dist/Dictator.app`. The packaging script builds in an isolated temporary directory and replaces only this app bundle; it leaves other Xcode build products untouched.
 
 ## Dictation flow
 
-1. Use **Start dictation**, hold the configurable global shortcut (`⌥⇧D` by default), or choose press-to-toggle in **Settings → Dictation**. The shortcut works from any app; HushKey listens only while dictation is active.
+1. Use **Start dictation**, hold the configurable global shortcut (`⌥⇧D` by default), or choose press-to-toggle in **Settings → Dictation**. The shortcut works from any app; Dictator listens only while dictation is active.
 2. Choose a writing mode. **Automatic** maps common email, messaging, and code apps when the global shortcut starts dictation. In **Settings → Dictation → App profiles**, add a bundle identifier, writing mode, and extra terms. Open **Optional app-specific overrides** to choose a local language, snippets, correction rules, filler cleanup, or a saved Transform style. Overrides apply only when Automatic dictation starts from that app; explicit modes use the global preferences. Profiles use app identity only and do not read app text. **Code** formats spoken symbols, while Message and Email support spoken line breaks. Corrections such as “scratch that” are applied only with an explicit pause cue.
 3. Stop when you’re finished. Edit the recognized phrase, restore the original recognition if needed, then **Copy text** or enable Accessibility and choose **Insert into current app**. The insertion shortcut (`⌥⇧I` by default) inserts the current output once into the focused supported field. Press `⌥⇧U` immediately in that same unchanged field to undo.
 4. Search recent transcripts and restore either the processed text or original recognition. In **Vocabulary**, add recognition hints or use **Import…/Export…** to move a plain-text word list. Add common phrases under **Snippets** and repeatable misspelling replacements under **Corrections**. Corrections apply locally to complete word or phrase matches; raw recognition remains available to restore.
@@ -60,11 +60,11 @@ The packaged app is at `dist/HushKey.app`. The packaging script builds in an iso
 
 ## Local transforms
 
-Choose **Polish**, **Make concise**, **Professional**, **Bullet points**, or **Action items** for a reviewable draft from Apple's on-device Foundation Model. HushKey has no remote fallback. When Apple Intelligence is unavailable or preparing, the app explains that those actions cannot run. **Remove fillers** is a deterministic local cleanup and does not require Apple Intelligence. Every draft is editable and must be explicitly applied; stale previews cannot replace a transcript that changed after generation. Undo is available until the transcript changes or is inserted.
+Choose **Polish**, **Make concise**, **Professional**, **Bullet points**, or **Action items** for a reviewable draft from Apple's on-device Foundation Model. Dictator has no remote fallback. When Apple Intelligence is unavailable or preparing, the app explains that those actions cannot run. **Remove fillers** is a deterministic local cleanup and does not require Apple Intelligence. Every draft is editable and must be explicitly applied; stale previews cannot replace a transcript that changed after generation. Undo is available until the transcript changes or is inserted.
 
 ## Meeting notes
 
-Open **Meeting notes**, choose **Microphone**, **System audio**, or **Both sides**, then choose **Start meeting**. HushKey requests the selected source's permission only after you start capture. System audio is available on macOS 14.2+ and captures audio playing from apps across the Mac; pause unrelated playback before starting. **Both sides** combines the selected microphone with app audio in one on-device recognition stream and requires both macOS permissions. Audio is never saved. Partial transcript text is checkpointed locally during capture so an interrupted meeting can be recovered; after Stop, HushKey saves it as a searchable note and removes the temporary checkpoint. You can edit the transcript/title, create a reviewable local summary or action-item list (macOS 26+ with Apple's on-device model), delete a note after confirmation, or export transcript/all notes as text. The summary process breaks long transcripts into bounded local chunks and supports up to 120,000 characters. HushKey does not identify speakers.
+Open **Meeting notes**, choose **Microphone**, **System audio**, or **Both sides**, then choose **Start meeting**. Dictator requests the selected source's permission only after you start capture. System audio is available on macOS 14.2+ and captures audio playing from apps across the Mac; pause unrelated playback before starting. **Both sides** combines the selected microphone with app audio in one on-device recognition stream and requires both macOS permissions. Audio is never saved. Partial transcript text is checkpointed locally during capture so an interrupted meeting can be recovered; after Stop, Dictator saves it as a searchable note and removes the temporary checkpoint. You can edit the transcript/title, create a reviewable local summary or action-item list (macOS 26+ with Apple's on-device model), delete a note after confirmation, or export transcript/all notes as text. The summary process breaks long transcripts into bounded local chunks and supports up to 120,000 characters. Dictator does not identify speakers.
 
 ## Silent Lab
 
@@ -77,42 +77,42 @@ Open **Meeting notes**, choose **Microphone**, **System audio**, or **Both sides
 
 ## Safe text insertion
 
-Text insertion is off by default. Enable it in **Settings → Typing**, approve HushKey under **System Settings → Privacy & Security → Accessibility**, then use the configurable global shortcut (`⌥⇧I` by default) in a supported text field. For the Home screen's named-target Insert button, start dictation with its global shortcut while that field is focused.
+Text insertion is off by default. Enable it in **Settings → Typing**, approve Dictator under **System Settings → Privacy & Security → Accessibility**, then use the configurable global shortcut (`⌥⇧I` by default) in a supported text field. For the Home screen's named-target Insert button, start dictation with its global shortcut while that field is focused.
 
-HushKey uses Accessibility to inspect the frontmost app and focused control, allows only supported text fields, rejects secure/password controls, and rechecks the process, field contents, and selection before insertion. Direct typing uses the selected-text attribute. If typing is declined and **Paste if typing fails** is enabled, HushKey temporarily places the text on the clipboard, waits up to two seconds for the same field to expose the exact expected text, then restores the prior clipboard if nothing else changed it meanwhile; otherwise it leaves the newer clipboard contents intact. A paste that cannot be verified is reported as uncertain, and the transcript stays available. Check the target field before choosing **Paste again**, because it may already have received the text. Unsupported controls fail closed. Undo is available only while the same field stays focused and its contents remain unchanged.
+Dictator uses Accessibility to inspect the frontmost app and focused control, allows only supported text fields, rejects secure/password controls, and rechecks the process, field contents, and selection before insertion. Direct typing uses the selected-text attribute. If typing is declined and **Paste if typing fails** is enabled, Dictator temporarily places the text on the clipboard, waits up to two seconds for the same field to expose the exact expected text, then restores the prior clipboard if nothing else changed it meanwhile; otherwise it leaves the newer clipboard contents intact. A paste that cannot be verified is reported as uncertain, and the transcript stays available. Check the target field before choosing **Paste again**, because it may already have received the text. Unsupported controls fail closed. Undo is available only while the same field stays focused and its contents remain unchanged.
 
-Codex may hide its composer from Accessibility. With paste fallback enabled, if Codex is still the frontmost app when dictation finishes, HushKey sends one unverified paste to Codex's active window and asks you to check the composer before retrying. The transcript remains in local history if the destination does not accept it.
+Codex may hide its composer from Accessibility. With paste fallback enabled, if Codex is still the frontmost app when dictation finishes, Dictator sends one unverified paste to Codex's active window and asks you to check the composer before retrying. The transcript remains in local history if the destination does not accept it.
 
 For a voice edit, select text in another app and hold the dedicated selected-text shortcut (`⌥⇧E` by default). Say an instruction, release, then review the preview in **Transforms**. Apply is explicit and fails closed if the original app, field contents, or selection changed. Spoken edit instructions are not saved in dictation history.
 
 ## Local data and privacy
 
-- Templates: `~/Library/Application Support/com.ruddvz.hushkey/dataset.json`.
-- Recent dictations: `~/Library/Application Support/com.ruddvz.hushkey/dictation-history.json`.
-- File transcription history: `~/Library/Application Support/com.ruddvz.hushkey/file-transcription-history.json` (up to 50 searchable jobs with edited text and timed cues; source audio is not copied).
-- Experiment sessions: `~/Documents/HushKey/Sessions/`, with motion CSV, event CSV, metadata, and optional microphone audio.
-- No telemetry, remote text processing, or paid API is used by HushKey. WhisperKit model files are fetched only after the user asks to download a model; the selected file is then processed locally.
+- Templates: `~/Library/Application Support/com.ruddvz.dictator/dataset.json`.
+- Recent dictations: `~/Library/Application Support/com.ruddvz.dictator/dictation-history.json`.
+- File transcription history: `~/Library/Application Support/com.ruddvz.dictator/file-transcription-history.json` (up to 50 searchable jobs with edited text and timed cues; source audio is not copied).
+- Experiment sessions: `~/Documents/Dictator/Sessions/`, with motion CSV, event CSV, metadata, and optional microphone audio.
+- No telemetry, remote text processing, or paid API is used by Dictator. WhisperKit model files are fetched only after the user asks to download a model; the selected file is then processed locally.
 - Use **Settings → Data & privacy** to configure privacy, local data, and research recording. Dictation and shortcut controls live under **Settings → Dictation** and **Settings → Shortcuts**; typing has its own section. Clear recent dictations from Home.
 - Voice recognition requires the user to start the mic and is local-only; no remote recognition fallback is used. Audio is saved only if the separate research recorder is explicitly active.
-- WhisperKit models are stored at `~/Library/Application Support/com.ruddvz.hushkey/WhisperKitModels/`; choose **Remove model** in **Transcribe files** to reclaim the downloaded model files.
-- Nearby-text hints require an explicit opt-in and Accessibility permission. HushKey extracts terms transiently; it does not save the surrounding text.
+- WhisperKit models are stored at `~/Library/Application Support/com.ruddvz.dictator/WhisperKitModels/`; choose **Remove model** in **Transcribe files** to reclaim the downloaded model files.
+- Nearby-text hints require an explicit opt-in and Accessibility permission. Dictator extracts terms transiently; it does not save the surrounding text.
 
 ## Project naming
 
-HushKey is the requested working name for this private prototype. A separate public macOS silent-dictation project already uses the same name: [amirrsyed/hushkey](https://github.com/amirrsyed/hushkey). Revisit the public product name before any public release.
+The app and repository are branded Dictator. Existing local data and preferences migrate on first launch; macOS may ask you to grant microphone, speech-recognition, and Accessibility access again because the app identifier changed.
 
 ## Limits
 
 Headphone motion is processed and low-rate (often about 25 Hz). Jaw movement and head motion can dominate the signal, and reseating the headphones can change the measurements. A result on a small trained vocabulary does not establish arbitrary phrase recognition. Voice, whisper, and silent-mouthing results must be evaluated separately and across sessions before drawing conclusions.
 
-HushKey includes local text transforms and a preview-first selected-text voice-edit workflow, but they are not a claim of full Wispr Flow or TypeWhisper parity. A generated draft can change meaning and must be reviewed. HushKey does not include workflow/plugin automation. Live acceptance of selected-text editing, microphone capture, file models, and meeting sources remains important; Apple Speech, WhisperKit, and Apple Foundation Model availability depends on the chosen local engine, supported OS, and device readiness. These are separate features from the silent-motion experiment and are not implied by its results.
+Dictator includes local text transforms and a preview-first selected-text voice-edit workflow, but they are not a claim of full Wispr Flow or TypeWhisper parity. A generated draft can change meaning and must be reviewed. Dictator does not include workflow/plugin automation. Live acceptance of selected-text editing, microphone capture, file models, and meeting sources remains important; Apple Speech, WhisperKit, and Apple Foundation Model availability depends on the chosen local engine, supported OS, and device readiness. These are separate features from the silent-motion experiment and are not implied by its results.
 
 ## Research reports
 
 - [Wispr Flow vs TypeWhisper report (PDF)](docs/research/Wispr_Flow_vs_TypeWhisper_Research_Report_2026-11-01.pdf)
-- [HushKey competitor landscape and product opportunities](docs/COMPETITOR_RESEARCH.md)
-- [Report index and how findings map to HushKey](docs/research/README.md)
+- [Dictator competitor landscape and product opportunities](docs/COMPETITOR_RESEARCH.md)
+- [Report index and how findings map to Dictator](docs/research/README.md)
 
-HushKey does not rebrand or bundle TypeWhisper code. TypeWhisper's upstream repository uses GPLv3 and states that rebranded distributions require a separate commercial license; HushKey implements its own local features and keeps the source project's license boundary. See [NOTICE.md](NOTICE.md) and the report index for attribution and scope.
+Dictator does not rebrand or bundle TypeWhisper code. TypeWhisper's upstream repository uses GPLv3 and states that rebranded distributions require a separate commercial license; Dictator implements its own local features and keeps the source project's license boundary. See [NOTICE.md](NOTICE.md) and the report index for attribution and scope.
 
 See [docs/TESTING_PROTOCOL.md](docs/TESTING_PROTOCOL.md) for the repeatable study and hardware-validation procedure. See [docs/PRODUCT_PLAN.md](docs/PRODUCT_PLAN.md) for the screen flow and file map. See [NOTICE.md](NOTICE.md) for source attribution and license boundaries.

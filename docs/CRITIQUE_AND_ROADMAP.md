@@ -1,10 +1,10 @@
-# Critique and improvement roadmap: Wispr Flow, TypeWhisper, HushKey
+# Critique and improvement roadmap: Wispr Flow, TypeWhisper, Dictator
 
 _Written 2026-11-01. Builds on [COMPETITOR_RESEARCH.md](COMPETITOR_RESEARCH.md) and the [supplied report](research/Wispr_Flow_vs_TypeWhisper_Research_Report_2026-11-01.pdf)._
 
 ## Ground rules
 
-We study how other products **behave** — screens, states, flows, timing, failure handling — and build our own native version that improves on them. We do not copy proprietary source, assets, or text (Wispr Flow), and we do not copy GPL code (TypeWhisper, VoiceInk) into HushKey's MIT codebase. Permissively licensed libraries (MIT/Apache, e.g. WhisperKit) can be used with attribution after a license check.
+We study how other products **behave** — screens, states, flows, timing, failure handling — and build our own native version that improves on them. We do not copy proprietary source, assets, or text (Wispr Flow), and we do not copy GPL code (TypeWhisper, VoiceInk) into Dictator's MIT codebase. Permissively licensed libraries (MIT/Apache, e.g. WhisperKit) can be used with attribution after a license check.
 
 Every "better" claim below should become a measurable check in the evaluation harness (see [Measuring it](#measuring-it)).
 
@@ -31,9 +31,9 @@ Every "better" claim below should become a measurable check in the evaluation ha
 - **Subscription friction** for a tool people use for seconds at a time.
 - **Feature sprawl.** Notetaker, Insights, Scratchpad, team invites, and referrals compete with the core loop in the sidebar.
 
-**What HushKey should do better**
+**What Dictator should do better**
 
-| Wispr behavior | HushKey improvement |
+| Wispr behavior | Dictator improvement |
 | --- | --- |
 | Cloud transcription | On-device by default (Apple Speech, WhisperKit), with a visible "nothing left this Mac" receipt per dictation |
 | Rewrite-first output | Raw and processed text are both kept; one keystroke flips between them; polishing is a visible, reversible step |
@@ -60,9 +60,9 @@ Every "better" claim below should become a measurable check in the evaluation ha
 - **GPL-3.0 plus a commercial license for rebranded distributions.** That's fine for them; for us it means ideas only, no code.
 - **Voice only**, like Wispr.
 
-**What HushKey should do better**
+**What Dictator should do better**
 
-| TypeWhisper behavior | HushKey improvement |
+| TypeWhisper behavior | Dictator improvement |
 | --- | --- |
 | Many engines, user assembles | One recommended engine per Mac, chosen by our own benchmark; advanced choice tucked away |
 | Workflows as rules | Keep rules, but show them as plain sentences ("In Xcode, use Code mode") with a live preview |
@@ -70,22 +70,22 @@ Every "better" claim below should become a measurable check in the evaluation ha
 | Local API/CLI | Worth matching later (App Intents + Shortcuts first, since they're native and permissioned) |
 | Statistics, backup | Stats shipped on the home; add export/import of vocabulary, snippets, and history |
 
-## HushKey today: honest critique
+## Dictator today: honest critique
 
 - **The core loop isn't accepted on real apps yet.** Microphone, whisper capture, global shortcut, insertion, and undo still need the manual pass in TextEdit plus a second app. Nothing else matters until this works every time.
 - **No streaming insertion.** Text appears only after stop plus finalization; Wispr feels faster because the release-to-text gap is short. Measure and minimize that gap.
-- **Paste fallback is global, not per-app.** When enabled, HushKey temporarily borrows the clipboard only for a supported text-field role and restores it if no newer clipboard change needs protection. Some apps still reject both Accessibility typing and paste; per-app fallback controls and live acceptance remain open work.
+- **Paste fallback is global, not per-app.** When enabled, Dictator temporarily borrows the clipboard only for a supported text-field role and restores it if no newer clipboard change needs protection. Some apps still reject both Accessibility typing and paste; per-app fallback controls and live acceptance remain open work.
 - **Polishing is a separate screen.** Transforms should be reachable from the pill and history rows, not only from a sidebar page.
 - **The Silent Lab reads as a science project.** Its evidence gates are right, but the user doesn't see a reason to use it day to day yet. The multimodal lane below fixes that by shipping the reliable pieces first.
-- **No benchmark.** We can't yet say HushKey is more accurate than anything. The eval harness is the fix.
+- **No benchmark.** We can't yet say Dictator is more accurate than anything. The eval harness is the fix.
 
 ---
 
-## The multimodal lane: what makes HushKey different
+## The multimodal lane: what makes Dictator different
 
 ### What the AirPods actually sense
 
-Through Apple's public `CMHeadphoneMotionManager` API, compatible AirPods report **head motion only**: attitude (pitch/roll/yaw), rotation rate, gravity, and user acceleration, at a low rate (HushKey's Setup screen shows the live rate). That's all a third-party app receives.
+Through Apple's public `CMHeadphoneMotionManager` API, compatible AirPods report **head motion only**: attitude (pitch/roll/yaw), rotation rate, gravity, and user acceleration, at a low rate (Dictator's Setup screen shows the live rate). That's all a third-party app receives.
 
 - **Head movement:** sensed directly and reliably.
 - **Jaw movement:** sensed **indirectly**. Chewing or mouthing words causes tiny vibrations and tilts that travel through the skull to the earbud. The signal is weak, low-rate, and easily swamped by walking or turning your head. Research systems that decode silent words from jaw motion (e.g. MuteIt, ACM IMWUT 2022) place IMUs near the jaw, use two IMUs to cancel head motion, and still restrict themselves to about 100 command words.
@@ -104,7 +104,7 @@ So "silent dictation of anything" is not achievable with today's hardware, and w
 
 ### Product shape
 
-- **Quiet level picker** on the pill and home: *Voice*, *Whisper*, *Silent commands*, *Gestures only*. HushKey suggests a level from context (e.g. a call is active, so suggest Gestures) but never switches silently.
+- **Quiet level picker** on the pill and home: *Voice*, *Whisper*, *Silent commands*, *Gestures only*. Dictator suggests a level from context (e.g. a call is active, so suggest Gestures) but never switches silently.
 - **The pill reflects every channel:** waveform for audio, a small head icon that pulses when motion confirms you're speaking, and a gesture glyph when a nod or shake is recognized.
 - **Silent Lab becomes "Train gestures and commands"**: a 2-minute guided session, a per-gesture confidence readout, and an honest "not reliable for you yet" state.
 - **Everything stays local.** Motion data never leaves the Mac; training data can be exported or deleted, as today.
@@ -155,7 +155,7 @@ Each item ships with a check in the held-out evaluation harness:
 - An independent MIT project by Amir Syed, created 2026-10-31, with the **same name**. It does silent dictation by **webcam lip reading**: a native Mac app plus a local Python model server. The model is a frozen Auto-AVSR conformer with LoRA adapters, a lip/jaw/throat "kinematic" branch, and in-app "Train on my mouth" personalisation. It reports 19.1% WER on voiced LRS3 and says outright that silent webcam use is worse.
 - Why it matters to us: it covers the channel AirPods can't sense (lips), and its roadmap lists AirPods head/jaw motion as a future input, which is what our Silent Lab does. The two approaches complement each other.
 - Ideas worth taking (MIT, attribute in `NOTICE.md` if code is adapted): a HUD with a live partial transcript (we now have the transcript card), Esc to cancel, clipboard restore after paste, energy-gate segmentation with pre-roll/hang-over, and paired-bootstrap eval comparisons for our eval harness.
-- Risk: the shared name could confuse people on GitHub and in search. Decide whether to keep "HushKey" before any public release.
-- A Codex session cloned it to `~/Documents/ChatGPT/HushKey` and left uncommitted edits there. They belong to that repo, not ours, and were not merged.
+- Risk: the shared name could confuse people on GitHub and in search. Decide whether to keep "Dictator" before any public release.
+- A Codex session cloned it to `~/Documents/ChatGPT/Dictator` and left uncommitted edits there. They belong to that repo, not ours, and were not merged.
 - **Safety review of its v0.1.1 DMG** (checked 2026-11-01). The SHA-256 matches the GitHub release digest. It is ad-hoc signed and not notarized, so Gatekeeper rejects it until it is opened with right-click ▸ Open. It asks for Camera and Accessibility. Its "Install model server" step installs PyTorch and friends from PyPI into a private venv, may fetch `uv` via `curl | sh` from astral.sh, and downloads about 1 GB of weights from Hugging Face. Its server binds 127.0.0.1 only, and no telemetry URLs were found in the source. Risk: a brand-new single-author project, unaudited.
-- **Name check** (2026-11-01). No registered "HushKey" trademark turned up in a quick search. The closest is **HUSH KEYS** (US Reg. 5935710, computer hardware and keyboards), which is near enough that a lawyer should check before a commercial launch. Domains: hushkey.com (2012), hushkey.io (2022) and hushkey.ai (2026-07) are registered; .app and .dev were inconclusive.
+- **Name check** (2026-11-01). No registered "Dictator" trademark turned up in a quick search. The closest is **HUSH KEYS** (US Reg. 5935710, computer hardware and keyboards), which is near enough that a lawyer should check before a commercial launch. Domains: dictator.com (2012), dictator.io (2022) and dictator.ai (2026-07) are registered; .app and .dev were inconclusive.

@@ -6,8 +6,8 @@ Gap 2 in [OPEN_SOURCE_LANDSCAPE_2026-11-04.md](OPEN_SOURCE_LANDSCAPE_2026-11-04.
 
 | Piece | Licence | Used how |
 |---|---|---|
-| [llama.cpp](https://github.com/ggml-org/llama.cpp) b11900 (incl. ggml) | MIT, © 2023-2026 The ggml authors | Linked: the official prebuilt `llama-b11900-xcframework.zip`, pinned by SHA-256 in `Packages/HushKeyLlama`. Licence text in `docs/licenses/LLAMA-CPP-MIT-LICENSE.txt`, shipped in the app's Resources. |
-| [LLM.swift](https://github.com/eastriverlee/LLM.swift) | MIT, © 2023 eastriver | **Not used.** It needs swift-syntax for its macros and swift-testing pinned to `main`, which is a lot of build for ~150 lines of calls. HushKey's `LlamaRunner` is written from llama.h directly. |
+| [llama.cpp](https://github.com/ggml-org/llama.cpp) b11900 (incl. ggml) | MIT, © 2023-2026 The ggml authors | Linked: the official prebuilt `llama-b11900-xcframework.zip`, pinned by SHA-256 in `Packages/DictatorLlama`. Licence text in `docs/licenses/LLAMA-CPP-MIT-LICENSE.txt`, shipped in the app's Resources. |
+| [LLM.swift](https://github.com/eastriverlee/LLM.swift) | MIT, © 2023 eastriver | **Not used.** It needs swift-syntax for its macros and swift-testing pinned to `main`, which is a lot of build for ~150 lines of calls. Dictator's `LlamaRunner` is written from llama.h directly. |
 | [matthartman/ghost-pepper](https://github.com/matthartman/ghost-pepper) | README badge says MIT, but the repository has **no LICENSE file** (GitHub reports no licence) | Idea only: a small local GGUF model for cleanup. No code or prompt copied. |
 | [SmolLM2 360M Instruct](https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct) (Hugging Face) | Apache-2.0 | The model. The Q4_K_M GGUF by [bartowski](https://huggingface.co/bartowski/SmolLM2-360M-Instruct-GGUF) (Apache-2.0) is downloaded only when the user picks **Download**, pinned to commit `7be6f65` and checked by size and SHA-256. Not bundled or modified. |
 | Qwen3 0.6B, Qwen3.5 0.8B (Alibaba Qwen; GGUFs by Unsloth) | Apache-2.0 | Evaluated, not shipped. |

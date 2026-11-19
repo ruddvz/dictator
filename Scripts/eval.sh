@@ -1,14 +1,14 @@
 #!/bin/bash
-# Runs HushKey's local dictation eval and writes docs/eval/report.md and report.json.
+# Runs Dictator's local dictation eval and writes docs/eval/report.md and report.json.
 # Audio stays on this Mac: clips are recognized with on-device Apple Speech and any WhisperKit
-# or Parakeet model already downloaded in HushKey. Nothing is downloaded and no remote service is used.
+# or Parakeet model already downloaded in Dictator. Nothing is downloaded and no remote service is used.
 set -euo pipefail
 
 project_root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$project_root"
 
-voice="${HUSHKEY_EVAL_VOICE:-Samantha}"
-locale="${HUSHKEY_EVAL_LOCALE:-en-US}"
+voice="${DICTATOR_EVAL_VOICE:-Samantha}"
+locale="${DICTATOR_EVAL_LOCALE:-en-US}"
 
 # Synthesize a bootstrap clip with macOS text-to-speech for each clip that has no consented recording.
 for split in dev holdout; do
@@ -28,16 +28,16 @@ for split in dev holdout; do
 done
 
 xcodegen generate --quiet
-xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build CODE_SIGNING_ALLOWED=NO \
+xcodebuild -project Dictator.xcodeproj -scheme Dictator -derivedDataPath .build CODE_SIGNING_ALLOWED=NO \
   build-for-testing -quiet
-# Sign the test host like dist/HushKey.app, so macOS treats it as the same app: Speech stays
+# Sign the test host like dist/Dictator.app, so macOS treats it as the same app: Speech stays
 # allowed without a prompt, and dist's permissions aren't moved to an ad-hoc copy.
-identity="$(security find-identity -p codesigning 2>/dev/null | awk '/"HushKey Local Signing"/ { print $2; exit }')"
+identity="$(security find-identity -p codesigning 2>/dev/null | awk '/"Dictator Local Signing"/ { print $2; exit }')"
 if [[ -n "$identity" ]]; then
-  codesign --force --deep --sign "$identity" --timestamp=none .build/Build/Products/Debug/HushKey.app
+  codesign --force --deep --sign "$identity" --timestamp=none .build/Build/Products/Debug/Dictator.app
 fi
-TEST_RUNNER_HUSHKEY_EVAL=1 TEST_RUNNER_HUSHKEY_EVAL_LOCALE="$locale" \
-  xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build CODE_SIGNING_ALLOWED=NO \
-  -only-testing:HushKeyTests/DictationEvalTests -only-testing:HushKeyTests/PauseRecognitionTests test-without-building -quiet
+TEST_RUNNER_DICTATOR_EVAL=1 TEST_RUNNER_DICTATOR_EVAL_LOCALE="$locale" \
+  xcodebuild -project Dictator.xcodeproj -scheme Dictator -derivedDataPath .build CODE_SIGNING_ALLOWED=NO \
+  -only-testing:DictatorTests/DictationEvalTests -only-testing:DictatorTests/PauseRecognitionTests test-without-building -quiet
 
 echo "Wrote $project_root/docs/eval/report.md"

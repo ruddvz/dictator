@@ -1,6 +1,6 @@
 # Dictation eval fixtures
 
-Fixed inputs for HushKey's local dictation eval (`Scripts/eval.sh`, report in [docs/eval](../../docs/eval/report.md)).
+Fixed inputs for Dictator's local dictation eval (`Scripts/eval.sh`, report in [docs/eval](../../docs/eval/report.md)).
 
 ```
 Fixtures/eval/
@@ -30,7 +30,7 @@ Categories: `code`, `line-breaks`, `corrections`, `snippets`, `fillers`.
 
 ## Polish cases (model-backed, reported)
 
-`polish.json` holds text as it reaches the Polished pass and the `expected` result: only fillers and stutters deleted, punctuation and capitals fixed. `PolishEvalTests` gates that every `expected` passes `DictationSmartCleanup.isSafeCleanup`. With `TEST_RUNNER_HUSHKEY_POLISH_MODEL=<path to a GGUF>` it also runs the local model and writes raw vs polished scores to [docs/eval/polish-report.md](../../docs/eval/polish-report.md). The few-shot examples in `DictationSmartCleanup.localExamples` must never repeat a polish input.
+`polish.json` holds text as it reaches the Polished pass and the `expected` result: only fillers and stutters deleted, punctuation and capitals fixed. `PolishEvalTests` gates that every `expected` passes `DictationSmartCleanup.isSafeCleanup`. With `TEST_RUNNER_DICTATOR_POLISH_MODEL=<path to a GGUF>` it also runs the local model and writes raw vs polished scores to [docs/eval/polish-report.md](../../docs/eval/polish-report.md). The few-shot examples in `DictationSmartCleanup.localExamples` must never repeat a polish input.
 
 ## Audio clips (reported, not gated)
 
@@ -44,6 +44,6 @@ Every clip is processed in all four modes. Automatic mode resolves to one of the
 ### Audio sources
 
 1. **Recorded** (preferred): a consented recording at `audio/<clip id>.<ext>`. Commit a recording only with the speaker's approval. Read the `reference` text naturally; keep the spoken commands ("new line", "underscore") exactly as written.
-2. **Synthetic** (bootstrap): if no recording exists, `Scripts/eval.sh` synthesizes the reference with the local macOS voice `Samantha` (override with `HUSHKEY_EVAL_VOICE`) into `.build/eval-audio/`, which is not committed. Synthetic speech is cleaner than real dictation, so its WER is optimistic.
+2. **Synthetic** (bootstrap): if no recording exists, `Scripts/eval.sh` synthesizes the reference with the local macOS voice `Samantha` (override with `DICTATOR_EVAL_VOICE`) into `.build/eval-audio/`, which is not committed. Synthetic speech is cleaner than real dictation, so its WER is optimistic.
 
 Do not add third-party speech datasets without first checking their license, and never download audio as part of the harness.

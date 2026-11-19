@@ -2147,7 +2147,7 @@
 
       ],
       "engine" : "whisperkit",
-      "skippedReason" : "No WhisperKit model is downloaded in HushKey. Download one in Transcribe Files to include it; the harness never downloads models."
+      "skippedReason" : "No WhisperKit model is downloaded in Dictator. Download one in Transcribe Files to include it; the harness never downloads models."
     }
   ],
   "generatedAt" : "2026-11-02T23:37:09Z",

@@ -6,29 +6,29 @@ cd "$project_root"
 
 swift Scripts/generate-app-icon.swift
 xcodegen generate
-derived_data="$(mktemp -d "${TMPDIR:-/tmp}/HushKey-build.XXXXXX")"
+derived_data="$(mktemp -d "${TMPDIR:-/tmp}/Dictator-build.XXXXXX")"
 stage_dir=""
 backup_dir=""
 backup_path=""
 cleanup() {
   rm -rf "$derived_data"
   if [[ -n "$stage_dir" && -d "$stage_dir" ]]; then rm -rf "$stage_dir"; fi
-  if [[ -n "$backup_path" && -d "$backup_path" && ! -d "$project_root/dist/HushKey.app" ]]; then
-    mv "$backup_path" "$project_root/dist/HushKey.app"
+  if [[ -n "$backup_path" && -d "$backup_path" && ! -d "$project_root/dist/Dictator.app" ]]; then
+    mv "$backup_path" "$project_root/dist/Dictator.app"
   fi
   if [[ -n "$backup_dir" && -d "$backup_dir" ]]; then rm -rf "$backup_dir"; fi
 }
 trap cleanup EXIT
-# HUSHKEY_SWIFT_FLAGS adds compile conditions for a developer build, e.g. "-D LIVE_TYPING_REHEARSAL".
+# DICTATOR_SWIFT_FLAGS adds compile conditions for a developer build, e.g. "-D LIVE_TYPING_REHEARSAL".
 extra_build_settings=()
-if [[ -n "${HUSHKEY_SWIFT_FLAGS:-}" ]]; then
-  extra_build_settings+=("OTHER_SWIFT_FLAGS=\$(inherited) $HUSHKEY_SWIFT_FLAGS")
+if [[ -n "${DICTATOR_SWIFT_FLAGS:-}" ]]; then
+  extra_build_settings+=("OTHER_SWIFT_FLAGS=\$(inherited) $DICTATOR_SWIFT_FLAGS")
 fi
-xcodebuild -project HushKey.xcodeproj -scheme HushKey -configuration Release -derivedDataPath "$derived_data" CODE_SIGNING_ALLOWED=NO build ${extra_build_settings[@]+"${extra_build_settings[@]}"}
-app_path="$derived_data/Build/Products/Release/HushKey.app"
+xcodebuild -quiet -project Dictator.xcodeproj -scheme Dictator -configuration Release -derivedDataPath "$derived_data" CODE_SIGNING_ALLOWED=NO build ${extra_build_settings[@]+"${extra_build_settings[@]}"}
+app_path="$derived_data/Build/Products/Release/Dictator.app"
 mkdir -p "$project_root/dist"
-stage_dir="$(mktemp -d "$project_root/dist/.HushKey-stage.XXXXXX")"
-staged_app="$stage_dir/HushKey.app"
+stage_dir="$(mktemp -d "$project_root/dist/.Dictator-stage.XXXXXX")"
+staged_app="$stage_dir/Dictator.app"
 ditto "$app_path" "$staged_app"
 resources="$staged_app/Contents/Resources"
 mkdir -p "$resources"
@@ -44,18 +44,21 @@ cp "$project_root/docs/licenses/LLAMA-CPP-MIT-LICENSE.txt" "$resources/"
 # rebuild loses Accessibility (fn key and typing into apps) even when microphone and Speech
 # survive. Sign with the local identity from Scripts/make-signing-identity.sh when it exists.
 # Distribution builds should use a real Developer ID.
-identity="$(security find-identity -p codesigning 2>/dev/null | awk '/"HushKey Local Signing"/ { print $2; exit }')"
+identity="$(security find-identity -v -p codesigning 2>/dev/null | awk '/"Dictator Local Signing"/ { print $2; exit }')"
 if [[ -n "$identity" ]]; then
   codesign --force --deep --sign "$identity" --timestamp=none "$staged_app"
 else
-  echo "warning: no HushKey Local Signing identity; Accessibility resets on each build (run Scripts/make-signing-identity.sh)" >&2
-  codesign --force --deep --sign - --timestamp=none \
-    -r='designated => identifier "com.ruddvz.hushkey"' "$staged_app"
+  echo "warning: no Dictator Local Signing identity; Accessibility resets on each build (run Scripts/make-signing-identity.sh)" >&2
+  # Deep-sign nested frameworks with their own identifiers, then give only the app its stable
+  # requirement. Passing the app requirement to `--deep` incorrectly stamps it onto frameworks.
+  codesign --force --deep --sign - --timestamp=none "$staged_app"
+  codesign --force --sign - --timestamp=none \
+    -r='designated => identifier "com.ruddvz.dictator"' "$staged_app"
 fi
-destination="$project_root/dist/HushKey.app"
+destination="$project_root/dist/Dictator.app"
 if [[ -e "$destination" ]]; then
-  backup_dir="$(mktemp -d "$project_root/dist/.HushKey-backup.XXXXXX")"
-  backup_path="$backup_dir/HushKey.app"
+  backup_dir="$(mktemp -d "$project_root/dist/.Dictator-backup.XXXXXX")"
+  backup_path="$backup_dir/Dictator.app"
   mv "$destination" "$backup_path"
 fi
 mv "$staged_app" "$destination"
@@ -66,4 +69,4 @@ if [[ -n "$backup_path" ]]; then
 fi
 rmdir "$stage_dir"
 stage_dir=""
-echo "Built $project_root/dist/HushKey.app"
+echo "Built $project_root/dist/Dictator.app"

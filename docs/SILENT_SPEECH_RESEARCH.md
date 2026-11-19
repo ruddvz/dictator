@@ -1,12 +1,12 @@
 # Silent Use: SubVox and similar work (2026-11-02)
 
-How HushKey's Silent Use compares with SubVox and other silent-speech work, what was tried on real takes, and what changed.
+How Dictator's Silent Use compares with SubVox and other silent-speech work, what was tried on real takes, and what changed.
 
 ## The short answer
 
-HushKey's Silent Use is a close adaptation of [joeblau/subvox](https://github.com/joeblau/subvox) (MIT). It uses the same channels (user acceleration, rotation rate, attitude change), the same per-user templates matched with 1-nearest-neighbour DTW, and the same distance and margin rejection. Its evidence gate (leave-one-out, a permutation test, and a held-out session) is stricter than SubVox's.
+Dictator's Silent Use is a close adaptation of [joeblau/subvox](https://github.com/joeblau/subvox) (MIT). It uses the same channels (user acceleration, rotation rate, attitude change), the same per-user templates matched with 1-nearest-neighbour DTW, and the same distance and margin rejection. Its evidence gate (leave-one-out, a permutation test, and a held-out session) is stricter than SubVox's.
 
-SubVox publishes no accuracy figures. Upstream has had no changes since commit `591d028`, the one HushKey adapted. No peer-reviewed work shows mouthed words decoded from commodity earbud head motion. The strong results either use sensors taped to the jaw or decode sentences rather than single words.
+SubVox publishes no accuracy figures. Upstream has had no changes since commit `591d028`, the one Dictator adapted. No peer-reviewed work shows mouthed words decoded from commodity earbud head motion. The strong results either use sensors taped to the jaw or decode sentences rather than single words.
 
 On this Mac's own 37 silent takes, decoding is only just above chance. The changes below make the evidence clearly significant (p 0.026 → 0.002), but accuracy is still under 50 % for 5 words.
 
@@ -49,7 +49,7 @@ A caution on these numbers: with 33–37 takes, one take moves accuracy by about
 ## What was broken end to end, and what changed
 
 1. **Silent Use re-locked after every launch and every new take.** The evidence lived only in memory and was cleared whenever templates changed, so you had to run Evaluate again each time. Now `AppModel.silentEvidence` re-runs in the background whenever the silent templates change, including at launch. It no longer depends on which condition the Evaluate screen is showing.
-2. **A trained word could not reach another app.** Hold capture only worked while HushKey was frontmost, and insertion refuses to target HushKey itself. You had to capture, switch apps, then press the insert shortcut. Now:
+2. **A trained word could not reach another app.** Hold capture only worked while Dictator was frontmost, and insertion refuses to target Dictator itself. You had to capture, switch apps, then press the insert shortcut. Now:
    - Holding **Control** on its own captures a silent word on Train and on an unlocked Silent Use, in any app (`FunctionKeyMonitor(key: .control)`, the same hold logic as fn for dictation). ⌃C and other Control shortcuts cancel the capture.
    - Accepted words are typed into the frontmost app (**Type into the front app**, on by default). Rejected matches and the "nothing" class are never typed.
 3. **Junk takes became templates.** Head turns and stray presses were saved silently. They are now refused with a reason, and live captures with the same problems are never typed.
@@ -77,7 +77,7 @@ Filtering the slow band out of the classifier's features was also measured and r
 ## Measuring further changes
 
 ```bash
-Scripts/silent-eval.sh            # scores ~/Library/Application Support/com.ruddvz.hushkey/dataset.json
+Scripts/silent-eval.sh            # scores ~/Library/Application Support/com.ruddvz.dictator/dataset.json
 Scripts/silent-eval.sh other.json # or any exported dataset
 ```
 

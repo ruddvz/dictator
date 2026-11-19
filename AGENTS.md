@@ -1,22 +1,22 @@
-# Working on HushKey (Codex, Claude, and any other agent)
+# Working on Dictator (Codex, Claude, and any other agent)
 
 ## One copy, one branch: `main`
 
-- **The only working copy is `~/Projects/HushKey`.** Don't create or use other clones (for example under `~/Documents/Codex/...` or `~/Documents/ChatGPT/...`). Work found in another copy should be moved here, then that copy deleted.
-- **Branch:** work on `main` and push to `main`. Everything was merged there on 2026-11-04 (ruddvz/hushkey#3, ruddvz/hushkey#4), and every other branch has been deleted. Don't create long-lived feature branches.
+- **The only working copy is `~/Projects/Dictator`.** Don't create or use other clones (for example under `~/Documents/Codex/...` or `~/Documents/ChatGPT/...`). Work found in another copy should be moved here, then that copy deleted.
+- **Branch:** work on `main` and push to `main`. Everything was merged there on 2026-11-04 (ruddvz/dictator#3, ruddvz/dictator#4), and every other branch has been deleted. Don't create long-lived feature branches.
 - Before starting: `git pull --ff-only`. Commit small, focused changes and push when done, so the other agent can pull them.
-- If another agent may be editing at the same time, use a git worktree on its own branch (`git worktree add ../HushKey-<task> -b <you>/<task>`) then merge it back into `main`, push, and delete the branch and worktree when done. Never use bare `git stash` (the stash list is shared).
+- If another agent may be editing at the same time, use a git worktree on its own branch (`git worktree add ../Dictator-<task> -b <you>/<task>`) then merge it back into `main`, push, and delete the branch and worktree when done. Never use bare `git stash` (the stash list is shared).
 - Record what you finished and what's next in `PROGRESS.md`.
 
 ## Build and test
 
 ```bash
 xcodegen generate
-xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build CODE_SIGNING_ALLOWED=NO test
-open .build/Build/Products/Debug/HushKey.app   # use open, not the raw binary, so mic/speech permission sticks
+xcodebuild -project Dictator.xcodeproj -scheme Dictator -derivedDataPath .build CODE_SIGNING_ALLOWED=NO test
+open .build/Build/Products/Debug/Dictator.app   # use open, not the raw binary, so mic/speech permission sticks
 ```
 
-Only one HushKey should run at a time; quit `dist/HushKey.app` before testing a debug build.
+Only one Dictator should run at a time; quit `dist/Dictator.app` before testing a debug build.
 
 ## Design and product rules
 

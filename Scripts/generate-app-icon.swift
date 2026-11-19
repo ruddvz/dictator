@@ -1,13 +1,13 @@
 import AppKit
 import Foundation
 
-// Draws HushKey's app icon and menu bar glyph: the breath ribbon from `BreathRibbon` and
+// Draws Dictator's app icon and menu bar glyph: the breath ribbon from `BreathRibbon` and
 // `MorphIcon`, in sage `signal` on a fog squircle. Colours are the Fog & sage tokens from
 // docs/DESIGN_SYSTEM.md. Run from the repository root; package-app.sh runs it.
 
-let appIconURL = URL(fileURLWithPath: "HushKey/Assets.xcassets/AppIcon.appiconset")
-let menuIconURL = URL(fileURLWithPath: "HushKey/Assets.xcassets/HushKeyMenuBar.imageset")
-let liveMenuIconURL = URL(fileURLWithPath: "HushKey/Assets.xcassets/HushKeyMenuBarLive.imageset")
+let appIconURL = URL(fileURLWithPath: "Dictator/Assets.xcassets/AppIcon.appiconset")
+let menuIconURL = URL(fileURLWithPath: "Dictator/Assets.xcassets/DictatorMenuBar.imageset")
+let liveMenuIconURL = URL(fileURLWithPath: "Dictator/Assets.xcassets/DictatorMenuBarLive.imageset")
 for url in [appIconURL, menuIconURL, liveMenuIconURL] {
     try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
 }
@@ -158,7 +158,7 @@ for (filename, size) in appIconSizes {
     }
 }
 // The glyphs are vector PDFs, so the menu bar and the larger sidebar brand row both draw them crisply.
-for (url, name, live) in [(menuIconURL, "HushKeyMenuBar", false), (liveMenuIconURL, "HushKeyMenuBarLive", true)] {
+for (url, name, live) in [(menuIconURL, "DictatorMenuBar", false), (liveMenuIconURL, "DictatorMenuBarLive", true)] {
     for old in ["\(name).png", "\(name)@2x.png"] {
         try? FileManager.default.removeItem(at: url.appendingPathComponent(old))
     }

@@ -1,6 +1,6 @@
 # UI and copy polish audit (4 November 2026)
 
-To review a screen, run `HubSnapshotTests` or `PillSnapshotTests` with `TEST_RUNNER_HUSHKEY_SNAPSHOT_DIR=<dir>`. They write PNGs of 8 hub screens (light and dark) and every pill phase. The audit was made from those renders against `docs/DESIGN_SYSTEM.md`.
+To review a screen, run `HubSnapshotTests` or `PillSnapshotTests` with `TEST_RUNNER_DICTATOR_SNAPSHOT_DIR=<dir>`. They write PNGs of 8 hub screens (light and dark) and every pill phase. The audit was made from those renders against `docs/DESIGN_SYSTEM.md`.
 
 ## Done (on main)
 
@@ -10,7 +10,7 @@ To review a screen, run `HubSnapshotTests` or `PillSnapshotTests` with `TEST_RUN
 
 ## Voice guide
 
-1. Calm and plain. Speak to "you"; the app is "HushKey", never "we".
+1. Calm and plain. Speak to "you"; the app is "Dictator", never "we".
 2. Outcome first, then one next step. Errors are two short sentences at most, with no internal values (confidence, AX, Core ML, raw errors).
 3. In-window buttons, titles and toggles use sentence case and start with a verb. Menu bar and context-menu items use title case.
 4. One name per feature (table below). Paths use ›, for example Settings › Typing.

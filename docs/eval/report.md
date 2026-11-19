@@ -1,4 +1,4 @@
-# HushKey dictation eval
+# Dictator dictation eval
 
 Generated 2026-11-02T23:37:09Z on macOS 27.0.1 by `Scripts/eval.sh`. Machine-readable results: [report.json](report.json).
 
@@ -87,7 +87,7 @@ Dev clips:
 
 ### whisperkit
 
-Skipped: No WhisperKit model is downloaded in HushKey. Download one in Transcribe Files to include it; the harness never downloads models.
+Skipped: No WhisperKit model is downloaded in Dictator. Download one in Transcribe Files to include it; the harness never downloads models.
 
 ## Comparisons (paired bootstrap, 2000 resamples)
 

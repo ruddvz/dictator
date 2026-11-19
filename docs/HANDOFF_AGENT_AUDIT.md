@@ -1,16 +1,16 @@
-# HushKey: end-to-end audit brief (for Antigravity or any coding agent)
+# Dictator: end-to-end audit brief (for Antigravity or any coding agent)
 
 Paste everything below the line into the agent.
 
 ---
 
-You are taking over quality work on **HushKey**, a local-first macOS dictation app (Swift 6, SwiftUI + AppKit, macOS 26, Apple Silicon). Your job is an **end-to-end bug hunt, critique and polish pass** whose bar is "Apple quality, as smooth as Wispr Flow". Find real defects, fix the ones you can verify, and report the rest with evidence. Don't redesign the product, and don't remove features.
+You are taking over quality work on **Dictator**, a local-first macOS dictation app (Swift 6, SwiftUI + AppKit, macOS 26, Apple Silicon). Your job is an **end-to-end bug hunt, critique and polish pass** whose bar is "Apple quality, as smooth as Wispr Flow". Find real defects, fix the ones you can verify, and report the rest with evidence. Don't redesign the product, and don't remove features.
 
 ## 1. Repo, branch and rules (read first)
 
-- Repo: `~/Projects/HushKey` (GitHub `ruddvz/hushkey`, private). Work on **`main`** (everything is merged there; there are no feature branches). Push small commits straight to `main`.
+- Repo: `~/Projects/Dictator` (GitHub `ruddvz/dictator`, private). Work on **`main`** (everything is merged there; there are no feature branches). Push small commits straight to `main`.
 - Read `AGENTS.md`, `CLAUDE.md`, `PROGRESS.md` (newest entries first) and `docs/DESIGN_SYSTEM.md` before touching code.
-- Before starting: `git pull --ff-only`. If another agent may be editing, work in a worktree: `git worktree add ../HushKey-<task> -b <you>/<task>`. Never use bare `git stash`. Commit small, focused changes with clear messages. Record what you did and what's next at the top of `PROGRESS.md`.
+- Before starting: `git pull --ff-only`. If another agent may be editing, work in a worktree: `git worktree add ../Dictator-<task> -b <you>/<task>`. Never use bare `git stash`. Commit small, focused changes with clear messages. Record what you did and what's next at the top of `PROGRESS.md`.
 - GitHub Actions is deliberately broken (billing). Ignore the red `build-test` check, and verify on this Mac instead.
 - **Licences:** never copy GPL code (TypeWhisper, VoiceInk, FluidVoice, MacParakeet). MIT code (FreeFlow, OpenWhispr, OpenTypeless, amirrsyed/hushkey) may be adapted with attribution in `NOTICE.md`. Wispr Flow is closed: match behaviour and measurements, not assets or copy.
 - **Product rules:**
@@ -24,25 +24,25 @@ You are taking over quality work on **HushKey**, a local-first macOS dictation a
 ## 2. Build, test, run
 
 ```bash
-osascript -e 'quit app "HushKey"'        # a running copy can abort the test run
+osascript -e 'quit app "Dictator"'        # a running copy can abort the test run
 xcodegen generate
-xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build CODE_SIGNING_ALLOWED=NO test
-Scripts/package-app.sh && open dist/HushKey.app
+xcodebuild -project Dictator.xcodeproj -scheme Dictator -derivedDataPath .build CODE_SIGNING_ALLOWED=NO test
+Scripts/package-app.sh && open dist/Dictator.app
 ```
 
 - The baseline is 317 tests, 3 skipped, 0 failures. Keep it green, and add tests for any logic you fix.
-- `package-app.sh` signs with the local "HushKey Local Signing" identity, so Accessibility permission survives rebuilds. Only one HushKey may run at a time, and only one dictation app may own fn: quit TypeWhisper and Wispr Flow while testing.
+- `package-app.sh` signs with the local "Dictator Local Signing" identity, so Accessibility permission survives rebuilds. Only one Dictator may run at a time, and only one dictation app may own fn: quit TypeWhisper and Wispr Flow while testing.
 - Use `open`, never the raw binary, or microphone and speech permission won't stick.
 - Unit tests don't prove that the mic, text insertion or permissions work. Say exactly what you checked live and what you didn't.
 - **Logs** (use `/usr/bin/log`; in zsh, `log` is a builtin):
-  - `/usr/bin/log show --predicate 'subsystem == "com.ruddvz.hushkey"' --last 10m --style compact`
+  - `/usr/bin/log show --predicate 'subsystem == "com.ruddvz.dictator"' --last 10m --style compact`
   - Categories: `start` (per-step dictation start timing and pill phase changes), `insertion` (focus and insert results), `parakeet` (confidence, peak, auto-insert), `shortcut`.
 
 ## 3. Architecture map
 
 | Area | Files |
 |---|---|
-| App, state, dictation flow | `HushKey/App/AppModel.swift` (3,100 lines: `startDictation`, `stopDictation`, `finish…`, cancel/retry, Dock policy), `HushKeyApp.swift` (scenes, menu bar menu, app delegate), `StartTiming.swift` |
+| App, state, dictation flow | `Dictator/App/AppModel.swift` (3,100 lines: `startDictation`, `stopDictation`, `finish…`, cancel/retry, Dock policy), `DictatorApp.swift` (scenes, menu bar menu, app delegate), `StartTiming.swift` |
 | fn / shortcuts | `Services/FunctionKeyMonitor.swift` (pure `FunctionKeyGesture` state machine: 120 ms hold delay, tap, double-tap hands-free), `App/KeyCombo.swift` |
 | Audio | `Audio/AudioService.swift` (AVAudioEngine built/started/stopped on a serial queue; `AudioLevelMailbox` at 30 Hz), `SpeechEnvelope.swift`, `OutputMuter.swift`, `DictationSounds.swift` |
 | Recognition and cleanup | `Audio/ParakeetDictationEngine.swift`, `MicTranscriber.swift` (Apple Speech preview), `DictationCleanup.swift` (fillers, self-corrections, Apple Intelligence delete-only polish), `DictationCustomization.swift` |
@@ -51,7 +51,7 @@ Scripts/package-app.sh && open dist/HushKey.app
 | Pill | `Views/FloatingPill.swift` (non-activating panel, fixed minimum 220 × 84 transparent frame, phases idle / hover / preparing / listening / finishing / error / done, Flow-style notice card, `CountdownCloseButton`) |
 | Hub | `Views/ContentView.swift` (sidebar + sheet), `HubToolbar.swift` (theme, notices bell, profile), `TrafficLightInset.swift`, `DictationView.swift` (home), `InsightsView.swift`, `SettingsView.swift`, `OnboardingView.swift` + `Onboarding/OnboardingFlow.swift`, `HushIcons.swift` (native SF Symbols), `Ambient.swift` (`BreathRibbon`, `AmbientField`) |
 | Silent Lab | `Decoding/*`, `Motion/HeadphoneMotionService.swift`, `Views/TrainView.swift`, `EvaluateView.swift`, `UseView.swift`, `SetupView.swift` |
-| Storage | `Recording/LocalJSONArchive.swift`, `SessionRecorder.swift`, `HushKeyPersonalDataBackup.swift`, `VoiceProfile.swift` |
+| Storage | `Recording/LocalJSONArchive.swift`, `SessionRecorder.swift`, `DictatorPersonalDataBackup.swift`, `VoiceProfile.swift` |
 
 Reference docs: `docs/DESIGN_SYSTEM.md` (tokens, measured Flow layout), `docs/WISPR_FLOW_FULL_AUDIT.md` (ranked gaps against Flow), `docs/PILL_UX_ANALYSIS.md`, `docs/research/INSTANT_START_AND_MENU_BAR.md` (how TypeWhisper, FreeFlow, OpenWhispr and VoiceInk start instantly; menu and pill geometry), `docs/TESTING_PROTOCOL.md`.
 
@@ -94,7 +94,7 @@ Reference docs: `docs/DESIGN_SYSTEM.md` (tokens, measured Flow layout), `docs/WI
    - Memory and CPU at idle (the hub's `AmbientField` should do no per-frame work when hidden).
    - Crash-safety of the JSON archives.
    - Anything that blocks the main thread over 16 ms during dictation.
-4. **Polish against Flow.** Put Wispr Flow's hub and HushKey's side by side at the same window size and measure: sidebar row height and font size, icon size, logo lockup, content panel insets and radius, card padding, list row height, section headers, empty states, popovers. Fix differences only where Flow is clearly better, and keep HushKey's Fog & sage identity. Do the same for the pill (idle, hover, recording, notice, copy card) and its motion: springs and timings are in `docs/research/INSTANT_START_AND_MENU_BAR.md`.
+4. **Polish against Flow.** Put Wispr Flow's hub and Dictator's side by side at the same window size and measure: sidebar row height and font size, icon size, logo lockup, content panel insets and radius, card padding, list row height, section headers, empty states, popovers. Fix differences only where Flow is clearly better, and keep Dictator's Fog & sage identity. Do the same for the pill (idle, hover, recording, notice, copy card) and its motion: springs and timings are in `docs/research/INSTANT_START_AND_MENU_BAR.md`.
 5. **Menu bar first, completed.** Extend the menu bar menu toward TypeWhisper's structure (behaviour only):
    - A status line first, then Start/Stop.
    - Microphone, Language and Model submenus.

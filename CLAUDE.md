@@ -7,10 +7,10 @@ GitHub Actions doesn't run for this private repo: jobs are refused for billing (
 Verify every change on this Mac instead, and say so in `PROGRESS.md`:
 
 ```bash
-osascript -e 'quit app "HushKey"'   # a running copy can abort the test run
+osascript -e 'quit app "Dictator"'   # a running copy can abort the test run
 xcodegen generate
-xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build CODE_SIGNING_ALLOWED=NO test
-Scripts/package-app.sh && open dist/HushKey.app
+xcodebuild -project Dictator.xcodeproj -scheme Dictator -derivedDataPath .build CODE_SIGNING_ALLOWED=NO test
+Scripts/package-app.sh && open dist/Dictator.app
 ```
 
 Then check the change in the packaged app, since unit tests don't cover the mic, insertion or permissions.
