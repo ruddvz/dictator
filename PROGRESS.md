@@ -2,7 +2,8 @@
 
 ## Dictator rebrand and project-wide polish (2026-11-20)
 
-- Rebranded the app, Xcode project/scheme, bundle identifier, assets, scripts, and source tree to **Dictator**. Added migration for prior HushKey preferences, app data, and session recordings so existing local work carries forward without overwriting newer Dictator data.
+- Rebranded the app, Xcode project/scheme, bundle identifier, assets, scripts, and source tree to **Dictator**. Renamed the GitHub repository to `ruddvz/dictator`, updated `origin`, and pushed the changes. Added migration for prior HushKey preferences, app data, and session recordings so existing local work carries forward without overwriting newer Dictator data.
+- Moved the canonical checkout to `~/Projects/Dictator`; a compatibility symlink at the former path keeps the already-running legacy app's bundle resources reachable until it is quit.
 - Unified all 12 hub pages on the same 1,040 pt content width and made the Insights confusion matrix scroll horizontally when needed. Added an explicit, guarded **Insert** retry on the transcript card for the Codex case where Accessibility exposes no focused control; unverified paste is labeled and cannot be retried automatically.
 - Clarified Speech Recognition permission during onboarding and the privacy scope of nearby text hints. Reviewed HeyClicky's Mac app and changelog: kept Dictator's existing opt-in, transient focused-field context and correction learning; full-screen capture and computer-use agents remain outside this local dictation flow. No code or assets copied.
 - **Verification:** 373 passed, 8 skipped, 0 failed in the full source suite. Built `dist/Dictator.app`, signed with the local Dictator signing identity, and verified its strict deep code signature and bundle identifier. `git diff --check` passed before the final snapshot harness adjustment.
