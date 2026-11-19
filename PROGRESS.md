@@ -1,5 +1,13 @@
 # HushKey progress
 
+## Investigated: Codex insertion and end-to-end status (2026-11-19)
+
+- Unified logs for the attached 17:18–17:19 screenshots show HushKey had Accessibility permission, but both dictation starts captured `insertTarget=false` and `pasteTarget=false`; at finish, Codex (`com.openai.codex`) returned `focused=none`. HushKey therefore showed the transcript card with Copy instead of inserting. The text was retained; this was a missing Accessibility focus target, not truncated recognition.
+- The Nov 8 resolver fix still handles apps whose focused control is available through an app-level or system-wide query. Codex returned no focused UI element, so the guarded direct-typing and paste paths both stop to avoid sending text to an unknown control. Next: diagnose Codex's live Accessibility tree and add a safe, explicit path only if the intended composer can be identified.
+- Ran the current source test suite: **360 passed, 8 skipped, 0 failed** on macOS 27.0.1. The latest recorded release-package verification remains the Nov 8 audit.
+- End-to-end sign-off is still open. Existing work covers all 12 sections and automated/static checks, but live microphone dictation, Codex and second-app insertion, selected-text editing, Meetings audio/export, the full file import-to-export journey, permissions, headphone motion capture, and VoiceOver remain unverified. See `docs/AUDIT_2026-11-08.md` and `docs/TESTING_PROTOCOL.md`.
+- Next fresh session: inspect Codex's Accessibility focus and complete a live insertion check in a blank test field, then continue the remaining device-level acceptance items.
+
 ## Completed: project-wide quality audit and UI identity pass (2026-11-08)
 
 - Reviewed all 12 sections, active controls, current labels, safety gates, local data paths, tests, and light/dark page renders. No enabled no-op controls or shipping placeholders were found; disabled History actions explain why they are unavailable.
