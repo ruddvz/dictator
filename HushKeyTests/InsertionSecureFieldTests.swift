@@ -50,6 +50,30 @@ final class UnverifiedPasteGateTests: XCTestCase {
         XCTAssertFalse(allows("AXGroup", "AXPasswordField", editable: true))
     }
 
+    func testUnverifiedPasteWithoutAXFocusIsLimitedToFrontmostCodexWithFallbackEnabled() {
+        XCTAssertTrue(TextInsertionService.allowsUnverifiedCodexPaste(
+            bundleIdentifier: "com.openai.codex",
+            frontmostBundleIdentifier: "com.openai.codex",
+            pasteFallbackEnabled: true))
+        XCTAssertFalse(TextInsertionService.allowsUnverifiedCodexPaste(
+            bundleIdentifier: "com.openai.codex",
+            frontmostBundleIdentifier: "com.openai.codex",
+            pasteFallbackEnabled: true,
+            focusedControlWasRejected: true))
+        XCTAssertFalse(TextInsertionService.allowsUnverifiedCodexPaste(
+            bundleIdentifier: "com.openai.codex",
+            frontmostBundleIdentifier: "com.openai.codex",
+            pasteFallbackEnabled: false))
+        XCTAssertFalse(TextInsertionService.allowsUnverifiedCodexPaste(
+            bundleIdentifier: "com.apple.finder",
+            frontmostBundleIdentifier: "com.apple.finder",
+            pasteFallbackEnabled: true))
+        XCTAssertFalse(TextInsertionService.allowsUnverifiedCodexPaste(
+            bundleIdentifier: "com.openai.codex",
+            frontmostBundleIdentifier: "com.apple.finder",
+            pasteFallbackEnabled: true))
+    }
+
     func testClipboardRestoreWaitsForSlowApps() {
         XCTAssertGreaterThanOrEqual(TextInsertionService.unverifiedPasteRestoreDelay, .milliseconds(400))
     }

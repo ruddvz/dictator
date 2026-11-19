@@ -81,6 +81,8 @@ Text insertion is off by default. Enable it in **Settings → Typing**, approve 
 
 HushKey uses Accessibility to inspect the frontmost app and focused control, allows only supported text fields, rejects secure/password controls, and rechecks the process, field contents, and selection before insertion. Direct typing uses the selected-text attribute. If typing is declined and **Paste if typing fails** is enabled, HushKey temporarily places the text on the clipboard, waits up to two seconds for the same field to expose the exact expected text, then restores the prior clipboard if nothing else changed it meanwhile; otherwise it leaves the newer clipboard contents intact. A paste that cannot be verified is reported as uncertain, and the transcript stays available. Check the target field before choosing **Paste again**, because it may already have received the text. Unsupported controls fail closed. Undo is available only while the same field stays focused and its contents remain unchanged.
 
+Codex may hide its composer from Accessibility. With paste fallback enabled, if Codex is still the frontmost app when dictation finishes, HushKey sends one unverified paste to Codex's active window and asks you to check the composer before retrying. The transcript remains in local history if the destination does not accept it.
+
 For a voice edit, select text in another app and hold the dedicated selected-text shortcut (`⌥⇧E` by default). Say an instruction, release, then review the preview in **Transforms**. Apply is explicit and fails closed if the original app, field contents, or selection changed. Spoken edit instructions are not saved in dictation history.
 
 ## Local data and privacy

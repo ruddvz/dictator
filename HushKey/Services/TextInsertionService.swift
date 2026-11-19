@@ -48,6 +48,18 @@ final class TextInsertionService {
         let selectedText: String
     }
 
+    struct FocusCandidate<Element> {
+        let element: Element
+        let processIdentifier: pid_t
+        let role: String
+        let subrole: String
+        let depth: Int
+        let isFocused: Bool
+        let isPassword: Bool
+        let selectedTextSettable: Bool
+        let hasEditableAncestor: Bool
+    }
+
     private(set) var isEnabled = false
     /// Callers must not retry when an accessibility edit may have changed the field but
     /// read-back could not confirm the exact result.
@@ -57,6 +69,7 @@ final class TextInsertionService {
     private(set) var lastDeliveryVerified = true
     @ObservationIgnored private var activationObserver: NSObjectProtocol?
     @ObservationIgnored private var exposedProcesses: Set<pid_t> = []
+    @ObservationIgnored private var descendantFocusWasRejected = false
     /// Paste through the clipboard in apps that refuse direct typing; the clipboard is restored.
     var allowsPasteFallback = UserDefaults.standard.object(forKey: "allowsPasteFallback") as? Bool ?? true {
         didSet { UserDefaults.standard.set(allowsPasteFallback, forKey: "allowsPasteFallback") }
@@ -395,6 +408,12 @@ final class TextInsertionService {
         exposeWebContent(of: app)
         let name = app.localizedName ?? "the app"
         guard let focused = focusedElement(expectedProcessIdentifier: app.processIdentifier) else {
+            if Self.allowsUnverifiedCodexPaste(bundleIdentifier: app.bundleIdentifier,
+                                               frontmostBundleIdentifier: NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+                                               pasteFallbackEnabled: allowsPasteFallback,
+                                               focusedControlWasRejected: descendantFocusWasRejected) {
+                return await pasteToUnexposedCodexField(text, app: app)
+            }
             status = "Nothing has focus in \(name). Nothing was pasted."
             return false
         }
@@ -433,6 +452,28 @@ final class TextInsertionService {
         return true
     }
 
+    private func pasteToUnexposedCodexField(_ text: String, app: NSRunningApplication) async -> Bool {
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier else {
+            status = "Codex is no longer frontmost. Nothing was pasted."
+            return false
+        }
+        let pasteboard = NSPasteboard.general
+        let saved = ClipboardSnapshot(pasteboard)
+        let ours = ClipboardSnapshot.placeTransient(text, on: pasteboard)
+        guard Self.postCommandV() else {
+            _ = saved.restore(to: pasteboard, ifChangeCountIs: ours)
+            status = "The paste shortcut could not be sent to Codex. Nothing was inserted."
+            return false
+        }
+        try? await Task.sleep(for: Self.unverifiedPasteRestoreDelay)
+        let restored = saved.restore(to: pasteboard, ifChangeCountIs: ours)
+        let clipboard = restored ? "Your clipboard was put back." : "The clipboard changed meanwhile, so it was left as is."
+        status = "Paste sent to the frontmost Codex window; HushKey could not verify the focused field. Check the composer before retrying. \(clipboard)"
+        lastDeliveryVerified = false
+        log.notice("sent unverified paste to frontmost Codex window; Accessibility focus was unavailable")
+        return true
+    }
+
     nonisolated static let unverifiedPasteRestoreDelay: Duration = .milliseconds(500)
 
     /// Whether an element that can't be read back still looks like somewhere to type: a text role,
@@ -444,6 +485,14 @@ final class TextInsertionService {
               !subrole.localizedCaseInsensitiveContains("secure"),
               !subrole.localizedCaseInsensitiveContains("password") else { return false }
         return isSupportedTextTarget(role: role, subrole: subrole) || selectedTextSettable || hasEditableAncestor
+    }
+
+    nonisolated static func allowsUnverifiedCodexPaste(bundleIdentifier: String?,
+                                                        frontmostBundleIdentifier: String?,
+                                                        pasteFallbackEnabled: Bool,
+                                                        focusedControlWasRejected: Bool = false) -> Bool {
+        pasteFallbackEnabled && !focusedControlWasRejected && bundleIdentifier == "com.openai.codex" &&
+            frontmostBundleIdentifier == "com.openai.codex"
     }
 
     /// Whether a readable, non-password field is in front and eligible for verified paste.
@@ -755,6 +804,7 @@ final class TextInsertionService {
     }
 
     private func focusedElement(expectedProcessIdentifier: pid_t? = nil) -> AXUIElement? {
+        descendantFocusWasRejected = false
         let systemWide = AXUIElementCreateSystemWide()
         let focusedApplication = accessibilityElement(kAXFocusedApplicationAttribute, of: systemWide)
         let applicationFocus = focusedApplication.flatMap {
@@ -768,11 +818,90 @@ final class TextInsertionService {
         } else {
             frontmostFocus = nil
         }
-        return Self.preferredFocusedElement(applicationFocusedElement: applicationFocus,
-                                            systemWideFocusedElement: systemWideFocus,
-                                            frontmostApplicationFocusedElement: frontmostFocus,
-                                            expectedProcessIdentifier: expectedProcessIdentifier,
-                                            processIdentifier: Self.processIdentifier(of:))
+        if let focused = Self.preferredFocusedElement(applicationFocusedElement: applicationFocus,
+                                                      systemWideFocusedElement: systemWideFocus,
+                                                      frontmostApplicationFocusedElement: frontmostFocus,
+                                                      expectedProcessIdentifier: expectedProcessIdentifier,
+                                                      processIdentifier: Self.processIdentifier(of:)) {
+            return focused
+        }
+
+        // Some web-backed apps (including Codex) expose no AXFocusedUIElement even when their
+        // focused editor is present in the app's accessibility tree. Search only the still-
+        // frontmost target app, and only return a uniquely focused editable descendant.
+        guard let expectedProcessIdentifier,
+              NSWorkspace.shared.frontmostApplication?.processIdentifier == expectedProcessIdentifier,
+              let app = NSRunningApplication(processIdentifier: expectedProcessIdentifier),
+              !app.isTerminated else { return nil }
+        return focusedDescendant(in: app)
+    }
+
+    private func focusedDescendant(in app: NSRunningApplication) -> AXUIElement? {
+        let applicationElement = AXUIElementCreateApplication(app.processIdentifier)
+        _ = AXUIElementSetMessagingTimeout(applicationElement, 0.05)
+        let windows = accessibilityElements(kAXWindowsAttribute, of: applicationElement, limit: 24)
+        let roots = windows.isEmpty
+            ? accessibilityElements(kAXChildrenAttribute, of: applicationElement, limit: 24)
+            : windows
+        var pending = roots.reversed().map { (element: $0, depth: 1) }
+        var candidates: [FocusCandidate<AXUIElement>] = []
+        var visited = 0
+        let maximumNodes = 96
+        let maximumDepth = 10
+        let deadline = DispatchTime.now().uptimeNanoseconds &+ 300_000_000
+
+        while let item = pending.popLast(), visited < maximumNodes,
+              DispatchTime.now().uptimeNanoseconds < deadline {
+            visited += 1
+            guard Self.processIdentifier(of: item.element) == app.processIdentifier else { continue }
+            _ = AXUIElementSetMessagingTimeout(item.element, 0.025)
+            let isFocused = boolAttribute(kAXFocusedAttribute as String, of: item.element)
+            if isFocused {
+                let role = stringAttribute(kAXRoleAttribute as String, of: item.element) ?? ""
+                let subrole = stringAttribute(kAXSubroleAttribute as String, of: item.element) ?? ""
+                var settable = DarwinBoolean(false)
+                let selectedTextSettable = AXUIElementIsAttributeSettable(
+                    item.element, kAXSelectedTextAttribute as CFString, &settable) == .success && settable.boolValue
+                let hasEditableAncestor = elementAttribute("AXEditableAncestor", of: item.element) != nil
+                candidates.append(FocusCandidate(element: item.element,
+                                                 processIdentifier: app.processIdentifier,
+                                                 role: role,
+                                                 subrole: subrole,
+                                                 depth: item.depth,
+                                                 isFocused: true,
+                                                 isPassword: isPasswordElement(item.element),
+                                                 selectedTextSettable: selectedTextSettable,
+                                                 hasEditableAncestor: hasEditableAncestor))
+            }
+
+            guard item.depth < maximumDepth else { continue }
+            let children = accessibilityElements(kAXChildrenAttribute as String, of: item.element, limit: 20)
+            pending.append(contentsOf: children.reversed().map { (element: $0, depth: item.depth + 1) })
+        }
+
+        let preferred = Self.preferredFocusedDescendant(candidates: candidates,
+                                                        expectedProcessIdentifier: app.processIdentifier,
+                                                        elementsEqual: CFEqual)
+        descendantFocusWasRejected = preferred == nil && !candidates.isEmpty
+        return preferred
+    }
+
+    private func accessibilityElements(_ attribute: String, of parent: AXUIElement,
+                                       limit: Int) -> [AXUIElement] {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(parent, attribute as CFString, &value) == .success,
+              let value, let elements = value as? [AXUIElement] else { return [] }
+        return Array(elements.prefix(limit))
+    }
+
+    private func elementAttribute(_ attribute: String, of element: AXUIElement) -> AXUIElement? {
+        accessibilityElement(attribute, of: element)
+    }
+
+    private func boolAttribute(_ attribute: String, of element: AXUIElement) -> Bool {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success else { return false }
+        return (value as? Bool) == true
     }
 
     private func accessibilityElement(_ attribute: String, of parent: AXUIElement) -> AXUIElement? {
@@ -793,6 +922,28 @@ final class TextInsertionService {
             if processIdentifier(candidate) == expectedProcessIdentifier { return candidate }
         }
         return nil
+    }
+
+    nonisolated static func preferredFocusedDescendant<Element>(
+        candidates: [FocusCandidate<Element>], expectedProcessIdentifier: pid_t,
+        elementsEqual: (Element, Element) -> Bool
+    ) -> Element? {
+        let eligible = candidates.compactMap { candidate -> (Element, Int, Int)? in
+            guard candidate.isFocused,
+                  candidate.processIdentifier == expectedProcessIdentifier,
+                  !candidate.isPassword,
+                  isSupportedTextTarget(role: candidate.role, subrole: candidate.subrole)
+                    || candidate.selectedTextSettable || candidate.hasEditableAncestor else { return nil }
+            let specificity = isSupportedTextTarget(role: candidate.role, subrole: candidate.subrole) ? 2 : 1
+            return (candidate.element, specificity, candidate.depth)
+        }
+        guard let bestSpecificity = eligible.map(\.1).max(),
+              let bestDepth = eligible.filter({ $0.1 == bestSpecificity }).map(\.2).max() else { return nil }
+        var unique: [Element] = []
+        for (element, specificity, depth) in eligible where specificity == bestSpecificity && depth == bestDepth {
+            if !unique.contains(where: { elementsEqual($0, element) }) { unique.append(element) }
+        }
+        return unique.count == 1 ? unique[0] : nil
     }
 
     nonisolated private static func processIdentifier(of element: AXUIElement) -> pid_t? {
