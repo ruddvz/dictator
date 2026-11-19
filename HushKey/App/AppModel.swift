@@ -248,7 +248,7 @@ final class AppModel {
     }
     /// After the rules, Apple Intelligence on this Mac drops the fillers they can't judge and
     /// fixes punctuation. It can only delete fillers, never reword.
-    var polishesWithAppleIntelligence = UserDefaults.standard.object(forKey: "smartCleanup") as? Bool ?? false {
+    var polishesWithAppleIntelligence = UserDefaults.standard.object(forKey: "smartCleanup") as? Bool ?? true {
         didSet { UserDefaults.standard.set(polishesWithAppleIntelligence, forKey: "smartCleanup") }
     }
     @ObservationIgnored private var smartCleanupSession: AnyObject?
@@ -2229,7 +2229,8 @@ final class AppModel {
         dictationStartedAt = Date()
         lastDictationDuration = nil
         let customWords = profileSettings.vocabulary
-        lastDictationContextualStrings = DictationContextHints.prioritized(customWords: customWords,
+        lastDictationContextualStrings = DictationContextHints.prioritized(
+                                                                           customWords: DictationContextHints.builtInWords + customWords,
                                                                            modeHints: Self.modeHints(for: activeDictationMode),
                                                                            nearbyHints: nearbyHints,
                                                                            learnedWords: dataset.vocabulary)

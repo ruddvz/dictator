@@ -521,6 +521,8 @@ enum DictationWordList {
 
 enum DictationContextHints {
     static let maximumCount = 100
+    /// Keep HushKey's own name in the recognizer vocabulary so the app can name itself correctly.
+    static let builtInWords = ["HushKey"]
 
     static func prioritized(
         customWords: [String],

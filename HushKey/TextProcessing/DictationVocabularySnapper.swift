@@ -9,6 +9,7 @@ import Foundation
 /// ("Pria" → "Priya", for names of five letters or more).
 enum DictationVocabularySnapper {
     static let maximumWindow = 3
+    private static let builtInSpellingAliases = ["hushki": "HushKey"]
 
     static func apply(_ text: String, terms: [String]) -> String {
         let candidates = terms
@@ -45,6 +46,7 @@ enum DictationVocabularySnapper {
     private static func matches(term: String, termKey: String, core: String, width: Int) -> Bool {
         guard core != term else { return false }
         let coreKey = key(for: core)
+        if width == 1, builtInSpellingAliases[coreKey] == term { return true }
         if coreKey == termKey {
             // A split word is clearly the term; a single word only needs fixing for its capitals.
             return width > 1 || term != term.lowercased()

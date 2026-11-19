@@ -1266,6 +1266,13 @@ final class SafetyAndStorageTests: XCTestCase {
             DictationContextHints.maximumCount)
     }
 
+    func testBuiltInHushKeySpellingIsSentAsARecognizerHintAndCorrectedForParakeet() {
+        let hints = DictationContextHints.prioritized(customWords: DictationContextHints.builtInWords)
+        XCTAssertEqual(hints.first, "HushKey")
+        XCTAssertEqual(DictationVocabularySnapper.apply("Hushki is listening.", terms: hints),
+                       "HushKey is listening.")
+    }
+
     func testWritingStyleValidationAndLocalPersistenceAreBounded() throws {
         // A fixed name, cleared before and after, so test runs don't leave a new plist behind each time.
         let suiteName = "HushKeyWritingStyleTests"

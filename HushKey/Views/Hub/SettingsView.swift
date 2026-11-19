@@ -276,8 +276,9 @@ private struct CleanupSettings: View {
                 }
             }
             SettingsRow(title: "Use nearby text for names",
-                        detail: model.usesNearbyTextHints ? model.insertion.contextAccessStatus
-                            : "Reads a few words around the cursor, then forgets them.") {
+                        detail: model.usesNearbyTextHints
+                            ? "Uses nearby name-like terms on this Mac for this dictation, then discards them. \(model.insertion.contextAccessStatus)"
+                            : "Optional. Uses nearby name-like terms on this Mac for this dictation, then discards them.") {
                 RowToggle(isOn: $model.usesNearbyTextHints, label: "Use nearby text hints")
             }
             if model.usesNearbyTextHints {
@@ -357,7 +358,7 @@ private struct InsertionSettings: View {
             SettingsRow(title: "Type where your cursor is", detail: "Dictation goes straight into the text box you’re in.") {
                 RowToggle(isOn: enabled, label: "Type into the focused field")
             }
-            SettingsRow(title: "Paste when typing is blocked", detail: "Verifies the exact text field; restores the clipboard when safe.") {
+            SettingsRow(title: "Paste when typing is blocked", detail: "Checks the field when possible. Codex may need you to confirm an unverified paste.") {
                 RowToggle(isOn: $insertion.allowsPasteFallback, label: "Paste if typing fails")
             }
             .disabled(!insertion.isEnabled)

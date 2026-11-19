@@ -24,7 +24,7 @@ extension AppModel {
             await meeting.start(
                 localeIdentifier: dictationLanguage,
                 contextualStrings: DictationContextHints.prioritized(
-                    customWords: DictationVocabulary.terms(from: dictationTerms),
+                    customWords: DictationContextHints.builtInWords + DictationVocabulary.terms(from: dictationTerms),
                     learnedWords: dataset.vocabulary),
                 dictationIsBusy: busy)
         }
