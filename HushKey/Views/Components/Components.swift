@@ -375,7 +375,7 @@ struct ListGroup<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) { content }
+        LazyVStack(alignment: .leading, spacing: 0) { content }
             .padding(.top, -Theme.hairlineWidth)
             .frame(maxWidth: .infinity, alignment: .leading)
             .clipShape(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))

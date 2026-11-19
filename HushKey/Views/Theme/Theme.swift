@@ -451,167 +451,42 @@ struct KeycapShortcut: View {
     }
 }
 
-// MARK: - Morphing state icon
+// MARK: - State icon
 
-/// One stroked line that morphs between HushKey's states: a calm hush, the breath ribbon
-/// opening into a lens with the voice, a working spinner, and a check. Every state uses the
-/// same number of points, so SwiftUI interpolates the path itself when the state changes.
-struct MorphIcon: View {
+/// Stable, native state glyphs around HushKey's own ribbon mark. Status changes stay legible
+/// without continuously rebuilding a custom path while the UI is scrolling or recording.
+struct StateIcon: View {
     enum Phase: Equatable { case idle, listening, working, done }
 
     var phase: Phase
     var level: Float = 0
-    var lineWidth: CGFloat = 2
 
-    /// The state being morphed away from, and when the morph began. Blending is done here,
-    /// frame by frame, because the live states also move every frame.
-    @State private var previous: Phase?
-    @State private var changedAt = Date.distantPast
-    @State private var settled = true
-    @State private var speech = SpeechMeter()
-
-    /// Speech amount eased per frame: quick to rise with a syllable, slower to fall.
-    private final class SpeechMeter {
-        var envelope = SpeechEnvelope()
-        var target: Double = 0
-        var value: Double = 0
-        var lastFrame: TimeInterval?
-
-        func advance(to time: TimeInterval) -> Double {
-            let dt = min(0.05, time - (lastFrame ?? time))
-            lastFrame = time
-            let rate = target > value ? 18.0 : 6.0
-            value += (target - value) * min(1, rate * dt)
-            return value
-        }
-    }
-
-    private static let morphDuration: TimeInterval = 0.45
+    private var normalizedLevel: CGFloat { CGFloat(min(1, max(0, level))) }
 
     var body: some View {
-        let isStatic = phase == .idle || phase == .done
-        TimelineView(.animation(minimumInterval: 1 / 60, paused: isStatic && settled)) { context in
-            let time = context.date.timeIntervalSinceReferenceDate
-            let raw = min(1, context.date.timeIntervalSince(changedAt) / Self.morphDuration)
-            let eased = 1 - pow(1 - raw, 3)
-            let spoken = phase == .listening ? speech.advance(to: time) : 0
-            let target = Self.points(for: phase, time: time, speech: spoken)
-            let vector = previous.map { Self.points(for: $0, time: time, speech: spoken).blended(to: target, by: eased) } ?? target
-            MorphLine(vector: vector)
-                .stroke(style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round))
-        }
-        .onChange(of: level) { _, newValue in
-            guard phase == .listening else { return }
-            speech.target = Double(speech.envelope.amount(for: newValue, at: Date.timeIntervalSinceReferenceDate))
-        }
-        .onChange(of: phase) { old, new in
-            if new != .listening { speech = SpeechMeter() }
-            previous = old
-            changedAt = Date()
-            settled = false
-            Task {
-                try? await Task.sleep(for: .seconds(Self.morphDuration + 0.05))
-                settled = true
-            }
-        }
-        .accessibilityHidden(true)
-    }
-
-    static let count = 33
-
-    /// `speech` is 0…1 from `SpeechEnvelope`, already eased; only the listening state uses it.
-    static func points(for phase: Phase, time: TimeInterval, speech: Double) -> AnimatableVector {
-        var values: [Double] = []
-        values.reserveCapacity(count * 2)
-        for index in 0..<count {
-            let t = Double(index) / Double(count - 1)
-            let point: (Double, Double)
+        Group {
             switch phase {
             case .idle:
-                // The app icon's ribbon: out along its top edge and back along its bottom, a hair
-                // apart, so the stroke tapers like the icon and listening can open it into a lens.
-                let u = t <= 0.5 ? 2 * t : 2 - 2 * t
-                let side = t <= 0.5 ? -1.0 : 1.0
-                let half = 0.035 * pow(sin(.pi * u), 1.3)
-                point = (0.1 + 0.8 * u, 0.5 - 0.09 * sin(2 * .pi * u) + side * half)
+                Image("HushKeyMenuBar").resizable().scaledToFit()
             case .listening:
-                // `BreathRibbon` as an outline: along the top edge, back along the bottom.
-                let u = t <= 0.5 ? 2 * t : 2 - 2 * t
-                let side = t <= 0.5 ? -1.0 : 1.0
-                let half = 0.03 * sin(.pi * u) + 0.25 * BreathRibbon.thickness(at: u, energy: speech, mode: .live, time: time)
-                point = (0.1 + 0.8 * u, 0.5 + 0.3 * BreathRibbon.spine(at: u, energy: speech, time: time) + side * half)
+                Image(systemName: "waveform")
+                    .font(.system(size: 18, weight: .medium))
+                    .symbolRenderingMode(.hierarchical)
+                    .scaleEffect(x: 1, y: 0.82 + normalizedLevel * 0.36)
+                    .opacity(0.76 + normalizedLevel * 0.24)
+                    .animation(.linear(duration: 0.09), value: normalizedLevel)
             case .working:
-                let angle = -Double.pi / 2 + time * 4.2 + t * 1.65 * .pi
-                point = (0.5 + 0.32 * cos(angle), 0.5 + 0.32 * sin(angle))
+                Image(systemName: "hourglass")
+                    .font(.system(size: 18, weight: .medium))
+                    .symbolRenderingMode(.hierarchical)
             case .done:
-                let corner = 0.38
-                point = t < corner
-                    ? (0.2 + 0.2 * (t / corner), 0.52 + 0.2 * (t / corner))
-                    : (0.4 + 0.42 * ((t - corner) / (1 - corner)), 0.72 - 0.44 * ((t - corner) / (1 - corner)))
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 18, weight: .medium))
+                    .symbolRenderingMode(.hierarchical)
             }
-            values.append(point.0)
-            values.append(point.1)
         }
-        return AnimatableVector(values: values)
-    }
-}
-
-private struct MorphLine: Shape {
-    var vector: AnimatableVector
-
-    var animatableData: AnimatableVector {
-        get { vector }
-        set { vector = newValue }
-    }
-
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let values = vector.values
-        guard values.count >= 4 else { return path }
-        let side = min(rect.width, rect.height)
-        let origin = CGPoint(x: rect.midX - side / 2, y: rect.midY - side / 2)
-        func point(_ i: Int) -> CGPoint {
-            CGPoint(x: origin.x + values[i * 2] * side, y: origin.y + values[i * 2 + 1] * side)
-        }
-        path.move(to: point(0))
-        for index in 1..<(values.count / 2) { path.addLine(to: point(index)) }
-        return path
-    }
-}
-
-/// Fixed-length vector so a polyline can be animated point by point.
-struct AnimatableVector: VectorArithmetic {
-    var values: [Double]
-
-    static var zero: AnimatableVector { AnimatableVector(values: []) }
-
-    static func + (lhs: AnimatableVector, rhs: AnimatableVector) -> AnimatableVector {
-        combine(lhs, rhs, +)
-    }
-
-    static func - (lhs: AnimatableVector, rhs: AnimatableVector) -> AnimatableVector {
-        combine(lhs, rhs, -)
-    }
-
-    mutating func scale(by rhs: Double) {
-        values = values.map { $0 * rhs }
-    }
-
-    var magnitudeSquared: Double { values.reduce(0) { $0 + $1 * $1 } }
-
-    func blended(to target: AnimatableVector, by amount: Double) -> AnimatableVector {
-        var delta = target - self
-        delta.scale(by: amount)
-        return self + delta
-    }
-
-    private static func combine(_ lhs: AnimatableVector, _ rhs: AnimatableVector,
-                                _ op: (Double, Double) -> Double) -> AnimatableVector {
-        let count = max(lhs.values.count, rhs.values.count)
-        return AnimatableVector(values: (0..<count).map { index in
-            op(index < lhs.values.count ? lhs.values[index] : 0,
-               index < rhs.values.count ? rhs.values[index] : 0)
-        })
+        .contentTransition(.symbolEffect(.replace))
+        .accessibilityHidden(true)
     }
 }
 

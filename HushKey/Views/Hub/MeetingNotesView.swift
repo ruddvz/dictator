@@ -263,7 +263,7 @@ struct MeetingNotesView: View {
                            message: searchText.isEmpty ? "Your meetings land here." : "Try another word.")
             } else {
                 ScrollView {
-                    VStack(spacing: Theme.s0) {
+                    LazyVStack(spacing: Theme.s0) {
                         ForEach(filteredNotes) { note in
                             MeetingNoteRow(note: note, isSelected: service.selectedNoteID == note.id) {
                                 service.select(note.id)

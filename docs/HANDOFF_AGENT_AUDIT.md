@@ -49,7 +49,7 @@ Scripts/package-app.sh && open dist/HushKey.app
 | Insertion | `Services/TextInsertionService.swift` (AX set-text, paste fallback with verification) |
 | Recovery and review | `Recording/DictationRecovery.swift` (`DictationNotice`, `ParakeetAutoInsertGate`: peak ≥ 0.06 and confidence ≥ 0.35, `TranscriptCard`) |
 | Pill | `Views/FloatingPill.swift` (non-activating panel, fixed minimum 220 × 84 transparent frame, phases idle / hover / preparing / listening / finishing / error / done, Flow-style notice card, `CountdownCloseButton`) |
-| Hub | `Views/ContentView.swift` (sidebar + sheet), `HubToolbar.swift` (theme, notices bell, profile), `TrafficLightInset.swift`, `DictationView.swift` (home), `InsightsView.swift`, `SettingsView.swift`, `OnboardingView.swift` + `Onboarding/OnboardingFlow.swift`, `HushIcons.swift`, `Ambient.swift` (`BreathRibbon`, `AmbientField`, `MorphIcon`) |
+| Hub | `Views/ContentView.swift` (sidebar + sheet), `HubToolbar.swift` (theme, notices bell, profile), `TrafficLightInset.swift`, `DictationView.swift` (home), `InsightsView.swift`, `SettingsView.swift`, `OnboardingView.swift` + `Onboarding/OnboardingFlow.swift`, `HushIcons.swift` (native SF Symbols), `Ambient.swift` (`BreathRibbon`, `AmbientField`) |
 | Silent Lab | `Decoding/*`, `Motion/HeadphoneMotionService.swift`, `Views/TrainView.swift`, `EvaluateView.swift`, `UseView.swift`, `SetupView.swift` |
 | Storage | `Recording/LocalJSONArchive.swift`, `SessionRecorder.swift`, `HushKeyPersonalDataBackup.swift`, `VoiceProfile.swift` |
 

@@ -802,7 +802,7 @@ struct FloatingPillView: View {
         return VStack(alignment: .leading, spacing: Theme.s2) {
             HStack(spacing: Theme.s2) {
                 if isSuccess {
-                    MorphIcon(phase: .done, lineWidth: 1.6)
+                    StateIcon(phase: .done)
                         .frame(width: 14, height: 14)
                         .foregroundStyle(Theme.signal)
                 } else {
@@ -1230,13 +1230,13 @@ private struct TypedConfirmation: View {
     let verb: String
     let appName: String?
     var settled = false
-    @State private var icon: MorphIcon.Phase = .working
+    @State private var icon: StateIcon.Phase = .working
     @State private var showsText = false
     @State private var tickScale: CGFloat = 0.8
 
     var body: some View {
         HStack(spacing: 6) {
-            MorphIcon(phase: settled ? .done : icon, lineWidth: 1.8)
+            StateIcon(phase: settled ? .done : icon)
                 .frame(width: 14, height: 14)
                 .foregroundStyle(Theme.signal)
                 .scaleEffect(settled ? 1 : tickScale)

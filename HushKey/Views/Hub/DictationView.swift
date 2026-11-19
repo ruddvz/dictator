@@ -93,7 +93,9 @@ struct DictationView: View {
             Task { await model.toggleDictation() }
         } label: {
             HStack(spacing: Theme.s2) {
-                LiveLevel(model.audio) { MorphIcon(phase: morphPhase, level: $0, lineWidth: Theme.ruleWidth) }
+                LiveLevel(model.audio) { level in
+                    StateIcon(phase: statePhase, level: level)
+                }
                     .frame(width: Theme.iconColumn, height: Theme.iconColumn)
                 Text(isFinishing ? "Transcribing"
                      : model.audio.isRunning ? "Stop"
@@ -131,7 +133,7 @@ struct DictationView: View {
 
     private var showsComposer: Bool { (isBusy && !isEditingSelection) || hasText }
 
-    private var morphPhase: MorphIcon.Phase {
+    private var statePhase: StateIcon.Phase {
         model.audio.isRunning ? .listening : model.isStartingDictation || isFinishing ? .working : .idle
     }
 
@@ -140,7 +142,9 @@ struct DictationView: View {
     private var composer: some View {
         VStack(alignment: .leading, spacing: Theme.s3) {
             HStack(spacing: Theme.s2) {
-                LiveLevel(model.audio) { MorphIcon(phase: morphPhase == .idle ? .done : morphPhase, level: $0, lineWidth: Theme.ruleWidth) }
+                LiveLevel(model.audio) { level in
+                    StateIcon(phase: statePhase == .idle ? .done : statePhase, level: level)
+                }
                     .frame(width: Theme.iconL, height: Theme.iconL)
                     .foregroundStyle(model.audio.isRunning ? Theme.listening : Theme.ink)
                 Text(model.isSelectedTextEditCapturing ? "Listening for your edit"
@@ -368,7 +372,7 @@ struct DictationView: View {
                         // A ruled list, not a boxed card: rows sit on the page between hairlines.
                         // Rows keep their inner padding for the hover wash, so the list moves
                         // out by it and the text lines up with the headings above.
-                        VStack(spacing: 0) {
+                        LazyVStack(spacing: 0) {
                             RowDivider().padding(.horizontal, Theme.rowPaddingH)
                             ForEach(Array(group.entries.enumerated()), id: \.element.id) { index, entry in
                                 if index > 0 {

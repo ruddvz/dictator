@@ -6,7 +6,7 @@ import SwiftUI
 /// HushKey's voice form: one ribbon that rests as a thin breathing line and swells with speech.
 /// Not bouncing bars: HushKey also hears whispered and mouthed speech, so the form has to show
 /// "heard" clearly at whisper level. Thickness follows √-ish speech, so a whisper already opens
-/// the line. Used in the floating pill, the home hero, and (as a lens) by `MorphIcon`.
+/// the line. Used in the floating pill and the home hero.
 struct BreathRibbon: View {
     enum Mode: Equatable { case rest, live, waiting, working }
 

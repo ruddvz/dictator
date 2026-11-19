@@ -73,7 +73,7 @@ struct MeetingResultCard: View {
 
     private var header: some View {
         HStack(spacing: Theme.s2) {
-            MorphIcon(phase: .done, lineWidth: 1.6)
+            StateIcon(phase: .done)
                 .frame(width: 14, height: 14)
                 .foregroundStyle(Theme.signal)
             Text("Meeting saved")
