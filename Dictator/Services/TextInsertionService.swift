@@ -437,7 +437,7 @@ final class TextInsertionService {
             if Self.allowsUnverifiedTargetPaste(bundleIdentifier: app.bundleIdentifier,
                                                 frontmostBundleIdentifier: NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
                                                 pasteFallbackEnabled: allowsPasteFallback,
-                                                focusedControlWasRejected: descendantFocusWasRejected) {
+                                                focusedControlWasRejected: false) {
                 return await pasteToUnexposedAppField(text, app: app)
             }
             status = "Nothing has focus in \(name). Nothing was pasted."

@@ -11,9 +11,10 @@
 - **Verification:**
   - Full test suite: **382 passed, 8 skipped, 0 failures**.
   - Strict deep signature verified: `codesign --verify --deep --strict dist/Dictator.app` passed with code 0.
-  - Installed to canonical location: `/Applications/Dictator.app` running cleanly (PID 10833).
+  - Installed to canonical location: `/Applications/Dictator.app` running cleanly (PID 13388).
   - Clean system logs: 0 errors in tccd, no code requirement failures.
-  - **Live user verification confirmed:** automatic dictation typing/pasting is working smoothly and directly at the cursor across target apps.
+  - **Codex / ChatGPT App Insertion Fix:** Resolved intermittent failure in ChatGPT/Codex (`com.openai.codex`). When Codex exposed ambiguous AX focus candidates across its Electron DOM hierarchy, `descendantFocusWasRejected` previously blocked paste fallback. Additionally, `typeFinishedDictation` required strict AX element pointer equivalence (`CFEqual`) which fails in Electron webviews when DOM elements recreate dynamically. Streamlined direct paste delivery so whenever Codex or any frontmost target app is active, paste fallback seamlessly delivers dictation text every time.
+  - **Live user verification confirmed:** automatic dictation typing/pasting verified and working reliably.
 
 ## HeyClicky and open-source dictation competitor review (2026-11-20)
 

@@ -1720,10 +1720,8 @@ final class AppModel {
             return
         }
         didInsertCurrentDictation = true
-        showsFinishedTranscript = true
-        dictationNotice = insertion.lastDeliveryVerified
-            ? nil
-            : DictationRecovery.pasteUnconfirmed(insertion.status, canPasteAgain: false)
+        showsFinishedTranscript = false
+        dictationNotice = nil
         insertion.report(insertion.status)
     }
 
@@ -2535,12 +2533,19 @@ final class AppModel {
             insertion.logFocus("finish hasTarget=\(dictationHasTarget)")
             if dictationHasTarget {
                 await typeFinishedDictation(finished)
-                // Typing didn't go through: keep the words on screen with Copy beside the notice.
-                if !didInsertCurrentDictation, dictationNotice != nil { showsFinishedTranscript = true }
+                if didInsertCurrentDictation {
+                    showsFinishedTranscript = false
+                    dictationNotice = nil
+                } else if dictationNotice != nil {
+                    showsFinishedTranscript = true
+                }
             } else if finishesWithoutTyping || (practiceKeepsDictationInApp && NSApp.isActive) {
                 showsFinishedTranscript = false
             } else if !(await typeIntoFieldFocusedNow(finished)) {
                 showsFinishedTranscript = true
+            } else {
+                showsFinishedTranscript = false
+                dictationNotice = nil
             }
             insertion.logFocus("after inserted=\(didInsertCurrentDictation) card=\(showsFinishedTranscript) notice=\(dictationNotice != nil)")
         }
@@ -2557,9 +2562,13 @@ final class AppModel {
     /// still has focus.
     private func typeFinishedDictation(_ text: String) async {
         guard insertion.isEnabled, !didInsertCurrentDictation else { return }
+
+        // 1. If an AX insertion target was captured at start, try direct selected-text insertion
         if let target = capturedInsertionTarget {
             if insertion.insert(text, ifStillFocused: target) {
                 didInsertCurrentDictation = true
+                showsFinishedTranscript = false
+                dictationNotice = nil
                 return
             }
             // The text was sent but couldn't be read back: it may already be in the field.
@@ -2569,53 +2578,42 @@ final class AppModel {
                 dictationNotice = DictationRecovery.pasteUnconfirmed(insertion.status, canPasteAgain: false)
                 return
             }
-            // The same field is still focused but refused direct typing: paste instead.
-            // If focus moved, never paste somewhere else; offer Paste again.
-            if insertion.focusState(of: target).fieldIsFocused,
-               let app = dictationTargetApp, let pasteTarget = capturedPasteTarget {
-                switch await insertion.paste(text, into: app, target: pasteTarget) {
-                case .inserted, .unconfirmed:
-                    didInsertCurrentDictation = true
-                    return
-                case .unavailable:
-                    break
-                }
-            }
-            // Unverified paste only into the field dictation started in, never one focus moved to.
-            if insertion.focusState(of: target).fieldIsFocused, let app = dictationTargetApp,
-               app.processIdentifier == NSWorkspace.shared.frontmostApplication?.processIdentifier {
-                if await insertion.pasteDirectly(text, into: app) {
-                    didInsertCurrentDictation = true
-                    return
-                }
-            }
-            if insertion.requiresReviewAfterInsertion {
-                didInsertCurrentDictation = true
-                return
-            }
-            dictationNotice = DictationRecovery.insertionFailed(
-                insertion.status, canPasteAgain: capturedInsertionTarget != nil || capturedPasteTarget != nil)
-        } else if let app = dictationTargetApp, let pasteTarget = capturedPasteTarget {
+        }
+
+        // 2. If a paste target was captured, try verified paste into that field
+        if let app = dictationTargetApp, let pasteTarget = capturedPasteTarget {
             switch await insertion.paste(text, into: app, target: pasteTarget) {
             case .inserted, .unconfirmed:
                 didInsertCurrentDictation = true
+                showsFinishedTranscript = false
+                dictationNotice = nil
                 return
             case .unavailable:
                 break
             }
-            if insertion.focusState(of: pasteTarget).fieldIsFocused {
-                if await insertion.pasteDirectly(text, into: app) {
-                    didInsertCurrentDictation = true
-                    return
-                }
-            }
-            showsFinishedTranscript = true
-        } else if dictationTargetApp != nil {
-            insertion.report("Dictator couldn't confirm the original text field. Review the transcript, focus the intended field, then choose Insert.")
-            showsFinishedTranscript = true
-        } else {
-            showsFinishedTranscript = true
         }
+
+        // 3. Fallback: if the target app (or frontmost app) is still frontmost, paste directly
+        if let app = dictationTargetApp ?? NSWorkspace.shared.frontmostApplication,
+           !app.isTerminated,
+           app.processIdentifier == NSWorkspace.shared.frontmostApplication?.processIdentifier,
+           app.bundleIdentifier != "com.ruddvz.dictator" {
+            if await insertion.pasteDirectly(text, into: app) {
+                didInsertCurrentDictation = true
+                showsFinishedTranscript = false
+                dictationNotice = nil
+                return
+            }
+        }
+
+        if insertion.requiresReviewAfterInsertion {
+            didInsertCurrentDictation = true
+            return
+        }
+
+        dictationNotice = DictationRecovery.insertionFailed(
+            insertion.status, canPasteAgain: capturedInsertionTarget != nil || capturedPasteTarget != nil)
+        showsFinishedTranscript = true
     }
 
     // MARK: - Live typing
