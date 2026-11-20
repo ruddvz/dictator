@@ -2,10 +2,10 @@
 
 ## Duplicate app cleanup and Accessibility recovery (2026-11-20)
 
-- Kept `/Users/rudra/Projects/Dictator/dist/Dictator.app` as the canonical app. Spotlight now returns only that app. Moved the old `HushKey.app` and generated build app copies to a dated folder in Trash, ejected the mounted third-party Hushkey disk image, and unregistered 23 stale Launch Services entries. No app data or history was removed.
+- Kept `/Users/rudra/Projects/Dictator/dist/Dictator.app` as the canonical app. Spotlight now returns only that app. Moved the old `HushKey.app` and generated build app copies to a dated folder in Trash, ejected the mounted third-party Hushkey disk image, unregistered 23 stale Launch Services entries, and reset Accessibility records for the old HushKey and third-party Hushkey bundle IDs. Dictator's current Accessibility grant and all app data/history were preserved. The old app's TCC row appearance could not be visually confirmed after System Settings refresh.
 - The screenshot also showed Dictator's separate **Typing into apps** preference was off. Updated onboarding and the Home notice to explain this is separate from macOS Accessibility. Home now offers **Check access**, polls while access is missing, prompts for the current app's Accessibility grant, and reinstalls the global key monitor whenever trust changes.
 - **Verification:** 373 passed, 8 skipped, 0 failed; `git diff --check` passed. The updated Release package is waiting on macOS Keychain authorization for the `Dictator Local Signing` private key before its final signature.
-- **Still open:** confirm `AXIsProcessTrusted()` becomes true after the canonical app is re-opened, then enable Dictator's typing preference and verify one insertion into a blank Codex composer. Stale TCC rows may still need removal in System Settings if they remain after the app entries are unregistered.
+- **Still open:** complete signing after macOS authorizes `codesign` to use the `Dictator Local Signing` key; reopen the rebuilt canonical app; confirm `AXIsProcessTrusted()` becomes true; enable Dictator's separate typing preference; and verify one insertion into a blank Codex composer. The live Accessibility and insertion checks need the app running and a real target field.
 
 ## Dictator rebrand and project-wide polish (2026-11-20)
 
