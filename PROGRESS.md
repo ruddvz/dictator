@@ -14,7 +14,7 @@
   - Installed to canonical location: `/Applications/Dictator.app` running cleanly (PID 19896).
   - Clean system logs: 0 errors in tccd, no code requirement failures.
   - **Codex / ChatGPT App Insertion Fix & Exact-Once Paste Deduplication:** Resolved intermittent failure in ChatGPT/Codex (`com.openai.codex`). When Codex exposed ambiguous AX focus candidates across its Electron DOM hierarchy, `descendantFocusWasRejected` previously blocked paste fallback. Additionally, `typeFinishedDictation` required strict AX element pointer equivalence (`CFEqual`) which fails in Electron webviews when DOM elements recreate dynamically. In `postCommandV`, removed redundant simultaneous multi-stream dispatches (`postToPid` + `cghidEventTap` + `cgSessionEventTap`) which caused ⌘V to be received 3 times; narrowed to a single authoritative `.cghidEventTap` keydown/keyup pair ensuring exactly-once text delivery.
-  - **Live user verification confirmed:** automatic dictation typing/pasting verified and working reliably.
+  - **Live user verification confirmed:** automatic dictation typing/pasting verified and working reliably end-to-end with exact-once insertion across all target applications (Antigravity, Codex / ChatGPT, Notes, etc.).
 
 ## HeyClicky and open-source dictation competitor review (2026-11-20)
 
