@@ -404,12 +404,12 @@ private struct InsertionSettings: View {
         }
 
         SettingsGroup(title: "Typing into other apps",
-                      footer: "Password fields are always skipped. Dictator only types into the field you started in.") {
+                      footer: "Password fields are always skipped. Dictator types directly where your cursor is.") {
             SettingsRow(title: "Type where your cursor is", detail: "Dictation goes straight into the text box you’re in.") {
                 RowToggle(isOn: enabled, label: "Type into the focused field")
             }
-            SettingsRow(title: "Paste when typing is blocked", detail: "Checks the field when possible. Sends paste when web or Electron editors hide their controls.") {
-                RowToggle(isOn: $insertion.allowsPasteFallback, label: "Paste if typing fails")
+            SettingsRow(title: "Paste fallback", detail: "When a web browser or Electron editor hides its controls, Dictator pastes automatically with ⌘V.") {
+                RowToggle(isOn: $insertion.allowsPasteFallback, label: "Paste fallback")
             }
             .disabled(!insertion.isEnabled)
             .opacity(insertion.isEnabled ? 1 : 0.5)

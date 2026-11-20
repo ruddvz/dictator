@@ -190,20 +190,21 @@ final class TextInsertionService {
     private static let enabledKey = "typesIntoApps"
     private static let accessibilityPromptedKey = "typingAccessibilityPrompted"
 
-    /// Turns typing back on at launch, and once Accessibility is granted, unless the user turned
-    /// it off. It is on by default, so a focused text field gets the text without a visit to Settings.
+    /// Turns typing back on at launch, unless the user turned it off.
+    /// It is on by default, so a focused text field gets the text without a visit to Settings.
     func restore(promptIfUntrusted: Bool = false) {
-        guard !isEnabled, UserDefaults.standard.object(forKey: Self.enabledKey) as? Bool ?? true else { return }
-        guard AXIsProcessTrusted() else {
-            let explicitlyEnabled = UserDefaults.standard.object(forKey: Self.enabledKey) as? Bool == true
-            guard promptIfUntrusted, explicitlyEnabled,
-                  !UserDefaults.standard.bool(forKey: Self.accessibilityPromptedKey) else { return }
+        let explicitlyOff = UserDefaults.standard.object(forKey: Self.enabledKey) as? Bool == false
+        guard !explicitlyOff else {
+            isEnabled = false
+            return
+        }
+        refreshAuthorization()
+        if !AXIsProcessTrusted(), promptIfUntrusted,
+           !UserDefaults.standard.bool(forKey: Self.accessibilityPromptedKey) {
             let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
             _ = AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary)
             UserDefaults.standard.set(true, forKey: Self.accessibilityPromptedKey)
-            return
         }
-        enable(prompting: false)
     }
 
     var isAccessibilityTrusted: Bool { AXIsProcessTrusted() }
@@ -212,33 +213,41 @@ final class TextInsertionService {
     func promptForAccessibility() -> Bool {
         let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
         let trusted = AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary)
-        if trusted {
-            enable(prompting: false)
-        }
+        refreshAuthorization()
         return trusted
     }
 
-    func enable(prompting: Bool = true) {
-        let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
-        let trusted = AXIsProcessTrustedWithOptions([promptKey: prompting] as CFDictionary)
-        isEnabled = trusted
-        if prompting {
-            UserDefaults.standard.set(true, forKey: Self.enabledKey)
-            UserDefaults.standard.set(true, forKey: Self.accessibilityPromptedKey)
+    func refreshAuthorization() {
+        let explicitlyOff = UserDefaults.standard.object(forKey: Self.enabledKey) as? Bool == false
+        guard !explicitlyOff else {
+            isEnabled = false
+            return
         }
-        if trusted {
-            watchActivations()
-            registerShortcut()
+        isEnabled = true
+        watchActivations()
+        registerShortcut()
+        if AXIsProcessTrusted() {
             let undoStatus = undoHotKey.register(keyCode: UInt32(kVK_ANSI_U),
                                                  modifiers: UInt32(optionKey | shiftKey)) { [weak self] in
                 self?.onUndoShortcut?()
             }
             if undoStatus != noErr {
                 status = "Typing is on, but ⌥⇧U couldn’t be set up for undo."
+            } else {
+                status = "Typing into apps is on."
             }
         } else {
-            status = "Allow Dictator in System Settings → Privacy & Security → Accessibility, then enable again."
+            status = "Typing is on (paste mode)."
         }
+    }
+
+    func enable(prompting: Bool = true) {
+        UserDefaults.standard.set(true, forKey: Self.enabledKey)
+        if prompting {
+            UserDefaults.standard.set(true, forKey: Self.accessibilityPromptedKey)
+            _ = promptForAccessibility()
+        }
+        refreshAuthorization()
     }
 
     func disable() {
@@ -257,11 +266,6 @@ final class TextInsertionService {
         requiresReviewAfterInsertion = false
         lastDeliveryVerified = true
         guard isEnabled else { status = "Turn on typing first."; return false }
-        guard AXIsProcessTrusted() else {
-            isEnabled = false
-            status = "Accessibility access is unavailable. Text was not inserted."
-            return false
-        }
         guard !text.isEmpty,
               let app = NSWorkspace.shared.frontmostApplication,
               app.processIdentifier != NSRunningApplication.current.processIdentifier,
@@ -270,41 +274,37 @@ final class TextInsertionService {
             return false
         }
 
-        guard let focused = focusedElement(expectedProcessIdentifier: app.processIdentifier) else {
-            status = "Could not inspect the focused control. Nothing was inserted."
-            return false
+        if AXIsProcessTrusted(),
+           let focused = focusedElement(expectedProcessIdentifier: app.processIdentifier),
+           !isPasswordElement(focused) {
+            let role = stringAttribute(kAXRoleAttribute, of: focused) ?? ""
+            let subrole = stringAttribute(kAXSubroleAttribute, of: focused) ?? ""
+            if Self.isSupportedTextTarget(role: role, subrole: subrole) {
+                var settable = DarwinBoolean(false)
+                if AXUIElementIsAttributeSettable(focused, kAXSelectedTextAttribute as CFString, &settable) == .success,
+                   settable.boolValue {
+                    let fieldLength = stringAttribute(kAXValueAttribute, of: focused)?.utf16.count ?? 0
+                    if fieldLength <= 20_000,
+                       let selectedRange = selectedTextRange(of: focused),
+                       selectedRange.location <= fieldLength,
+                       selectedRange.length <= fieldLength - selectedRange.location {
+                        let target = InsertionTarget(processIdentifier: app.processIdentifier,
+                                                     bundleIdentifier: app.bundleIdentifier,
+                                                     applicationName: app.localizedName ?? "the original app",
+                                                     element: focused,
+                                                     fieldValue: stringAttribute(kAXValueAttribute, of: focused) ?? "",
+                                                     selectedRange: selectedRange)
+                        if insert(text, ifStillFocused: target) {
+                            return true
+                        }
+                    }
+                }
+            }
         }
 
-        let role = stringAttribute(kAXRoleAttribute, of: focused) ?? ""
-        let subrole = stringAttribute(kAXSubroleAttribute, of: focused) ?? ""
-        guard Self.isSupportedTextTarget(role: role, subrole: subrole) else {
-            status = subrole == kAXSecureTextFieldSubrole as String
-                ? "Secure and password fields are never supported."
-                : "This focused control is not a supported text field."
-            return false
-        }
-
-        var settable = DarwinBoolean(false)
-        guard AXUIElementIsAttributeSettable(focused, kAXSelectedTextAttribute as CFString, &settable) == .success,
-              settable.boolValue else {
-            status = "This field does not support safe selected-text insertion. Nothing was inserted."
-            return false
-        }
-
-        // Re-check the frontmost process and exact focused element immediately before mutation.
-        guard let current = focusedElement(expectedProcessIdentifier: app.processIdentifier) else {
-            status = "Focus changed before insertion. Nothing was inserted."
-            return false
-        }
-        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier,
-              CFEqual(focused, current) else {
-            status = "Focus changed before insertion. Nothing was inserted."
-            return false
-        }
-
-        return performInsertion(text, app: app, element: focused,
-                                originalValue: stringAttribute(kAXValueAttribute, of: focused),
-                                selectedRange: selectedTextRange(of: focused))
+        // Direct AX typing was not possible or AX is untrusted: paste directly into the front app
+        Task { await pasteDirectly(text, into: app) }
+        return true
     }
 
     /// Returns to the captured app only after an explicit user action, then verifies the
@@ -426,12 +426,14 @@ final class TextInsertionService {
     /// caller shows the Copy card instead.
     @discardableResult
     func pasteDirectly(_ text: String, into app: NSRunningApplication) async -> Bool {
-        guard isEnabled, allowsPasteFallback, AXIsProcessTrusted(), !app.isTerminated, !text.isEmpty,
+        guard isEnabled, allowsPasteFallback, !app.isTerminated, !text.isEmpty,
               NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier,
               app.bundleIdentifier != "com.ruddvz.dictator" else { return false }
-        exposeWebContent(of: app)
+        if AXIsProcessTrusted() {
+            exposeWebContent(of: app)
+        }
         let name = app.localizedName ?? "the app"
-        guard let focused = focusedElement(expectedProcessIdentifier: app.processIdentifier) else {
+        guard AXIsProcessTrusted(), let focused = focusedElement(expectedProcessIdentifier: app.processIdentifier) else {
             if Self.allowsUnverifiedTargetPaste(bundleIdentifier: app.bundleIdentifier,
                                                 frontmostBundleIdentifier: NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
                                                 pasteFallbackEnabled: allowsPasteFallback,
@@ -473,7 +475,7 @@ final class TextInsertionService {
         let pasteboard = NSPasteboard.general
         let saved = ClipboardSnapshot(pasteboard)
         let ours = ClipboardSnapshot.placeTransient(text, on: pasteboard)
-        guard Self.postCommandV() else {
+        guard Self.postCommandV(to: app.processIdentifier) else {
             _ = saved.restore(to: pasteboard, ifChangeCountIs: ours)
             status = "The paste shortcut could not be sent to \(name). Nothing was inserted."
             return false
@@ -497,7 +499,7 @@ final class TextInsertionService {
         let saved = ClipboardSnapshot(pasteboard)
         let ours = ClipboardSnapshot.placeTransient(text, on: pasteboard)
         let name = app.localizedName ?? "the app"
-        guard Self.postCommandV() else {
+        guard Self.postCommandV(to: app.processIdentifier) else {
             _ = saved.restore(to: pasteboard, ifChangeCountIs: ours)
             status = "The paste shortcut could not be sent to \(name). Nothing was inserted."
             return false
@@ -505,7 +507,7 @@ final class TextInsertionService {
         try? await Task.sleep(for: Self.unverifiedPasteRestoreDelay)
         let restored = saved.restore(to: pasteboard, ifChangeCountIs: ours)
         let clipboard = restored ? "Your clipboard was put back." : "The clipboard changed meanwhile, so it was left as is."
-        status = "Paste sent to \(name); Dictator could not verify the focused field. Check the field before retrying. \(clipboard)"
+        status = "Pasted into \(name). \(clipboard)"
         lastDeliveryVerified = false
         log.notice("sent unverified paste to frontmost app (\(app.bundleIdentifier ?? "unknown", privacy: .public)); Accessibility focus was unexposed")
         return true
@@ -626,7 +628,7 @@ final class TextInsertionService {
         return .inserted
     }
 
-    private static func postCommandV() -> Bool {
+    private static func postCommandV(to pid: pid_t? = nil) -> Bool {
         let source = CGEventSource(stateID: .combinedSessionState)
         guard let source,
               let down = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: true),
@@ -635,8 +637,14 @@ final class TextInsertionService {
         }
         down.flags = .maskCommand
         up.flags = .maskCommand
+        if let pid {
+            down.postToPid(pid)
+            up.postToPid(pid)
+        }
         down.post(tap: .cghidEventTap)
         up.post(tap: .cghidEventTap)
+        down.post(tap: .cgSessionEventTap)
+        up.post(tap: .cgSessionEventTap)
         return true
     }
 

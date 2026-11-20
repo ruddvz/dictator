@@ -699,13 +699,7 @@ final class AppModel {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(1.5))
                 guard let self, !Task.isCancelled else { break }
-                let trusted = AXIsProcessTrusted()
-                if trusted {
-                    if !self.insertion.isEnabled {
-                        self.refreshAccessibilityState()
-                    }
-                    self.refreshFunctionKeyStatus()
-                }
+                self.refreshAccessibilityState()
             }
         }
     }
@@ -1703,7 +1697,7 @@ final class AppModel {
     }
 
     /// Offers one explicit recovery attempt against the currently active app after automatic
-    /// focus discovery failed. A sent but unverified paste is recorded as sent to prevent duplicates.
+    /// focus discovery failed. It still requires Accessibility to identify an editable field.
     func insertDictationIntoFrontmostApp() async {
         if !insertion.isEnabled && AXIsProcessTrusted() {
             refreshAccessibilityState()
@@ -2184,11 +2178,8 @@ final class AppModel {
     }
 
     func refreshAccessibilityState() {
-        let trusted = AXIsProcessTrusted()
+        insertion.refreshAuthorization()
         refreshFunctionKeyStatus()
-        if trusted && !insertion.isEnabled {
-            insertion.restore()
-        }
     }
 
     @discardableResult
@@ -2269,9 +2260,9 @@ final class AppModel {
         timing.mark("pasteTarget")
         capturedInsertionTargetName = capturedInsertionTarget?.applicationName
         dictationTargetApp = isDictator ? nil : target
-        dictationHasTarget = insertion.isEnabled && (capturedInsertionTarget != nil || capturedPasteTarget != nil)
+        dictationHasTarget = insertion.isEnabled && (capturedInsertionTarget != nil || capturedPasteTarget != nil || dictationTargetApp != nil)
         Logger(subsystem: "com.ruddvz.dictator", category: "insertion")
-            .notice("start insertTarget=\(self.capturedInsertionTarget != nil) pasteTarget=\(self.capturedPasteTarget != nil)")
+            .notice("start insertTarget=\(self.capturedInsertionTarget != nil) pasteTarget=\(self.capturedPasteTarget != nil) hasTargetApp=\(self.dictationTargetApp != nil)")
         timing.mark("logFocus")
         let targetBundleIdentifier = isDictator ? nil : target?.bundleIdentifier
         let profileSettings = DictationAppProfile.resolve(
@@ -2612,19 +2603,15 @@ final class AppModel {
             case .unavailable:
                 break
             }
-            if app.processIdentifier == NSWorkspace.shared.frontmostApplication?.processIdentifier {
+            if insertion.focusState(of: pasteTarget).fieldIsFocused {
                 if await insertion.pasteDirectly(text, into: app) {
                     didInsertCurrentDictation = true
                     return
                 }
             }
             showsFinishedTranscript = true
-        } else if let app = dictationTargetApp ?? NSWorkspace.shared.frontmostApplication,
-                  app.bundleIdentifier != "com.ruddvz.dictator" {
-            if await insertion.pasteDirectly(text, into: app) {
-                didInsertCurrentDictation = true
-                return
-            }
+        } else if dictationTargetApp != nil {
+            insertion.report("Dictator couldn't confirm the original text field. Review the transcript, focus the intended field, then choose Insert.")
             showsFinishedTranscript = true
         } else {
             showsFinishedTranscript = true
@@ -3286,13 +3273,15 @@ final class AppModel {
             if trusted { functionKey.install() }
             functionKeyInstalledTrusted = trusted
         }
+        let status: String
         if !trusted {
-            dictationShortcutStatus = "Accessibility isn't active for this Dictator copy. Enable it in System Settings, then check again."
+            status = "Accessibility isn't active for this Dictator copy. Enable it in System Settings, then check again."
         } else if let conflict = Self.globeKeyConflict {
-            dictationShortcutStatus = "Set “Press 🌐 key to” to Do Nothing in Keyboard settings. It currently \(conflict)."
+            status = "Set “Press 🌐 key to” to Do Nothing in Keyboard settings. It currently \(conflict)."
         } else {
-            dictationShortcutStatus = "Hold fn to dictate from any app. Double-press fn for hands-free; press again to stop."
+            status = "Hold fn to dictate from any app. Double-press fn for hands-free; press again to stop."
         }
+        if dictationShortcutStatus != status { dictationShortcutStatus = status }
     }
 
     /// What macOS does with the Globe key, when that would fight with dictation.

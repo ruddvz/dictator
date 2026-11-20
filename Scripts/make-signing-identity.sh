@@ -28,7 +28,8 @@ password="$(/usr/bin/openssl rand -hex 12)"
 /usr/bin/openssl pkcs12 -export -inkey "$work/key.pem" -in "$work/cert.pem" -name "$name" \
   -out "$work/id.p12" -passout "pass:$password"
 security import "$work/id.p12" -k "$HOME/Library/Keychains/login.keychain-db" -P "$password" -T /usr/bin/codesign
-security add-trusted-cert -r trustRoot -p codeSign -k "$HOME/Library/Keychains/login.keychain-db" "$work/cert.pem"
+security add-trusted-cert -r trustRoot -p codeSign -k "$HOME/Library/Keychains/login.keychain-db" "$work/cert.pem" 2>/dev/null || true
+security add-trusted-cert -p codeSign "$work/cert.pem" 2>/dev/null || true
 if ! security find-identity -v -p codesigning | grep -q "\"$name\""; then
   echo "Could not validate $name for local code signing." >&2
   exit 1

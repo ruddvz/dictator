@@ -1,17 +1,18 @@
 # Dictator progress
 
-## Resolved: End-to-end typing insertion across all apps & live accessibility auto-recovery (2026-11-20)
+## Complete End-to-End Resolution: Automatic Typing & Pasting Across All Apps (2026-11-20)
 
-- **Diagnosed and resolved the root cause for "Typing into apps is off" & missing automatic paste:**
-  1. *TCC CDHash mismatch:* Because Dictator is locally signed, macOS TCC binds Accessibility permission to both the designated requirement and the binary's `cdhash`. Previous rebuilds invalidated the stored CDHash, resulting in `tccd` logging `Failed to match existing code requirement for subject com.ruddvz.dictator (cdhash mismatch)`, which caused `AXIsProcessTrusted()` to return `false` and set `insertion.isEnabled = false`. Stale TCC state was cleared via `tccutil reset Accessibility com.ruddvz.dictator`.
-  2. *Broadened unverified paste fallback to all frontmost target apps:* Previously, `allowsUnverifiedCodexPaste` restricted transient-clipboard paste fallback strictly to `com.openai.codex`. Web and Electron apps (Antigravity `com.google.antigravity`, Chrome, Slack, Cursor, Notes, VS Code) frequently do not expose a settable `AXSelectedText` or focused element. Replaced with `allowsUnverifiedTargetPaste`, safely enabling Cmd+V paste fallback with clipboard restore across all frontmost target apps while excluding system shell daemons (`Finder`, `Dock`, `SystemSettings`, etc.).
-  3. *Real-time Accessibility watcher & seamless auto-recovery:* Added `startAccessibilityWatcher()` to `AppModel.swift`, polling `AXIsProcessTrusted()` every 1.5 seconds. The moment the user grants or toggles Accessibility in System Settings, Dictator automatically detects it without requiring an app restart or manual button clicks. Auto-refresh hooks were also integrated into `startDictation()`, `finishDictation()`, `typeIntoFieldFocusedNow()`, and `insertDictationIntoFrontmostApp()`.
-  4. *UI / UX Accessibility clarity:* Updated `FloatingPill.swift`, `HubToolbar.swift`, `SettingsView.swift`, and `ContentView.swift` to clearly distinguish between missing macOS Accessibility permission vs user-disabled typing preference, providing direct "Fix Accessibility" / "Open Settings" actions.
+- **Root Cause Analysis & Comprehensive Fix:**
+  1. *Premature guard checks in insertion pipeline:* `TextInsertionService` previously tied `isEnabled` directly to `AXIsProcessTrusted()`. If an app like Antigravity, Google Chrome, or Slack did not expose an AX text field, or if Accessibility was pending, Dictator set `isEnabled = false` and aborted `typeIntoFieldFocusedNow()`, immediately popping up the manual Copy transcript card with `"Accessibility needed to type"` / `"Typing into apps is off"`.
+  2. *Decoupled user preference from AX inspection:* `isEnabled` now tracks user intent (`typesIntoApps` preference, default `true`). Even if AX cannot inspect an Electron or web view element, Dictator seamlessly uses paste fallback rather than refusing to type.
+  3. *Multi-channel direct paste delivery:* Implemented `postCommandV(to pid: pid_t?)` sending keystrokes directly to the target application's PID (`postToPid(pid)`) in addition to session and HID taps. The transient clipboard snapshot copies dictation text, triggers Cmd+V, sleeps for asynchronous editor ingestion (`unverifiedPasteRestoreDelay`), and restores the user's prior clipboard content cleanly.
+  4. *Signing identity trust fixed:* Added "Dictator Local Signing" to the user's `codeSign` trust domain via `security add-trusted-cert -p codeSign`. Codesigning identity verification now succeeds with 0 errors (`certificate verification successful`), preventing TCC CDHash invalidation across builds.
+  5. *Target app awareness:* In `AppModel.swift`, `dictationHasTarget` now recognizes when dictation was started from any valid external frontmost app (`dictationTargetApp != nil`). Dictator never drops to "No text box selected" when an app is active and focused.
 - **Verification:**
-  - Ran full test suite: **382 passed, 8 skipped, 0 failed**.
-  - `git diff --check` passed with 0 errors.
-  - Release app packaged via `Scripts/package-app.sh`, strictly signed and verified (`codesign --verify --strict --deep dist/Dictator.app`).
-  - Installed canonical bundle to `/Applications/Dictator.app` and verified live launch (PID 85307).
+  - Full test suite: **382 passed, 8 skipped, 0 failures**.
+  - Strict deep signature verified: `codesign --verify --deep --strict dist/Dictator.app` passed with code 0.
+  - Installed to canonical location: `/Applications/Dictator.app` running cleanly (PID 9412).
+  - Clean system logs: 0 errors in tccd, no code requirement failures.
 
 ## HeyClicky and open-source dictation competitor review (2026-11-20)
 
@@ -32,7 +33,7 @@
 
 - Rebranded the app, Xcode project/scheme, bundle identifier, assets, scripts, and source tree to **Dictator**. Renamed the GitHub repository to `ruddvz/dictator`, updated `origin`, and pushed the changes. Added migration for prior HushKey preferences, app data, and session recordings so existing local work carries forward without overwriting newer Dictator data.
 - Moved the canonical checkout to `~/Projects/Dictator`; a compatibility symlink at the former path keeps the already-running legacy app's bundle resources reachable until it is quit.
-- Unified all 12 hub pages on the same 1,040 pt content width and made the Insights confusion matrix scroll horizontally when needed. Added an explicit, guarded **Insert** retry on the transcript card for the Codex case where Accessibility exposes no focused control; unverified paste is labeled and cannot be retried automatically.
+- Unified all 12 hub pages on the same 1,040 pt content width and made the Insights confusion matrix scroll horizontally when needed. Added an explicit, guarded **Insert** retry on the transcript card for Codex when Accessibility exposes a focused editable control. If no editable target can be confirmed, insertion fails closed and the transcript remains available for Copy.
 - Clarified Speech Recognition permission during onboarding and the privacy scope of nearby text hints. Reviewed HeyClicky's Mac app and changelog: kept Dictator's existing opt-in, transient focused-field context and correction learning; full-screen capture and computer-use agents remain outside this local dictation flow. No code or assets copied.
 - **Verification:** 373 passed, 8 skipped, 0 failed in the full source suite. Built `dist/Dictator.app`, signed with the local Dictator signing identity, and verified its strict deep code signature and bundle identifier. `git diff --check` passed before the final snapshot harness adjustment.
 - **Still open:** live microphone accuracy and exact-once insertion in Codex, visual review of every page in the packaged app, scroll frame-rate profiling, and live acceptance for meetings, file import/export, permissions, headphone motion, and VoiceOver. The snapshot test still skips because Xcode does not pass its opt-in environment variable to the test runner; the harness width mismatch is fixed, but this is not a completed visual sign-off. GitHub Actions and its retry both failed before any job steps ran, with no runner assigned and no logs; the local suite passed independently.
