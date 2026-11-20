@@ -47,7 +47,7 @@ cp "$project_root/docs/licenses/LLAMA-CPP-MIT-LICENSE.txt" "$resources/"
 identity="$(security find-identity -v -p codesigning 2>/dev/null | awk '/"Dictator Local Signing"/ { print $2; exit }')"
 if [[ -n "${DICTATOR_SIGNING_IDENTITY:-}" ]]; then
   codesign --force --deep --sign "$DICTATOR_SIGNING_IDENTITY" --timestamp=none "$staged_app"
-elif [[ -n "$identity" && "${DICTATOR_USE_LOCAL_IDENTITY:-0}" == "1" ]]; then
+elif [[ -n "$identity" ]]; then
   codesign --force --deep --sign "$identity" --timestamp=none "$staged_app"
 else
   # Deep-sign nested frameworks with their own identifiers, then give only the app its stable

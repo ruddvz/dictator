@@ -434,10 +434,14 @@ final class TextInsertionService {
         }
         let name = app.localizedName ?? "the app"
         guard AXIsProcessTrusted(), let focused = focusedElement(expectedProcessIdentifier: app.processIdentifier) else {
+            guard AXIsProcessTrusted() else {
+                status = "Accessibility access is unavailable. Text was not inserted."
+                return false
+            }
             if Self.allowsUnverifiedTargetPaste(bundleIdentifier: app.bundleIdentifier,
                                                 frontmostBundleIdentifier: NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
                                                 pasteFallbackEnabled: allowsPasteFallback,
-                                                focusedControlWasRejected: false) {
+                                                focusedControlWasRejected: descendantFocusWasRejected) {
                 return await pasteToUnexposedAppField(text, app: app)
             }
             status = "Nothing has focus in \(name). Nothing was pasted."
@@ -491,6 +495,11 @@ final class TextInsertionService {
     }
 
     private func pasteToUnexposedAppField(_ text: String, app: NSRunningApplication) async -> Bool {
+        guard AXIsProcessTrusted() else {
+            status = "Accessibility access is required to type into apps."
+            lastDeliveryVerified = false
+            return false
+        }
         guard NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier else {
             status = "\(app.localizedName ?? "The target app") is no longer frontmost. Nothing was pasted."
             return false
@@ -629,6 +638,7 @@ final class TextInsertionService {
     }
 
     private static func postCommandV(to pid: pid_t? = nil) -> Bool {
+        guard AXIsProcessTrusted() else { return false }
         let source = CGEventSource(stateID: .combinedSessionState)
         guard let source,
               let down = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: true),
@@ -637,8 +647,15 @@ final class TextInsertionService {
         }
         down.flags = .maskCommand
         up.flags = .maskCommand
-        down.post(tap: .cghidEventTap)
-        up.post(tap: .cghidEventTap)
+        if let pid, pid > 0 {
+            down.postToPid(pid)
+            usleep(25_000)
+            up.postToPid(pid)
+        } else {
+            down.post(tap: .cghidEventTap)
+            usleep(25_000)
+            up.post(tap: .cghidEventTap)
+        }
         return true
     }
 

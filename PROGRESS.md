@@ -1,5 +1,20 @@
 # Dictator progress
 
+## Resolution: Empty Paste False-Positive & Persistent Signing (2026-11-20)
+
+- **Root Cause Analysis & Fix:**
+  1. *Ad-Hoc Signing Invalidation:* Packaging previously bypassed `"Dictator Local Signing"` due to an unset environment flag, falling back to ad-hoc codesigning (`codesign -s -`). On macOS, this invalidated TCC Accessibility trust (`AXIsProcessTrusted() == false`), causing the WindowServer to silently drop synthesized key events.
+  2. *False Positive Paste Reporting:* In `TextInsertionService.swift`, `pasteToUnexposedAppField` was called without asserting `AXIsProcessTrusted()`. Because `down.post(tap: .cghidEventTap)` has no error return code in CoreGraphics, `postCommandV` returned `true`, causing Dictator to falsely display `✓ Pasted into Antigravity` / `✓ Pasted into ChatGPT` while the keystroke was dropped and the text field remained empty.
+  3. *Automatic Identity Detection:* Updated `Scripts/package-app.sh` so `Dictator Local Signing` is automatically detected and applied whenever present in the keychain, ensuring stable designated requirements and persistent Accessibility permissions across builds.
+  4. *Strict Accessibility Assertion & PID Targeting:*
+     - Guarded `postCommandV`, `pasteDirectly`, and `pasteToUnexposedAppField` with `AXIsProcessTrusted()`. If Accessibility is untrusted, Dictator immediately falls back to displaying the transcript recovery card with the `Copy` button rather than falsely claiming success.
+     - Upgraded `postCommandV` to target the specific application process via `down.postToPid(pid)` with a 25ms keydown dwell time when a target PID is available, ensuring Electron/Chromium message pumps reliably capture the paste shortcut.
+- **Verification:**
+  - Automated test suite: **391 passed, 8 skipped, 0 failures**.
+  - Verified signed package with `Authority=Dictator Local Signing` (`codesign -dvv dist/Dictator.app`).
+  - Deployed to `/Applications/Dictator.app` (PID 10954 running live with active Accessibility trust).
+
+
 ## Public README and fn shortcut artwork (2026-11-20)
 
 - Added a sculpted fn-key cover, a six-second shortcut illustration, and the real Home prompt. Removed a previously published screenshot that showed transcript history and usage. Earlier Git commits retain that image.
