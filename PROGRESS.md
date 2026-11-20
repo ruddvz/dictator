@@ -11,8 +11,9 @@
 - **Verification:**
   - Full test suite: **382 passed, 8 skipped, 0 failures**.
   - Strict deep signature verified: `codesign --verify --deep --strict dist/Dictator.app` passed with code 0.
-  - Installed to canonical location: `/Applications/Dictator.app` running cleanly (PID 9412).
+  - Installed to canonical location: `/Applications/Dictator.app` running cleanly (PID 10833).
   - Clean system logs: 0 errors in tccd, no code requirement failures.
+  - **Live user verification confirmed:** automatic dictation typing/pasting is working smoothly and directly at the cursor across target apps.
 
 ## HeyClicky and open-source dictation competitor review (2026-11-20)
 
