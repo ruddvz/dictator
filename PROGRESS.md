@@ -1,5 +1,12 @@
 # Dictator progress
 
+## Public README and fn shortcut artwork (2026-11-20)
+
+- Added a sculpted fn-key cover, a six-second shortcut illustration, and the real Home prompt. Removed a previously published screenshot that showed transcript history and usage. Earlier Git commits retain that image.
+- Documented the source build, first dictation, local processing, and manual Copy → ⌘V recovery. GitHub had no packaged releases at the time of this change.
+- Checked README links, image dimensions, and animation frames. This documentation change did not test live dictation or insertion.
+- Next fresh task: reproduce the reported empty paste in a neutral document before recording an end-to-end demo.
+
 ## Competitor Synthesis & Industry-Leading Capabilities (2026-11-20)
 
 - **Comprehensive Feature Parity & Outperformance:**
