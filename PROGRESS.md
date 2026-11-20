@@ -1,5 +1,12 @@
 # Dictator progress
 
+## Completed — public README and installation guidance (2026-11-20)
+
+- Reworked the README into a public-facing overview with verified features, requirements, first-run steps, privacy and permission notes, developer setup, CI, and support links.
+- Verified that this repository has no published GitHub installer or linked App Store listing. The README makes the source-only status explicit, labels source builds for developers/testers, and documents `fn` (Globe) as the default dictation key.
+- Checked README links against the repository tree and corrected the evaluation-guide path.
+- Next: prepare a signed and notarized macOS release and add its download instructions, or document App Store distribution, in a separate task.
+
 ## Complete End-to-End Resolution: Automatic Typing & Pasting Across All Apps (2026-11-20)
 
 - **Root Cause Analysis & Comprehensive Fix:**
