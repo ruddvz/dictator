@@ -246,6 +246,8 @@ struct Notice: Identifiable {
                                   title: "Typing into apps is off",
                                   detail: "macOS Accessibility is separate. Enable Dictator's typing switch to insert at your cursor.",
                                   action: "Enable typing") { model in
+                model.insertion.enable()
+                guard !model.insertion.isEnabled else { return }
                 UserDefaults.standard.set(SettingsView.Section.insertion.rawValue, forKey: "settingsSection")
                 model.screen = .settings
             })
