@@ -333,6 +333,8 @@ struct FloatingPillView: View {
     @State private var isSlowStart = false
     /// The timer joins the pill once a dictation passes 30 s.
     @State private var showsElapsed = false
+    /// Detects silent or muted mic input after listening starts.
+    @State private var isQuietMic = false
     /// The pointer is over a notice or the copy card: its countdown waits, as in Wispr Flow.
     @State private var isHoveringCard = false
     /// How long a card that loses nothing by closing stays up on its own.
@@ -448,10 +450,21 @@ struct FloatingPillView: View {
             // Keyed on the observed mic state; the start time itself isn't observed.
             .task(id: model.audio.isRunning) {
                 showsElapsed = false
+                isQuietMic = false
                 guard model.audio.isRunning else { return }
-                try? await Task.sleep(for: .seconds(30))
+                try? await Task.sleep(for: .milliseconds(2500))
+                guard !Task.isCancelled, model.audio.isRunning else { return }
+                if model.audio.peakLevel < 0.005 {
+                    withAnimation(Theme.snappy) { isQuietMic = true }
+                }
+                try? await Task.sleep(for: .milliseconds(27500))
                 guard !Task.isCancelled, model.audio.isRunning else { return }
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showsElapsed = true }
+            }
+            .onChange(of: model.audio.level) { _, level in
+                if isQuietMic && level >= 0.01 {
+                    withAnimation(Theme.snappy) { isQuietMic = false }
+                }
             }
             .onChange(of: phase) { old, new in
                 hoveredControl = nil
@@ -782,6 +795,14 @@ struct FloatingPillView: View {
             }
             guard isSlowStart else { return nil }
             return .init(title: model.audio.isStarting ? "Waiting for microphone…" : "Getting ready…", shortcut: nil)
+        case .listening:
+            if isQuietMic && model.audio.peakLevel < 0.005 {
+                return .init(title: "Microphone quiet or muted", shortcut: nil)
+            }
+            if model.audio.level > 0.98 {
+                return .init(title: "Audio clipping — speaking too loudly", shortcut: nil)
+            }
+            return nil
         case .meetingStarting:
             let meeting = model.meetingNotes
             if meeting.audio.isAwaitingPermission || meeting.transcriber.isAwaitingPermission {

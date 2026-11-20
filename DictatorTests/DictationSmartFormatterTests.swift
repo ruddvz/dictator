@@ -1,0 +1,94 @@
+import XCTest
+@testable import Dictator
+
+final class DictationSmartFormatterTests: XCTestCase {
+    func testCurrencies() {
+        XCTAssertEqual(DictationSmartFormatter.formatCurrencies("It costs twenty dollars and fifty cents."),
+                       "It costs $20.50.")
+        XCTAssertEqual(DictationSmartFormatter.formatCurrencies("Send twenty dollars."),
+                       "Send $20.")
+        XCTAssertEqual(DictationSmartFormatter.formatCurrencies("Pay 100 dollars."),
+                       "Pay $100.")
+        XCTAssertEqual(DictationSmartFormatter.formatCurrencies("Only fifty cents."),
+                       "Only $0.50.")
+        XCTAssertEqual(DictationSmartFormatter.formatCurrencies("A round of five million dollars."),
+                       "A round of $5 million.")
+        XCTAssertEqual(DictationSmartFormatter.formatCurrencies("Costs twenty euros or fifty pounds or one hundred yen."),
+                       "Costs €20 or £50 or ¥100.")
+    }
+
+    func testPercentages() {
+        XCTAssertEqual(DictationSmartFormatter.formatPercentages("We saw twenty percent growth."),
+                       "We saw 20% growth.")
+        XCTAssertEqual(DictationSmartFormatter.formatPercentages("Accuracy is fifty point five percent."),
+                       "Accuracy is 50.5%.")
+        XCTAssertEqual(DictationSmartFormatter.formatPercentages("Success rate is 100 percent."),
+                       "Success rate is 100%.")
+    }
+
+    func testClockTimes() {
+        XCTAssertEqual(DictationSmartFormatter.formatClockTimes("Let's meet at five thirty pm."),
+                       "Let's meet at 5:30 PM.")
+        XCTAssertEqual(DictationSmartFormatter.formatClockTimes("Call at 9 45 am."),
+                       "Call at 9:45 AM.")
+        XCTAssertEqual(DictationSmartFormatter.formatClockTimes("Doors open at ten am."),
+                       "Doors open at 10 AM.")
+        XCTAssertEqual(DictationSmartFormatter.formatClockTimes("Meet at twelve noon or twelve midnight."),
+                       "Meet at 12:00 PM or 12:00 AM.")
+    }
+
+    func testUnits() {
+        XCTAssertEqual(DictationSmartFormatter.formatUnits("It is twenty degrees celsius today."),
+                       "It is 20°C today.")
+        XCTAssertEqual(DictationSmartFormatter.formatUnits("Set to seventy degrees fahrenheit."),
+                       "Set to 70°F.")
+        XCTAssertEqual(DictationSmartFormatter.formatUnits("Downloaded ten gigabytes and five megabytes."),
+                       "Downloaded 10 GB and 5 MB.")
+        XCTAssertEqual(DictationSmartFormatter.formatUnits("Driving sixty miles per hour."),
+                       "Driving 60 mph.")
+    }
+
+    func testDecimals() {
+        XCTAssertEqual(DictationSmartFormatter.formatDecimals("Pi is approximately three point one four."),
+                       "Pi is approximately 3.14.")
+        XCTAssertEqual(DictationSmartFormatter.formatDecimals("Value is zero point five."),
+                       "Value is 0.5.")
+    }
+
+    func testQuantitiesAndIdioms() {
+        XCTAssertEqual(DictationSmartFormatter.formatQuantities("I ordered twenty five items."),
+                       "I ordered 25 items.")
+        XCTAssertEqual(DictationSmartFormatter.formatQuantities("Received one hundred and fifty pages."),
+                       "Received 150 pages.")
+        XCTAssertEqual(DictationSmartFormatter.formatQuantities("Year two thousand twenty six."),
+                       "Year 2026.")
+        // Idioms with 'one' should be preserved
+        XCTAssertEqual(DictationSmartFormatter.format("This is one of the best ideas."),
+                       "This is one of the best ideas.")
+    }
+
+    func testCJKSpacing() {
+        XCTAssertEqual(DictationSmartFormatter.formatCJK("我 们 一 起 去 看 看 。"),
+                       "我们一起去看看。")
+        XCTAssertEqual(DictationSmartFormatter.formatCJK("今 天 天 气 很 好 ， 明 天 也 是 。"),
+                       "今天天气很好，明天也是。")
+    }
+
+    func testCodeAndTerminalSanitization() {
+        XCTAssertEqual(DictationSmartFormatter.formatCodeAndTerminal("“hello world” and ‘single’", isTerminal: false),
+                       "\"hello world\" and 'single'")
+        XCTAssertEqual(DictationSmartFormatter.formatCodeAndTerminal("run ls - la on / usr / bin", isTerminal: true),
+                       "run ls -la on /usr/bin")
+        XCTAssertEqual(DictationSmartFormatter.formatCodeAndTerminal("first line\nsecond line\nthird line", isTerminal: true),
+                       "first line second line third line")
+    }
+
+    func testDynamicSnippetExpansion() {
+        let fixedDate = Date(timeIntervalSince1970: 1700000000)
+        let template = "Date: {date}, Time: {time}, ISO: {iso}"
+        let expanded = DictationSnippetExpander.expandDynamicVariables(in: template, now: fixedDate)
+        XCTAssertFalse(expanded.contains("{date}"))
+        XCTAssertFalse(expanded.contains("{time}"))
+        XCTAssertFalse(expanded.contains("{iso}"))
+    }
+}

@@ -282,6 +282,8 @@ struct DictationView: View {
                     .foregroundStyle(model.transcriber.text.isEmpty ? Theme.ink3 : Theme.ink)
                     .frame(maxWidth: .infinity, alignment: .topLeading)
                     .textSelection(.enabled)
+                    .accessibilityLabel("Live dictation transcript")
+                    .accessibilityHint("Recognized words appear here as you speak.")
             }
             .frame(minHeight: Theme.editorShort, maxHeight: Theme.editorTall)
         } else {
@@ -291,6 +293,8 @@ struct DictationView: View {
                 .scrollContentBackground(.hidden)
                 .frame(minHeight: Theme.editorShort, maxHeight: Theme.editorTall)
                 .padding(.horizontal, -Theme.textEditorInset) // align TextEditor's inset text with the header
+                .accessibilityLabel("Dictation transcript")
+                .accessibilityHint("Edit the recognized text before inserting or copying it.")
         }
     }
 
@@ -621,7 +625,7 @@ private struct NextStepRow: View {
             model.insertion.isEnabled ? nil : Step(
                 id: "insertion", title: "Type straight into any app",
                 detail: "macOS Accessibility is separate. Enable Dictator's typing switch to insert at your cursor.",
-                action: "Enable typing") { model in
+                action: "Open typing settings") { model in
                     UserDefaults.standard.set(SettingsView.Section.insertion.rawValue, forKey: "settingsSection")
                     model.screen = .settings
                 },

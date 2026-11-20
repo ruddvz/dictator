@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Speech
 
@@ -71,13 +72,21 @@ enum DictationMode: String, CaseIterable, Identifiable, Codable {
     static func resolved(_ requested: DictationMode, bundleIdentifier: String?) -> DictationMode {
         guard requested == .automatic else { return requested }
         let bundle = (bundleIdentifier ?? "").lowercased()
-        if bundle == "com.apple.mail" || bundle.contains("outlook") { return .email }
+        if bundle == "com.apple.mail" || bundle.contains("outlook") ||
+            bundle.contains("superhuman") || bundle.contains("mimestream") ||
+            bundle.contains("spark") || bundle.contains("mailmate") { return .email }
         if bundle == "com.apple.mobilesms" || bundle.contains("slack") ||
-            bundle.contains("discord") || bundle.contains("teams") { return .message }
+            bundle.contains("discord") || bundle.contains("teams") ||
+            bundle.contains("whatsapp") || bundle.contains("telegram") ||
+            bundle.contains("signal") || bundle.contains("mattermost") ||
+            bundle.contains("messenger") { return .message }
         if bundle == "com.apple.dt.xcode" || bundle.contains("vscode") ||
             bundle.contains("cursor") || bundle.contains("antigravity") ||
             bundle.contains("jetbrains") || bundle == "com.apple.terminal" ||
-            bundle == "com.googlecode.iterm2" || bundle == "com.mitchellh.ghostty" { return .code }
+            bundle == "com.googlecode.iterm2" || bundle == "com.mitchellh.ghostty" ||
+            bundle.contains("warp") || bundle.contains("alacritty") ||
+            bundle.contains("kitty") || bundle.contains("wezterm") ||
+            bundle.contains("sublime") || bundle.contains("zed") { return .code }
         return .natural
     }
 }
@@ -286,10 +295,13 @@ enum DictationModeFormatter {
 enum DictationTranscriptProcessor {
     static func process(_ raw: String, mode: DictationMode, snippets: String,
                         applyCorrections: Bool = true, cleanupFillers: Bool = false,
-                        correctionRules: String = "", tone: DictationTone = .formal) -> String {
+                        correctionRules: String = "", tone: DictationTone = .formal,
+                        vocabulary: [String] = [], targetBundleIdentifier: String? = nil) -> String {
         let source = applyCorrections ? DictationBacktrack.apply(to: raw) : raw
-        let corrected = DictationSnippetExpander.expandSegments(source, definitions: correctionRules)
+        let snapped = vocabulary.isEmpty ? source : DictationVocabularySnapper.apply(source, terms: vocabulary)
+        let corrected = DictationSnippetExpander.expandSegments(snapped, definitions: correctionRules)
         let lastFreeSegment = corrected.lastIndex { !$0.isProtected }
+        let isTerminal = isTerminalApp(targetBundleIdentifier)
         let formatted = corrected.enumerated().flatMap { index, segment -> [DictationTextSegment] in
             guard !segment.isProtected else { return [segment] }
             let leading = segment.text.prefix(while: \.isWhitespace)
@@ -297,9 +309,13 @@ enum DictationTranscriptProcessor {
             let trailing = remainder.reversed().prefix(while: \.isWhitespace).reversed()
             var text = String(remainder.dropLast(trailing.count))
             if cleanupFillers { text = DictationLocalCleanup.removeFillers(from: text, restoresCapitals: mode != .code) }
-            if mode == .code { text = DictationCodeFormatter.format(text) }
-            else {
+            if mode == .code {
+                text = DictationCodeFormatter.format(text)
+                text = DictationSmartFormatter.formatCodeAndTerminal(text, isTerminal: isTerminal)
+            } else {
+                text = DictationSmartFormatter.format(text)
                 text = DictationModeFormatter.format(text, mode: mode)
+                if isTerminal { text = DictationSmartFormatter.formatCodeAndTerminal(text, isTerminal: true) }
                 // Tone only drops the closing full stop at the very end of the dictation.
                 if tone == .casual { text = index == lastFreeSegment ? tone.apply(to: text) : text }
                 else { text = tone.apply(to: text) }
@@ -310,6 +326,13 @@ enum DictationTranscriptProcessor {
             return DictationSnippetExpander.expandSegments(preservedWhitespace, definitions: snippets)
         }
         return formatted.map(\.text).joined().trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    static func isTerminalApp(_ bundleIdentifier: String?) -> Bool {
+        guard let bundle = bundleIdentifier?.lowercased(), !bundle.isEmpty else { return false }
+        return bundle == "com.apple.terminal" || bundle.contains("iterm") ||
+            bundle.contains("ghostty") || bundle.contains("warp") ||
+            bundle.contains("alacritty") || bundle.contains("kitty")
     }
 }
 
@@ -463,7 +486,7 @@ enum DictationSnippetExpander {
                     text: source.substring(with: NSRange(location: cursor, length: match.range.location - cursor)),
                     isProtected: false))
             }
-            var replacement = match.replacement
+            var replacement = expandDynamicVariables(in: match.replacement)
             if !match.punctuation.isEmpty, let last = replacement.last, ".!?".contains(last) {
                 replacement.removeLast()
             }
@@ -474,6 +497,40 @@ enum DictationSnippetExpander {
             segments.append(DictationTextSegment(text: source.substring(from: cursor), isProtected: false))
         }
         return segments
+    }
+
+    /// Expands dynamic tags like {date}, {time}, {datetime}, {iso}, and {clipboard}.
+    static func expandDynamicVariables(in template: String, now: Date = Date()) -> String {
+        guard template.contains("{") else { return template }
+        var result = template
+        if result.contains("{date}") {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .long
+            formatter.timeStyle = .none
+            result = result.replacingOccurrences(of: "{date}", with: formatter.string(from: now))
+        }
+        if result.contains("{time}") {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .none
+            formatter.timeStyle = .short
+            result = result.replacingOccurrences(of: "{time}", with: formatter.string(from: now))
+        }
+        if result.contains("{datetime}") {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .medium
+            formatter.timeStyle = .short
+            result = result.replacingOccurrences(of: "{datetime}", with: formatter.string(from: now))
+        }
+        if result.contains("{iso}") {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withFullDate]
+            result = result.replacingOccurrences(of: "{iso}", with: formatter.string(from: now))
+        }
+        if result.contains("{clipboard}") {
+            let clip = NSPasteboard.general.string(forType: .string) ?? ""
+            result = result.replacingOccurrences(of: "{clipboard}", with: clip)
+        }
+        return result
     }
 
     private static func boundaryPattern(for cue: String) -> String {

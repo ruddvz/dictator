@@ -23,7 +23,9 @@ final class ClipboardSnapshotTests: XCTestCase {
         let saved = ClipboardSnapshot(pasteboard)
         let ours = ClipboardSnapshot.placeTransient("dictated text", on: pasteboard)
         XCTAssertEqual(pasteboard.string(forType: .string), "dictated text")
-        XCTAssertTrue(pasteboard.types?.contains(ClipboardSnapshot.transientTypes[0]) == true)
+        for type in ClipboardSnapshot.transientTypes {
+            XCTAssertTrue(pasteboard.types?.contains(type) == true, "Missing transient marker: \(type.rawValue)")
+        }
 
         XCTAssertTrue(saved.restore(to: pasteboard, ifChangeCountIs: ours))
         XCTAssertEqual(pasteboard.string(forType: .string), "user copy")

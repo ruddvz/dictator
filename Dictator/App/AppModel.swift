@@ -488,6 +488,7 @@ final class AppModel {
     @ObservationIgnored private var activeDictationCleansFillers = false
     @ObservationIgnored private var activeDictationAppliesSpokenCorrections = true
     @ObservationIgnored private var activeDictationUsesSmartCleanup = false
+    @ObservationIgnored private var activeDictationVocabulary: [String] = []
     @ObservationIgnored private var captureDictationProfileName: String?
     @ObservationIgnored private var captureDictationWritingStylePresetID: UUID?
 
@@ -2280,6 +2281,7 @@ final class AppModel {
         activeDictationCorrectionRules = profileSettings.correctionRules
         activeDictationCleansFillers = profileSettings.cleansFillers
         activeDictationAppliesSpokenCorrections = appliesSpokenCorrections
+        activeDictationVocabulary = profileSettings.vocabulary
         activeDictationUsesSmartCleanup = polishesWithAppleIntelligence && profileSettings.cleansFillers &&
             profileSettings.mode != .code
         timing.mark("profile")
@@ -2485,7 +2487,9 @@ final class AppModel {
             applyCorrections: activeDictationAppliesSpokenCorrections,
             cleanupFillers: activeDictationCleansFillers,
             correctionRules: activeDictationCorrectionRules,
-            tone: activeDictationTone)
+            tone: activeDictationTone,
+            vocabulary: activeDictationVocabulary,
+            targetBundleIdentifier: dictationTargetApp?.bundleIdentifier)
         transcriber.replaceText(processed)
         if !processed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             activeDictationProfileName = captureDictationProfileName
@@ -2770,7 +2774,9 @@ final class AppModel {
             phrase.words, mode: activeDictationMode, snippets: activeDictationSnippets,
             applyCorrections: activeDictationAppliesSpokenCorrections,
             cleanupFillers: activeDictationCleansFillers,
-            correctionRules: activeDictationCorrectionRules, tone: tone)
+            correctionRules: activeDictationCorrectionRules, tone: tone,
+            vocabulary: activeDictationVocabulary,
+            targetBundleIdentifier: dictationTargetApp?.bundleIdentifier)
         let text = LiveTypingSession.keepingLineBreaks(of: phrase.words, mode: activeDictationMode, in: processed)
         guard !punctuation.isEmpty, !text.isEmpty else { return punctuation + text }
         return punctuation + (text.first?.isWhitespace == true ? "" : " ") + text

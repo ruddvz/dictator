@@ -408,6 +408,8 @@ struct MeetingNotesView: View {
                     .frame(minHeight: minHeight)
                     .padding(Theme.s3)
                     .disabled(service.isGenerating)
+                    .accessibilityLabel("\(title) for meeting note")
+                    .accessibilityHint("Edit this section of the selected meeting note.")
             }
             .surface(.outlined)
         }

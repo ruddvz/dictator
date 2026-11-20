@@ -68,6 +68,10 @@ final class DictationCleanupTests: XCTestCase {
         XCTAssertEqual(clean("You know, it's fine. Basically, it works."), "It's fine. It works.")
         XCTAssertEqual(clean("Hmm, let me think. Ah, right."), "Let me think. Right.")
         XCTAssertEqual(clean("We should uh ship it today."), "We should ship it today.")
+        XCTAssertEqual(clean("Basically we should launch this today."), "We should launch this today.")
+        XCTAssertEqual(clean("We can meet at like 5 PM."), "We can meet at 5 PM.")
+        XCTAssertEqual(clean("I was like thinking about that."), "I was thinking about that.")
+        XCTAssertEqual(clean("Um like we should go."), "We should go.")
     }
 
     func testSmartCleanupMayOnlyDropFillersAndStutters() {

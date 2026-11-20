@@ -306,6 +306,8 @@ struct PersonalizationView: View {
                 .font(.hkBody.monospaced())
                 .frame(minHeight: Theme.editorShort)
                 .editorField()
+                .accessibilityLabel("Spoken snippets")
+                .accessibilityHint("Enter one spoken cue and expansion per line.")
                 .padding(.top, Theme.s2)
             Text("One per line: spoken cue => expanded phrase. Use this editor to repair malformed older entries.")
                 .font(.hkCaption)
@@ -330,6 +332,8 @@ struct PersonalizationView: View {
                 .font(.hkBody.monospaced())
                 .frame(minHeight: Theme.editorShort)
                 .editorField()
+                .accessibilityLabel("Correction rules")
+                .accessibilityHint("Enter one recognized phrase and its correction per line.")
                 .padding(.top, Theme.s2)
             Text("One per line: recognized phrase => corrected phrase. Matches are case-insensitive and respect whole-word boundaries. Raw recognition remains available to restore.")
                 .font(.hkCaption)
@@ -465,7 +469,7 @@ private struct PersonalizationEntryEditor: View {
                            hint: "Used as an on-device recognition hint.", autofocus: true)
             } else {
                 SheetField(label: section == .corrections ? "Recognized phrase" : "Spoken cue",
-                           prompt: section == .corrections ? "For example: Hush Key" : "For example: my email",
+                           prompt: section == .corrections ? "For example: Dictator" : "For example: my email",
                            text: $cue,
                            hint: section == .corrections
                                ? "Replaces whole-word matches in the transcript."

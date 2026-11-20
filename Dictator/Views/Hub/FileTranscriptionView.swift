@@ -225,12 +225,15 @@ struct FileTranscriptionView: View {
                     .frame(minHeight: Theme.editorTall)
                     .disabled(isBusy)
                     .padding(Theme.s3)
+                    .accessibilityLabel("File transcript")
+                    .accessibilityHint("Edit the transcript. Subtitle exports keep the original wording and timing; Save text includes your edits.")
                 RowDivider()
                 HStack(spacing: Theme.s2) {
-                    Text(exportMessage ?? "Edits save automatically. Subtitles keep the original timing.")
+                    Text(exportMessage ?? "Subtitle exports keep original wording and timing. Save text includes edits.")
                         .font(.hkCaption)
                         .foregroundStyle(Theme.ink3)
-                        .lineLimit(1)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                     Spacer()
                     Button("SRT") { save(content: SubtitleFormatter.srt(currentCues), fileExtension: "srt", type: UTType(filenameExtension: "srt") ?? .plainText) }
                         .buttonStyle(SecondaryButtonStyle())

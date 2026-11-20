@@ -13,12 +13,23 @@ enum DictationLocalCleanup {
     /// "u h" from a recognizer that spelled the sound out.
     private static let spelledFillerExpression = try! NSRegularExpression(
         pattern: #"(?i)(?:,\s*|\s+)?(?<![\p{L}\p{N}_'’-])u\s+h(?![\p{L}\p{N}_'’-])"#)
-    /// Verbal tics, removed only where speech sets them apart with commas, so "I like it",
+    private static let compoundFillerExpression = try! NSRegularExpression(
+        pattern: #"(?i)(?:,\s*|\s+)?\b(?:um\s+like|uh\s+like|like\s+um|like\s+uh|you\s+know\s+like|so\s+basically|so\s+yeah)\b(?:,\s*|\s+)?"#)
+    /// Verbal tics, removed where speech sets them apart with commas, so "I like it",
     /// "you know the answer" and "I mean it" stay.
     private static let tics = #"(?:you\s+know|i\s+mean|like|basically|so\s+yeah|kind\s+of|sort\s+of|literally)"#
     private static let leadingTicExpression = try! NSRegularExpression(
         pattern: #"(?im)(^|[.!?]\s+)"# + tics + #"\s*,\s*"#)
+    /// Unpunctuated sentence-initial tics like "Basically we need...", "Literally this is...", or "Like we should..."
+    private static let unpunctuatedLeadingTicExpression = try! NSRegularExpression(
+        pattern: #"(?im)(^|[.!?]\s+)(?:basically|literally|so\s+yeah|like(?=\s+(?:we|i|it|you|they|there|this|that|he|she)))\s+"#)
     private static let midTicExpression = try! NSRegularExpression(pattern: #"(?i)\s*,\s*"# + tics + #"\s*,\s*"#)
+    /// Hesitation "like" before numbers/quantities: "at like 5 PM" -> "at 5 PM"
+    private static let pauseLikeExpression = try! NSRegularExpression(
+        pattern: #"(?i)\b(about|around|at)\s+like\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b"#)
+    /// Hesitation "like" between auxiliary and participle: "I was like thinking" -> "I was thinking"
+    private static let verbLikeExpression = try! NSRegularExpression(
+        pattern: #"(?i)\b(was|were|am|is|are)\s+like\s+(thinking|saying|wondering|feeling|going)\b"#)
     /// Words people repeat on purpose: "very very", "no no", "had had", "that that".
     private static let meaningfulRepeats: Set<String> = [
         "very", "so", "no", "bye", "ha", "haha", "really", "much", "many", "more", "far", "again", "yeah", "yes",
@@ -42,14 +53,20 @@ enum DictationLocalCleanup {
         let startsCapitalized = restoresCapitals && (text.first(where: \.isLetter)?.isUppercase ?? false)
         var result = text
         let capitalizesSentences = restoresCapitals && everySentenceIsCapitalized(text)
-        for expression in [spelledFillerExpression, fillerExpression] {
+        for expression in [compoundFillerExpression, spelledFillerExpression, fillerExpression] {
             result = expression.stringByReplacingMatches(in: result, range: NSRange(result.startIndex..., in: result),
                                                          withTemplate: " ")
         }
         result = leadingTicExpression.stringByReplacingMatches(in: result, range: NSRange(result.startIndex..., in: result),
                                                                withTemplate: "$1")
+        result = unpunctuatedLeadingTicExpression.stringByReplacingMatches(in: result, range: NSRange(result.startIndex..., in: result),
+                                                                          withTemplate: "$1")
         result = midTicExpression.stringByReplacingMatches(in: result, range: NSRange(result.startIndex..., in: result),
                                                            withTemplate: " ")
+        result = pauseLikeExpression.stringByReplacingMatches(in: result, range: NSRange(result.startIndex..., in: result),
+                                                              withTemplate: "$1 $2")
+        result = verbLikeExpression.stringByReplacingMatches(in: result, range: NSRange(result.startIndex..., in: result),
+                                                             withTemplate: "$1 $2")
         result = collapseRepeats(in: result, using: phraseRepeatExpression, keepsAll: meaningfulPhrases)
         result = collapseRepeats(in: result, using: repeatExpression, keepsAll: meaningfulRepeats)
         result = tidy(result, capitalizeStart: startsCapitalized)

@@ -155,6 +155,8 @@ struct TransformView: View {
                                 .frame(minHeight: Theme.editorShort, maxHeight: Theme.editorShortMax)
                                 .disabled(model.isFinalizingSelectedTextEdit || model.isGeneratingSelectedTextEdit || model.isApplyingSelectedTextEdit)
                                 .editorField()
+                                .accessibilityLabel("Selected-text editing instruction")
+                                .accessibilityHint("Describe how Dictator should rewrite the selected text.")
                         }
                     }
 
@@ -194,6 +196,8 @@ struct TransformView: View {
                                 .frame(minHeight: Theme.editorShort, maxHeight: Theme.editorTall)
                                 .disabled(model.isApplyingSelectedTextEdit || model.selectedTextEditApplied)
                                 .editorField()
+                                .accessibilityLabel("Selected-text rewrite preview")
+                                .accessibilityHint("Review or edit the result before applying it.")
                         }
                     }
 
@@ -245,6 +249,8 @@ struct TransformView: View {
                         .frame(minHeight: Theme.editorMedium, maxHeight: Theme.editorTallMax)
                         .disabled(isBusy)
                         .padding(Theme.s3)
+                        .accessibilityLabel("Text to transform")
+                        .accessibilityHint("Enter or edit the text you want Dictator to transform.")
                     RowDivider()
                     HStack(spacing: Theme.s2) {
                         Text(selectedStyle?.name ?? selectedAction.rawValue)
@@ -361,6 +367,8 @@ struct TransformView: View {
                     .scrollContentBackground(.hidden)
                     .frame(minHeight: Theme.editorMedium)
                     .padding(Theme.s3)
+                    .accessibilityLabel("Transform preview")
+                    .accessibilityHint("Review or edit the transformed text before copying it.")
                 RowDivider()
                 HStack(spacing: Theme.s2) {
                     if sourceSnapshot != currentText {

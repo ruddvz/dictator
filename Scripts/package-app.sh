@@ -45,10 +45,11 @@ cp "$project_root/docs/licenses/LLAMA-CPP-MIT-LICENSE.txt" "$resources/"
 # survive. Sign with the local identity from Scripts/make-signing-identity.sh when it exists.
 # Distribution builds should use a real Developer ID.
 identity="$(security find-identity -v -p codesigning 2>/dev/null | awk '/"Dictator Local Signing"/ { print $2; exit }')"
-if [[ -n "$identity" ]]; then
+if [[ -n "${DICTATOR_SIGNING_IDENTITY:-}" ]]; then
+  codesign --force --deep --sign "$DICTATOR_SIGNING_IDENTITY" --timestamp=none "$staged_app"
+elif [[ -n "$identity" && "${DICTATOR_USE_LOCAL_IDENTITY:-0}" == "1" ]]; then
   codesign --force --deep --sign "$identity" --timestamp=none "$staged_app"
 else
-  echo "warning: no Dictator Local Signing identity; Accessibility resets on each build (run Scripts/make-signing-identity.sh)" >&2
   # Deep-sign nested frameworks with their own identifiers, then give only the app its stable
   # requirement. Passing the app requirement to `--deep` incorrectly stamps it onto frameworks.
   codesign --force --deep --sign - --timestamp=none "$staged_app"

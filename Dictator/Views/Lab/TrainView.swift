@@ -271,6 +271,8 @@ private struct TakeTile: View {
     var issue: TakeIssue?
     var onDelete: () -> Void
     @State private var hovering = false
+    @FocusState private var deleteHasKeyboardFocus: Bool
+    @AccessibilityFocusState private var deleteHasAccessibilityFocus: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.figureGap) {
@@ -291,7 +293,10 @@ private struct TakeTile: View {
                 Spacer()
                 Button("Delete", icon: .trash, action: onDelete)
                     .buttonStyle(IconButtonStyle())
-                    .opacity(hovering ? 1 : 0)
+                    .focused($deleteHasKeyboardFocus)
+                    .accessibilityFocused($deleteHasAccessibilityFocus)
+                    .accessibilityLabel("Delete training take")
+                    .opacity(hovering || deleteHasKeyboardFocus || deleteHasAccessibilityFocus ? 1 : 0)
             }
         }
         .padding(Theme.s3)

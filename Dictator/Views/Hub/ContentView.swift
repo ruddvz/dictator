@@ -129,6 +129,8 @@ struct ContentView: View {
             .buttonStyle(.plain)
             .padding(.vertical, Theme.s1)
             .help(labIsOpen ? "Hide the Silent Lab" : "Show the Silent Lab")
+            .accessibilityLabel("Silent Lab")
+            .accessibilityValue(labIsOpen ? "Expanded" : "Collapsed")
         } else {
             Button {
                 withAnimation(Theme.snappy) { showsLab.toggle() }
