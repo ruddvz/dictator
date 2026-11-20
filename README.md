@@ -1,96 +1,113 @@
-# Dictator
+<h1 align="center">Dictator</h1>
 
-**Private, on-device dictation for macOS.**
+<p align="center"><strong>Speak naturally. Keep your words. Stay in flow.</strong><br>
+A native macOS dictation studio for turning speech into editable text — on your Mac.</p>
 
-Dictator turns speech into editable text on your Mac. Dictate anywhere, transcribe files, capture meeting notes, and shape drafts with local tools. Audio and text processing stay on-device; optional speech models are downloaded only when you choose them.
+<p align="center">
+  <a href="#first-dictation"><img src="https://img.shields.io/badge/macOS-14%2B-1E2321?logo=apple&logoColor=white" alt="macOS 14 or later"></a>
+  <a href="https://github.com/ruddvz/dictator/actions/workflows/ci.yml"><img src="https://github.com/ruddvz/dictator/actions/workflows/ci.yml/badge.svg?branch=main" alt="Build and tests"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-4A7763.svg" alt="MIT License"></a>
+  <img src="https://img.shields.io/badge/speech-on--device-4A7763.svg" alt="On-device speech">
+</p>
 
-[![CI](https://github.com/ruddvz/dictator/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ruddvz/dictator/actions/workflows/ci.yml)
-[![macOS 14+](https://img.shields.io/badge/macOS-14%2B-111111?logo=apple)](#requirements)
-[![MIT License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+<p align="center">
+  <img src="docs/assets/dictator-hero.jpg" alt="A sculptural microphone orb surrounded by a flowing sage waveform" width="512">
+</p>
 
-[Download status](#download-and-install) · [Features](#what-you-can-do) · [Privacy](#privacy-and-permissions) · [Report a problem](https://github.com/ruddvz/dictator/issues)
+<p align="center"><em>Your voice, already where you need it.</em></p>
 
-## Download and install
+Dictator is built for the moment between having a thought and getting it onto the page. Hold **fn (Globe)**, speak, review the words, then copy or insert them into a supported app. Shape drafts, transcribe audio, and capture meeting notes with tools that work locally.
 
-### Ready-to-use app
+## See Dictator
 
-There is **no signed, notarized Mac app published in this repository**, and no Mac App Store listing is linked here. The [GitHub Releases page](https://github.com/ruddvz/dictator/releases) currently has no installer. Until an official release is published, the repository is source code; the build below is intended for developers and testers.
+<p align="center">
+  <img src="docs/assets/home-live.png" alt="Live capture of Dictator Home, showing the Hold fn and talk prompt" width="512">
+  &nbsp;&nbsp;
+  <img src="docs/assets/floating-control.png" alt="Live capture of Dictator's compact floating control" width="300">
+</p>
 
-### Build from source
+<p align="center"><sub>Live captures from the running Mac app. The Home image is cropped to keep local transcript history private.</sub></p>
 
-You’ll need a Mac, Xcode with the macOS SDK, and XcodeGen. Homebrew can install XcodeGen:
+### Voice becomes text, stays on-device
+
+<p align="center">
+  <img src="docs/assets/dictator-voice-loop.gif" alt="Animated 3D microphone orb with an orbiting sage signal, representing local voice-to-text" width="512">
+</p>
+
+## What Dictator does
+
+| Speak | Shape | Send |
+| --- | --- | --- |
+| Live dictation from a button or the **fn (Globe)** key. Apple Speech is ready to use; optional Parakeet models run locally after download. | Natural, Message, Email, Code, or Automatic modes, plus local vocabulary, snippets, corrections, and review-first transforms. | Copy or use guarded insertion in supported text fields. Recheck the destination and undo a recent insertion. |
+
+### One workspace for voice and writing
+
+- **Dictation:** Words appear as you speak with Apple Speech. Choose local Parakeet if you want its batch-style transcript, or let Dictator fall back to Apple Speech when a model or language is unavailable.
+- **Writing controls:** Set Automatic mode per app, add vocabulary and snippets, define correction rules, and restore the original transcript at any time.
+- **Local transforms:** Make a reviewable draft that is polished, concise, professional, formatted as bullets, or organized as action items. Filler cleanup also works without Apple Intelligence.
+- **Voice edit:** Select text in another app, speak an instruction, review the proposed edit, and apply it only when it is ready.
+- **File transcription:** Transcribe one audio file at a time and export text, SRT, or WebVTT. Apple Speech needs no model download; WhisperKit is an optional local engine.
+- **Meeting notes:** Capture your microphone, Mac system audio, or both. Search and edit local transcripts, then export them as text.
+- **Silent Lab:** Train and evaluate a small vocabulary from headphone motion. This research experiment is not general lip reading.
+
+## First dictation
+
+1. Open Dictator and hold **fn (Globe)**, the default global shortcut, or select **Dictate** in Home. The shortcut is configurable in **Settings → Shortcuts**.
+2. Speak naturally, then release or stop. Review and edit the transcript.
+3. Choose **Copy**, or turn on **Insert into current app** and grant Accessibility access to insert into a supported text field.
+
+Apple Speech streams text as you talk. Parakeet returns a transcript when you finish. Dictator listens only while you start a recording.
+
+## Made to stay local
+
+- Speech recognition and text processing run on this Mac. There is no telemetry, paid API, or remote speech-recognition fallback.
+- Optional speech models download only after you request them; the model files then run locally. Downloads require internet.
+- Ordinary dictation audio is not written to disk. Transcript history is stored locally and can be disabled or cleared in Settings.
+- Meeting audio is not saved; its transcript is stored when you stop.
+- Nearby-text hints are off by default. When enabled, a bounded text slice is used to find recognition terms and then discarded.
+- Silent Lab's separate research recorder saves audio only when you explicitly enable it.
+
+Microphone access begins when you start capture. Accessibility is used for the fn shortcut and text insertion; System Audio Recording is requested when you start a system-audio meeting; Motion access is requested only when you open **Silent Lab → Connect**.
+
+## Compatibility
+
+| Capability | Needs |
+| --- | --- |
+| Core app and live dictation | macOS 14 or later; Apple Silicon and Intel Macs |
+| System-audio meeting capture | macOS 14.2 or later |
+| Apple Intelligence transforms, meeting summaries, and voice edit | macOS 26 or later, with Apple's on-device Foundation Model available |
+| Silent Lab | Compatible head-tracking headphones connected as the Mac's audio output |
+
+Dictation does not require headphones. Model languages, performance, and availability vary by Mac and selected engine. Generated drafts can change meaning, so review them before applying.
+
+## Get Dictator
+
+Build the app on a Mac with Xcode, the macOS SDK, and XcodeGen:
 
 ```sh
+brew install xcodegen
 git clone https://github.com/ruddvz/dictator.git
 cd dictator
-brew install xcodegen
 ./Scripts/package-app.sh
 open dist/Dictator.app
 ```
 
-The first build downloads the project’s Swift package dependencies, so it needs an internet connection. The packaging script creates an ad-hoc signed local build; it is not Developer ID signed or notarized for distribution. Without a stable local signing identity, macOS may ask you to grant Accessibility access again after each rebuild.
+## For contributors
 
-## What you can do
-
-- **Dictate in any app:** Apple’s on-device Speech is the default. The optional Parakeet engine also runs locally after you download its model. Choose Natural, Message, Email, Code, or Automatic writing modes; add vocabulary, snippets, and correction rules.
-- **Review before inserting:** Edit or copy a transcript, or enable guarded text insertion into supported fields. Dictator checks the destination before inserting and offers a limited undo.
-- **Transform text locally:** Create reviewable polish, concise, professional, bullet-point, and action-item drafts. Apple’s on-device Foundation Model is required for model-backed transforms; filler cleanup also works on macOS 14+ without it.
-- **Edit selected text by voice:** Select text in another app, speak an edit instruction, review the local draft, and choose whether to apply it. This feature requires macOS 26+ and Accessibility access.
-- **Transcribe files:** Work with one audio file at a time and export text, SRT, or WebVTT. Apple Speech needs no model download; WhisperKit is available as an optional local engine.
-- **Capture meeting notes:** Transcribe your microphone, Mac system audio, or both. Review and export searchable local transcripts. Audio is not saved.
-- **Explore Silent Lab:** Train and evaluate a small, personal vocabulary from head motion with compatible headphones. This is an experiment, not general lip reading.
-
-## Requirements
-
-| Feature | Requirement |
-| --- | --- |
-| Dictation and core app | macOS 14 or later; Apple Silicon and Intel Macs |
-| System-audio meeting capture | macOS 14.2 or later |
-| Apple Intelligence transforms, summaries, and voice editing | macOS 26 or later, with Apple’s on-device Foundation Model available |
-| Optional speech models | Internet to download; supported languages, model availability, and performance depend on the selected engine and Mac |
-| Silent Lab | Compatible head-tracking headphones connected as the Mac’s audio output |
-
-Dictation does not require headphones. Model-based features depend on macOS, language, hardware, and Apple’s local model availability.
-
-## First dictation
-
-1. Open Dictator and start dictation from the app, or hold the **fn (Globe)** key. This is the default global shortcut and can be changed in **Settings → Shortcuts**.
-2. Speak, then stop dictation. Review or edit the transcript.
-3. Copy the text, or enable **Insert into current app** in Settings and grant Accessibility access. Insertion is limited to supported text fields.
-
-The microphone is active only while you explicitly record. Apple Speech streams recognized words as you speak; Parakeet returns its transcript when recording ends. If Parakeet is unavailable for the selected language, Dictator falls back to Apple Speech.
-
-## Privacy and permissions
-
-- Dictation, file transcription, meeting transcription, and model-backed text transforms run on this Mac. Dictator has no telemetry, paid API, or remote speech-recognition fallback.
-- Speech-model files are downloaded only after you request them. Model downloads need internet; your audio is processed locally.
-- Ordinary dictation audio is not saved to disk. Recent transcript history is stored locally and can be disabled or cleared in Settings.
-- Meeting audio is not saved; the transcript is stored locally when you stop. Silent Lab’s separate research recorder can save audio only when you explicitly enable it.
-- Nearby-text hints are off by default. If enabled, Dictator reads a bounded amount of text around the cursor to find recognition terms, then discards it.
-- Accessibility is needed for the default fn shortcut and for text insertion. Microphone and system-audio access are requested when you start the relevant capture. Motion access is requested only when you open **Silent Lab → Connect**.
-
-Dictator does not identify speakers. A generated draft can change meaning; review it before applying. See the [personal-data backup guide](docs/PERSONAL_DATA_BACKUP.md) for moving local preferences and history.
-
-## Silent Lab is experimental
-
-Silent Lab uses processed, low-rate motion from compatible headphones. Head movement and fit changes can affect results. It requires separate training and held-out evaluation on a small, user-trained vocabulary; success there does not show that arbitrary silent speech can be recognized.
-
-## Development
-
-Generate the Xcode project and run the test suite:
+Generate the Xcode project and run the suite:
 
 ```sh
 xcodegen generate
 xcodebuild -project Dictator.xcodeproj -scheme Dictator -derivedDataPath .build CODE_SIGNING_ALLOWED=NO test
 ```
 
-GitHub Actions runs the same build and tests on macOS. The repository also includes a local dictation evaluation script at `./Scripts/eval.sh`; see [the evaluation guide](Fixtures/eval/README.md) for fixtures and setup.
+[GitHub Actions](https://github.com/ruddvz/dictator/actions/workflows/ci.yml) builds and tests on macOS. For evaluation fixtures, splits, and local scoring, see [the evaluation guide](Fixtures/eval/README.md).
 
-## Help, attribution, and license
+## Explore more
 
-- [Report an issue](https://github.com/ruddvz/dictator/issues). Include your macOS version and steps to reproduce; avoid attaching private audio or transcript content.
+- [Personal-data backup guide](docs/PERSONAL_DATA_BACKUP.md)
 - [Testing protocol](docs/TESTING_PROTOCOL.md)
 - [Product plan and file map](docs/PRODUCT_PLAN.md)
 - [Third-party notices and license boundaries](NOTICE.md)
 
-Dictator is released under the [MIT License](LICENSE). Third-party components have their own terms; see the notices and license files in `docs/licenses/`.
+Dictator is released under the [MIT License](LICENSE). Third-party components retain their own licenses; see [NOTICE.md](NOTICE.md) and `docs/licenses/`.
