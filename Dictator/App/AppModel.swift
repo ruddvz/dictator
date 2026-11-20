@@ -355,6 +355,9 @@ final class AppModel {
     private(set) var typedIntoAppName: String?
     private(set) var didCompleteFirstDictation = UserDefaults.standard.bool(forKey: "completedFirstDictation")
     private(set) var rawDictationText = ""
+    private(set) var correctionLearningSuggestion: DictationCorrectionLearningSuggestion?
+    private(set) var correctionLearningFeedback: String?
+    var canUndoCorrectionLearning: Bool { learnedCorrectionTermForUndo != nil }
     private(set) var transformUndoOriginalText: String?
     private(set) var transformUndoOutputText: String?
     var canUndoLocalTransform: Bool {
@@ -459,6 +462,8 @@ final class AppModel {
     @ObservationIgnored private var fileTranscriptionSessionsDiscardedByClear = Set<UUID>()
     @ObservationIgnored private var dictationHistorySaveTask: Task<Void, Never>?
     @ObservationIgnored private var currentDictationHistoryEntryID: UUID?
+    @ObservationIgnored private var correctionLearningSourceText: String?
+    @ObservationIgnored private var learnedCorrectionTermForUndo: String?
     @ObservationIgnored private var capturedInsertionTarget: TextInsertionService.InsertionTarget?
     /// The current dictation's live typing, when `typesWhileSpeaking` applies to its field.
     @ObservationIgnored private var liveTyping: LiveTypingSession?
@@ -681,6 +686,26 @@ final class AppModel {
                 self?.insertion.restore()
                 self?.refreshLaunchAtLogin()
                 self?.pruneDictationHistory()
+            }
+        }
+        startAccessibilityWatcher()
+    }
+
+    private var accessibilityWatcherTask: Task<Void, Never>?
+
+    func startAccessibilityWatcher() {
+        guard accessibilityWatcherTask == nil else { return }
+        accessibilityWatcherTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1.5))
+                guard let self, !Task.isCancelled else { break }
+                let trusted = AXIsProcessTrusted()
+                if trusted {
+                    if !self.insertion.isEnabled {
+                        self.refreshAccessibilityState()
+                    }
+                    self.refreshFunctionKeyStatus()
+                }
             }
         }
     }
@@ -1680,6 +1705,9 @@ final class AppModel {
     /// Offers one explicit recovery attempt against the currently active app after automatic
     /// focus discovery failed. A sent but unverified paste is recorded as sent to prevent duplicates.
     func insertDictationIntoFrontmostApp() async {
+        if !insertion.isEnabled && AXIsProcessTrusted() {
+            refreshAccessibilityState()
+        }
         let text = transcriber.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !didInsertCurrentDictation,
               !audio.isRunning, !isFinalizingDictation, !transcriber.isRunning,
@@ -1817,6 +1845,7 @@ final class AppModel {
     func retranscribeDictation(_ entry: DictationHistoryEntry) async {
         guard retranscribeState(for: entry).isAvailable, let held = heldHistoryAudio, held.entryID == entry.id,
               let engine = retranscribeEngine(for: entry) else { return }
+        resetCorrectionLearningState()
         guard captureGate.claim(.dictation) else {
             dictationHistoryMessage = "Meeting capture is active. Stop it before re-transcribing."
             return
@@ -1967,6 +1996,7 @@ final class AppModel {
         capturedInsertionTarget = nil
         capturedPasteTarget = nil
         capturedInsertionTargetName = nil
+        resetCorrectionLearningState()
         transcriber.clear()
         rawDictationText = ""
         clearLocalTransformUndo()
@@ -2030,6 +2060,7 @@ final class AppModel {
 
     func restoreDictation(_ entry: DictationHistoryEntry, useRawText: Bool = false) {
         guard !audio.isRunning, !isFinalizingDictation, !transcriber.isFinalizing else { return }
+        resetCorrectionLearningState()
         cancelPendingDictationHistorySave()
         let restoredText = useRawText ? (entry.rawText ?? entry.text) : entry.text
         transcriber.replaceText(restoredText)
@@ -2055,12 +2086,21 @@ final class AppModel {
     func restoreRawTranscript() {
         guard !audio.isRunning, !isFinalizingDictation, !transcriber.isFinalizing,
               !rawDictationText.isEmpty else { return }
-        editCurrentDictation(rawDictationText)
+        editCurrentDictation(rawDictationText, offersCorrectionLearning: false)
     }
 
-    func editCurrentDictation(_ text: String) {
+    func editCurrentDictation(_ text: String, offersCorrectionLearning: Bool = true) {
         guard !audio.isRunning, !isFinalizingDictation, !transcriber.isRunning,
               !transcriber.isFinalizing, transcriber.text != text else { return }
+        if offersCorrectionLearning {
+            if correctionLearningSourceText == nil { correctionLearningSourceText = transcriber.text }
+            correctionLearningSuggestion = DictationCorrectionLearning.suggestion(
+                from: correctionLearningSourceText ?? "", to: text)
+            correctionLearningFeedback = nil
+            learnedCorrectionTermForUndo = nil
+        } else {
+            resetCorrectionLearningState()
+        }
         transcriber.replaceText(text)
         didInsertCurrentDictation = false
         insertion.clearUndoRecord()
@@ -2068,8 +2108,56 @@ final class AppModel {
         scheduleCurrentDictationSave()
     }
 
+    func learnCurrentCorrectionSuggestion() {
+        guard let suggestion = correctionLearningSuggestion else { return }
+        let term = suggestion.corrected.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !term.isEmpty, !term.contains(","), !term.contains(where: \.isNewline) else { return }
+        var terms = DictationVocabulary.terms(from: dictationTerms)
+        if terms.contains(where: { $0.compare(term, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame }) {
+            correctionLearningFeedback = "“\(term)” is already in your vocabulary."
+            correctionLearningSuggestion = nil
+            correctionLearningSourceText = nil
+            return
+        }
+        terms.append(term)
+        let encoded = DictationVocabulary.encode(terms)
+        guard encoded.utf8.count <= DictationAppProfile.maximumCustomizationBytes else {
+            correctionLearningFeedback = "Your vocabulary is full. Remove a term before adding this one."
+            correctionLearningSuggestion = nil
+            correctionLearningSourceText = nil
+            return
+        }
+        dictationTerms = encoded
+        learnedCorrectionTermForUndo = term
+        correctionLearningSuggestion = nil
+        correctionLearningSourceText = nil
+        correctionLearningFeedback = "Added “\(term)” to your on-device vocabulary."
+    }
+
+    func dismissCorrectionLearningSuggestion() {
+        resetCorrectionLearningState()
+    }
+
+    func undoCorrectionLearning() {
+        guard let term = learnedCorrectionTermForUndo else { return }
+        let terms = DictationVocabulary.terms(from: dictationTerms).filter {
+            $0.compare(term, options: [.caseInsensitive, .diacriticInsensitive]) != .orderedSame
+        }
+        dictationTerms = DictationVocabulary.encode(terms)
+        correctionLearningFeedback = "Removed “\(term)” from your vocabulary."
+        learnedCorrectionTermForUndo = nil
+    }
+
+    private func resetCorrectionLearningState() {
+        correctionLearningSourceText = nil
+        correctionLearningSuggestion = nil
+        correctionLearningFeedback = nil
+        learnedCorrectionTermForUndo = nil
+    }
+
     func clearCurrentDictation() {
         guard !audio.isRunning, !isFinalizingDictation, !transcriber.isFinalizing else { return }
+        resetCorrectionLearningState()
         cancelPendingDictationHistorySave()
         transcriber.clear()
         capturedInsertionTarget = nil
@@ -2091,7 +2179,16 @@ final class AppModel {
     func requestFunctionKeyAccessibilityAccess() {
         let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
         _ = AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary)
+        refreshAccessibilityState()
+        startAccessibilityWatcher()
+    }
+
+    func refreshAccessibilityState() {
+        let trusted = AXIsProcessTrusted()
         refreshFunctionKeyStatus()
+        if trusted && !insertion.isEnabled {
+            insertion.restore()
+        }
     }
 
     @discardableResult
@@ -2133,6 +2230,9 @@ final class AppModel {
 
     private func startDictation() async {
         guard !isFinalizingDictation, !transcriber.isFinalizing else { return }
+        if !insertion.isEnabled && AXIsProcessTrusted() {
+            refreshAccessibilityState()
+        }
         guard !meetingNotes.isStarting, !meetingNotes.isCapturing, !meetingNotes.isFinalizing else {
             insertion.report("Meeting capture is active. Stop it before starting dictation.")
             return
@@ -2377,6 +2477,7 @@ final class AppModel {
         let recognizedBy: DictationEngine = lastRecognitionUsedParakeet ? .parakeet : .appleSpeech
         finishingAudioOverride = nil
         lastRecognitionUsedParakeet = false
+        resetCorrectionLearningState()
         let isRetranscribing = retranscribingDictationID != nil
         rawDictationText = rawText
         // Phrases already typed live stay as typed; only what's left is cleaned up and typed now.
@@ -2437,6 +2538,9 @@ final class AppModel {
             dictationNotice = notice
         } else {
             retainedAudio.reset()
+            if !insertion.isEnabled && AXIsProcessTrusted() {
+                refreshAccessibilityState()
+            }
             insertion.logFocus("finish hasTarget=\(dictationHasTarget)")
             if dictationHasTarget {
                 await typeFinishedDictation(finished)
@@ -2690,6 +2794,9 @@ final class AppModel {
     /// No text field had focus when dictation began. If one has focus now, because the person
     /// clicked into it while talking, type there; otherwise the card stays up with Copy.
     private func typeIntoFieldFocusedNow(_ text: String) async -> Bool {
+        if !insertion.isEnabled && AXIsProcessTrusted() {
+            refreshAccessibilityState()
+        }
         guard insertion.isEnabled, !didInsertCurrentDictation, !text.isEmpty,
               let app = NSWorkspace.shared.frontmostApplication,
               app.processIdentifier != NSRunningApplication.current.processIdentifier,
@@ -3383,6 +3490,12 @@ final class AppModel {
     func openPrivacySettings(_ privacy: DictationNotice.Privacy) {
         guard let url = privacy.settingsURL else { return }
         NSWorkspace.shared.open(url)
+    }
+
+    /// Opens Accessibility settings in Privacy & Security.
+    func openAccessibilitySettings() {
+        startAccessibilityWatcher()
+        openPrivacySettings(.accessibility)
     }
 
     /// Opens the input tab of Sound settings, for a muted or missing microphone.

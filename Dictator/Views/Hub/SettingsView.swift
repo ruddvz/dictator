@@ -351,14 +351,64 @@ private struct InsertionSettings: View {
         @Bindable var model = model
         @Bindable var insertion = model.insertion
         let enabled = Binding(get: { insertion.isEnabled },
-                              set: { $0 ? insertion.enable() : insertion.disable() })
+                              set: { value in
+                                  if value {
+                                      insertion.enable()
+                                      if !insertion.isEnabled {
+                                          model.requestFunctionKeyAccessibilityAccess()
+                                          model.openAccessibilitySettings()
+                                      }
+                                  } else {
+                                      insertion.disable()
+                                  }
+                              })
+
+        if !insertion.accessibilityAvailable {
+            VStack(alignment: .leading, spacing: Theme.s2) {
+                HStack(spacing: Theme.s2) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(Theme.danger)
+                        .font(.system(size: 14))
+                    Text("Accessibility permission required")
+                        .font(.hkHeadline)
+                        .foregroundStyle(Theme.ink)
+                }
+                Text("macOS requires Accessibility access so Dictator can type and paste text where your cursor is.")
+                    .font(.hkBody)
+                    .foregroundStyle(Theme.ink2)
+                Text("If Dictator is already in the Accessibility list, toggle it OFF and then ON, or remove it with “−” and re-add “/Applications/Dictator.app” with “+” to refresh permissions.")
+                    .font(.hkCaption)
+                    .foregroundStyle(Theme.ink3)
+                HStack(spacing: Theme.s2) {
+                    Button("Open Accessibility Settings") {
+                        model.openAccessibilitySettings()
+                    }
+                    .buttonStyle(PrimaryButtonStyle(tint: Theme.signal, foreground: Theme.paper))
+                    Button("Check access") {
+                        model.requestFunctionKeyAccessibilityAccess()
+                        insertion.enable()
+                        model.refreshAccessibilityState()
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
+                }
+                .padding(.top, Theme.s1)
+            }
+            .padding(Theme.s3)
+            .surface(.outlined)
+            .task {
+                while !Task.isCancelled && !insertion.accessibilityAvailable {
+                    model.refreshAccessibilityState()
+                    try? await Task.sleep(for: .seconds(1))
+                }
+            }
+        }
 
         SettingsGroup(title: "Typing into other apps",
                       footer: "Password fields are always skipped. Dictator only types into the field you started in.") {
             SettingsRow(title: "Type where your cursor is", detail: "Dictation goes straight into the text box you’re in.") {
                 RowToggle(isOn: enabled, label: "Type into the focused field")
             }
-            SettingsRow(title: "Paste when typing is blocked", detail: "Checks the field when possible. Codex may need you to confirm an unverified paste.") {
+            SettingsRow(title: "Paste when typing is blocked", detail: "Checks the field when possible. Sends paste when web or Electron editors hide their controls.") {
                 RowToggle(isOn: $insertion.allowsPasteFallback, label: "Paste if typing fails")
             }
             .disabled(!insertion.isEnabled)

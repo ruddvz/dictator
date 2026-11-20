@@ -1204,6 +1204,15 @@ final class SafetyAndStorageTests: XCTestCase {
         XCTAssertEqual(DictationVocabulary.encode([" Maya ", "", "Dictator"]), "Maya\nDictator")
     }
 
+    func testCorrectionLearningOnlySuggestsOneDistinctiveWordReplacement() {
+        XCTAssertEqual(
+            DictationCorrectionLearning.suggestion(from: "Open Whispr is ready", to: "Open Whisper is ready"),
+            DictationCorrectionLearningSuggestion(recognized: "Whispr", corrected: "Whisper"))
+        XCTAssertNil(DictationCorrectionLearning.suggestion(from: "the tool is ready", to: "a tool is ready"))
+        XCTAssertNil(DictationCorrectionLearning.suggestion(from: "Open Whispr today", to: "Open Whisper tomorrow"))
+        XCTAssertNil(DictationCorrectionLearning.suggestion(from: "Open Whispr", to: "Open Whisper now"))
+    }
+
     func testWordListImportMergesDeduplicatesAndSkipsOverlongTerms() throws {
         let longTerm = String(repeating: "x", count: DictationWordList.maximumTermLength + 1)
         let data = Data("\u{FEFF}Kubernetes, dictator\r\nCafé\n\ncafe\n\(longTerm)\nPostgres\n".utf8)

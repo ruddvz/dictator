@@ -28,11 +28,13 @@ struct DictationNotice: Equatable {
     enum Privacy: Equatable {
         case microphone
         case speechRecognition
+        case accessibility
 
         var settingsURL: URL? {
             switch self {
             case .microphone: URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")
             case .speechRecognition: URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_SpeechRecognition")
+            case .accessibility: URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
             }
         }
     }
@@ -102,6 +104,10 @@ enum DictationRecovery {
         case .speechRecognition:
             DictationNotice(kind: .permission(.speechRecognition), message: "Allow speech recognition",
                             detail: "Turn on Dictator under Privacy & Security › Speech Recognition, then dictate again. Recognition stays on this Mac.",
+                            canRetry: false, canPasteAgain: false)
+        case .accessibility:
+            DictationNotice(kind: .permission(.accessibility), message: "Allow Accessibility",
+                            detail: "Turn on Dictator under Privacy & Security › Accessibility, then dictate again to insert at your cursor.",
                             canRetry: false, canPasteAgain: false)
         }
     }

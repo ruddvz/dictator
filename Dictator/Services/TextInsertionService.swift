@@ -206,6 +206,18 @@ final class TextInsertionService {
         enable(prompting: false)
     }
 
+    var isAccessibilityTrusted: Bool { AXIsProcessTrusted() }
+
+    @discardableResult
+    func promptForAccessibility() -> Bool {
+        let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
+        let trusted = AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary)
+        if trusted {
+            enable(prompting: false)
+        }
+        return trusted
+    }
+
     func enable(prompting: Bool = true) {
         let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
         let trusted = AXIsProcessTrustedWithOptions([promptKey: prompting] as CFDictionary)
@@ -420,13 +432,17 @@ final class TextInsertionService {
         exposeWebContent(of: app)
         let name = app.localizedName ?? "the app"
         guard let focused = focusedElement(expectedProcessIdentifier: app.processIdentifier) else {
-            if Self.allowsUnverifiedCodexPaste(bundleIdentifier: app.bundleIdentifier,
-                                               frontmostBundleIdentifier: NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
-                                               pasteFallbackEnabled: allowsPasteFallback,
-                                               focusedControlWasRejected: descendantFocusWasRejected) {
-                return await pasteToUnexposedCodexField(text, app: app)
+            if Self.allowsUnverifiedTargetPaste(bundleIdentifier: app.bundleIdentifier,
+                                                frontmostBundleIdentifier: NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+                                                pasteFallbackEnabled: allowsPasteFallback,
+                                                focusedControlWasRejected: descendantFocusWasRejected) {
+                return await pasteToUnexposedAppField(text, app: app)
             }
             status = "Nothing has focus in \(name). Nothing was pasted."
+            return false
+        }
+        guard !isPasswordElement(focused) else {
+            status = "Password fields are skipped. Nothing was pasted."
             return false
         }
         var pid: pid_t = 0
@@ -436,12 +452,20 @@ final class TextInsertionService {
         var ancestor: CFTypeRef?
         let hasEditableAncestor = AXUIElementCopyAttributeValue(
             focused, "AXEditableAncestor" as CFString, &ancestor) == .success && ancestor != nil
-        guard AXUIElementGetPid(focused, &pid) == .success, pid == app.processIdentifier,
-              !isPasswordElement(focused),
-              Self.allowsUnverifiedPaste(role: stringAttribute(kAXRoleAttribute, of: focused) ?? "",
-                                         subrole: stringAttribute(kAXSubroleAttribute, of: focused) ?? "",
-                                         selectedTextSettable: selectedTextSettable,
-                                         hasEditableAncestor: hasEditableAncestor) else {
+        let role = stringAttribute(kAXRoleAttribute, of: focused) ?? ""
+        let subrole = stringAttribute(kAXSubroleAttribute, of: focused) ?? ""
+        let isFocusedApp = AXUIElementGetPid(focused, &pid) == .success && pid == app.processIdentifier
+
+        if !isFocusedApp || !Self.allowsUnverifiedPaste(role: role,
+                                                       subrole: subrole,
+                                                       selectedTextSettable: selectedTextSettable,
+                                                       hasEditableAncestor: hasEditableAncestor) {
+            if Self.allowsUnverifiedTargetPaste(bundleIdentifier: app.bundleIdentifier,
+                                                frontmostBundleIdentifier: NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+                                                pasteFallbackEnabled: allowsPasteFallback,
+                                                focusedControlWasRejected: false) {
+                return await pasteToUnexposedAppField(text, app: app)
+            }
             status = "No text box is focused in \(name). Nothing was pasted."
             return false
         }
@@ -464,26 +488,31 @@ final class TextInsertionService {
         return true
     }
 
-    private func pasteToUnexposedCodexField(_ text: String, app: NSRunningApplication) async -> Bool {
+    private func pasteToUnexposedAppField(_ text: String, app: NSRunningApplication) async -> Bool {
         guard NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier else {
-            status = "Codex is no longer frontmost. Nothing was pasted."
+            status = "\(app.localizedName ?? "The target app") is no longer frontmost. Nothing was pasted."
             return false
         }
         let pasteboard = NSPasteboard.general
         let saved = ClipboardSnapshot(pasteboard)
         let ours = ClipboardSnapshot.placeTransient(text, on: pasteboard)
+        let name = app.localizedName ?? "the app"
         guard Self.postCommandV() else {
             _ = saved.restore(to: pasteboard, ifChangeCountIs: ours)
-            status = "The paste shortcut could not be sent to Codex. Nothing was inserted."
+            status = "The paste shortcut could not be sent to \(name). Nothing was inserted."
             return false
         }
         try? await Task.sleep(for: Self.unverifiedPasteRestoreDelay)
         let restored = saved.restore(to: pasteboard, ifChangeCountIs: ours)
         let clipboard = restored ? "Your clipboard was put back." : "The clipboard changed meanwhile, so it was left as is."
-        status = "Paste sent to the frontmost Codex window; Dictator could not verify the focused field. Check the composer before retrying. \(clipboard)"
+        status = "Paste sent to \(name); Dictator could not verify the focused field. Check the field before retrying. \(clipboard)"
         lastDeliveryVerified = false
-        log.notice("sent unverified paste to frontmost Codex window; Accessibility focus was unavailable")
+        log.notice("sent unverified paste to frontmost app (\(app.bundleIdentifier ?? "unknown", privacy: .public)); Accessibility focus was unexposed")
         return true
+    }
+
+    private func pasteToUnexposedCodexField(_ text: String, app: NSRunningApplication) async -> Bool {
+        await pasteToUnexposedAppField(text, app: app)
     }
 
     nonisolated static let unverifiedPasteRestoreDelay: Duration = .milliseconds(500)
@@ -499,12 +528,33 @@ final class TextInsertionService {
         return isSupportedTextTarget(role: role, subrole: subrole) || selectedTextSettable || hasEditableAncestor
     }
 
+    nonisolated static func allowsUnverifiedTargetPaste(bundleIdentifier: String?,
+                                                        frontmostBundleIdentifier: String?,
+                                                        pasteFallbackEnabled: Bool,
+                                                        focusedControlWasRejected: Bool = false) -> Bool {
+        guard pasteFallbackEnabled, !focusedControlWasRejected,
+              let bundleIdentifier, let frontmostBundleIdentifier,
+              bundleIdentifier == frontmostBundleIdentifier,
+              bundleIdentifier != "com.ruddvz.dictator" else { return false }
+        let excludedBundles: Set<String> = [
+            "com.apple.finder",
+            "com.apple.dock",
+            "com.apple.SystemSettings",
+            "com.apple.systempreferences",
+            "com.apple.loginwindow",
+            "com.apple.WindowManager"
+        ]
+        return !excludedBundles.contains(bundleIdentifier)
+    }
+
     nonisolated static func allowsUnverifiedCodexPaste(bundleIdentifier: String?,
                                                         frontmostBundleIdentifier: String?,
                                                         pasteFallbackEnabled: Bool,
                                                         focusedControlWasRejected: Bool = false) -> Bool {
-        pasteFallbackEnabled && !focusedControlWasRejected && bundleIdentifier == "com.openai.codex" &&
-            frontmostBundleIdentifier == "com.openai.codex"
+        allowsUnverifiedTargetPaste(bundleIdentifier: bundleIdentifier,
+                                    frontmostBundleIdentifier: frontmostBundleIdentifier,
+                                    pasteFallbackEnabled: pasteFallbackEnabled,
+                                    focusedControlWasRejected: focusedControlWasRejected)
     }
 
     /// Whether a readable, non-password field is in front and eligible for verified paste.

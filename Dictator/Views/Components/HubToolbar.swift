@@ -242,11 +242,19 @@ struct Notice: Identifiable {
             })
         }
         if !model.insertion.isEnabled {
+            let needsAccess = !model.insertion.accessibilityAvailable
             notices.append(Notice(id: "insertion", kind: .attention, icon: .cursor,
-                                  title: "Typing into apps is off",
-                                  detail: "macOS Accessibility is separate. Enable Dictator's typing switch to insert at your cursor.",
-                                  action: "Enable typing") { model in
-                model.insertion.enable()
+                                  title: needsAccess ? "Accessibility permission needed" : "Typing into apps is off",
+                                  detail: needsAccess
+                                    ? "Allow Dictator in System Settings → Privacy & Security → Accessibility to type into your apps."
+                                    : "macOS Accessibility is separate. Enable Dictator's typing switch to insert at your cursor.",
+                                  action: needsAccess ? "Open Settings" : "Enable typing") { model in
+                if needsAccess {
+                    model.requestFunctionKeyAccessibilityAccess()
+                    model.openAccessibilitySettings()
+                } else {
+                    model.insertion.enable()
+                }
                 guard !model.insertion.isEnabled else { return }
                 UserDefaults.standard.set(SettingsView.Section.insertion.rawValue, forKey: "settingsSection")
                 model.screen = .settings

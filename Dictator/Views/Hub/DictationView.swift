@@ -178,6 +178,45 @@ struct DictationView: View {
 
             transcriptEditor
 
+            if let suggestion = model.correctionLearningSuggestion {
+                HStack(spacing: Theme.s3) {
+                    VStack(alignment: .leading, spacing: Theme.s1) {
+                        Text("Learn this correction?")
+                            .font(.hkControl.weight(.semibold))
+                        Text("“\(suggestion.recognized)” → “\(suggestion.corrected)” · only the corrected word is saved on this Mac")
+                            .font(.hkCaption)
+                            .foregroundStyle(Theme.ink2)
+                            .lineLimit(2)
+                    }
+                    Spacer(minLength: Theme.s2)
+                    Button("Add word") { model.learnCurrentCorrectionSuggestion() }
+                        .buttonStyle(SecondaryButtonStyle())
+                    Button { model.dismissCorrectionLearningSuggestion() } label: {
+                        Image(systemName: "xmark")
+                    }
+                    .buttonStyle(IconButtonStyle())
+                    .accessibilityLabel("Dismiss vocabulary suggestion")
+                }
+                .padding(.horizontal, Theme.s3)
+                .padding(.vertical, Theme.s2)
+                .background(Theme.well, in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            } else if let feedback = model.correctionLearningFeedback {
+                HStack(spacing: Theme.s2) {
+                    Text(feedback)
+                        .font(.hkCaption)
+                        .foregroundStyle(Theme.ink2)
+                    Spacer(minLength: Theme.s2)
+                    if model.canUndoCorrectionLearning {
+                        Button("Undo") { model.undoCorrectionLearning() }
+                            .buttonStyle(SecondaryButtonStyle())
+                    }
+                }
+                .padding(.horizontal, Theme.s3)
+                .padding(.vertical, Theme.s2)
+                .transition(.opacity)
+            }
+
             HStack(spacing: Theme.s2) {
                 Button("Insert", icon: .insert) { model.insertDictationText() }
                     .buttonStyle(PrimaryButtonStyle())
@@ -204,6 +243,7 @@ struct DictationView: View {
         }
         .card(padding: Theme.s4, style: .outlined)
         .animation(Theme.snappy, value: model.audio.isRunning)
+        .animation(Theme.snappy, value: model.correctionLearningSuggestion)
     }
 
     private var modeMenu: some View {

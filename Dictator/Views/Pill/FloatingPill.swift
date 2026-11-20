@@ -797,9 +797,10 @@ struct FloatingPillView: View {
     /// finishing with Copy and close.
     private var transcriptCard: some View {
         let hint: String? = if case .finished(let value) = cardState { value } else { nil }
+        let needsAccessibility = !model.insertion.accessibilityAvailable
         let shownHint = model.didInsertCurrentDictation
             ? (model.insertion.lastDeliveryVerified ? "Inserted" : "Paste sent — check the field")
-            : (model.insertion.isEnabled ? hint : "Typing into apps is off")
+            : (model.insertion.isEnabled ? hint : (needsAccessibility ? "Accessibility needed to type" : "Typing into apps is off"))
         let isSuccess = model.didInsertCurrentDictation && model.insertion.lastDeliveryVerified
         return VStack(alignment: .leading, spacing: Theme.s2) {
             HStack(spacing: Theme.s2) {
@@ -847,7 +848,14 @@ struct FloatingPillView: View {
                     .help("Try the active text field once more")
                 }
                 if !model.insertion.isEnabled {
-                    Button("Turn on typing") {
+                    Button(needsAccessibility ? "Fix Accessibility" : "Turn on typing") {
+                        if needsAccessibility {
+                            model.requestFunctionKeyAccessibilityAccess()
+                            model.openAccessibilitySettings()
+                        } else {
+                            model.insertion.enable()
+                            model.refreshAccessibilityState()
+                        }
                         UserDefaults.standard.set(SettingsView.Section.insertion.rawValue, forKey: "settingsSection")
                         model.screen = .settings
                         NSApp.activate(ignoringOtherApps: true)
@@ -856,7 +864,7 @@ struct FloatingPillView: View {
                     .buttonStyle(.plain)
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(Theme.signal)
-                    .help("Turn on typing into the focused text box")
+                    .help(needsAccessibility ? "Grant Dictator Accessibility access in System Settings" : "Turn on typing into the focused text box")
                 }
                 Spacer()
                 Button {

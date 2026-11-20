@@ -324,6 +324,52 @@ enum DictationCorrectionRules {
     }
 }
 
+struct DictationCorrectionLearningSuggestion: Equatable {
+    let recognized: String
+    let corrected: String
+}
+
+/// Offers learning only for a single explicit, user-made word replacement.
+/// It never saves transcript text or learns automatically.
+enum DictationCorrectionLearning {
+    private static let commonWords: Set<String> = [
+        "about", "after", "again", "also", "and", "any", "are", "back", "because", "been",
+        "before", "being", "but", "can", "could", "did", "does", "doing", "down", "each",
+        "even", "few", "for", "from", "get", "got", "had", "has", "have", "her", "here",
+        "him", "his", "how", "into", "just", "know", "like", "make", "many", "more", "most",
+        "much", "must", "near", "need", "new", "not", "now", "off", "old", "once", "only",
+        "other", "our", "out", "over", "own", "same", "should", "some", "such", "than", "that",
+        "the", "their", "them", "then", "there", "these", "they", "this", "those", "through",
+        "too", "under", "until", "very", "want", "was", "way", "were", "what", "when", "where",
+        "which", "while", "who", "why", "will", "with", "would", "you", "your"
+    ]
+
+    static func suggestion(from original: String, to edited: String) -> DictationCorrectionLearningSuggestion? {
+        let before = words(in: original)
+        let after = words(in: edited)
+        guard before.count == after.count, !before.isEmpty else { return nil }
+
+        var changed: (String, String)?
+        for (old, new) in zip(before, after) where !equivalent(old, new) {
+            guard changed == nil else { return nil }
+            changed = (old, new)
+        }
+        guard let (recognized, corrected) = changed,
+              recognized.count >= 3, corrected.count >= 3,
+              !commonWords.contains(recognized.lowercased()),
+              !commonWords.contains(corrected.lowercased()) else { return nil }
+        return DictationCorrectionLearningSuggestion(recognized: recognized, corrected: corrected)
+    }
+
+    private static func words(in text: String) -> [String] {
+        text.components(separatedBy: CharacterSet.alphanumerics.inverted).filter { !$0.isEmpty }
+    }
+
+    private static func equivalent(_ lhs: String, _ rhs: String) -> Bool {
+        lhs.compare(rhs, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+    }
+}
+
 enum DictationSnippetExpander {
     private struct Match {
         let range: NSRange

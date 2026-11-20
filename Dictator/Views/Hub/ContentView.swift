@@ -406,6 +406,10 @@ private struct SetupChecklist: View {
                                 request(permission)
                                 return
                             }
+                            if step.settingsSection == .insertion && !model.insertion.accessibilityAvailable {
+                                model.requestFunctionKeyAccessibilityAccess()
+                                model.openAccessibilitySettings()
+                            }
                             if let section = step.settingsSection {
                                 UserDefaults.standard.set(section.rawValue, forKey: "settingsSection")
                             }
@@ -447,6 +451,8 @@ private struct SetupChecklist: View {
             let outcome: LocalPermissionOutcome = switch permission {
             case .microphone: await LocalPermissionAccess.microphone()
             case .speechRecognition: await LocalPermissionAccess.speechRecognition()
+            case .accessibility:
+                AXIsProcessTrusted() ? .authorized : .denied
             }
             refresh()
             if outcome == .denied || outcome == .restricted {

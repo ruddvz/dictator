@@ -55,6 +55,14 @@ final class UnverifiedPasteGateTests: XCTestCase {
             bundleIdentifier: "com.openai.codex",
             frontmostBundleIdentifier: "com.openai.codex",
             pasteFallbackEnabled: true))
+        XCTAssertTrue(TextInsertionService.allowsUnverifiedTargetPaste(
+            bundleIdentifier: "com.google.antigravity",
+            frontmostBundleIdentifier: "com.google.antigravity",
+            pasteFallbackEnabled: true))
+        XCTAssertTrue(TextInsertionService.allowsUnverifiedTargetPaste(
+            bundleIdentifier: "com.google.Chrome",
+            frontmostBundleIdentifier: "com.google.Chrome",
+            pasteFallbackEnabled: true))
         XCTAssertFalse(TextInsertionService.allowsUnverifiedCodexPaste(
             bundleIdentifier: "com.openai.codex",
             frontmostBundleIdentifier: "com.openai.codex",
