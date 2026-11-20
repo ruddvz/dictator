@@ -1,5 +1,11 @@
 # Dictator progress
 
+## Completed — visual README showcase and live captures (2026-11-20)
+
+- Rebuilt the README around Dictator's local-first product story, with custom 3D hero artwork, a looping motion graphic, and live captures of the Home screen and floating control.
+- Cropped the Home capture to omit personal transcript history. Checked all repository-relative README links against the current tree.
+- Next fresh task: capture the remaining product screens with clean demo data and add official distribution links when they are ready.
+
 ## Completed — public README and installation guidance (2026-11-20)
 
 - Reworked the README into a public-facing overview with verified features, requirements, first-run steps, privacy and permission notes, developer setup, CI, and support links.
