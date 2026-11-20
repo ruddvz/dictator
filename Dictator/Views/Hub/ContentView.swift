@@ -366,7 +366,7 @@ private struct SetupChecklist: View {
             steps.append(Step(title: "Allow speech recognition", isDone: speechGranted,
                               opens: .dictation, permission: .speechRecognition))
         }
-        steps.append(Step(title: "Turn on typing", isDone: model.insertion.isEnabled,
+        steps.append(Step(title: "Enable typing into apps", isDone: model.insertion.isEnabled,
                           opens: .settings, settingsSection: .insertion))
         steps.append(Step(title: "Finish a first dictation", isDone: model.didCompleteFirstDictation,
                           opens: .dictation))

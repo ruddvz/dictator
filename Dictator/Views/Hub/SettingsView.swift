@@ -195,7 +195,7 @@ private struct ShortcutSettings: View {
                             }
                             .buttonStyle(PrimaryButtonStyle())
                         }
-                        Button("Check again") { model.refreshFunctionKeyStatus() }
+                        Button("Check access") { model.requestFunctionKeyAccessibilityAccess() }
                             .buttonStyle(SecondaryButtonStyle())
                     }
                 }

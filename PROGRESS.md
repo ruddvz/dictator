@@ -1,5 +1,12 @@
 # Dictator progress
 
+## Duplicate app cleanup and Accessibility recovery (2026-11-20)
+
+- Kept `/Users/rudra/Projects/Dictator/dist/Dictator.app` as the canonical app. Spotlight now returns only that app. Moved the old `HushKey.app` and generated build app copies to a dated folder in Trash, ejected the mounted third-party Hushkey disk image, and unregistered 23 stale Launch Services entries. No app data or history was removed.
+- The screenshot also showed Dictator's separate **Typing into apps** preference was off. Updated onboarding and the Home notice to explain this is separate from macOS Accessibility. Home now offers **Check access**, polls while access is missing, prompts for the current app's Accessibility grant, and reinstalls the global key monitor whenever trust changes.
+- **Verification:** 373 passed, 8 skipped, 0 failed; `git diff --check` passed. The updated Release package is waiting on macOS Keychain authorization for the `Dictator Local Signing` private key before its final signature.
+- **Still open:** confirm `AXIsProcessTrusted()` becomes true after the canonical app is re-opened, then enable Dictator's typing preference and verify one insertion into a blank Codex composer. Stale TCC rows may still need removal in System Settings if they remain after the app entries are unregistered.
+
 ## Dictator rebrand and project-wide polish (2026-11-20)
 
 - Rebranded the app, Xcode project/scheme, bundle identifier, assets, scripts, and source tree to **Dictator**. Renamed the GitHub repository to `ruddvz/dictator`, updated `origin`, and pushed the changes. Added migration for prior HushKey preferences, app data, and session recordings so existing local work carries forward without overwriting newer Dictator data.

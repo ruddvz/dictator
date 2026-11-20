@@ -29,6 +29,13 @@ struct DictationView: View {
             }
             .animation(Theme.gentle, value: showsComposer)
         }
+        .task(id: model.dictationShortcutNeedsAttention) {
+            guard model.dictationShortcutNeedsAttention else { return }
+            while !Task.isCancelled && model.dictationShortcutNeedsAttention {
+                model.refreshFunctionKeyStatus()
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
         .onDisappear { reader.stop() }
         .scrollIndicators(.automatic)
         .confirmationDialog(!model.dictationHistoryArchiveUnreadable
@@ -58,6 +65,9 @@ struct DictationView: View {
                         .foregroundStyle(Theme.finishing)
                         .fixedSize(horizontal: false, vertical: true)
                     if problemIsAccessibility {
+                        Button("Check access") { model.requestFunctionKeyAccessibilityAccess() }
+                            .buttonStyle(SecondaryButtonStyle())
+                            .controlSize(.small)
                         Button("Open Settings") {
                             NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
                         }
@@ -570,8 +580,8 @@ private struct NextStepRow: View {
         let candidates: [Step] = [
             model.insertion.isEnabled ? nil : Step(
                 id: "insertion", title: "Type straight into any app",
-                detail: "Turn on typing and finished dictations land where your cursor is.",
-                action: "Turn on typing") { model in
+                detail: "macOS Accessibility is separate. Enable Dictator's typing switch to insert at your cursor.",
+                action: "Enable typing") { model in
                     UserDefaults.standard.set(SettingsView.Section.insertion.rawValue, forKey: "settingsSection")
                     model.screen = .settings
                 },

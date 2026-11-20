@@ -2088,6 +2088,12 @@ final class AppModel {
         _ = insertion.requestAccessibilityAccessForContext()
     }
 
+    func requestFunctionKeyAccessibilityAccess() {
+        let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
+        _ = AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary)
+        refreshFunctionKeyStatus()
+    }
+
     @discardableResult
     func saveDictationAppProfile(appName: String, bundleIdentifier: String, mode: DictationMode,
                                  vocabulary: String, languageIdentifier: String? = nil,
@@ -3166,14 +3172,15 @@ final class AppModel {
     func refreshFunctionKeyStatus() {
         guard dictationShortcut.usesFunctionKey else { return }
         let trusted = AXIsProcessTrusted()
-        if trusted, !functionKeyInstalledTrusted {
-            // Monitors added before access was granted stay deaf, so add them again.
+        if trusted != functionKeyInstalledTrusted {
+            // A monitor created before access was granted stays deaf. Recreate it on both
+            // permission transitions so revoking and granting access again cannot leave a stale monitor.
             functionKey.uninstall()
-            functionKey.install()
-            functionKeyInstalledTrusted = true
+            if trusted { functionKey.install() }
+            functionKeyInstalledTrusted = trusted
         }
         if !trusted {
-            dictationShortcutStatus = "Could not watch the fn key yet. Allow Dictator in Accessibility settings."
+            dictationShortcutStatus = "Accessibility isn't active for this Dictator copy. Enable it in System Settings, then check again."
         } else if let conflict = Self.globeKeyConflict {
             dictationShortcutStatus = "Set “Press 🌐 key to” to Do Nothing in Keyboard settings. It currently \(conflict)."
         } else {
