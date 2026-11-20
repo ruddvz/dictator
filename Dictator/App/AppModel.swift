@@ -669,7 +669,7 @@ final class AppModel {
         installDictationShortcut()
         installSelectedTextEditShortcut()
         installPasteLastShortcut()
-        insertion.restore()
+        insertion.restore(promptIfUntrusted: true)
         pruneDictationHistory()
         updateMotionActivity()
         syncCaptureMode()
