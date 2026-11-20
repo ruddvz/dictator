@@ -14,7 +14,7 @@ Dictator turns speech into editable text on your Mac. Dictate anywhere, transcri
 
 ### Ready-to-use app
 
-There is **no signed, notarized Mac download or Mac App Store listing yet**. The [GitHub Releases page](https://github.com/ruddvz/dictator/releases) currently has no installer. Until an official release is published, the repository is source code; the build below is intended for developers and testers.
+There is **no signed, notarized Mac app published in this repository**, and no Mac App Store listing is linked here. The [GitHub Releases page](https://github.com/ruddvz/dictator/releases) currently has no installer. Until an official release is published, the repository is source code; the build below is intended for developers and testers.
 
 ### Build from source
 
@@ -84,7 +84,7 @@ xcodegen generate
 xcodebuild -project Dictator.xcodeproj -scheme Dictator -derivedDataPath .build CODE_SIGNING_ALLOWED=NO test
 ```
 
-GitHub Actions runs the same build and tests on macOS. The repository also includes a local dictation evaluation script at `./Scripts/eval.sh`; see [the evaluation guide](docs/eval/README.md) for fixtures and setup.
+GitHub Actions runs the same build and tests on macOS. The repository also includes a local dictation evaluation script at `./Scripts/eval.sh`; see [the evaluation guide](Fixtures/eval/README.md) for fixtures and setup.
 
 ## Help, attribution, and license
 
