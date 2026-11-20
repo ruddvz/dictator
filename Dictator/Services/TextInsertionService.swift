@@ -637,14 +637,8 @@ final class TextInsertionService {
         }
         down.flags = .maskCommand
         up.flags = .maskCommand
-        if let pid {
-            down.postToPid(pid)
-            up.postToPid(pid)
-        }
         down.post(tap: .cghidEventTap)
         up.post(tap: .cghidEventTap)
-        down.post(tap: .cgSessionEventTap)
-        up.post(tap: .cgSessionEventTap)
         return true
     }
 
