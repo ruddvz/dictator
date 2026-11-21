@@ -48,7 +48,7 @@ identity="$(security find-identity -v -p codesigning 2>/dev/null | awk '/"Dictat
 signed=0
 if [[ -n "${DICTATOR_SIGNING_IDENTITY:-}" ]]; then
   codesign --force --deep --sign "$DICTATOR_SIGNING_IDENTITY" --timestamp=none "$staged_app" && signed=1 || true
-elif [[ -n "$identity" && "${DICTATOR_USE_LOCAL_IDENTITY:-0}" == "1" ]]; then
+elif [[ -n "$identity" ]]; then
   codesign --force --deep --sign "$identity" --timestamp=none "$staged_app" 2>/dev/null && signed=1 || true
 fi
 
