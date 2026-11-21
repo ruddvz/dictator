@@ -389,11 +389,11 @@ struct FileTranscriptionView: View {
 
     private func chooseFile() {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.audio]
+        panel.allowedContentTypes = [.audio, .movie, .quickTimeMovie, .mpeg4Movie]
         panel.allowsOtherFileTypes = true
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
-        panel.prompt = "Choose Audio"
+        panel.prompt = "Choose Recording"
         if panel.runModal() == .OK, let url = panel.url {
             selectFile(url)
         }

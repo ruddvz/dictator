@@ -499,7 +499,7 @@ enum DictationSnippetExpander {
         return segments
     }
 
-    /// Expands dynamic tags like {date}, {time}, {datetime}, {iso}, and {clipboard}.
+    /// Expands dynamic tags like {date}, {time}, {datetime}, {iso}, {year}, {month}, {day}, {weekday}, {uuid}, and {clipboard}.
     static func expandDynamicVariables(in template: String, now: Date = Date()) -> String {
         guard template.contains("{") else { return template }
         var result = template
@@ -525,6 +525,29 @@ enum DictationSnippetExpander {
             let formatter = ISO8601DateFormatter()
             formatter.formatOptions = [.withFullDate]
             result = result.replacingOccurrences(of: "{iso}", with: formatter.string(from: now))
+        }
+        if result.contains("{year}") {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy"
+            result = result.replacingOccurrences(of: "{year}", with: formatter.string(from: now))
+        }
+        if result.contains("{month}") {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "MMMM"
+            result = result.replacingOccurrences(of: "{month}", with: formatter.string(from: now))
+        }
+        if result.contains("{day}") {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "d"
+            result = result.replacingOccurrences(of: "{day}", with: formatter.string(from: now))
+        }
+        if result.contains("{weekday}") {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "EEEE"
+            result = result.replacingOccurrences(of: "{weekday}", with: formatter.string(from: now))
+        }
+        if result.contains("{uuid}") {
+            result = result.replacingOccurrences(of: "{uuid}", with: UUID().uuidString.lowercased())
         }
         if result.contains("{clipboard}") {
             let clip = NSPasteboard.general.string(forType: .string) ?? ""

@@ -303,6 +303,8 @@ final class TextInsertionService {
         }
 
         // Direct AX typing was not possible or AX is untrusted: paste directly into the front app
+        // only if an AX mutation wasn't already accepted.
+        guard !requiresReviewAfterInsertion else { return false }
         Task { await pasteDirectly(text, into: app) }
         return true
     }
@@ -639,23 +641,25 @@ final class TextInsertionService {
 
     private static func postCommandV(to pid: pid_t? = nil) -> Bool {
         guard AXIsProcessTrusted() else { return false }
-        let source = CGEventSource(stateID: .combinedSessionState)
+        let source = CGEventSource(stateID: .hidSystemState) ?? CGEventSource(stateID: .combinedSessionState)
         guard let source,
-              let down = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: true),
-              let up = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: false) else {
+              let cmdDown = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_Command), keyDown: true),
+              let vDown = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: true),
+              let vUp = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: false),
+              let cmdUp = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_Command), keyDown: false) else {
             return false
         }
-        down.flags = .maskCommand
-        up.flags = .maskCommand
-        if let pid, pid > 0 {
-            down.postToPid(pid)
-            usleep(25_000)
-            up.postToPid(pid)
-        } else {
-            down.post(tap: .cghidEventTap)
-            usleep(25_000)
-            up.post(tap: .cghidEventTap)
-        }
+        cmdDown.flags = .maskCommand
+        vDown.flags = .maskCommand
+        vUp.flags = .maskCommand
+        cmdUp.flags = []
+
+        // Universal HID posting: routes via WindowServer directly to the active focused window & helper/renderer process
+        cmdDown.post(tap: .cghidEventTap)
+        vDown.post(tap: .cghidEventTap)
+        usleep(30_000)
+        vUp.post(tap: .cghidEventTap)
+        cmdUp.post(tap: .cghidEventTap)
         return true
     }
 
@@ -786,8 +790,8 @@ final class TextInsertionService {
     nonisolated static func directInsertionVerification(originalValue: String,
                                                         expectedValue: String,
                                                         observedValue: String) -> DirectInsertionVerification {
-        if observedValue == expectedValue { return .verified }
-        if observedValue == originalValue { return .unchanged }
+        if PasteDeliveryVerifier.matches(observedValue, expectedValue) { return .verified }
+        if PasteDeliveryVerifier.matches(observedValue, originalValue) { return .unchanged }
         return .changedUnexpectedly
     }
 
@@ -1080,18 +1084,27 @@ final class TextInsertionService {
             status = "The focused app declined safe insertion. Nothing was inserted."
             return false
         }
-        guard let observedValue = stringAttribute(kAXValueAttribute, of: currentElement) else {
-            undoRecord = nil
-            requiresReviewAfterInsertion = true
-            lastDeliveryVerified = false
-            status = "Dictator sent the text, but could not read it back to confirm. Check the field before retrying to avoid a duplicate."
-            return false
+        var observedValue = stringAttribute(kAXValueAttribute, of: currentElement)
+        var verification = observedValue.map {
+            Self.directInsertionVerification(originalValue: currentValue, expectedValue: expectedValue, observedValue: $0)
+        } ?? .changedUnexpectedly
+
+        // In asynchronous UI frameworks (Electron, WebKit, Catalyst, NSTextView with delegate formatting),
+        // the accessibility value attribute updates slightly after AXUIElementSetAttributeValue returns.
+        // Poll briefly before determining outcome.
+        if verification != .verified {
+            for _ in 0..<4 {
+                usleep(25_000)
+                guard let latest = stringAttribute(kAXValueAttribute, of: currentElement) else { break }
+                observedValue = latest
+                verification = Self.directInsertionVerification(originalValue: currentValue, expectedValue: expectedValue, observedValue: latest)
+                if verification == .verified { break }
+            }
         }
-        switch Self.directInsertionVerification(originalValue: currentValue,
-                                                expectedValue: expectedValue,
-                                                observedValue: observedValue) {
+
+        switch verification {
         case .verified:
-            if let possibleUndo, Self.fingerprint(observedValue) == possibleUndo.expectedFingerprint {
+            if let possibleUndo, let observedValue, Self.fingerprint(observedValue) == possibleUndo.expectedFingerprint {
                 undoRecord = possibleUndo
                 status = "Inserted and verified in the focused field. Press ⌥⇧U now to undo while it stays focused and unchanged."
             } else {
@@ -1101,7 +1114,11 @@ final class TextInsertionService {
             return true
         case .unchanged:
             undoRecord = nil
-            status = "The focused field did not change. Nothing was inserted."
+            // AXUIElementSetAttributeValue returned .success, so text was accepted by the element.
+            // Mark requiresReviewAfterInsertion so callers do NOT blindly fall back to Cmd+V (which would type duplicates).
+            requiresReviewAfterInsertion = true
+            lastDeliveryVerified = false
+            status = "Dictator sent the text via Accessibility, but could not confirm the field updated. Check the field before typing again."
             return false
         case .changedUnexpectedly:
             undoRecord = nil
@@ -1210,11 +1227,11 @@ enum PasteDeliveryVerifier {
     /// Whether a field shows the same text, as a reader would see it. Chromium editors report a
     /// typed space as a non-breaking space, add a newline for an empty paragraph, and may carry
     /// zero-width characters, none of which the pasted text contains.
-    static func matches(_ observed: String, _ expected: String) -> Bool {
+    nonisolated static func matches(_ observed: String, _ expected: String) -> Bool {
         observed == expected || normalized(observed) == normalized(expected)
     }
 
-    static func normalized(_ value: String) -> String {
+    nonisolated static func normalized(_ value: String) -> String {
         value
             .replacingOccurrences(of: "\u{00A0}", with: " ")
             .replacingOccurrences(of: "\u{200B}", with: "")

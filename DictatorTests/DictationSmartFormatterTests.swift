@@ -91,4 +91,67 @@ final class DictationSmartFormatterTests: XCTestCase {
         XCTAssertFalse(expanded.contains("{time}"))
         XCTAssertFalse(expanded.contains("{iso}"))
     }
+
+    func testGlobalCurrencies() {
+        XCTAssertEqual(DictationSmartFormatter.formatCurrencies("Pay fifty rupees."),
+                       "Pay ₹50.")
+        XCTAssertEqual(DictationSmartFormatter.formatCurrencies("Costs twenty canadian dollars."),
+                       "Costs CA$20.")
+        XCTAssertEqual(DictationSmartFormatter.formatCurrencies("Costs twenty australian dollars."),
+                       "Costs A$20.")
+        XCTAssertEqual(DictationSmartFormatter.formatCurrencies("Price is twenty swiss francs."),
+                       "Price is CHF 20.")
+    }
+
+    func testEmails() {
+        XCTAssertEqual(DictationSmartFormatter.formatEmails("Send to john dot doe at gmail dot com please."),
+                       "Send to john.doe@gmail.com please.")
+        XCTAssertEqual(DictationSmartFormatter.formatEmails("Email support at apple dot com for help."),
+                       "Email support@apple.com for help.")
+        XCTAssertEqual(DictationSmartFormatter.formatEmails("Reach me at john underscore doe at company dot org."),
+                       "Reach me at john_doe@company.org.")
+    }
+
+    func testURLs() {
+        XCTAssertEqual(DictationSmartFormatter.formatURLs("Visit https colon slash slash github dot com slash ruddvz."),
+                       "Visit https://github.com/ruddvz.")
+        XCTAssertEqual(DictationSmartFormatter.formatURLs("Check out www dot google dot com today."),
+                       "Check out www.google.com today.")
+        XCTAssertEqual(DictationSmartFormatter.formatURLs("Go to github dot com slash ruddvz slash dictator."),
+                       "Go to github.com/ruddvz/dictator.")
+    }
+
+    func testDates() {
+        XCTAssertEqual(DictationSmartFormatter.formatDates("Event is on July fourth twenty twenty six."),
+                       "Event is on July 4, 2026.")
+        XCTAssertEqual(DictationSmartFormatter.formatDates("Party on December twenty fifth."),
+                       "Party on December 25th.")
+        XCTAssertEqual(DictationSmartFormatter.formatDates("Starting January first."),
+                       "Starting January 1st.")
+    }
+
+    func testOrdinals() {
+        XCTAssertEqual(DictationSmartFormatter.formatOrdinals("This is the twenty first century."),
+                       "This is the 21st century.")
+        XCTAssertEqual(DictationSmartFormatter.formatOrdinals("He finished thirty second in line."),
+                       "He finished 32nd in line.")
+        XCTAssertEqual(DictationSmartFormatter.formatOrdinals("Our hundredth user registered."),
+                       "Our 100th user registered.")
+    }
+
+    func testDynamicSnippetExpansionExtended() {
+        let fixedDate = Date(timeIntervalSince1970: 1700000000)
+        let template = "{year}/{month}/{day}/{weekday}/{uuid}"
+        let expanded = DictationSnippetExpander.expandDynamicVariables(in: template, now: fixedDate)
+        XCTAssertFalse(expanded.contains("{year}"))
+        XCTAssertFalse(expanded.contains("{month}"))
+        XCTAssertFalse(expanded.contains("{day}"))
+        XCTAssertFalse(expanded.contains("{weekday}"))
+        XCTAssertFalse(expanded.contains("{uuid}"))
+        let parts = expanded.split(separator: "/")
+        XCTAssertEqual(parts.count, 5)
+        XCTAssertEqual(parts[0], "2023")
+        XCTAssertEqual(parts[1], "November")
+        XCTAssertEqual(parts[4].split(separator: "-").count, 5)
+    }
 }

@@ -44,6 +44,10 @@ enum DictationSmartFormatter {
     static func format(_ text: String) -> String {
         guard !text.isEmpty else { return text }
         var result = text
+        result = formatEmails(result)
+        result = formatURLs(result)
+        result = formatDates(result)
+        result = formatOrdinals(result)
         result = formatClockTimes(result)
         result = formatCurrencies(result)
         result = formatPercentages(result)
@@ -173,11 +177,15 @@ enum DictationSmartFormatter {
             result.replaceSubrange(wholeRange, with: String(format: "$0.%02d", val))
         }
 
-        // 5. Euros, Pounds, Yen
+        // 5. Euros, Pounds, Yen, Rupees, Canadian Dollars, Australian Dollars, Swiss Francs
         let currencySymbols: [(pattern: String, symbol: String)] = [
             (#"(?:euros?)"#, "€"),
             (#"(?:pounds?)"#, "£"),
-            (#"(?:yen)"#, "¥")
+            (#"(?:yen)"#, "¥"),
+            (#"(?:rupees?|inr)"#, "₹"),
+            (#"(?:canadian\s+dollars?|cad)"#, "CA$"),
+            (#"(?:australian\s+dollars?|aud)"#, "A$"),
+            (#"(?:swiss\s+francs?|chf)"#, "CHF ")
         ]
         for (pattern, symbol) in currencySymbols {
             let regex = try! NSRegularExpression(pattern: #"(?i)\b("# + amountPattern + #")\s+"# + pattern + #"\b"#)
@@ -432,5 +440,222 @@ enum DictationSmartFormatter {
             }
         }
         return nil
+    }
+
+    /// Formats spoken email addresses like "john dot doe at gmail dot com" -> "john.doe@gmail.com".
+    static func formatEmails(_ text: String) -> String {
+        var result = text
+        let localToken = #"[a-zA-Z0-9]+"#
+        let separatorToken = #"(?:dot|\.|dash|-|hyphen|underscore|_)"#
+        let localPartPattern = #"(?:"# + localToken + #"(?:\s+"# + separatorToken + #"\s+"# + localToken + #")*)"#
+        let domainToken = #"[a-zA-Z0-9-]+"#
+        let domainPartPattern = #"(?:"# + domainToken + #"(?:\s+dot\s+"# + domainToken + #")+)"#
+
+        let emailRegex = try! NSRegularExpression(
+            pattern: #"(?i)\b("# + localPartPattern + #")\s+at\s+("# + domainPartPattern + #")\b"#)
+
+        for match in emailRegex.matches(in: result, range: NSRange(result.startIndex..., in: result)).reversed() {
+            guard let wholeRange = Range(match.range, in: result),
+                  let localRange = Range(match.range(at: 1), in: result),
+                  let domainRange = Range(match.range(at: 2), in: result) else { continue }
+            let local = String(result[localRange])
+                .replacingOccurrences(of: #"(?i)\s+dot\s+"#, with: ".", options: .regularExpression)
+                .replacingOccurrences(of: #"(?i)\s+dash\s+"#, with: "-", options: .regularExpression)
+                .replacingOccurrences(of: #"(?i)\s+hyphen\s+"#, with: "-", options: .regularExpression)
+                .replacingOccurrences(of: #"(?i)\s+underscore\s+"#, with: "_", options: .regularExpression)
+                .replacingOccurrences(of: " ", with: "")
+            let domain = String(result[domainRange])
+                .replacingOccurrences(of: #"(?i)\s+dot\s+"#, with: ".", options: .regularExpression)
+                .replacingOccurrences(of: " ", with: "")
+            result.replaceSubrange(wholeRange, with: "\(local)@\(domain)")
+        }
+        return result
+    }
+
+    /// Formats spoken URLs like "https colon slash slash github dot com" -> "https://github.com",
+    /// "www dot google dot com" -> "www.google.com".
+    static func formatURLs(_ text: String) -> String {
+        var result = text
+        // 1. Spoken scheme: "https colon slash slash" -> "https://", "http colon slash slash" -> "http://"
+        result = result.replacingOccurrences(
+            of: #"(?i)\b(https?)\s+colon\s+slash\s+slash\s+"#,
+            with: "$1://",
+            options: .regularExpression)
+
+        // 2. "www dot ..." -> "www.domain.com"
+        let domainToken = #"[a-zA-Z0-9-]+(?:\s+dot\s+[a-zA-Z0-9-]+)+"#
+        let wwwRegex = try! NSRegularExpression(pattern: #"(?i)\bwww\s+dot\s+("# + domainToken + #")\b"#)
+        for match in wwwRegex.matches(in: result, range: NSRange(result.startIndex..., in: result)).reversed() {
+            guard let wholeRange = Range(match.range, in: result),
+                  let domainRange = Range(match.range(at: 1), in: result) else { continue }
+            let domain = String(result[domainRange])
+                .replacingOccurrences(of: #"(?i)\s+dot\s+"#, with: ".", options: .regularExpression)
+                .replacingOccurrences(of: " ", with: "")
+            result.replaceSubrange(wholeRange, with: "www.\(domain)")
+        }
+
+        // 3. Scheme-prefixed domains: "https://github dot com slash ruddvz" -> "https://github.com/ruddvz"
+        let schemeRegex = try! NSRegularExpression(
+            pattern: #"(?i)(https?://)([a-zA-Z0-9-]+(?:\s+dot\s+[a-zA-Z0-9-]+)+)((?:\s+slash\s+[a-zA-Z0-9._~%-]+)*)"#)
+        for match in schemeRegex.matches(in: result, range: NSRange(result.startIndex..., in: result)).reversed() {
+            guard let wholeRange = Range(match.range, in: result),
+                  let schemeRange = Range(match.range(at: 1), in: result),
+                  let domainRange = Range(match.range(at: 2), in: result) else { continue }
+            let scheme = String(result[schemeRange]).lowercased()
+            let domain = String(result[domainRange])
+                .replacingOccurrences(of: #"(?i)\s+dot\s+"#, with: ".", options: .regularExpression)
+                .replacingOccurrences(of: " ", with: "")
+            var path = ""
+            if match.range(at: 3).location != NSNotFound, let pathRange = Range(match.range(at: 3), in: result) {
+                path = String(result[pathRange])
+                    .replacingOccurrences(of: #"(?i)\s+slash\s+"#, with: "/", options: .regularExpression)
+                    .replacingOccurrences(of: " ", with: "")
+            }
+            result.replaceSubrange(wholeRange, with: "\(scheme)\(domain)\(path)")
+        }
+
+        // 4. Common standalone domains: "github dot com" -> "github.com"
+        let tlds = #"(?:com|org|net|io|co|ai|app|dev|edu|gov|uk|ca|de|in|me)"#
+        let standaloneDomainRegex = try! NSRegularExpression(
+            pattern: #"(?i)\b([a-zA-Z0-9-]{2,})\s+dot\s+("# + tlds + #")((?:\s+slash\s+[a-zA-Z0-9._~%-]+)*)\b"#)
+        for match in standaloneDomainRegex.matches(in: result, range: NSRange(result.startIndex..., in: result)).reversed() {
+            guard let wholeRange = Range(match.range, in: result),
+                  let nameRange = Range(match.range(at: 1), in: result),
+                  let tldRange = Range(match.range(at: 2), in: result) else { continue }
+            let name = String(result[nameRange]).lowercased()
+            let tld = String(result[tldRange]).lowercased()
+            var path = ""
+            if match.range(at: 3).location != NSNotFound, let pathRange = Range(match.range(at: 3), in: result) {
+                path = String(result[pathRange])
+                    .replacingOccurrences(of: #"(?i)\s+slash\s+"#, with: "/", options: .regularExpression)
+                    .replacingOccurrences(of: " ", with: "")
+            }
+            result.replaceSubrange(wholeRange, with: "\(name).\(tld)\(path)")
+        }
+
+        return result
+    }
+
+    /// Formats spoken calendar dates like "July fourth twenty twenty six" -> "July 4, 2026",
+    /// "December twenty fifth" -> "December 25th", "January first" -> "January 1st".
+    static func formatDates(_ text: String) -> String {
+        var result = text
+        let monthNames = #"(?:January|February|March|April|May|June|July|August|September|October|November|December)"#
+        let ordinalWords: [String: (day: Int, suffix: String)] = [
+            "first": (1, "1st"), "1st": (1, "1st"),
+            "second": (2, "2nd"), "2nd": (2, "2nd"),
+            "third": (3, "3rd"), "3rd": (3, "3rd"),
+            "fourth": (4, "4th"), "4th": (4, "4th"),
+            "fifth": (5, "5th"), "5th": (5, "5th"),
+            "sixth": (6, "6th"), "6th": (6, "6th"),
+            "seventh": (7, "7th"), "7th": (7, "7th"),
+            "eighth": (8, "8th"), "8th": (8, "8th"),
+            "ninth": (9, "9th"), "9th": (9, "9th"),
+            "tenth": (10, "10th"), "10th": (10, "10th"),
+            "eleventh": (11, "11th"), "11th": (11, "11th"),
+            "twelfth": (12, "12th"), "12th": (12, "12th"),
+            "thirteenth": (13, "13th"), "13th": (13, "13th"),
+            "fourteenth": (14, "14th"), "14th": (14, "14th"),
+            "fifteenth": (15, "15th"), "15th": (15, "15th"),
+            "sixteenth": (16, "16th"), "16th": (16, "16th"),
+            "seventeenth": (17, "17th"), "17th": (17, "17th"),
+            "eighteenth": (18, "18th"), "18th": (18, "18th"),
+            "nineteenth": (19, "19th"), "19th": (19, "19th"),
+            "twentieth": (20, "20th"), "20th": (20, "20th"),
+            "twenty first": (21, "21st"), "twenty-first": (21, "21st"), "21st": (21, "21st"),
+            "twenty second": (22, "22nd"), "twenty-second": (22, "22nd"), "22nd": (22, "22nd"),
+            "twenty third": (23, "23rd"), "twenty-third": (23, "23rd"), "23rd": (23, "23rd"),
+            "twenty fourth": (24, "24th"), "twenty-fourth": (24, "24th"), "24th": (24, "24th"),
+            "twenty fifth": (25, "25th"), "twenty-fifth": (25, "25th"), "25th": (25, "25th"),
+            "twenty sixth": (26, "26th"), "twenty-sixth": (26, "26th"), "26th": (26, "26th"),
+            "twenty seventh": (27, "27th"), "twenty-seventh": (27, "27th"), "27th": (27, "27th"),
+            "twenty eighth": (28, "28th"), "twenty-eighth": (28, "28th"), "28th": (28, "28th"),
+            "twenty ninth": (29, "29th"), "twenty-ninth": (29, "29th"), "29th": (29, "29th"),
+            "thirtieth": (30, "30th"), "30th": (30, "30th"),
+            "thirty first": (31, "31st"), "thirty-first": (31, "31st"), "31st": (31, "31st")
+        ]
+
+        let ordinalPattern = #"(?:thirty[-\s]+first|twenty[-\s]+(?:ninth|eighth|seventh|sixth|fifth|fourth|third|second|first)|thirtieth|twentieth|nineteenth|eighteenth|seventeenth|sixteenth|fifteenth|fourteenth|thirteenth|twelfth|eleventh|tenth|ninth|eighth|seventh|sixth|fifth|fourth|third|second|first|\d{1,2}(?:st|nd|rd|th)?)"#
+
+        // 1. Month + Day + Year: "July fourth twenty twenty six" -> "July 4, 2026", "July 4th 2026" -> "July 4, 2026"
+        let yearPattern = #"(?:20\d{2}|19\d{2}|twenty\s+(?:twenty[-\s]+[a-z]+|thirty[-\s]+[a-z]+|twenty|thirty))"#
+        let fullDateRegex = try! NSRegularExpression(
+            pattern: #"(?i)\b("# + monthNames + #")\s+("# + ordinalPattern + #")(?:\s*,)?\s+("# + yearPattern + #")\b"#)
+        for match in fullDateRegex.matches(in: result, range: NSRange(result.startIndex..., in: result)).reversed() {
+            guard let wholeRange = Range(match.range, in: result),
+                  let mRange = Range(match.range(at: 1), in: result),
+                  let dRange = Range(match.range(at: 2), in: result),
+                  let yRange = Range(match.range(at: 3), in: result) else { continue }
+            let month = String(result[mRange]).capitalized
+            let dayKey = String(result[dRange]).lowercased().trimmingCharacters(in: .whitespaces)
+            let yearStr = String(result[yRange]).lowercased()
+            guard let dayInfo = ordinalWords[dayKey] ?? Int(dayKey).map({ ($0, "\($0)") }),
+                  dayInfo.day >= 1 && dayInfo.day <= 31 else { continue }
+            let yearVal: Int
+            if let y = Int(yearStr) {
+                yearVal = y
+            } else if let parsed = parseYearWords(yearStr) {
+                yearVal = parsed
+            } else {
+                continue
+            }
+            result.replaceSubrange(wholeRange, with: "\(month) \(dayInfo.day), \(yearVal)")
+        }
+
+        // 2. Month + Day: "December twenty fifth" -> "December 25th", "January first" -> "January 1st"
+        let monthDayRegex = try! NSRegularExpression(
+            pattern: #"(?i)\b("# + monthNames + #")\s+("# + ordinalPattern + #")\b"#)
+        for match in monthDayRegex.matches(in: result, range: NSRange(result.startIndex..., in: result)).reversed() {
+            guard let wholeRange = Range(match.range, in: result),
+                  let mRange = Range(match.range(at: 1), in: result),
+                  let dRange = Range(match.range(at: 2), in: result) else { continue }
+            let month = String(result[mRange]).capitalized
+            let dayKey = String(result[dRange]).lowercased().trimmingCharacters(in: .whitespaces)
+            guard let dayInfo = ordinalWords[dayKey] else { continue }
+            result.replaceSubrange(wholeRange, with: "\(month) \(dayInfo.suffix)")
+        }
+
+        return result
+    }
+
+    private static func parseYearWords(_ text: String) -> Int? {
+        let lower = text.lowercased()
+        if lower == "twenty twenty six" || lower == "twenty twenty-six" { return 2026 }
+        if lower == "twenty twenty five" || lower == "twenty twenty-five" { return 2025 }
+        if lower == "twenty twenty seven" || lower == "twenty twenty-seven" { return 2027 }
+        if lower == "twenty twenty four" || lower == "twenty twenty-four" { return 2024 }
+        if lower == "twenty thirty" { return 2030 }
+        return nil
+    }
+
+    /// Formats compound spoken ordinals: "twenty first" -> "21st", "thirty second" -> "32nd", "hundredth" -> "100th".
+    static func formatOrdinals(_ text: String) -> String {
+        var result = text
+        let compoundOrdinals: [(pattern: String, replacement: String)] = [
+            (#"(?i)\btwenty[-\s]+first\b"#, "21st"),
+            (#"(?i)\btwenty[-\s]+second\b"#, "22nd"),
+            (#"(?i)\btwenty[-\s]+third\b"#, "23rd"),
+            (#"(?i)\btwenty[-\s]+fourth\b"#, "24th"),
+            (#"(?i)\btwenty[-\s]+fifth\b"#, "25th"),
+            (#"(?i)\btwenty[-\s]+sixth\b"#, "26th"),
+            (#"(?i)\btwenty[-\s]+seventh\b"#, "27th"),
+            (#"(?i)\btwenty[-\s]+eighth\b"#, "28th"),
+            (#"(?i)\btwenty[-\s]+ninth\b"#, "29th"),
+            (#"(?i)\bthirtieth\b"#, "30th"),
+            (#"(?i)\bthirty[-\s]+first\b"#, "31st"),
+            (#"(?i)\bthirty[-\s]+second\b"#, "32nd"),
+            (#"(?i)\bfortieth\b"#, "40th"),
+            (#"(?i)\bfiftieth\b"#, "50th"),
+            (#"(?i)\bsixtieth\b"#, "60th"),
+            (#"(?i)\bseventieth\b"#, "70th"),
+            (#"(?i)\beightieth\b"#, "80th"),
+            (#"(?i)\bninetieth\b"#, "90th"),
+            (#"(?i)\bhundredth\b"#, "100th")
+        ]
+
+        for (pattern, replacement) in compoundOrdinals {
+            result = result.replacingOccurrences(of: pattern, with: replacement, options: .regularExpression)
+        }
+        return result
     }
 }

@@ -1,5 +1,30 @@
 # Dictator progress
 
+## Polish & Insertion Resiliency: Universal Keystroke Delivery, Anti-Duplication & Competitor Features (2026-11-21)
+
+- **Root Cause & Fix for Electron/Chromium Target Ingestion & Duplication:**
+  1. *Universal HID Command+V Injection (`TextInsertionService.swift`):*
+     - Replaced direct PID targeting (`postToPid(pid)`) with universal `.cghidEventTap` synthesis. In Chromium and Electron applications (Antigravity, Codex, VS Code, Slack, ChatGPT desktop), the application process ID belongs to the main browser process, whereas DOM/Monaco editors run in helper renderer processes (`Helper (Renderer)`). Direct PID Mach messaging bypassed WindowServer routing and was dropped, resulting in the false-positive "✓ Pasted into Antigravity" notice while the text field stayed empty.
+     - Upgraded `postCommandV` to emit the complete `cmdDown` (virtualKey 55, flags `.maskCommand`) → `vDown` (virtualKey 9, flags `.maskCommand`) → 30ms dwell time → `vUp` → `cmdUp` sequence to `.cghidEventTap`, ensuring universal hardware-level routing through WindowServer to whichever key window and renderer child process has focus.
+  2. *Asynchronous Verification & Anti-Duplication Safeguards (`TextInsertionService.swift`):*
+     - In asynchronous UI frameworks, `AXUIElementSetAttributeValue` accepts the string immediately while the text field's `kAXValueAttribute` updates asynchronously on subsequent runloop turns. `performInsertion` previously returned `.unchanged` instantaneously, causing `typeFinishedDictation` to fall back to a second Cmd+V paste on top of the text already inserted.
+     - Added asynchronous verification polling (up to 100ms) with normalized matching (`PasteDeliveryVerifier.matches`) to tolerate non-breaking spaces and whitespace variations.
+     - Once `AXUIElementSetAttributeValue` returns `.success`, `requiresReviewAfterInsertion` is asserted if unconfirmed, strictly preventing automatic Cmd+V fallback and eliminating duplicate or tripled pastes.
+  3. *Smart Formatter Expansions (`DictationSmartFormatter.swift`):*
+     - **Spoken Email Normalization:** Converts spoken addresses (`"john dot doe at gmail dot com"` → `"john.doe@gmail.com"`, `"support at apple dot com"` → `"support@apple.com"`, `"john underscore doe at company dot org"` → `"john_doe@company.org"`).
+     - **Spoken URL Normalization:** Converts spoken URLs (`"https colon slash slash github dot com slash ruddvz"` → `"https://github.com/ruddvz"`, `"www dot google dot com"` → `"www.google.com"`, `"github dot com slash ruddvz slash dictator"` → `"github.com/ruddvz/dictator"`).
+     - **Spoken Calendar Dates:** Converts spoken dates with years (`"July fourth twenty twenty six"` → `"July 4, 2026"`) and without years (`"December twenty fifth"` → `"December 25th"`, `"January first"` → `"January 1st"`).
+     - **Spoken Ordinals:** Converts compound spoken ordinals (`"twenty first"` → `"21st"`, `"thirty second"` → `"32nd"`, `"hundredth"` → `"100th"`).
+     - **Global Currencies:** Added Indian Rupee (`"fifty rupees"` → `"₹50"`), Canadian Dollar (`"twenty canadian dollars"` → `"CA$20"`), Australian Dollar (`"twenty australian dollars"` → `"A$20"`), and Swiss Franc (`"twenty swiss francs"` → `"CHF 20"`).
+  4. *Dynamic Personalization Snippets (`DictationCustomization.swift`):*
+     - Added `{year}`, `{month}`, `{day}`, `{weekday}`, and `{uuid}` variables to `DictationSnippetExpander.expandDynamicVariables`.
+  5. *Video File Transcription (`FileTranscriptionView.swift`):*
+     - Updated file selection dialog `panel.allowedContentTypes = [.audio, .movie, .quickTimeMovie, .mpeg4Movie]` and prompt to `"Choose Recording"`, enabling seamless transcription of `.mov`, `.mp4`, `.m4v` recordings and webinars alongside audio files.
+- **Verification:**
+  - Automated test suite: **397 passed, 8 skipped, 0 failures** (up from 391 passed).
+  - Code signed with `Authority=Dictator Local Signing` and verified deep strict signature.
+  - Installed release build to `/Applications/Dictator.app` and verified live operation.
+
 ## Resolution: Empty Paste False-Positive & Persistent Signing (2026-11-20)
 
 - **Root Cause Analysis & Fix:**
