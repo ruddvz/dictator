@@ -7,6 +7,7 @@
 3. [Critique and improvement roadmap](../CRITIQUE_AND_ROADMAP.md) — critiques of Wispr Flow, TypeWhisper, and Dictator; what AirPods motion can and cannot sense; the layered quiet-input plan (gestures, speaking confirmation, whisper boost, silent commands); and measurable checks.
 4. [Dictation alternatives research (1 November 2026)](../COMPETITOR_RESEARCH_ADDENDUM_2026-11-01.md) — analysis of FreeFlow, OpenWhispr, OpenTypeless, SpeakType, and the supplied roundups, with Dictator recommendations and source links.
 5. [Open-source dictation landscape (4 November 2026)](OPEN_SOURCE_LANDSCAPE_2026-11-04.md) — dimastatz/whisper-flow plus 20 newer open-source apps (FluidVoice, VoiceInk, Ghost Pepper, Muesli, Pindrop, yap, Talkify…), licences, and the ranked list of gaps Dictator should build.
+6. [English dictation model update (21 November 2026)](models/english-dictation-model-update-2026.md) — current FluidAudio/Parakeet releases, community comparisons, English evidence, and the single streaming model selected for evaluation.
 
 ## Audits and working notes
 
