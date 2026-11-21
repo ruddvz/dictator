@@ -528,7 +528,7 @@ final class TextInsertionService {
         await pasteToUnexposedAppField(text, app: app)
     }
 
-    nonisolated static let unverifiedPasteRestoreDelay: Duration = .milliseconds(500)
+    nonisolated static let unverifiedPasteRestoreDelay: Duration = .milliseconds(2500)
 
     /// Whether an element that can't be read back still looks like somewhere to type: a text role,
     /// a settable selection, or (Chromium) an editable ancestor. Never a password field.
@@ -610,7 +610,7 @@ final class TextInsertionService {
             self.pasteObservation(target: target, in: app)
         }
         if verification != .confirmed {
-            try? await Task.sleep(for: .milliseconds(80))
+            try? await Task.sleep(for: Self.unverifiedPasteRestoreDelay)
         }
         let restored = saved.restore(to: pasteboard, ifChangeCountIs: ours)
         guard verification == .confirmed else {
@@ -641,25 +641,18 @@ final class TextInsertionService {
 
     private static func postCommandV(to pid: pid_t? = nil) -> Bool {
         guard AXIsProcessTrusted() else { return false }
-        let source = CGEventSource(stateID: .hidSystemState) ?? CGEventSource(stateID: .combinedSessionState)
-        guard let source,
-              let cmdDown = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_Command), keyDown: true),
-              let vDown = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: true),
-              let vUp = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: false),
-              let cmdUp = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_Command), keyDown: false) else {
+        let source = CGEventSource(stateID: .combinedSessionState)
+        guard let vDown = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: true),
+              let vUp = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: false) else {
             return false
         }
-        cmdDown.flags = .maskCommand
         vDown.flags = .maskCommand
         vUp.flags = .maskCommand
-        cmdUp.flags = []
 
         // Universal HID posting: routes via WindowServer directly to the active focused window & helper/renderer process
-        cmdDown.post(tap: .cghidEventTap)
         vDown.post(tap: .cghidEventTap)
-        usleep(30_000)
+        usleep(35_000)
         vUp.post(tap: .cghidEventTap)
-        cmdUp.post(tap: .cghidEventTap)
         return true
     }
 
@@ -1114,11 +1107,11 @@ final class TextInsertionService {
             return true
         case .unchanged:
             undoRecord = nil
-            // AXUIElementSetAttributeValue returned .success, so text was accepted by the element.
-            // Mark requiresReviewAfterInsertion so callers do NOT blindly fall back to Cmd+V (which would type duplicates).
-            requiresReviewAfterInsertion = true
+            // Direct AX selected-text was ignored by the element (e.g. Electron / Chromium / WebKit web views).
+            // The field was completely untouched, so callers can safely fall back to keyboard paste (⌘V).
+            requiresReviewAfterInsertion = false
             lastDeliveryVerified = false
-            status = "Dictator sent the text via Accessibility, but could not confirm the field updated. Check the field before typing again."
+            status = "Direct accessibility typing was not reflected in the focused control. Falling back to paste."
             return false
         case .changedUnexpectedly:
             undoRecord = nil
