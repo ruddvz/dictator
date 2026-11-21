@@ -1446,3 +1446,11 @@ Same as above, plus: start a dictation with no field focused, click into TextEdi
 - `xcodebuild -project HushKey.xcodeproj -scheme HushKey -derivedDataPath .build CODE_SIGNING_ALLOWED=NO test`: 129 passed, 2 skipped, 0 failed. Release packaging succeeded; strict signature verification passed and the updated app is open.
 - Live force-quit recovery and microphone/system-audio capture still need a user-approved session. GitHub Actions hosted jobs remain unable to start due the account payment/spending-limit restriction.
 - Next: live meeting crash-recovery and file-transcription acceptance in a user-approved session.
+
+## Completed — public README refresh (2026-11-21)
+
+- Reworked the README around Dictator’s signature hold-fn/review/copy flow, with the app icon, custom key art, visible shortcut animation, and the genuine Home screenshot.
+- Used PlayGarba’s feature-specific visual storytelling as a reference while keeping Dictator’s own Fog & sage identity and product-specific claims.
+- Clarified local privacy behavior, feature prerequisites, and how to build from source. There is no prebuilt installer yet, so the README does not advertise a store or download that is not available.
+- Documentation-only change; no app build or tests run.
+- Next: prepare a packaged macOS release when signing and distribution are ready.

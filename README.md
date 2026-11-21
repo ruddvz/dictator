@@ -1,43 +1,60 @@
-# Dictator
+<div align="center">
+  <img src="Dictator/Assets.xcassets/AppIcon.appiconset/icon_512x512.png" alt="Dictator app icon" width="88">
+  <h1>Dictator</h1>
+  <p><strong>Hold fn. Say it. Release to review.</strong><br>
+  Your voice becomes editable text, ready for wherever you write on your Mac.</p>
+  <p>
+    <a href="#build-for-mac"><img alt="Build for macOS" src="https://img.shields.io/badge/Build_for-macOS-477C67?style=for-the-badge&labelColor=20312A"></a>
+  </p>
+  <p><a href="#how-it-works">How it works</a> &nbsp;·&nbsp; <a href="#private-by-design">Privacy</a> &nbsp;·&nbsp; <a href="#build-for-mac">Build for Mac</a></p>
+</div>
 
-**Hold fn to talk. Release to review your words.**
+<p align="center">
+  <img src="docs/assets/fn-key.jpg" alt="A sculpted fn key sends a sage sound wave into a text cursor" width="512">
+</p>
 
-Dictator turns speech into editable text on your Mac. Dictate a reply, fix a name, then copy it into the app where you're writing. Apple Speech handles dictation on-device in supported languages.
+Dictator is a native macOS voice-to-text app. Speak naturally, review your words, and continue in the app where you were already writing.
 
-**[Build for Mac](#build-for-mac)** · [Try your first dictation](#try-your-first-dictation) · [Privacy](#privacy)
+<p align="center">
+  <img src="docs/assets/home-live.png" alt="Dictator Home, ready to listen. Hold fn or choose Dictate." width="512">
+</p>
+<p align="center"><sub>Dictator Home, ready to listen. Hold fn or choose Dictate.</sub></p>
 
-![A sculpted fn key with a sage sound wave leading to a text cursor](docs/assets/fn-key.jpg)
+<p align="center"><a href="docs/assets/fn-gesture.gif">▶ Play the fn shortcut illustration</a> <sub>(animated illustration)</sub></p>
 
-[Play the shortcut illustration](docs/assets/fn-gesture.gif)
+## How it works
 
-## Try your first dictation
+1. **Set up once.** Open Dictator and allow **Microphone** and **Speech Recognition** for Apple Speech. **Accessibility** enables the global shortcut and direct insertion.
+2. **Speak.** Hold **fn (Globe)** and say “The blue notebook is on the shelf.” Release the key. For hands-free dictation, press **fn** twice to start and once to stop.
+3. **Review and continue.** Read or edit the transcript in Dictator. Choose **Copy**, then paste with **⌘V** into your email, document, chat, or any other app.
 
-1. Open Dictator. In setup, allow **Microphone** and **Speech Recognition** for Apple Speech. **Accessibility** enables the global shortcut and insertion.
-2. Hold **fn** (Globe) and say “The blue notebook is on the shelf.” Release the key. For hands-free dictation, press **fn** twice to start and once to stop.
-3. In **Home**, review the transcript and choose **Copy**. Click where you want the sentence and press **⌘V**.
+You can also start from **Home** or choose another shortcut in **Settings → Shortcuts**. Direct insertion is available in **Settings → Typing** when an editable field is focused. If an app does not receive inserted text, use **Copy** in Home and paste manually.
 
-![Dictator Home showing the Hold fn and talk prompt](docs/assets/home-live.png)
+## A small toolkit for getting words right
 
-You can also start dictation from **Home** or change the key in **Settings → Shortcuts**. To try direct insertion, enable it in **Settings → Typing** and focus an editable field. If Dictator reports a paste but the field is empty, use **Copy** in Home and paste manually.
+<table>
+  <tr>
+    <td width="50%" valign="top"><strong>Vocabulary</strong><br>Teach Dictator names, preferred spellings, corrections, and reusable snippets.</td>
+    <td width="50%" valign="top"><strong>Transforms</strong><br>Shape a draft into bullets, a shorter note, or a more polished message. Apple Intelligence options require macOS 26+ and an available on-device model.</td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><strong>Audio files</strong><br>Transcribe recordings and export plain text, SRT, or WebVTT subtitles.</td>
+    <td width="50%" valign="top"><strong>Meeting notes</strong><br>Capture microphone audio, Mac audio, or both. System-audio capture requires macOS 14.2+.</td>
+  </tr>
+</table>
 
-## Writing with Dictator
+## Private by design
 
-| When you want to… | Open |
-| --- | --- |
-| Get a name right or expand a phrase you use often | **Vocabulary** for names, snippets, and corrections. |
-| Turn a rough paragraph into bullets or a shorter email | **Transforms** to review an editable draft. Apple Intelligence options require macOS 26 or later and an available on-device model. |
-| Make subtitles from a recording | **Files** to transcribe audio and export text, SRT, or WebVTT. |
-| Keep notes from a call | **Meeting notes** to capture a microphone, Mac audio, or both. System-audio capture requires macOS 14.2 or later. |
+- **On-device by default:** Apple Speech recognizes dictation locally in supported languages.
+- **Audio stays temporary:** ordinary dictation audio is held in memory while Dictator processes it.
+- **Local model choices:** optional Parakeet and WhisperKit models run on your Mac after download.
+- **Your history, your Mac:** transcript history is stored locally. Turn it off in Settings or clear saved dictations in Home.
 
-## Privacy
-
-Ordinary dictation audio stays in memory. Apple Speech recognition runs on-device, and optional Parakeet and WhisperKit models run locally after download. Dictator keeps transcript history on your Mac. You can switch history off in Settings or clear saved dictations in Home. See the [guide to backing up your data](docs/PERSONAL_DATA_BACKUP.md).
+See the [personal data and backup guide](docs/PERSONAL_DATA_BACKUP.md) for storage details.
 
 ## Build for Mac
 
-Dictator targets **macOS 14 or later**. The app is available as source. There is currently no packaged GitHub release.
-
-On a Mac with full Xcode (Swift 6.2 or later) and Homebrew installed, run these commands in Terminal. The packaging script builds and signs a local copy at `dist/Dictator.app`.
+Dictator supports **macOS 14 or later**. The repository contains the app source and packaging script; there is no prebuilt installer to download yet. To create a local `Dictator.app`, use a Mac with **full Xcode (Swift 6.2 or later)** and Homebrew:
 
 ```sh
 brew install xcodegen
@@ -47,11 +64,13 @@ cd dictator
 open dist/Dictator.app
 ```
 
-For development, run the test suite after generating the project with XcodeGen.
+For development, generate the Xcode project and run the test suite:
 
 ```sh
 xcodegen generate
 xcodebuild -project Dictator.xcodeproj -scheme Dictator -derivedDataPath .build CODE_SIGNING_ALLOWED=NO test
 ```
+
+## Explore the project
 
 [Testing guide](docs/TESTING_PROTOCOL.md) · [Evaluation fixtures](Fixtures/eval/README.md) · [MIT license](LICENSE) · [Third-party notices](NOTICE.md)
