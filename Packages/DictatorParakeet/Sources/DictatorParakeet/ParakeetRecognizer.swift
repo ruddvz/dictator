@@ -4,7 +4,9 @@ import Foundation
 
 /// NVIDIA Parakeet TDT 0.6B, run on this Mac's Neural Engine through FluidAudio's Core ML build.
 public enum ParakeetModel: String, CaseIterable, Sendable, Identifiable {
-    /// English only, and the more accurate of the two for English.
+    /// Parakeet Ultra, retained as a local alternative to benchmark against the English-only v2.
+    case englishUltra = "parakeet-ultra-coreml"
+    /// English-only model; FluidAudio currently describes v2 as the more accurate choice for English.
     case englishV2 = "parakeet-tdt-0.6b-v2"
     /// 25 European languages.
     case multilingualV3 = "parakeet-tdt-0.6b-v3"
@@ -13,6 +15,7 @@ public enum ParakeetModel: String, CaseIterable, Sendable, Identifiable {
 
     var version: AsrModelVersion {
         switch self {
+        case .englishUltra: .ultra
         case .englishV2: .v2
         case .multilingualV3: .v3
         }

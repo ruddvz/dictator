@@ -40,9 +40,20 @@ final class ParakeetDictationEngineTests: XCTestCase {
     func testEnglishDictationPrefersTheEnglishModel() {
         XCTAssertEqual(ParakeetModel.preferred(for: "en-CA"), .englishV2)
         XCTAssertEqual(ParakeetModel.preferred(for: "fr-CA"), .multilingualV3)
+        XCTAssertTrue(ParakeetModel.englishUltra.supports(localeIdentifier: "en-US"))
+        XCTAssertFalse(ParakeetModel.englishUltra.supports(localeIdentifier: "fr-FR"))
         XCTAssertTrue(ParakeetModel.multilingualV3.supports(localeIdentifier: "de-DE"))
         XCTAssertFalse(ParakeetModel.englishV2.supports(localeIdentifier: "de-DE"))
         XCTAssertFalse(ParakeetModel.multilingualV3.supports(localeIdentifier: "ja-JP"))
+    }
+
+    func testSavedEnglishV2SelectionIsPreserved() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "parakeet-\(UUID().uuidString)"))
+        defaults.set(ParakeetModel.englishV2.rawValue, forKey: ParakeetDictationEngine.modelKey)
+
+        let engine = ParakeetDictationEngine(modelRoot: root, defaults: defaults)
+        XCTAssertEqual(engine.model, .englishV2)
     }
 
     func testAMissingModelAsksForTheDownload() throws {

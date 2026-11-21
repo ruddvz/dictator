@@ -24,7 +24,8 @@ enum DictationEngine: String, CaseIterable, Identifiable {
 extension ParakeetModel {
     var title: String {
         switch self {
-        case .englishV2: "English (v2)"
+        case .englishUltra: "Ultra (English · compare)"
+        case .englishV2: "English (v2 · recommended)"
         case .multilingualV3: "25 languages (v3)"
         }
     }
@@ -32,6 +33,7 @@ extension ParakeetModel {
     /// Approximate download, measured on this Mac; the real size is shown once it's on disk.
     var approximateBytes: Int64 {
         switch self {
+        case .englishUltra: 630_000_000
         case .englishV2: 451_000_000
         case .multilingualV3: 480_000_000
         }
@@ -40,7 +42,7 @@ extension ParakeetModel {
     /// Language codes the model recognizes (two-letter, from the dictation locale).
     var languageCodes: Set<String> {
         switch self {
-        case .englishV2: ["en"]
+        case .englishUltra, .englishV2: ["en"]
         case .multilingualV3: ["bg", "hr", "cs", "da", "nl", "en", "et", "fi", "fr", "de", "el", "hu", "it",
                                "lv", "lt", "mt", "pl", "pt", "ro", "sk", "sl", "es", "sv", "ru", "uk"]
         }
@@ -52,7 +54,7 @@ extension ParakeetModel {
         return languageCodes.contains(code.lowercased())
     }
 
-    /// English dictation gets the English model; other languages the multilingual one.
+    /// English dictation stays on the English-only v2; other supported locales use v3.
     static func preferred(for localeIdentifier: String) -> ParakeetModel {
         ParakeetModel.englishV2.supports(localeIdentifier: localeIdentifier) ? .englishV2 : .multilingualV3
     }

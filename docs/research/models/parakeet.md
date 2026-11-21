@@ -33,13 +33,19 @@ FluidAudio reports that Ultra improves on v3 accuracy while staying near v3 spee
 - NVIDIA’s v2 card reports 6.05% average WER across its listed English Open-ASR-Leaderboard sets and flags that its accuracy can vary on incomplete sentences/word-for-word fragments. This score is not directly comparable with the separate Ultra results without harmonizing evaluation details. [NVIDIA v2 model card](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2)
 
 ### Inferences
-- Best next step: keep v2 as the English default until Dictator’s own holdout and live-speech evaluation shows Ultra is better; expose Ultra as an optional “higher accuracy / multilingual” candidate and test it without overwriting the known-good engine.
+- Best next step: keep v2 as the English default until Dictator’s own holdout and live-speech evaluation shows Ultra is better; expose Ultra only as an optional comparison candidate and test it without overwriting the known-good engine.
 - Do not ship Redux as the accuracy default. It is a storage-footprint option, not the strongest measured transcription option.
 - Evaluate on the target Mac and real Dictator samples: spontaneous short phrases, names, technical vocabulary, quiet speech, noisy rooms, code-switching, and the exact dictation cleanup path. Record WER/CER, insertion/deletion/substitution errors, first-use compile time, warm latency, and memory. Keep the recorded audio local and opt-in.
 
 ### Gaps
 - No fair head-to-head benchmark was found comparing Dictator’s v2 vs v3 vs Ultra with Dictator’s sample set, post-processing, and target Mac.
 - The FluidAudio benchmark uses an M5 Pro/macOS 27, which may not match the user’s device or OS; results should not be promised as user-device performance.
+
+### FluidAudio guide recheck (2026-11-20)
+
+- FluidAudio's current guide explicitly says to use v2 for English-only work because it is “a bit more accurate”; Ultra is its recommended v3-family option, not a proven v2 replacement. Its benchmark lists v2 at 2.1% average WER on LibriSpeech test-clean, while the Ultra/v3 comparison reports 2.13%/2.27% corpus WER. Since the aggregation differs, these numbers do not establish a winner between v2 and Ultra. ([FluidAudio model guide](https://github.com/FluidInference/FluidAudio/blob/main/README.md), [benchmarks](https://github.com/FluidInference/FluidAudio/blob/main/Documentation/Benchmarks.md))
+- FluidAudio also documents Parakeet Unified, a separate English-only batch/streaming manager. It reports 1.68% aggregate test-clean WER in batch and 1.79% in streaming on an M5 Pro; this is a stronger candidate for a future isolated evaluation, but Dictator's current Parakeet wrapper does not use that API. ([FluidAudio benchmarks](https://github.com/FluidInference/FluidAudio/blob/main/Documentation/Benchmarks.md), [models guide](https://github.com/FluidInference/FluidAudio/blob/main/Documentation/Models.md))
+- Dictator now targets FluidAudio 0.18.4 and keeps v2 selected by default for English. Ultra is optional, does not download automatically, and the multilingual v3 option remains available for existing users. This is based on public benchmarks, not a test of the user's voice.
 
 ## What other current FluidAudio/NVIDIA candidates are relevant?
 

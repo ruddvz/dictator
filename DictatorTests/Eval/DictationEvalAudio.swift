@@ -160,7 +160,13 @@ final class ParakeetEvalEngine: DictationEvalEngine {
         ParakeetModel.allCases.filter { $0.isDownloaded(in: installedRoot) }
     }
 
-    var name: String { "parakeet-\(model == .englishV2 ? "v2" : "v3") (on-device)" }
+    var name: String {
+        switch model {
+        case .englishUltra: "parakeet-ultra (on-device)"
+        case .englishV2: "parakeet-v2 (on-device)"
+        case .multilingualV3: "parakeet-v3 (on-device)"
+        }
+    }
 
     func unavailableReason() async -> String? {
         guard engine.isDownloaded else {

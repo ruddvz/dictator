@@ -26,6 +26,7 @@ final class ParakeetRecognizerTests: XCTestCase {
 
     func testModelFoldersMatchFluidAudioLayout() {
         let root = URL(fileURLWithPath: "/tmp/models")
+        XCTAssertEqual(ParakeetModel.englishUltra.directory(in: root).lastPathComponent, "parakeet-ultra")
         XCTAssertEqual(ParakeetModel.englishV2.directory(in: root).lastPathComponent, "parakeet-tdt-0.6b-v2")
         XCTAssertEqual(ParakeetModel.multilingualV3.directory(in: root).lastPathComponent, "parakeet-tdt-0.6b-v3")
         XCTAssertFalse(ParakeetModel.englishV2.isDownloaded(in: root.appending(path: UUID().uuidString)))

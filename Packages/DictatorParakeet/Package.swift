@@ -14,7 +14,7 @@ let package = Package(
         .library(name: "DictatorParakeet", targets: ["DictatorParakeet"])
     ],
     dependencies: [
-        .package(url: "https://github.com/FluidInference/FluidAudio.git", exact: "0.18.2", traits: [])
+        .package(url: "https://github.com/FluidInference/FluidAudio.git", exact: "0.18.4", traits: [])
     ],
     targets: [
         .target(
