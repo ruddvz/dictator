@@ -8,6 +8,16 @@
 4. [Dictation alternatives research (1 November 2026)](../COMPETITOR_RESEARCH_ADDENDUM_2026-11-01.md) — analysis of FreeFlow, OpenWhispr, OpenTypeless, SpeakType, and the supplied roundups, with Dictator recommendations and source links.
 5. [Open-source dictation landscape (4 November 2026)](OPEN_SOURCE_LANDSCAPE_2026-11-04.md) — dimastatz/whisper-flow plus 20 newer open-source apps (FluidVoice, VoiceInk, Ghost Pepper, Muesli, Pindrop, yap, Talkify…), licences, and the ranked list of gaps Dictator should build.
 
+## Audits and working notes
+
+- [Dictator product audit (20 November 2026)](audits/dictator-product-audit-2026-11-20.md) — feature inventory, positioning, and remaining validation questions.
+- [Dictator feature-gap audit](competitors/dictator-gap-audit.md) — competitor-inspired opportunities grounded in the current app behavior.
+- [Competitor notes: HeyClicky and dictation](competitors/heyclicky-and-dictation.md) — product comparison and source notes.
+- [HeyClicky research](competitors/heyclicky.md) · [Open-source projects](competitors/open-source-projects.md)
+- [Voice model versions](models/voice-model-versions.md) · [Model alternatives](models/alternatives.md) · [Parakeet](models/parakeet.md) · [Wispr Flow](models/wispr-flow.md)
+
+These notes are dated research, not a promise of feature parity or a current benchmark. Recheck source material before relying on competitor release, pricing, or licensing details.
+
 ## How the findings map to Dictator
 
 The Dictation screen implements a local-first slice of the recommendations: Natural, Message, Email, Code, and Automatic modes; app-identifier mapping for common apps; explicit spoken correction cues with raw-transcript recovery; optional transient vocabulary hints from a bounded cursor-neighborhood; conservative filler cleanup; and a guarded single-step insertion undo. Searchable snippets/vocabulary and transcript history with raw restore are available in their own workspace. **Transforms** provides review-first Apple on-device writing drafts and up to 12 user-created local styles when the model is available, with deterministic filler cleanup as a no-model option. **Transcribe files** supports Apple on-device Speech and user-downloaded WhisperKit models, with TXT/SRT/WebVTT export and searchable local transcript recovery; Dictator stores the transcript and timed cues, never the source audio. **Meeting notes** supports explicit microphone, system-audio, or combined capture, searchable local transcripts, text export, and optional on-device summary/action-item drafts.

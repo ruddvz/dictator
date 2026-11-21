@@ -22,7 +22,7 @@ No features were removed. The shared page layout still uses a 1,040 pt maximum w
 - Scrolling smoothness has not been measured. Source inspection found lazy history lists and continuous 30/60 fps animation candidates; neither proves the reported stutter or identifies its cause. A live scroll profile is still needed.
 - SRT/WebVTT exports do not apply edits from the full transcript editor to the original timed cues. This is now explicit in the UI; a separate timed-cue editing/synchronization flow would be needed to change that behavior safely.
 - Only Settings and Home received live screenshots in this pass. A complete page-by-page visual sign-off, including reduced-motion, VoiceOver, narrow-window and large-window behavior, remains open.
-- No ASR model was promoted. See [Voice Model Versions.md](Voice%20Model%20Versions.md) for current Parakeet, Wispr Flow and alternative-model research plus a benchmark/update gate.
+- No ASR model was promoted. See [Voice model versions](../models/voice-model-versions.md) for Parakeet, Wispr Flow and alternative-model research plus a benchmark/update gate.
 
 ## Reference lens
 
