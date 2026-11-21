@@ -22,31 +22,13 @@ enum DictationEngine: String, CaseIterable, Identifiable {
 }
 
 extension ParakeetModel {
-    var title: String {
-        switch self {
-        case .englishUltra: "Ultra (English · compare)"
-        case .englishV2: "English (v2 · recommended)"
-        case .multilingualV3: "25 languages (v3)"
-        }
-    }
+    var title: String { "English · Parakeet Unified" }
 
-    /// Approximate download, measured on this Mac; the real size is shown once it's on disk.
-    var approximateBytes: Int64 {
-        switch self {
-        case .englishUltra: 630_000_000
-        case .englishV2: 451_000_000
-        case .multilingualV3: 480_000_000
-        }
-    }
+    /// Approximate download size; the real size is shown once it's on disk.
+    var approximateBytes: Int64 { 610_000_000 }
 
     /// Language codes the model recognizes (two-letter, from the dictation locale).
-    var languageCodes: Set<String> {
-        switch self {
-        case .englishUltra, .englishV2: ["en"]
-        case .multilingualV3: ["bg", "hr", "cs", "da", "nl", "en", "et", "fi", "fr", "de", "el", "hu", "it",
-                               "lv", "lt", "mt", "pl", "pt", "ro", "sk", "sl", "es", "sv", "ru", "uk"]
-        }
-    }
+    var languageCodes: Set<String> { ["en"] }
 
     func supports(localeIdentifier: String) -> Bool {
         let code = Locale(identifier: localeIdentifier).language.languageCode?.identifier
@@ -54,10 +36,8 @@ extension ParakeetModel {
         return languageCodes.contains(code.lowercased())
     }
 
-    /// English dictation stays on the English-only v2; other supported locales use v3.
-    static func preferred(for localeIdentifier: String) -> ParakeetModel {
-        ParakeetModel.englishV2.supports(localeIdentifier: localeIdentifier) ? .englishV2 : .multilingualV3
-    }
+    /// Dictator exposes one Parakeet model. Non-English locales fall back to Apple Speech.
+    static func preferred(for localeIdentifier: String) -> ParakeetModel { .englishUnified }
 }
 
 /// Setup and recognition state for Parakeet dictation, shown in Settings and used by `AppModel`.
@@ -82,13 +62,7 @@ final class ParakeetDictationEngine {
     /// The last dictation: audio length and how long Parakeet took, for the setup diagnostics.
     private(set) var lastRun: (audioSeconds: Double, processingSeconds: Double)?
 
-    var model: ParakeetModel {
-        didSet {
-            guard model != oldValue else { return }
-            UserDefaults.standard.set(model.rawValue, forKey: Self.modelKey)
-            refresh()
-        }
-    }
+    let model: ParakeetModel
 
     @ObservationIgnored private let recognizer = ParakeetRecognizer()
     @ObservationIgnored private var downloadTask: Task<Void, Never>?
@@ -99,14 +73,36 @@ final class ParakeetDictationEngine {
 
     static let modelKey = "parakeetModel"
     nonisolated static var defaultModelRoot: URL { AppDataDirectory.url.appending(path: "ParakeetModels", directoryHint: .isDirectory) }
+    private static let legacyModelFolders = [
+        "parakeet-tdt-0.6b-v2", "parakeet-tdt-0.6b-v3", "parakeet-ultra",
+    ]
 
     init(modelRoot: URL = ParakeetDictationEngine.defaultModelRoot,
          model: ParakeetModel? = nil, defaults: UserDefaults = .standard) {
         self.modelRoot = modelRoot
-        self.model = model
-            ?? defaults.string(forKey: Self.modelKey).flatMap(ParakeetModel.init(rawValue:))
-            ?? .preferred(for: defaults.string(forKey: "dictationLanguage") ?? "en-US")
+        self.model = model ?? .englishUnified
+        // Rewrite any previous v2, v3, or Ultra choice to the single model now offered.
+        defaults.set(self.model.rawValue, forKey: Self.modelKey)
+        if modelRoot.standardizedFileURL == Self.defaultModelRoot.standardizedFileURL {
+            let root = modelRoot
+            Task.detached(priority: .utility) {
+                Self.removeLegacyModelCaches(in: root)
+            }
+        }
         refresh()
+    }
+
+    /// Remove only the former model directories owned by Dictator. Other cache entries and
+    /// shared FluidAudio caches are intentionally left untouched.
+    nonisolated static func removeLegacyModelCaches(in root: URL) {
+        let fileManager = FileManager.default
+        for folder in legacyModelFolders {
+            let directory = root.appending(path: folder, directoryHint: .isDirectory)
+            guard let values = try? directory.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]),
+                  values.isDirectory == true,
+                  values.isSymbolicLink != true else { continue }
+            try? fileManager.removeItem(at: directory)
+        }
     }
 
     var isDownloaded: Bool { model.isDownloaded(in: modelRoot) }

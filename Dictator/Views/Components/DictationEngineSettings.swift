@@ -18,9 +18,10 @@ struct DictationEngineRows: View {
             SettingsRow(title: "Parakeet model", detail: modelDetail,
                         detailTint: needsAttention ? Theme.danger : Theme.ink2) {
                 HStack(spacing: Theme.s2) {
-                    MenuPicker(selection: $parakeet.model,
-                               options: ParakeetModel.allCases.map { ($0, $0.title) })
-                        .disabled(parakeet.isBusy || model.audio.isRunning || model.isFinalizingDictation)
+                    Text(parakeet.model.title)
+                        .font(.hkCaption)
+                        .foregroundStyle(Theme.ink2)
+                        .accessibilityLabel("Selected model: \(parakeet.model.title)")
                     // Before a download, the download is this row's own control, not a row of its own.
                     if needsDownload {
                         Button(downloadTitle) { parakeet.download() }
@@ -80,7 +81,7 @@ struct DictationEngineRows: View {
         case .appleSpeech:
             "Built into macOS. No download, and words appear as you speak."
         case .parakeet:
-            "NVIDIA's model on this Mac's Neural Engine. Text appears when you let go."
+            "Parakeet Unified runs locally on this Mac. Dictation is English-only and the final text arrives when you let go."
         }
     }
 
@@ -88,8 +89,7 @@ struct DictationEngineRows: View {
         let parakeet = model.parakeet
         if !parakeet.model.supports(localeIdentifier: model.dictationLanguage) {
             let language = Locale.current.localizedString(forIdentifier: model.dictationLanguage) ?? model.dictationLanguage
-            return "The \(parakeet.model.title) model doesn't know \(language), so dictation uses Apple Speech. "
-                + "Choose the 25-language model."
+            return "Parakeet Unified is configured for English. \(language) dictation uses Apple Speech."
         }
         return parakeet.statusDescription
     }

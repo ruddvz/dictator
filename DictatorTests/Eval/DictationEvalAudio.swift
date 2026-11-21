@@ -162,9 +162,7 @@ final class ParakeetEvalEngine: DictationEvalEngine {
 
     var name: String {
         switch model {
-        case .englishUltra: "parakeet-ultra (on-device)"
-        case .englishV2: "parakeet-v2 (on-device)"
-        case .multilingualV3: "parakeet-v3 (on-device)"
+        case .englishUnified: "parakeet-unified (on-device)"
         }
     }
 

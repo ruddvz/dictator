@@ -2,35 +2,37 @@
 import FluidAudio
 import Foundation
 
-/// NVIDIA Parakeet TDT 0.6B, run on this Mac's Neural Engine through FluidAudio's Core ML build.
+/// Dictator's single English streaming Parakeet model, run locally through FluidAudio/Core ML.
 public enum ParakeetModel: String, CaseIterable, Sendable, Identifiable {
-    /// Parakeet Ultra, retained as a local alternative to benchmark against the English-only v2.
-    case englishUltra = "parakeet-ultra-coreml"
-    /// English-only model; FluidAudio currently describes v2 as the more accurate choice for English.
-    case englishV2 = "parakeet-tdt-0.6b-v2"
-    /// 25 European languages.
-    case multilingualV3 = "parakeet-tdt-0.6b-v3"
+    /// NVIDIA's English Parakeet Unified 0.6B checkpoint, exposed by FluidAudio 0.18.4.
+    case englishUnified = "parakeet-unified-en-0.6b-coreml"
 
     public var id: String { rawValue }
 
-    var version: AsrModelVersion {
-        switch self {
-        case .englishUltra: .ultra
-        case .englishV2: .v2
-        case .multilingualV3: .v3
-        }
-    }
+    public var configuration: UnifiedConfig { UnifiedConfig(leftFrames: 70, chunkFrames: 7, rightFrames: 7) }
+    public var family: UnifiedModelFamily { .parakeetEnglish }
+    public var repo: Repo { family.repo }
 
-    /// The folder FluidAudio expects under the models root, e.g. `parakeet-tdt-0.6b-v2-coreml`.
-    public var folderName: String { AsrModels.defaultCacheDirectory(for: version).lastPathComponent }
+    /// FluidAudio's Hugging Face cache directory for this single checkpoint.
+    public var folderName: String { repo.folderName }
 
     public func directory(in root: URL) -> URL {
         root.appending(path: folderName, directoryHint: .isDirectory)
     }
 
-    /// True when every model file and the vocabulary are on disk and complete.
+    /// Files required for the selected 1.12-second streaming configuration only.
+    public var requiredFiles: Set<String> {
+        [
+            family.streamingEncoderFile(precision: .int8, contextSuffix: configuration.contextSuffix),
+            family.decoderFile,
+            family.jointDecisionFile,
+            family.vocab,
+        ]
+    }
+
+    /// True when every model bundle and shared file for this tier is present.
     public func isDownloaded(in root: URL) -> Bool {
-        AsrModels.modelsExist(at: directory(in: root), version: version)
+        requiredFiles.allSatisfy { FileManager.default.fileExists(atPath: directory(in: root).appending(path: $0).path) }
     }
 }
 
@@ -69,12 +71,12 @@ public enum ParakeetRecognizerError: LocalizedError {
     }
 }
 
-/// Downloads, loads and runs one Parakeet model. Audio never leaves the Mac; only the model
-/// files are fetched from Hugging Face, and only when `download` is called.
+/// Downloads, loads and runs the single English Parakeet Unified streaming tier. Audio never
+/// leaves the Mac; only the selected Core ML model files are fetched from Hugging Face.
 public actor ParakeetRecognizer {
     public static let sampleRate = 16_000
 
-    private var manager: AsrManager?
+    private var manager: StreamingUnifiedAsrManager?
     public private(set) var loadedModel: ParakeetModel?
 
     public init() {}
@@ -84,25 +86,31 @@ public actor ParakeetRecognizer {
                                 progress: @escaping @Sendable (ParakeetDownloadProgress) -> Void) async throws {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let tracker = DownloadTracker(report: progress)
-        try await AsrModels.download(to: model.directory(in: root), version: model.version,
-                                     progressHandler: { tracker.update($0) })
+        let encoder = model.family.streamingEncoderFile(
+            precision: .int8, contextSuffix: model.configuration.contextSuffix)
+        try await ModelHub.download(model.repo, to: root,
+                                    additionalModelNames: [encoder],
+                                    progressHandler: { tracker.update($0) })
     }
 
     /// Loads the model and runs it once on silence, so the first dictation doesn't pay for
     /// Core ML's Neural Engine warm-up.
     public func load(_ model: ParakeetModel, from root: URL) async throws {
         if loadedModel == model, manager != nil { return }
-        unload()
-        let models = try await AsrModels.load(from: model.directory(in: root), version: model.version)
-        let manager = AsrManager(config: .default)
-        try await manager.loadModels(models)
-        var state = TdtDecoderState.make(decoderLayers: await manager.decoderLayerCount)
-        _ = try? await manager.transcribe([Float](repeating: 0, count: Self.sampleRate), decoderState: &state)
+        await unload()
+        let manager = StreamingUnifiedAsrManager(config: model.configuration)
+        try await manager.loadModels(to: root)
+        let silence = try Self.buffer(from: [Float](repeating: 0, count: model.configuration.chunkSamples + model.configuration.rightSamples))
+        try await manager.appendAudio(silence)
+        try await manager.processBufferedAudio()
+        _ = try await manager.finish()
+        try await manager.reset()
         self.manager = manager
         loadedModel = model
     }
 
-    public func unload() {
+    public func unload() async {
+        if let manager { await manager.cleanup() }
         manager = nil
         loadedModel = nil
     }
@@ -112,18 +120,31 @@ public actor ParakeetRecognizer {
         guard let manager else { throw ParakeetRecognizerError.notLoaded }
         guard !samples.isEmpty else { throw ParakeetRecognizerError.noAudio }
         let started = ContinuousClock.now
-        // Parakeet refuses clips under a second; a quick "yes" is padded with silence.
-        let minimum = ASRConstants.minimumRequiredSamples(forSampleRate: Self.sampleRate)
-        let padded = samples.count < minimum
-            ? samples + [Float](repeating: 0, count: minimum - samples.count) : samples
-        var state = TdtDecoderState.make(decoderLayers: await manager.decoderLayerCount)
-        let result = try await manager.transcribe(padded, decoderState: &state)
+        try await manager.reset()
+        try await manager.appendAudio(Self.buffer(from: samples))
+        try await manager.processBufferedAudio()
+        let text = try await manager.finish().trimmingCharacters(in: .whitespacesAndNewlines)
+        let timings = await manager.consumeTokenTimings()
         let elapsed = ContinuousClock.now - started
         return ParakeetTranscript(
-            text: result.text.trimmingCharacters(in: .whitespacesAndNewlines),
-            confidence: result.confidence,
+            text: text,
+            confidence: timings.isEmpty ? 0 : timings.reduce(Float(0)) { $0 + $1.confidence } / Float(timings.count),
             audioSeconds: Double(samples.count) / Double(Self.sampleRate),
             processingSeconds: Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18)
+    }
+
+    private static func buffer(from samples: [Float]) throws -> AVAudioPCMBuffer {
+        guard let format = AVAudioFormat(standardFormatWithSampleRate: Double(Self.sampleRate), channels: 1) else {
+            throw ParakeetRecognizerError.noAudio
+        }
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count)),
+              let channel = buffer.floatChannelData?.pointee else { throw ParakeetRecognizerError.noAudio }
+        buffer.frameLength = AVAudioFrameCount(samples.count)
+        samples.withUnsafeBufferPointer { source in
+            guard let baseAddress = source.baseAddress else { return }
+            channel.update(from: baseAddress, count: samples.count)
+        }
+        return buffer
     }
 
     /// Joins microphone buffers and converts them to 16 kHz mono, as Parakeet expects.

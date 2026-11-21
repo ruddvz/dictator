@@ -37,30 +37,31 @@ final class DictationVocabularySnapperTests: XCTestCase {
 
 @MainActor
 final class ParakeetDictationEngineTests: XCTestCase {
-    func testEnglishDictationPrefersTheEnglishModel() {
-        XCTAssertEqual(ParakeetModel.preferred(for: "en-CA"), .englishV2)
-        XCTAssertEqual(ParakeetModel.preferred(for: "fr-CA"), .multilingualV3)
-        XCTAssertTrue(ParakeetModel.englishUltra.supports(localeIdentifier: "en-US"))
-        XCTAssertFalse(ParakeetModel.englishUltra.supports(localeIdentifier: "fr-FR"))
-        XCTAssertTrue(ParakeetModel.multilingualV3.supports(localeIdentifier: "de-DE"))
-        XCTAssertFalse(ParakeetModel.englishV2.supports(localeIdentifier: "de-DE"))
-        XCTAssertFalse(ParakeetModel.multilingualV3.supports(localeIdentifier: "ja-JP"))
+    func testDictatorOffersOnlyEnglishUnifiedTier() {
+        XCTAssertEqual(ParakeetModel.preferred(for: "en-CA"), .englishUnified)
+        XCTAssertEqual(ParakeetModel.preferred(for: "fr-CA"), .englishUnified)
+        XCTAssertEqual(ParakeetModel.allCases, [.englishUnified])
+        XCTAssertTrue(ParakeetModel.englishUnified.supports(localeIdentifier: "en-US"))
+        XCTAssertFalse(ParakeetModel.englishUnified.supports(localeIdentifier: "fr-FR"))
+        XCTAssertFalse(ParakeetModel.englishUnified.supports(localeIdentifier: "de-DE"))
+        XCTAssertEqual(ParakeetModel.englishUnified.configuration.contextSuffix, "70_7_7")
     }
 
-    func testSavedEnglishV2SelectionIsPreserved() throws {
+    func testExistingModelSelectionMigratesToUltra() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         let defaults = try XCTUnwrap(UserDefaults(suiteName: "parakeet-\(UUID().uuidString)"))
-        defaults.set(ParakeetModel.englishV2.rawValue, forKey: ParakeetDictationEngine.modelKey)
+        defaults.set("parakeet-tdt-0.6b-v2", forKey: ParakeetDictationEngine.modelKey)
 
         let engine = ParakeetDictationEngine(modelRoot: root, defaults: defaults)
-        XCTAssertEqual(engine.model, .englishV2)
+        XCTAssertEqual(engine.model, .englishUnified)
+        XCTAssertEqual(defaults.string(forKey: ParakeetDictationEngine.modelKey), ParakeetModel.englishUnified.rawValue)
     }
 
     func testAMissingModelAsksForTheDownload() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         let defaults = try XCTUnwrap(UserDefaults(suiteName: "parakeet-\(UUID().uuidString)"))
         let engine = ParakeetDictationEngine(modelRoot: root, defaults: defaults)
-        XCTAssertEqual(engine.model, .englishV2)
+        XCTAssertEqual(engine.model, .englishUnified)
         XCTAssertEqual(engine.phase, .notDownloaded)
         XCTAssertFalse(engine.isDownloaded)
         XCTAssertTrue(engine.statusDescription.contains("downloaded once"))
@@ -69,13 +70,32 @@ final class ParakeetDictationEngineTests: XCTestCase {
 
     func testTranscribingWithoutAModelFailsSoAppleSpeechCanTakeOver() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
-        let engine = ParakeetDictationEngine(modelRoot: root, model: .englishV2)
+        let engine = ParakeetDictationEngine(modelRoot: root, model: .englishUnified)
         do {
             _ = try await engine.transcribe([])
             XCTFail("Expected an error")
         } catch {
             XCTAssertEqual(error as? ParakeetRecognizerError, .notLoaded)
         }
+    }
+
+    func testLegacyCacheCleanupRemovesOnlyV2AndV3Folders() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let fileManager = FileManager.default
+        try fileManager.createDirectory(at: root.appending(path: "parakeet-tdt-0.6b-v2"), withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: root.appending(path: "parakeet-tdt-0.6b-v3"), withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: root.appending(path: "parakeet-ultra"), withIntermediateDirectories: true)
+        let ultra = root.appending(path: "parakeet-ultra", directoryHint: .isDirectory)
+        try fileManager.createDirectory(at: ultra, withIntermediateDirectories: true)
+        let marker = ultra.appending(path: "keep.txt")
+        try Data("keep".utf8).write(to: marker)
+
+        ParakeetDictationEngine.removeLegacyModelCaches(in: root)
+
+        XCTAssertFalse(fileManager.fileExists(atPath: root.appending(path: "parakeet-tdt-0.6b-v2").path))
+        XCTAssertFalse(fileManager.fileExists(atPath: root.appending(path: "parakeet-tdt-0.6b-v3").path))
+        XCTAssertFalse(fileManager.fileExists(atPath: root.appending(path: "parakeet-ultra").path))
+        XCTAssertTrue(fileManager.fileExists(atPath: marker.path))
     }
 
     func testModeHintsAreNotTreatedAsVocabulary() {
