@@ -444,7 +444,7 @@ enum DictationSmartCleanup {
         // Keep the polish pass snappy so text lands without noticeable delay.
         let timeout = min(1.5, 0.8 + Double(trimmed.count) / 300)
         return await withTimeout(timeout) { @MainActor in
-            try? await session.respond(to: prompt(trimmed), options: GenerationOptions(samplingMode: .greedy)).content
+            try? await session.respond(to: prompt(trimmed), options: GenerationOptions(sampling: .greedy)).content
         }
     }
 

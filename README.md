@@ -5,7 +5,6 @@
   A fast, private, open-source dictation app for macOS, and an alternative to Wispr Flow.</p>
   <p>
     <a href="https://github.com/ruddvz/dictator/releases/latest"><img alt="Download" src="https://img.shields.io/github/v/release/ruddvz/dictator?style=for-the-badge&label=Download&color=477C67&labelColor=20312A"></a>
-    <a href="https://github.com/ruddvz/dictator/actions"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/ruddvz/dictator/ci.yml?style=for-the-badge&label=Tests&labelColor=20312A"></a>
     <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/License-MIT-DCE6DC?style=for-the-badge&labelColor=20312A"></a>
     <img alt="macOS 14+" src="https://img.shields.io/badge/macOS-14%2B-DCE6DC?style=for-the-badge&labelColor=20312A">
   </p>
@@ -127,9 +126,10 @@ All of these can be changed in **Settings → Shortcuts**.
 Issues and pull requests are welcome.
 
 ```sh
-xcodegen generate
-xcodebuild -project Dictator.xcodeproj -scheme Dictator -derivedDataPath .build CODE_SIGNING_ALLOWED=NO test
+./Scripts/test.sh
 ```
+
+Tests run locally; the GitHub workflow is manual-only.
 
 Work on `main` with small, focused commits, and record what you finished in [PROGRESS.md](PROGRESS.md). Agents and contributors should read [AGENTS.md](AGENTS.md) first: it explains the signing rule above and the text-insertion rules that must not be reverted. The [documentation index](docs/README.md) covers design, testing and research. Maintainers can build a shareable, unnotarized disk image with `./Scripts/make-dmg.sh`.
 

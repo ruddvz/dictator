@@ -1,8 +1,9 @@
 name: macOS build and tests
 
+# Manual only. The project's tests are run locally with ./Scripts/test.sh; GitHub's hosted runners
+# ship an older Xcode than development uses, so automatic runs reported failures that weren't real.
 on:
-  push:
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   build-test:

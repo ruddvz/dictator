@@ -1,5 +1,9 @@
 # Dictator progress
 
+## Completed — local CI (2026-11-25)
+
+- GitHub's automatic "macOS build and tests" had failed on every push since at least 2026-11-21: the runner's Xcode 26.6 rejects `GenerationOptions(samplingMode:)` (DictationCleanup.swift). Switched the call to `sampling:` (compiles on both SDKs; deprecation warning on Xcode 27), made the workflow manual-only (`workflow_dispatch`), removed the Tests badge, and added `./Scripts/test.sh` as the real test run. Local suite: 407 run, 9 skipped, 0 failures. Whether a manual GitHub run now passes is unchecked.
+
 ## Completed — release v1.0.0 and DMG (2026-11-25)
 
 - Published https://github.com/ruddvz/dictator/releases/tag/v1.0.0 with `Dictator-1.0.0.dmg` (ad-hoc signed, universal, macOS 14+, NOT notarized; SHA-256 9371bf7f…d7d1 verified after download). `Scripts/make-dmg.sh` builds it; `DICTATOR_AD_HOC=1` makes `package-app.sh` skip the local identity.
