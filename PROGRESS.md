@@ -1,5 +1,11 @@
 # Dictator progress
 
+## Completed — transcript-quality review from live history (2026-11-25)
+
+- Read the 50 saved dictations (Apple Speech fallback, en-US; Parakeet Unified was not downloaded). Fillers and repeats ("Uh", "I I", "as as") are cleaned correctly. Misrecognitions seen: "Vercel"→"Vercell", "Wispr Flow"→"Whisper flow" (3×), "goated"→"voted", "end-to-end"→"and to end", "EV"→"E V" (4×), "CNG"→"CN G", Indian place and product names (Vadodara, Curvv).
+- Added built-in tech names (Vercel, GitHub, TypeScript, etc.) to `DictationContextHints.builtInWords`, with a snapper test. 400 tests, 0 failures.
+- Not fixed: phonetic errors (goated, Wispr, end-to-end) need a better engine, not vocabulary. Next: download Parakeet Unified, set the language to en-IN for Apple Speech, add EV/CNG/Vadodara/Curvv to the user's Vocabulary, then re-compare on the same sentences. The upgrade silently deleting the v2 model without downloading Unified is still open.
+
 ## Completed — audit follow-up: test fix and paste latency (2026-11-25)
 
 - Fixed `testLegacyCacheCleanupRemovesOnlyFormerModelFolders`: it asserted `parakeet-ultra` was deleted and also that a file inside it survived. It now keeps an unrelated folder. Suite: 399 run, 8 skipped, 0 failures.

@@ -98,6 +98,15 @@ final class ParakeetDictationEngineTests: XCTestCase {
         XCTAssertTrue(fileManager.fileExists(atPath: marker.path))
     }
 
+    func testBuiltInTechNamesFixCommonMisrecognitions() {
+        let terms = DictationContextHints.builtInWords
+        XCTAssertEqual(DictationVocabularySnapper.apply("I deploy through Vercell now", terms: terms),
+                       "I deploy through Vercel now")
+        XCTAssertEqual(DictationVocabularySnapper.apply("push it to github", terms: terms), "push it to GitHub")
+        XCTAssertEqual(DictationVocabularySnapper.apply("write it in type script", terms: terms),
+                       "write it in TypeScript")
+    }
+
     func testModeHintsAreNotTreatedAsVocabulary() {
         XCTAssertTrue(AppModel.modeHints(for: .code).contains("camelCase"))
         XCTAssertTrue(AppModel.modeHints(for: .natural).isEmpty)

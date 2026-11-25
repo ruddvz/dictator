@@ -647,8 +647,13 @@ enum DictationWordList {
 
 enum DictationContextHints {
     static let maximumCount = 100
-    /// Keep Dictator's own name in the recognizer vocabulary so the app can name itself correctly.
-    static let builtInWords = ["Dictator"]
+    /// Keep Dictator's own name, and tech names people say constantly, in the recognizer vocabulary.
+    /// Real dictation history showed "Vercel" arriving as "Vercell"; a one-letter-off capitalized
+    /// name is snapped back by `DictationVocabularySnapper`. Custom words rank ahead of these.
+    static let builtInWords = [
+        "Dictator", "Vercel", "Cloudflare", "GitHub", "TypeScript", "JavaScript",
+        "ChatGPT", "OpenAI", "Supabase", "Xcode", "macOS",
+    ]
 
     static func prioritized(
         customWords: [String],
