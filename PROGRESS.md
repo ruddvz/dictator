@@ -1,5 +1,12 @@
 # Dictator progress
 
+## Completed — audit follow-up: test fix and paste latency (2026-11-25)
+
+- Fixed `testLegacyCacheCleanupRemovesOnlyFormerModelFolders`: it asserted `parakeet-ultra` was deleted and also that a file inside it survived. It now keeps an unrelated folder. Suite: 399 run, 8 skipped, 0 failures.
+- Stop-to-done latency: Parakeet inference takes ~0.3–0.4 s, but the pill waited ~2.6 s more because the paste paths slept 2.5 s (`unverifiedPasteRestoreDelay`) before returning. The restore now runs in the background (`scheduleClipboardRestore`); the 2.5 s delay is unchanged, and a back-to-back paste waits for a pending restore first. Status text for those paths now says the clipboard "is put back in a moment".
+- Not verified live: the packaged app was not rebuilt or run, so the new timing is unmeasured. The previously installed `/Applications` build was still on Parakeet v2, not Unified.
+- Open from the audit: notarized release, Dynamic Type/Reduce Motion/VoiceOver, localization, `AppModel.swift` size (3.6k lines), Swift 6 language mode, macOS 14/15 test coverage.
+
 ## Completed — public repo and positioning refresh (2026-11-21)
 
 - Updated the public GitHub description and topics to present Dictator as an open-source Wispr Flow alternative for macOS.

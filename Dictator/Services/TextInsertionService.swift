@@ -479,6 +479,7 @@ final class TextInsertionService {
         }
 
         let pasteboard = NSPasteboard.general
+        await finishPendingClipboardRestore()
         let saved = ClipboardSnapshot(pasteboard)
         let ours = ClipboardSnapshot.placeTransient(text, on: pasteboard)
         guard Self.postCommandV(to: app.processIdentifier) else {
@@ -488,10 +489,8 @@ final class TextInsertionService {
         }
         // Electron and web editors read the pasteboard asynchronously; putting the old clipboard
         // back too soon pastes that instead of the dictation.
-        try? await Task.sleep(for: Self.unverifiedPasteRestoreDelay)
-        let restored = saved.restore(to: pasteboard, ifChangeCountIs: ours)
-        let clipboard = restored ? "Your clipboard was put back." : "The clipboard changed meanwhile, so it was left as is."
-        status = "Pasted into \(name). \(clipboard)"
+        scheduleClipboardRestore(saved, ours: ours, on: pasteboard)
+        status = "Pasted into \(name). Your clipboard is put back in a moment."
         lastDeliveryVerified = false
         return true
     }
@@ -507,6 +506,7 @@ final class TextInsertionService {
             return false
         }
         let pasteboard = NSPasteboard.general
+        await finishPendingClipboardRestore()
         let saved = ClipboardSnapshot(pasteboard)
         let ours = ClipboardSnapshot.placeTransient(text, on: pasteboard)
         let name = app.localizedName ?? "the app"
@@ -515,10 +515,8 @@ final class TextInsertionService {
             status = "The paste shortcut could not be sent to \(name). Nothing was inserted."
             return false
         }
-        try? await Task.sleep(for: Self.unverifiedPasteRestoreDelay)
-        let restored = saved.restore(to: pasteboard, ifChangeCountIs: ours)
-        let clipboard = restored ? "Your clipboard was put back." : "The clipboard changed meanwhile, so it was left as is."
-        status = "Pasted into \(name). \(clipboard)"
+        scheduleClipboardRestore(saved, ours: ours, on: pasteboard)
+        status = "Pasted into \(name). Your clipboard is put back in a moment."
         lastDeliveryVerified = false
         log.notice("sent unverified paste to frontmost app (\(app.bundleIdentifier ?? "unknown", privacy: .public)); Accessibility focus was unexposed")
         return true
@@ -529,6 +527,26 @@ final class TextInsertionService {
     }
 
     nonisolated static let unverifiedPasteRestoreDelay: Duration = .milliseconds(2500)
+
+    private var pendingClipboardRestore: Task<Void, Never>?
+
+    /// Puts the user's clipboard back once the target has had `unverifiedPasteRestoreDelay` to read
+    /// ours. It runs in the background so the caller (and the pill) isn't held for 2.5 s after the
+    /// text has already landed.
+    private func scheduleClipboardRestore(_ saved: ClipboardSnapshot, ours: Int, on pasteboard: NSPasteboard) {
+        pendingClipboardRestore = Task { @MainActor in
+            try? await Task.sleep(for: Self.unverifiedPasteRestoreDelay)
+            _ = saved.restore(to: pasteboard, ifChangeCountIs: ours)
+        }
+    }
+
+    /// Waits out any restore still pending, so a back-to-back paste never snapshots our own text
+    /// as the user's clipboard.
+    private func finishPendingClipboardRestore() async {
+        guard let task = pendingClipboardRestore else { return }
+        await task.value
+        pendingClipboardRestore = nil
+    }
 
     /// Whether an element that can't be read back still looks like somewhere to type: a text role,
     /// a settable selection, or (Chromium) an editable ancestor. Never a password field.
@@ -598,6 +616,7 @@ final class TextInsertionService {
             return .inserted
         }
         let pasteboard = NSPasteboard.general
+        await finishPendingClipboardRestore()
         let saved = ClipboardSnapshot(pasteboard)
         let ours = ClipboardSnapshot.placeTransient(text, on: pasteboard)
         guard Self.postCommandV() else {
@@ -609,14 +628,13 @@ final class TextInsertionService {
             originalValue: target.fieldValue, expectedValue: expectedValue) {
             self.pasteObservation(target: target, in: app)
         }
-        if verification != .confirmed {
-            try? await Task.sleep(for: Self.unverifiedPasteRestoreDelay)
-        }
-        let restored = saved.restore(to: pasteboard, ifChangeCountIs: ours)
         guard verification == .confirmed else {
+            // The target may still be reading our text; put the clipboard back after the full delay,
+            // without holding up the caller.
+            scheduleClipboardRestore(saved, ours: ours, on: pasteboard)
             logPasteMismatch(verification, target: target, expectedValue: expectedValue, insertedText: text, in: app)
             undoRecord = nil
-            let clipboard = restored ? "Your clipboard was put back." : "The clipboard changed meanwhile, so it was left as is."
+            let clipboard = "Your clipboard is put back in a moment."
             status = verification == .targetChanged
                 ? "Paste was sent to \(name), but focus or field contents changed before confirmation. Check the field before retrying; a retry could duplicate text. \(clipboard)"
                 : "Paste was sent to \(name), but Dictator could not verify the exact field contents. Check the field before retrying; a retry could duplicate text. \(clipboard)"
@@ -633,6 +651,7 @@ final class TextInsertionService {
         } else {
             undoRecord = nil
         }
+        let restored = saved.restore(to: pasteboard, ifChangeCountIs: ours)
         let clipboard = restored ? "Your clipboard was put back." : "The clipboard changed meanwhile, so it was left as is."
         status = "Pasted into \(name) and verified in the same text field. \(clipboard)"
         lastDeliveryVerified = true

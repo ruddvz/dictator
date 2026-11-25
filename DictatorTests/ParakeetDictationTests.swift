@@ -79,15 +79,15 @@ final class ParakeetDictationEngineTests: XCTestCase {
         }
     }
 
-    func testLegacyCacheCleanupRemovesOnlyV2AndV3Folders() throws {
+    func testLegacyCacheCleanupRemovesOnlyFormerModelFolders() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let fileManager = FileManager.default
         try fileManager.createDirectory(at: root.appending(path: "parakeet-tdt-0.6b-v2"), withIntermediateDirectories: true)
         try fileManager.createDirectory(at: root.appending(path: "parakeet-tdt-0.6b-v3"), withIntermediateDirectories: true)
         try fileManager.createDirectory(at: root.appending(path: "parakeet-ultra"), withIntermediateDirectories: true)
-        let ultra = root.appending(path: "parakeet-ultra", directoryHint: .isDirectory)
-        try fileManager.createDirectory(at: ultra, withIntermediateDirectories: true)
-        let marker = ultra.appending(path: "keep.txt")
+        let other = root.appending(path: "unrelated-cache", directoryHint: .isDirectory)
+        try fileManager.createDirectory(at: other, withIntermediateDirectories: true)
+        let marker = other.appending(path: "keep.txt")
         try Data("keep".utf8).write(to: marker)
 
         ParakeetDictationEngine.removeLegacyModelCaches(in: root)
