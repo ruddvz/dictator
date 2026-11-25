@@ -1,5 +1,10 @@
 # Dictator progress
 
+## Completed — insertion rehearsal and "That" check (2026-11-25)
+
+- Built the `-D LIVE_TYPING_REHEARSAL` variant and fed scripted partials into a real TextEdit document with no microphone: the text landed exactly once ("Hello world this is a rehearsal of live typing and a second phrase after a pause"). Browser and Electron fields were NOT verified: the Chrome attempts were abandoned at the user's request (never use their Chrome business account), and the run that targeted Chrome did not reach it. Run the rehearsal against those apps from a normal desktop Space: `DICTATOR_SWIFT_FLAGS="-D LIVE_TYPING_REHEARSAL" ./Scripts/package-app.sh`, then `open dist/Dictator.app --args -liveTypingRehearsalApp <bundle id> -liveTypingRehearsal "words | more words"` with that app frontmost and a text field focused. Rebuild with `./Scripts/install.sh` afterwards to restore the normal build.
+- The stray leading "That" in Files output is not a general bug: two other voices and sentences transcribed with no extra word. It appeared once, before the unusual name "Vadodara".
+
 ## Completed — local CI (2026-11-25)
 
 - GitHub's automatic "macOS build and tests" had failed on every push since at least 2026-11-21: the runner's Xcode 26.6 rejects `GenerationOptions(samplingMode:)` (DictationCleanup.swift). Switched the call to `sampling:` (compiles on both SDKs; deprecation warning on Xcode 27), made the workflow manual-only (`workflow_dispatch`), removed the Tests badge, and added `./Scripts/test.sh` as the real test run. Local suite: 407 run, 9 skipped, 0 failures. Whether a manual GitHub run now passes is unchecked.
