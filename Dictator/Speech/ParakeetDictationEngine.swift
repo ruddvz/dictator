@@ -276,6 +276,19 @@ final class ParakeetDictationEngine {
         return transcript
     }
 
+    /// Waits (up to `timeout`) for the word-spotting model that boosts the user's vocabulary.
+    /// Dictation never waits for it, but a file transcript isn't time-critical, and without it the
+    /// user's words are silently ignored. A failed or slow load just continues without boosting.
+    func awaitVocabularyBoosting(timeout: Duration = .seconds(30)) async {
+        guard !isVocabularyBoostingReady else { return }
+        guard await warmUp().value else { return }
+        prepareVocabularyBoosting()
+        let deadline = ContinuousClock.now + timeout
+        while !isVocabularyBoostingReady, boostingTask != nil, ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+    }
+
     func removeModel() {
         guard !isBusy else { return }
         defaults.set(true, forKey: Self.removedByUserKey)

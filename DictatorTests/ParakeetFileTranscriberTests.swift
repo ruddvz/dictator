@@ -54,4 +54,24 @@ final class ParakeetFileTranscriberTests: XCTestCase {
         XCTAssertEqual(transcriber.text, "hello")
         XCTAssertTrue(transcriber.cues.isEmpty)
     }
+
+    /// Opt-in: runs the real Parakeet model on a real file.
+    /// `TEST_RUNNER_DICTATOR_LIVE_FILE=/path/to/audio.aiff TEST_RUNNER_DICTATOR_LIVE_MODEL_ROOT=<ParakeetModels dir> xcodebuild … test`
+    func testLiveTranscriptionOfRealFile() async throws {
+        guard let path = ProcessInfo.processInfo.environment["DICTATOR_LIVE_FILE"] else {
+            throw XCTSkip("Set TEST_RUNNER_DICTATOR_LIVE_FILE to run against the real Parakeet model.")
+        }
+        let root = ProcessInfo.processInfo.environment["DICTATOR_LIVE_MODEL_ROOT"].map { URL(fileURLWithPath: $0) }
+            ?? ParakeetDictationEngine.defaultModelRoot
+        let engine = ParakeetDictationEngine(modelRoot: root)
+        try XCTSkipUnless(engine.isDownloaded, "Parakeet model is not on this Mac.")
+                let transcriber = ParakeetFileTranscriber()
+        transcriber.transcribe(file: URL(fileURLWithPath: path), engine: engine,
+                               vocabulary: ["Vadodara", "Vercel"])
+        let deadline = Date().addingTimeInterval(120)
+        while transcriber.isTranscribing, Date() < deadline { try await Task.sleep(for: .milliseconds(200)) }
+        print("LIVE_BOOST_READY:", engine.isVocabularyBoostingReady, "LIVE_RESULT:", transcriber.text, "| error:", transcriber.error ?? "none")
+        XCTAssertNil(transcriber.error)
+        XCTAssertFalse(transcriber.text.isEmpty)
+    }
 }

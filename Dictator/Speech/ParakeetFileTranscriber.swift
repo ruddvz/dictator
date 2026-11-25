@@ -41,6 +41,11 @@ final class ParakeetFileTranscriber {
                     try await Self.decodeSamples(from: url)
                 }.value
                 guard let self, currentGeneration == self.generation else { return }
+                if !vocabulary.isEmpty, !engine.isVocabularyBoostingReady {
+                    self.status = "Loading your vocabulary…"
+                    await engine.awaitVocabularyBoosting()
+                    guard currentGeneration == self.generation else { return }
+                }
                 self.status = "Transcribing with Parakeet on this Mac…"
                 let transcript = try await engine.transcribe(samples: samples, vocabulary: vocabulary)
                 guard currentGeneration == self.generation else { return }
