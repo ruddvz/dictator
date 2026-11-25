@@ -52,6 +52,10 @@ For hands-free dictation, press **fn** twice to start and once to stop. If the t
 
 See the [personal data and backup guide](docs/PERSONAL_DATA_BACKUP.md) for storage details.
 
+## Install
+
+**Quickest:** download `Dictator-1.0.0.dmg` from the [latest release](https://github.com/ruddvz/dictator/releases/latest). It isn't notarized, so macOS asks you to allow it once under System Settings → Privacy & Security → Open Anyway; the steps are in the release notes. **Most reliable:** build it yourself with the installer below, which keeps Accessibility permission across updates.
+
 ## Build for Mac
 
 Dictator supports **macOS 14 or later** on Apple silicon or Intel. There is no notarized release or App Store build yet, so you build it once from source; the installer does everything else. You need full **Xcode** from the App Store (open it once to accept the license) and, if XcodeGen isn't installed, [Homebrew](https://brew.sh/).
