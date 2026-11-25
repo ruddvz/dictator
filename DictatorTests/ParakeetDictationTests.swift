@@ -98,6 +98,16 @@ final class ParakeetDictationEngineTests: XCTestCase {
         XCTAssertTrue(fileManager.fileExists(atPath: marker.path))
     }
 
+    func testLongTermsSnapWhenHeardAFewLettersOff() {
+        let terms = ["Wispr Flow"]
+        XCTAssertEqual(DictationVocabularySnapper.apply("Whisperflow is the benchmark.", terms: terms),
+                       "Wispr Flow is the benchmark.")
+        XCTAssertEqual(DictationVocabularySnapper.apply("We are building a Whisper flow alternative", terms: terms),
+                       "We are building a Wispr Flow alternative")
+        XCTAssertEqual(DictationVocabularySnapper.apply("The wind will flow and whisper", terms: terms),
+                       "The wind will flow and whisper")
+    }
+
     func testDownloadIfNeededSkipsAModelTheUserRemoved() throws {
         let suite = "dictator.tests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))

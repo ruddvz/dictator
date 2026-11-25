@@ -1,5 +1,10 @@
 # Dictator progress
 
+## Completed — Parakeet first live result and snapper tolerance (2026-11-25)
+
+- Parakeet Unified downloaded (595 MB) and ran live: 0.28 s for 5 s of audio, confidence 0.74. Spoken vocabulary test came back "E V C and Godara curve and Whisperflow" for EV/CNG/Vadodara/Curvv/Wispr Flow: Parakeet takes no hints, so the snapper is the only fix.
+- `DictationVocabularySnapper` now also snaps long terms (8+ letters) heard up to two edits off with the same first and last letter ("Whisperflow", "Whisper flow" → "Wispr Flow"). 402 tests, 0 failures. Not fixed by design: short or phonetically distant terms (EV, CNG, Vadodara→"Godara", Curvv→"curve") need the user's Vocabulary entries and stay unreliable; a Parakeet custom-vocabulary (CTC boosting) path is the real fix and is not built.
+
 ## Completed — auto-download Parakeet model (2026-11-25)
 
 - `ParakeetDictationEngine.downloadIfNeeded()` runs at launch when Parakeet is the chosen engine and no model is on disk (first run, or an upgrade that deleted v2). It downloads from Hugging Face via FluidAudio; progress and failures show in Settings. A model removed by the user (`parakeetModelRemovedByUser`) is not re-downloaded until they download it again. 401 tests, 0 failures.

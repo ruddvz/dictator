@@ -48,6 +48,13 @@ enum DictationVocabularySnapper {
             // A split word is clearly the term; a single word only needs fixing for its capitals.
             return width > 1 || term != term.lowercased()
         }
+        // A long term heard with a couple of letters off ("Whisper flow" for "Wispr Flow"). Length,
+        // the same first and last letter, and at most two edits keep ordinary words out of reach.
+        if termKey.count >= 8, coreKey.count >= 6,
+           coreKey.first == termKey.first, coreKey.last == termKey.last,
+           editDistance(coreKey, termKey, limit: 2) <= 2 {
+            return true
+        }
         // A capitalized name with one letter wrong.
         guard width == 1, termKey.count >= 5, term.first?.isUppercase == true,
               core.first?.isUppercase == true, !term.contains(" ") else { return false }
