@@ -54,18 +54,23 @@ See the [personal data and backup guide](docs/PERSONAL_DATA_BACKUP.md) for stora
 
 ## Build for Mac
 
-Dictator supports **macOS 14 or later**. There is no prebuilt installer or App Store release yet; build the app from the public source. You need a Mac with full **Xcode (Swift 6.2 or later)** and [Homebrew](https://brew.sh/).
+Dictator supports **macOS 14 or later** on Apple silicon or Intel. There is no notarized release or App Store build yet, so you build it once from source; the installer does everything else. You need full **Xcode** from the App Store (open it once to accept the license) and, if XcodeGen isn't installed, [Homebrew](https://brew.sh/).
 
 ```sh
-brew install xcodegen
 git clone https://github.com/ruddvz/dictator.git
 cd dictator
-./Scripts/make-signing-identity.sh
-./Scripts/package-app.sh
-open dist/Dictator.app
+./Scripts/install.sh
 ```
 
-The signing script creates a stable local identity so macOS Accessibility permission can persist across rebuilds. After the first launch, allow Dictator under **System Settings → Privacy & Security → Accessibility** and grant the requested microphone and speech permissions.
+The installer checks your Mac, installs XcodeGen if needed, creates a stable local signing identity, builds the app, copies it to `/Applications`, and opens it. The first build takes several minutes. Run `./Scripts/install.sh --check` to test prerequisites without building.
+
+After the first launch:
+
+1. Allow **Microphone** and **Speech Recognition** when macOS asks.
+2. Switch Dictator on under **System Settings → Privacy & Security → Accessibility**. This lets the fn key start dictation and lets Dictator type into other apps.
+3. Hold **fn**, speak, release. For the best accuracy choose **Parakeet** in Settings → Dictation; the model downloads once (about 600 MB) and then runs offline.
+
+If macOS asks whether `codesign` may use "Dictator Local Signing", choose **Always Allow**. To update later, run `git pull && ./Scripts/install.sh`. Because the app is signed with your own local identity, Accessibility permission survives updates.
 
 ## Development
 

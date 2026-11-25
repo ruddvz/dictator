@@ -1,6 +1,12 @@
 # Dictator progress
 
-## In progress — live audit of the packaged app (2026-11-25)
+## Completed — one-command installer (2026-11-25)
+
+- `Scripts/install.sh` checks macOS 14+, full Xcode (and first-launch setup), installs XcodeGen via Homebrew if missing, creates the local signing identity, builds with `package-app.sh`, installs to /Applications, verifies the signature, and opens the app. `--check` tests prerequisites only. README install section rewritten around it.
+- Verified on this Mac only (identity already existed, Xcode 27.2, macOS 27): full run built, signed with the Dictator Local Signing requirement, installed and launched. NOT verified on a clean Mac with no identity, no Homebrew, or an older Xcode/macOS.
+- Still open: a notarized, double-click release needs an Apple Developer ID (not available here). Until then every user builds from source.
+
+## Completed — live audit of the packaged app (2026-11-25)
 
 - Rebuilt with `package-app.sh` (signed "Dictator Local Signing", designated requirement unchanged), deployed to /Applications, 402 tests pass. Viewed live: Home, Insights, Style, Transforms, Files, Meeting notes, Vocabulary, Shortcuts sheet, and Settings (Dictation, Shortcuts, Cleanup, System, Appearance, Typing, Data & privacy). No old-name text appears in the UI; the "HushKey" the user saw is their own test file name. Remaining source mentions are migration code and MIT attribution.
 - Finding 1 (FIXED, deployed, not yet verified on a real file in the UI): Files only offered Apple Speech or WhisperKit and ignored Parakeet (the Apple result "Hush, key" for "HushKey" was the symptom). Added `ParakeetFileTranscriber` (decodes any audio/video via AVAssetReader to 16 kHz mono, runs the loaded Parakeet model with the user's vocabulary), a `.parakeet` case in `FileTranscriptionEngine`, and made it the Files default (falls back to Apple Speech when the model isn't downloaded). Parakeet gives plain text, so SRT/WebVTT stay disabled for it. 406 tests, 0 failures. Live check still to do: choose /tmp/dictator-files-test.aiff (spoken "Vadodara and Vercel…") in Files and press Transcribe; the Open panel can't be driven from the background.
