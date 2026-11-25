@@ -305,6 +305,6 @@ private struct TakeTile: View {
             .strokeBorder(isNew ? Theme.signal : issue != nil ? Theme.finishing : Theme.hairline,
                           lineWidth: isNew ? Theme.selectedStroke : Theme.hairlineWidth))
         .onHover { hovering = $0 }
-        .animation(.easeOut(duration: 0.12), value: hovering)
+        .animation(Theme.fade, value: hovering)
     }
 }

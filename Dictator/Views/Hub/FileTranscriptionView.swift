@@ -9,6 +9,7 @@ struct FileTranscriptionView: View {
     @State private var pendingSaveTask: Task<Void, Never>?
     @State private var confirmClearHistory = false
     @State private var isDropTargeted = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var workspace: FileTranscriptionWorkspace { model.fileTranscriptionWorkspace }
     private var transcription: LocalFileTranscriber { model.fileTranscriber }
@@ -175,6 +176,18 @@ struct FileTranscriptionView: View {
         @Bindable var whisper = model.whisperFileTranscriber
         let sourceName = workspace.selectedURL?.lastPathComponent ?? workspace.activeSourceName
         return HStack(spacing: Theme.s4) {
+            // The file's tile: a waveform once a file is chosen, a tray before. It lifts when a
+            // file is held over the zone, so the drop target answers before you let go.
+            Glyph(sourceName == nil ? .download : .waveform, size: Theme.iconL)
+                .foregroundStyle(isDropTargeted ? Theme.inverseInk : Theme.signal)
+                .frame(width: Theme.tileL, height: Theme.tileL)
+                .background(isDropTargeted ? Theme.signal : Theme.signalSoft,
+                            in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
+                .scaleEffect(isDropTargeted && !reduceMotion ? 1.08 : 1)
+                .offset(y: isDropTargeted && !reduceMotion ? -Theme.s0 : 0)
+                .contentTransition(.symbolEffect(.replace))
+                .animation(Theme.snappy, value: isDropTargeted)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Theme.s2) {
                 Text(sourceName ?? "Drop audio or video here")
                     .font(.hkTitle2)
@@ -230,7 +243,7 @@ struct FileTranscriptionView: View {
         .overlay(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous)
             .strokeBorder(isDropTargeted ? Theme.signal : Theme.signalEdge,
                           style: StrokeStyle(lineWidth: Theme.selectedStroke, dash: Theme.dash)))
-        .animation(.easeOut(duration: 0.12), value: isDropTargeted)
+        .animation(Theme.fade, value: isDropTargeted)
         .contentShape(RoundedRectangle(cornerRadius: Theme.r2, style: .continuous))
         .dropDestination(for: URL.self) { urls, _ in
             guard !isBusy, let url = urls.first, url.isFileURL else { return false }

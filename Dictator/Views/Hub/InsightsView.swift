@@ -317,11 +317,10 @@ private struct Metric: View {
                 .contentTransition(.numericText())
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
-            if isLead {
-                Capsule().fill(Theme.signal).frame(width: Theme.s6, height: Theme.ruleWidth)
-                    .padding(.bottom, Theme.s1)
-                    .accessibilityHidden(true)
-            }
+            // Every figure keeps the rule's slot, so the labels share one baseline; only the lead shows it.
+            Capsule().fill(isLead ? Theme.signal : .clear).frame(width: Theme.s6, height: Theme.ruleWidth)
+                .padding(.bottom, Theme.s1)
+                .accessibilityHidden(true)
             Text(label).font(.hkCaption).foregroundStyle(Theme.ink2).fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -425,7 +424,7 @@ private struct CategoryBar: View {
             }
             .frame(height: Theme.chipHeight)
             .background(Theme.track, in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
-            .onAppear { withAnimation(.spring(response: 0.9, dampingFraction: 0.86).delay(0.25)) { grown = true } }
+            .onAppear { withAnimation(Theme.reducesMotion ? Theme.calm : .spring(response: 0.9, dampingFraction: 0.86).delay(0.25)) { grown = true } }
             HStack(spacing: Theme.s2) {
                 Text(category.rawValue).foregroundStyle(Theme.ink2)
                 Spacer(minLength: 0)

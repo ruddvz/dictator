@@ -222,8 +222,7 @@ struct DictationView: View {
                     .buttonStyle(PrimaryButtonStyle())
                     .disabled(!model.insertion.isEnabled || isBusy || !hasText)
                     .help(model.insertion.isEnabled ? "Insert into the app you dictated from" : "Turn on typing in Settings › Typing")
-                Button("Copy", icon: .copy) { model.copyDictationText() }
-                    .buttonStyle(SecondaryButtonStyle())
+                CopyButton { model.copyDictationText() }
                     .disabled(isBusy || !hasText)
                 if !isBusy, !model.rawDictationText.isEmpty, model.rawDictationText != model.transcriber.text {
                     Button("Original", icon: .undo) { model.restoreRawTranscript() }
@@ -413,9 +412,8 @@ struct DictationView: View {
             if model.dictationHistory.isEmpty {
                 emptyHistory
             } else if groupedHistory.isEmpty {
-                ContentUnavailableView.search(text: historySearch)
-                    .frame(maxWidth: .infinity, minHeight: Theme.editorMedium)
-                    .card(style: .outlined)
+                EmptyState(icon: .search, title: "No matches",
+                           message: "Nothing in your history matches “\(historySearch)”.")
             } else {
                 ForEach(groupedHistory, id: \.day) { group in
                     VStack(alignment: .leading, spacing: Theme.s2) {
@@ -444,22 +442,13 @@ struct DictationView: View {
         }
     }
 
-    /// Empty history sits on the page under its heading: what will collect here and how.
+    /// Empty history: the same centred empty state as every other page's lists.
     private var emptyHistory: some View {
-        VStack(alignment: .leading, spacing: Theme.s1) {
-            Text(model.savesDictationHistory ? "Nothing dictated yet" : "History is off")
-                .font(.hkHeadline)
-            Text(model.savesDictationHistory
-                 ? "Each dictation is kept here on this Mac, grouped by day, ready to copy or edit again."
-                 : "Turn it on in Settings › Data & privacy to keep recent dictations on this Mac.")
-                .font(.hkCallout)
-                .foregroundStyle(Theme.ink2)
-                .frame(maxWidth: Theme.readingWidth, alignment: .leading)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, Theme.rowPaddingV)
-        .overlay(alignment: .top) { RowDivider() }
+        EmptyState(icon: model.savesDictationHistory ? .clock : .lock,
+                   title: model.savesDictationHistory ? "Nothing dictated yet" : "History is off",
+                   message: model.savesDictationHistory
+                       ? "Each dictation is kept here on this Mac, grouped by day, ready to copy or edit again."
+                       : "Turn it on in Settings › Data & privacy to keep recent dictations on this Mac.")
     }
 
     private var searchField: some View {
@@ -722,7 +711,7 @@ private struct HistoryRow: View {
         .overlay(alignment: .topTrailing) { actionPill.padding(Theme.s2) }
         .contentShape(Rectangle())
         .onTapGesture { if isLong { toggleExpanded() } }
-        .onHover { hovering in withAnimation(.easeOut(duration: 0.12)) { isHovering = hovering } }
+        .onHover { hovering in withAnimation(Theme.fade) { isHovering = hovering } }
         .contextMenu { menuItems }
         .sheet(isPresented: $showsDiff) {
             HistoryDiffSheet(entry: entry)
@@ -825,7 +814,7 @@ private struct HistoryRow: View {
         .shadow(color: .black.opacity(0.06), radius: Theme.figureGap, y: Theme.s0)
         .opacity(showsActions ? 1 : 0)
         .offset(x: showsActions ? 0 : Theme.figureGap)
-        .animation(.easeOut(duration: 0.12), value: showsActions)
+        .animation(Theme.fade, value: showsActions)
         .allowsHitTesting(showsActions)
     }
 

@@ -167,7 +167,7 @@ struct ContentView: View {
         let to = Self.navigationOrder.firstIndex(of: model.screen) ?? 0
         let rise: CGFloat = to >= from ? 14 : -14
         return .asymmetric(insertion: .opacity.combined(with: .offset(y: rise)),
-                           removal: .opacity.animation(.easeOut(duration: 0.1)))
+                           removal: .opacity.animation(.easeOut(duration: Motion.exit)))
     }
 
     private var page: some View {
@@ -337,7 +337,7 @@ private struct SidebarItem: View {
         }
         .buttonStyle(PressStyle())
         .onHover { hovering = $0 }
-        .animation(.easeOut(duration: 0.12), value: hovering)
+        .animation(Theme.fade, value: hovering)
         .help(collapsed ? title : "")
         .accessibilityLabel(title)
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])

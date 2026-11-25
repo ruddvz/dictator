@@ -66,7 +66,11 @@ struct SettingsView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.bottom, Theme.pageBottom)
                     .id(section)
-                    .transition(.opacity.combined(with: .offset(y: Theme.figureGap)))
+                    // The old section leaves almost at once, so two forms never overlap mid-fade;
+                    // the new one settles in from just below.
+                    .transition(.asymmetric(
+                        insertion: .opacity.combined(with: .offset(y: Theme.reducesMotion ? 0 : Theme.figureGap)),
+                        removal: .opacity.animation(.easeOut(duration: Motion.exit))))
                 }
                 .scrollIndicators(.automatic)
             }
@@ -117,7 +121,7 @@ private struct SettingsNav: View {
                 .onHover { hovered = $0 ? item : (hovered == item ? nil : hovered) }
             }
         }
-        .animation(.easeOut(duration: 0.12), value: hovered)
+        .animation(Theme.fade, value: hovered)
     }
 }
 

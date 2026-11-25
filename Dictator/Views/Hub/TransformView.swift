@@ -381,12 +381,11 @@ struct TransformView: View {
                             .foregroundStyle(Theme.ink2)
                     }
                     Spacer()
-                    Button("Copy", icon: .copy) {
+                    CopyButton {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(draft, forType: .string)
                         statusMessage = "Preview copied."
                     }
-                    .buttonStyle(SecondaryButtonStyle())
                     Button("Use this", icon: .check) {
                         guard model.applyLocalTransform(draft, basedOn: sourceSnapshot) else {
                             statusMessage = currentText == sourceSnapshot

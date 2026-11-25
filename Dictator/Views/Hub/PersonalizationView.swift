@@ -517,6 +517,7 @@ private struct PersonalizationEntryEditor: View {
 
 /// A word you could add, drawn as a dashed sage outline so it reads as a suggestion, not an entry.
 private struct SampleTermButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hovering = false
 
     func makeBody(configuration: Configuration) -> some View {
@@ -531,8 +532,8 @@ private struct SampleTermButtonStyle: ButtonStyle {
             .overlay(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
                 .strokeBorder(Theme.signalEdge, style: StrokeStyle(lineWidth: Theme.hairlineWidth, dash: Theme.dash)))
             .contentShape(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .scaleEffect(Theme.pressed(configuration.isPressed, scale: 0.97, reduceMotion: reduceMotion))
             .onHover { hovering = $0 }
-            .animation(.easeOut(duration: 0.12), value: hovering)
+            .animation(Theme.fade, value: hovering)
     }
 }

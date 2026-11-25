@@ -245,6 +245,7 @@ struct MeetingNoticeCard: View {
 
 /// Compact actions on the pill's cards: filled sage for the one main action, outlined otherwise.
 struct CardOutlineButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var prominent = false
     @State private var hovering = false
 
@@ -260,9 +261,9 @@ struct CardOutlineButtonStyle: ButtonStyle {
                                        : Theme.ink.opacity(hovering ? 0.12 : 0.06)))
             .overlay(Capsule().strokeBorder(Theme.ink.opacity(prominent ? 0 : 0.18), lineWidth: 0.5))
             .contentShape(Capsule())
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .scaleEffect(Theme.pressed(configuration.isPressed, scale: 0.97, reduceMotion: reduceMotion))
             .onHover { hovering = $0 }
-            .animation(.easeOut(duration: 0.12), value: hovering)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .animation(Theme.fade, value: hovering)
+            .animation(Theme.fade, value: configuration.isPressed)
     }
 }

@@ -161,6 +161,7 @@ private struct LiveActivityChip: View {
 
 /// 28 pt toolbar control (Wispr's size), soft fill on hover and while its popover is open.
 struct ToolbarButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var active = false
     @State private var hovering = false
 
@@ -175,9 +176,9 @@ struct ToolbarButtonStyle: ButtonStyle {
             .background(hovering || active ? Theme.hover : .clear,
                         in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
             .contentShape(Rectangle())
-            .scaleEffect(configuration.isPressed ? 0.9 : 1)
+            .scaleEffect(Theme.pressed(configuration.isPressed, scale: 0.9, reduceMotion: reduceMotion))
             .onHover { hovering = $0 }
-            .animation(.easeOut(duration: 0.12), value: hovering)
+            .animation(Theme.fade, value: hovering)
             .animation(Theme.snappy, value: configuration.isPressed)
     }
 }

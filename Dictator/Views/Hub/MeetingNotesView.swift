@@ -502,7 +502,7 @@ private struct MeetingNoteRow: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .animation(.easeOut(duration: 0.12), value: hovering)
+        .animation(Theme.fade, value: hovering)
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 }

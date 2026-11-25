@@ -570,6 +570,42 @@ struct EmptyState<Action: View>: View {
     }
 }
 
+/// A secondary Copy button that confirms itself: the glyph turns to a check and the title to
+/// "Copied" for `Motion.confirmHold`, then back. The width holds the longer title, so nothing
+/// beside it shifts. VoiceOver hears "Copied" announced.
+struct CopyButton: View {
+    var title = "Copy"
+    var action: () -> Void
+    @State private var copied = false
+    @State private var token = 0
+
+    var body: some View {
+        Button {
+            action()
+            token += 1
+            let current = token
+            withAnimation(Theme.snappy) { copied = true }
+            AccessibilityNotification.Announcement("Copied").post()
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(Motion.confirmHold))
+                if current == token { withAnimation(Theme.gentle) { copied = false } }
+            }
+        } label: {
+            ZStack {
+                // Reserves the wider of the two titles.
+                Label("Copied", icon: .check).hidden()
+                Label(title, icon: .copy).hidden()
+                Label(copied ? "Copied" : title, icon: copied ? .check : .copy)
+                    .contentTransition(.opacity)
+                    .id(copied)
+                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
+            }
+        }
+        .buttonStyle(SecondaryButtonStyle())
+        .accessibilityLabel(copied ? "Copied" : title)
+    }
+}
+
 extension EmptyState where Action == EmptyView {
     init(icon: HushIcon, title: String, message: String) {
         self.init(icon: icon, title: title, message: message) { EmptyView() }

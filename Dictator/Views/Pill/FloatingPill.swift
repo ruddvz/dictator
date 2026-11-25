@@ -414,6 +414,7 @@ struct FloatingPillView: View {
             }
             if phase == .error, let notice = model.dictationNotice {
                 noticeCard(notice)
+                    .nudge(on: notice)
                     .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .bottom))
                         .combined(with: .offset(y: 6)))
             }
@@ -1199,6 +1200,7 @@ private struct PillIconButton: View {
 
 /// A capsule action on the dark notice card: filled for the main action, outlined otherwise.
 private struct NoticeButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var prominent: Bool
 
     func makeBody(configuration: Configuration) -> some View {
@@ -1211,8 +1213,8 @@ private struct NoticeButtonStyle: ButtonStyle {
             .overlay(Capsule().strokeBorder(Theme.ink.opacity(prominent ? 0 : 0.28), lineWidth: Theme.hairlineWidth))
             .contentShape(Capsule())
             .opacity(configuration.isPressed ? 0.8 : 1)
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .scaleEffect(Theme.pressed(configuration.isPressed, scale: 0.97, reduceMotion: reduceMotion))
+            .animation(Theme.fade, value: configuration.isPressed)
     }
 }
 

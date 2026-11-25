@@ -85,6 +85,7 @@ enum Theme {
     static let iconXL: CGFloat = 28          // empty states, feature tiles
     static let iconColumn: CGFloat = 20      // fixed slot so labels beside icons line up
     static let iconTile: CGFloat = 32        // tinted square behind a notice glyph
+    static let tileL: CGFloat = 44           // the file tile in the Files drop zone
 
     // MARK: Widths (W)
     static let pageWidth: CGFloat = 1040
@@ -145,13 +146,39 @@ enum Theme {
     static let heroGlow = dynamic(light: 0x7FB39C, dark: 0x7FB39C)    // sage, lit for a dark surface
     static let heroMist = dynamic(light: 0x8FA7B4, dark: 0x7F97A4)    // fog, never used as an accent
 
-    // Motion
-    static let snappy = Animation.spring(response: 0.32, dampingFraction: 0.82)
-    static let gentle = Animation.spring(response: 0.5, dampingFraction: 0.86)
+    // Motion. The three springs read the system's Reduce Motion setting each time they are used:
+    // with it on they become `fade`-length eases with no overshoot, so the 100-odd call sites
+    // that animate with them honour it without checking it themselves.
+    /// Presses, hover, page switch, selection, button state.
+    static var snappy: Animation {
+        reducesMotion ? calm : .spring(response: 0.32, dampingFraction: 0.82)
+    }
+    /// Content appearing, numbers, checklists.
+    static var gentle: Animation {
+        reducesMotion ? calm : .spring(response: 0.5, dampingFraction: 0.86)
+    }
     /// Fast out, soft landing, for panels and the sidebar width (Wispr's most used curve).
-    static let glide = Animation.timingCurve(0.05, 0.6, 0.4, 0.95, duration: 0.28)
+    static var glide: Animation {
+        reducesMotion ? calm : .timingCurve(0.05, 0.6, 0.4, 0.95, duration: 0.28)
+    }
+    /// Colour and opacity only (hover fills, focus rings, drop targets). Not motion, so it is
+    /// the same with Reduce Motion.
+    static let fade = Animation.easeOut(duration: 0.12)
+    /// What the springs become with Reduce Motion: a short ease, no overshoot.
+    static let calm = Animation.easeInOut(duration: 0.15)
     /// Gap between items that enter one after another (sections, rows, heatmap columns).
     static let stagger: Double = 0.05
+    /// How far a pressed control gives (buttons); rows and cards use `PressStyle`'s 0.98.
+    static let pressScale: CGFloat = 0.97
+
+    /// The system Reduce Motion setting, for code that has no SwiftUI environment (tokens,
+    /// AppKit). Views should prefer `@Environment(\.accessibilityReduceMotion)`.
+    static var reducesMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+
+    /// A press scale that stays at 1 with Reduce Motion.
+    static func pressed(_ isPressed: Bool, scale: CGFloat = pressScale, reduceMotion: Bool) -> CGFloat {
+        isPressed && !reduceMotion ? scale : 1
+    }
 
     private static func dynamic(light: UInt32, dark: UInt32) -> Color {
         Color(nsColor: NSColor(name: nil) { appearance in
@@ -293,6 +320,7 @@ extension View {
 
 /// Sage rounded button for the one main action on a surface (Wispr: 36 pt, radius 10).
 struct PrimaryButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var tint: Color = Theme.signal
     var foreground: Color = Theme.inverseInk
     @Environment(\.isEnabled) private var isEnabled
@@ -309,15 +337,16 @@ struct PrimaryButtonStyle: ButtonStyle {
             .background(tint.opacity(isEnabled ? (hovering ? 0.88 : 1) : Theme.disabledOpacity),
                         in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
             .contentShape(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .scaleEffect(Theme.pressed(configuration.isPressed, scale: 0.97, reduceMotion: reduceMotion))
             .onHover { hovering = $0 }
             .animation(Theme.snappy, value: configuration.isPressed)
-            .animation(.easeOut(duration: 0.12), value: hovering)
+            .animation(Theme.fade, value: hovering)
     }
 }
 
 /// Neutral filled button for secondary actions, such as a settings row's "Change".
 struct SecondaryButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var minWidth: CGFloat? = nil
     @Environment(\.isEnabled) private var isEnabled
     @State private var hovering = false
@@ -338,15 +367,16 @@ struct SecondaryButtonStyle: ButtonStyle {
             .overlay(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
                 .strokeBorder(Theme.hairline, lineWidth: Theme.hairlineWidth))
             .contentShape(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .scaleEffect(Theme.pressed(configuration.isPressed, scale: 0.97, reduceMotion: reduceMotion))
             .onHover { hovering = $0 }
             .animation(Theme.snappy, value: configuration.isPressed)
-            .animation(.easeOut(duration: 0.12), value: hovering)
+            .animation(Theme.fade, value: hovering)
     }
 }
 
 /// Red-text neutral button for destructive actions; the confirmation dialog does the warning.
 struct DestructiveButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.isEnabled) private var isEnabled
     @State private var hovering = false
 
@@ -361,7 +391,7 @@ struct DestructiveButtonStyle: ButtonStyle {
             .background(hovering && isEnabled ? Theme.dangerSoft : Theme.hover,
                         in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
             .contentShape(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .scaleEffect(Theme.pressed(configuration.isPressed, scale: 0.97, reduceMotion: reduceMotion))
             .onHover { hovering = $0 }
             .animation(Theme.snappy, value: configuration.isPressed)
     }
@@ -369,6 +399,7 @@ struct DestructiveButtonStyle: ButtonStyle {
 
 /// Square icon-only control that shows a soft fill on hover.
 struct IconButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hovering = false
 
     func makeBody(configuration: Configuration) -> some View {
@@ -381,20 +412,21 @@ struct IconButtonStyle: ButtonStyle {
             .frame(width: Theme.fieldHeight, height: Theme.fieldHeight)
             .background(hovering ? Theme.hover : .clear, in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
             .contentShape(Rectangle())
-            .scaleEffect(configuration.isPressed ? 0.9 : 1)
+            .scaleEffect(Theme.pressed(configuration.isPressed, scale: 0.9, reduceMotion: reduceMotion))
             .onHover { hovering = $0 }
-            .animation(.easeOut(duration: 0.12), value: hovering)
+            .animation(Theme.fade, value: hovering)
             .animation(Theme.snappy, value: configuration.isPressed)
     }
 }
 
 /// A row or card that gives a little under the pointer when pressed.
 struct PressStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var scale: CGFloat = 0.98
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? scale : 1)
+            .scaleEffect(Theme.pressed(configuration.isPressed, scale: scale, reduceMotion: reduceMotion))
             .animation(Theme.snappy, value: configuration.isPressed)
     }
 }

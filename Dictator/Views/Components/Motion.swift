@@ -10,8 +10,6 @@ import SwiftUI
 // MARK: - Tokens
 
 enum Motion {
-    /// Frame rate for ribbons that only breathe; the live pill keeps its own 120.
-    static let ambientFrameRate: Double = 30
     /// Frame rate for ribbons that may follow the voice on a page (the Home band).
     static let bandFrameRate: Double = 60
     /// Seconds between voices in a chorus, so the lines never move in lockstep.
@@ -27,24 +25,101 @@ enum Motion {
     static let bandBloomWaiting: Double = 0.25
     static let bandBloomWorking: Double = 0.4
     /// One entrance for page content: a short rise and fade.
-    static let entrance = Animation.spring(response: 0.5, dampingFraction: 0.86)
+    static var entrance: Animation { Theme.gentle }
+    /// The page mark's one breath when a page opens: in, then out. Seconds.
+    static let markBreathIn: Double = 0.38
+    static let markBreathOut: Double = 0.7
+    /// How far the page mark swells on that breath (speech energy, 0…1).
+    static let markSwell: Double = 0.5
+    /// How long outgoing content (a page, a settings section) takes to fade, so old and new never
+    /// overlap for long. Seconds.
+    static let exit: Double = 0.1
+    /// How long a confirmation ("Copied", a check) stays before it settles back. Seconds.
+    static let confirmHold: Double = 1.4
+}
+
+// MARK: - Nudge
+
+/// A short sideways nudge, for a notice that needs a second look (the pill's error card).
+/// Runs once when the view appears and again each time `trigger` changes; about a third of a
+/// second; still with Reduce Motion.
+struct Nudge<Trigger: Equatable>: ViewModifier {
+    var trigger: Trigger
+    @State private var count = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        if reduceMotion {
+            content
+        } else {
+            content
+                .onAppear { count += 1 }
+                .onChange(of: trigger) { count += 1 }
+                .keyframeAnimator(initialValue: 0.0, trigger: count) { view, x in
+                view.offset(x: x)
+            } keyframes: { _ in
+                KeyframeTrack {
+                    CubicKeyframe(-5, duration: 0.07)
+                    CubicKeyframe(4, duration: 0.08)
+                    CubicKeyframe(-2, duration: 0.08)
+                    SpringKeyframe(0, duration: 0.14, spring: .snappy)
+                }
+            }
+        }
+    }
+}
+
+extension View {
+    func nudge<Trigger: Equatable>(on trigger: Trigger) -> some View {
+        modifier(Nudge(trigger: trigger))
+    }
 }
 
 // MARK: - Pieces
 
-/// A small breathing ribbon: the Dictator mark in motion. Used beside page titles and in empty
-/// states. It only breathes (never follows the mic), at a low frame rate.
+/// The small Dictator mark beside each page title. It takes one breath when the page opens
+/// (swells and settles in about a second) and then holds still. It used to breathe for as long
+/// as the page was open, a 30 fps `TimelineView` + `Canvas` inside every page's scroll view,
+/// which re-rendered the page header continuously and cost CPU while scrolling or idle.
+/// Reduce Motion: drawn still.
 struct RibbonMark: View {
     var size: CGSize = Motion.markSize
-    var mode: BreathRibbon.Mode = .rest
     var tint: Color = Theme.signal
-    @State private var visible = true
+    @State private var swell: Double = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        BreathRibbon(level: 0, mode: mode, tint: tint, frameRate: Motion.ambientFrameRate, paused: !visible)
+        RibbonMarkShape(swell: swell)
+            .fill(LinearGradient(colors: [tint.opacity(0.45), tint, tint.opacity(0.45)],
+                                 startPoint: .leading, endPoint: .trailing))
             .frame(width: size.width, height: size.height)
-            .onWindowVisibilityChange { visible = $0 }
+            .onAppear {
+                guard !reduceMotion else { return }
+                withAnimation(.easeOut(duration: Motion.markBreathIn)) {
+                    swell = Motion.markSwell
+                } completion: {
+                    withAnimation(.easeInOut(duration: Motion.markBreathOut)) { swell = 0 }
+                }
+            }
             .accessibilityHidden(true)
+    }
+}
+
+/// The breath ribbon's outline at a fixed moment, with its swell animatable, so a one-off
+/// breath is interpolated by SwiftUI without a per-frame clock.
+struct RibbonMarkShape: Shape {
+    var swell: Double
+    /// A fixed point in the resting breath, a little past its fullest, so the still mark reads.
+    static let restTime: TimeInterval = BreathRibbon.restLoop * 0.3
+
+    var animatableData: Double {
+        get { swell }
+        set { swell = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        BreathRibbon.path(in: rect.size, energy: swell, mode: .live, time: Self.restTime)
+            .offsetBy(dx: rect.minX, dy: rect.minY)
     }
 }
 
