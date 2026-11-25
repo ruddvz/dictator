@@ -7,7 +7,7 @@ import XCTest
 @MainActor
 final class PillSnapshotTests: XCTestCase {
     func testRenderPillPhases() throws {
-        guard let dir = ProcessInfo.processInfo.environment["TEST_RUNNER_DICTATOR_SNAPSHOT_DIR"] else { throw XCTSkip("Set TEST_RUNNER_DICTATOR_SNAPSHOT_DIR to render pill snapshots") }
+        guard let dir = (ProcessInfo.processInfo.environment["DICTATOR_SNAPSHOT_DIR"] ?? ProcessInfo.processInfo.environment["TEST_RUNNER_DICTATOR_SNAPSHOT_DIR"]) else { throw XCTSkip("Set TEST_RUNNER_DICTATOR_SNAPSHOT_DIR to render pill snapshots") }
         let temp = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         try FileManager.default.createDirectory(at: temp, withIntermediateDirectories: true)
         let model = AppModel(dictationHistoryURL: temp.appending(path: "h.json"),

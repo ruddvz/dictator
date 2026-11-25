@@ -7,14 +7,14 @@ import XCTest
 @MainActor
 final class HubSnapshotTests: XCTestCase {
     func testRenderHubScreens() throws {
-        guard let dir = ProcessInfo.processInfo.environment["TEST_RUNNER_DICTATOR_SNAPSHOT_DIR"] else {
+        guard let dir = (ProcessInfo.processInfo.environment["DICTATOR_SNAPSHOT_DIR"] ?? ProcessInfo.processInfo.environment["TEST_RUNNER_DICTATOR_SNAPSHOT_DIR"]) else {
             throw XCTSkip("Set TEST_RUNNER_DICTATOR_SNAPSHOT_DIR to render hub snapshots")
         }
         let temp = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         try FileManager.default.createDirectory(at: temp, withIntermediateDirectories: true)
         let model = AppModel(dictationHistoryURL: temp.appending(path: "h.json"),
                              fileTranscriptionHistoryURL: temp.appending(path: "f.json"))
-        let snapshotWidth = max(900, min(1920, Double(ProcessInfo.processInfo.environment["TEST_RUNNER_DICTATOR_SNAPSHOT_WIDTH"] ?? "900") ?? 900))
+        let snapshotWidth = max(900, min(1920, Double((ProcessInfo.processInfo.environment["DICTATOR_SNAPSHOT_WIDTH"] ?? ProcessInfo.processInfo.environment["TEST_RUNNER_DICTATOR_SNAPSHOT_WIDTH"]) ?? "900") ?? 900))
         let screens: [(AppModel.Screen, String, AnyView)] = [
             (.dictation, "dictation", AnyView(DictationView())),
             (.transforms, "transforms", AnyView(TransformView())),

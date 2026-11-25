@@ -7,7 +7,7 @@ import XCTest
 @MainActor
 final class MotionSnapshotTests: XCTestCase {
     func testRenderHomeBand() throws {
-        guard let dir = ProcessInfo.processInfo.environment["TEST_RUNNER_DICTATOR_SNAPSHOT_DIR"] else {
+        guard let dir = (ProcessInfo.processInfo.environment["DICTATOR_SNAPSHOT_DIR"] ?? ProcessInfo.processInfo.environment["TEST_RUNNER_DICTATOR_SNAPSHOT_DIR"]) else {
             throw XCTSkip("Set TEST_RUNNER_DICTATOR_SNAPSHOT_DIR to render the Home band")
         }
         let size = CGSize(width: 820, height: 172)
