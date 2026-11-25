@@ -269,6 +269,12 @@ final class AppModel {
             }
         }
     }
+    /// Whether the small bar rests at the bottom of the screen between dictations. Off (the
+    /// default), nothing is drawn or clickable there until you dictate; the bar then rises, and
+    /// settles away again afterwards. On, it stays as a thin resting bar you can click.
+    var showsIdleBar = UserDefaults.standard.object(forKey: "showIdleBar") as? Bool ?? false {
+        didSet { UserDefaults.standard.set(showsIdleBar, forKey: "showIdleBar") }
+    }
     @ObservationIgnored private var isApplyingTemporaryPillHide = false
     @ObservationIgnored private var pillUnhideTask: Task<Void, Never>?
     private(set) var pillHiddenUntil: Date?

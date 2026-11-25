@@ -679,13 +679,16 @@ private struct HistoryRow: View {
     var reader: HistoryReader
 
     @State private var isHovering = false
+    /// Set a beat after the pointer settles on the row, so rows sliding under it while the page
+    /// scrolls don't build and tear down their actions every few milliseconds.
+    @State private var pillReady = false
     @State private var copied = false
     @State private var expanded = false
     @State private var showsDiff = false
 
     private var isReading: Bool { reader.speakingID == entry.id }
     private var isRetranscribing: Bool { model.retranscribingDictationID == entry.id }
-    private var showsActions: Bool { isHovering || isReading || copied }
+    private var showsActions: Bool { pillReady || isReading || copied }
     /// Long dictations show three lines; a click opens the rest.
     private var isLong: Bool { entry.text.count > 220 || entry.text.filter(\.isNewline).count > 2 }
     /// The row opens with a firm spring; with Reduce Motion it just changes.
@@ -708,7 +711,22 @@ private struct HistoryRow: View {
         .padding(.vertical, Theme.rowPaddingV)
         .frame(minHeight: Theme.listRow)
         .background(isHovering ? Theme.well : .clear, in: RoundedRectangle(cornerRadius: Theme.r3, style: .continuous))
-        .overlay(alignment: .topTrailing) { actionPill.padding(Theme.s2) }
+        .overlay(alignment: .topTrailing) {
+            // Built only while shown: a menu, buttons and a shadow in every row of a long history
+            // made the list slow to scroll.
+            if showsActions {
+                actionPill.padding(Theme.s2).transition(.opacity)
+            }
+        }
+        .animation(Theme.fade, value: showsActions)
+        .task(id: isHovering) {
+            if isHovering {
+                try? await Task.sleep(for: .milliseconds(120))
+                if !Task.isCancelled { pillReady = true }
+            } else {
+                pillReady = false
+            }
+        }
         .contentShape(Rectangle())
         .onTapGesture { if isLong { toggleExpanded() } }
         .onHover { hovering in withAnimation(Theme.fade) { isHovering = hovering } }

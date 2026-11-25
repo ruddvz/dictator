@@ -153,6 +153,10 @@ private struct DictationSettings: View {
             SettingsRow(title: "Dictation bar", detail: "The small bar at the bottom of your screen.") {
                 RowToggle(isOn: $model.showsFloatingPill, label: "Show the dictation bar")
             }
+            SettingsRow(title: "Bar at rest", detail: "Off: nothing sits on screen until you dictate. On: a thin bar stays at the bottom edge.") {
+                RowToggle(isOn: $model.showsIdleBar, label: "Show the bar when idle")
+            }
+            .disabled(!model.showsFloatingPill)
             SettingsRow(title: "Sounds", detail: "A soft cue when the mic opens, when text lands, and when something fails.") {
                 RowToggle(isOn: $model.playsDictationSounds, label: "Play dictation sounds")
             }

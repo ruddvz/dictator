@@ -305,7 +305,13 @@ final class AmbientFieldView: NSView {
     private var ribbonShown = false
     private var bloom: Double = -1
     private var animated = true
+    /// Paused by the owner (window hidden), and separately while the user scrolls. The two are
+    /// kept apart so one can't undo the other.
+    private var ownerPaused = false
+    private var scrollPaused = false
     private var paused = false
+    private var scrollMonitor: Any?
+    private var scrollResume: DispatchWorkItem?
     private var builtSize: CGSize = .zero
     private var builtAnimated: Bool?
 
@@ -358,7 +364,8 @@ final class AmbientFieldView: NSView {
         setRibbonShown(ribbon != nil)
         setBloom(bloom)
         if rebuild { builtSize = .zero; needsLayout = true }
-        setPaused(paused)
+        ownerPaused = paused
+        updatePause()
     }
 
     /// The resting ribbon hands over to the live one (and back) with a short crossfade, not a cut.
@@ -500,6 +507,51 @@ final class AmbientFieldView: NSView {
     }
 
     /// Stops or resumes every loop where it is (Apple QA1673).
+    /// While the page scrolls, the hero holds still: every scrolled frame would otherwise also
+    /// recomposite this field's gradients and masks, and a long page then drops frames. It picks
+    /// up again a moment after the last scroll event, and stays still if it has scrolled away.
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if let scrollMonitor { NSEvent.removeMonitor(scrollMonitor) }
+        scrollMonitor = nil
+        scrollResume?.cancel()
+        scrollPaused = false
+        updatePause()
+        guard window != nil else { return }
+        scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            self?.scrolled(in: event.window)
+            return event
+        }
+    }
+
+    deinit {
+        if let scrollMonitor { NSEvent.removeMonitor(scrollMonitor) }
+        scrollResume?.cancel()
+    }
+
+    private func scrolled(in eventWindow: NSWindow?) {
+        guard eventWindow != nil, eventWindow === window else { return }
+        if !scrollPaused {
+            scrollPaused = true
+            updatePause()
+        }
+        scrollResume?.cancel()
+        let resume = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.scrollPaused = false
+            self.updatePause(checkVisible: true)
+        }
+        scrollResume = resume
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: resume)
+    }
+
+    private func updatePause(checkVisible: Bool = false) {
+        // Scrolled out of view (nothing of it visible): no reason to animate either. Only checked
+        // after a scroll, when the layout is settled.
+        let hidden = checkVisible && window != nil && visibleRect.isEmpty
+        setPaused(ownerPaused || scrollPaused || hidden)
+    }
+
     private func setPaused(_ paused: Bool) {
         guard paused != self.paused else { return }
         self.paused = paused

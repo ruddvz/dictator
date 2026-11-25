@@ -136,7 +136,8 @@ final class FloatingPillController {
                                         // After the layout pass that measured it: resizing the panel
                                         // from inside AppKit's constraint pass aborts the app.
                                         DispatchQueue.main.async { self?.resize(to: size) }
-                                    })
+                                    },
+                                    onIdleHidden: { [weak self] hidden in self?.interactiveHosting?.isPassThrough = hidden })
             .environment(model)
             // While the panel is still larger than the pill (see `resize`), keep the pill on the bottom edge.
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
@@ -148,6 +149,7 @@ final class FloatingPillController {
         hosting.frame = CGRect(origin: .zero, size: contentSize)
         panel.contentView = hosting
         interactiveHosting = hosting
+        hosting.isPassThrough = !model.showsIdleBar // idle until the first dictation; the view updates it
         self.panel = panel
         screen = PillPlacement.screenUnderPointer()
         if screenObserver == nil {
@@ -299,14 +301,18 @@ enum PillPlacement {
 
 protocol PillInteractiveHosting: AnyObject {
     var activeContentRect: CGRect { get set }
+    /// True while the pill is invisible at rest: every click goes to the app underneath.
+    var isPassThrough: Bool { get set }
 }
 
 final class FirstMouseHostingView<Content: View>: NSHostingView<Content>, PillInteractiveHosting {
     var activeContentRect: CGRect = .zero
+    var isPassThrough = false
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     override func hitTest(_ point: NSPoint) -> NSView? {
+        guard !isPassThrough else { return nil }
         guard activeContentRect.isEmpty || activeContentRect.contains(point) else { return nil }
         return super.hitTest(point) ?? (activeContentRect.contains(point) ? self : nil)
     }
@@ -321,6 +327,11 @@ struct FloatingPillView: View {
     var onCentre: () -> Void = {}
     /// The pill's measured size, so the panel can fit it.
     var onSize: (CGSize) -> Void = { _ in }
+    /// Told when the pill becomes invisible at rest (or visible again), so the panel can let clicks through.
+    var onIdleHidden: (Bool) -> Void = { _ in }
+
+    /// At rest with "Bar at rest" off: nothing is drawn and nothing can be clicked.
+    private var idleIsHidden: Bool { previewPhase == nil && phase == .idle && !model.showsIdleBar }
 
     @State private var isHovering = false
     /// After a few quiet seconds the idle bar shrinks to a dot, out of the way.
@@ -430,6 +441,7 @@ struct FloatingPillView: View {
             .animation(.spring(response: 0.34, dampingFraction: 0.78), value: phase)
             .animation(.spring(response: 0.34, dampingFraction: 0.78), value: cardState)
             .animation(.spring(response: 0.34, dampingFraction: 0.78), value: showsControls)
+            .onChange(of: idleIsHidden, initial: true) { _, hidden in onIdleHidden(hidden) }
             .animation(Theme.snappy, value: hint)
             .animation(.spring(response: 0.34, dampingFraction: 0.78), value: model.meetingNotes.resultNoteID)
             .animation(.spring(response: 0.34, dampingFraction: 0.78), value: model.meetingNotes.notice)
@@ -575,6 +587,9 @@ struct FloatingPillView: View {
             .scaleEffect(isHover && hoveredControl == .dictate ? 1.05 : 1)
             .animation(.spring(response: 0.28, dampingFraction: 0.7), value: hoveredControl)
             .animation(.spring(response: 0.35, dampingFraction: 0.76), value: pillTargetSize)
+            .opacity(idleIsHidden ? 0 : 1)
+            .animation(.easeOut(duration: idleIsHidden ? 0.25 : 0.12), value: idleIsHidden)
+            .allowsHitTesting(!idleIsHidden)
             .contentShape(Capsule())
             .onHover { inside in
                 guard phase == .hover || !inside else { return }
