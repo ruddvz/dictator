@@ -1,5 +1,14 @@
 # Dictator progress
 
+## Completed — design and motion pass (2026-11-25)
+
+- Audit and decisions: `docs/DESIGN_PASS_2026-11-25.md`. Tokens and rules: `docs/DESIGN_SYSTEM.md` › Motion.
+- Performance: the page-title `RibbonMark` no longer runs a 30 fps `TimelineView` + `Canvas` on every page. It takes one breath when the page opens, then holds still. The deployed build idled at 0.0 % CPU over 5 s, but its window was on another Space, so the page wasn't visible during that sample.
+- Reduce Motion: `Theme.snappy`, `gentle` and `glide` become a 0.15 s ease with Reduce Motion on, and press scales stay at 1. New tokens: `Theme.fade`, `calm`, `pressScale`, `tileL`, `Motion.exit`, `confirmHold`.
+- UI: `CopyButton` confirms "Copied" (Home's latest dictation, transform previews); the pill error card nudges once; Settings sections no longer overlap mid-fade; the Files drop zone has a sage file tile that lifts while a file is held; Insights labels share one baseline; Home's empty and no-match history use `EmptyState`.
+- Snapshot tests read `DICTATOR_SNAPSHOT_DIR` (xcodebuild strips `TEST_RUNNER_`). Before this they always skipped.
+- Checks: 407 tests, 9 skipped, 0 failures. Packaged with `package-app.sh` (Dictator Local Signing), deployed to /Applications, and launched. Pages checked as snapshot renders at 1045 and 900 pt, light and dark, with no clipping; Home was captured live from the deployed build. The live window couldn't be clicked through: it was on another Space behind a full-screen app. NOT checked live: the motion itself (mark breath, Copied swap, error nudge, drop lift), Reduce Motion switched on, and VoiceOver.
+
 ## Completed — insertion rehearsal and "That" check (2026-11-25)
 
 - Built the `-D LIVE_TYPING_REHEARSAL` variant and fed scripted partials into a real TextEdit document with no microphone: the text landed exactly once ("Hello world this is a rehearsal of live typing and a second phrase after a pause"). Browser and Electron fields were NOT verified: the Chrome attempts were abandoned at the user's request (never use their Chrome business account), and the run that targeted Chrome did not reach it. Run the rehearsal against those apps from a normal desktop Space: `DICTATOR_SWIFT_FLAGS="-D LIVE_TYPING_REHEARSAL" ./Scripts/package-app.sh`, then `open dist/Dictator.app --args -liveTypingRehearsalApp <bundle id> -liveTypingRehearsal "words | more words"` with that app frontmost and a text field focused. Rebuild with `./Scripts/install.sh` afterwards to restore the normal build.
