@@ -53,7 +53,10 @@ final class DecodingTests: XCTestCase {
         XCTAssertLessThan(signal.pValue, 0.01)
 
         let null = try XCTUnwrap(Evaluation.run(templates: noise, featureSet: .all, permutations: 200))
-        XCTAssertGreaterThan(null.pValue, 0.01)
+        // Permutations are unseeded and a pure-noise p-value is uniform, so a fixed floor fails about
+        // one run in a hundred. Noise must simply look less significant than the real signal.
+        XCTAssertGreaterThan(null.pValue, signal.pValue)
+        XCTAssertLessThan(null.accuracy, signal.accuracy)
     }
 
     func testEvaluationIncludesSessionSeparatedHoldout() throws {

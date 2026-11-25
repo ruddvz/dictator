@@ -1,5 +1,12 @@
 # Dictator progress
 
+## Completed — Parakeet custom-vocabulary boosting (2026-11-25)
+
+- Parakeet now prefers the user's vocabulary (plus built-in tech names). `ParakeetRecognizer.transcribe(_:vocabulary:)` configures FluidAudio's CTC keyword spotter and rescorer on the streaming Unified manager. The CTC model (parakeet-ctc-110m, ~98 MB, Hugging Face, stored in `~/Library/Application Support/FluidAudio/Models`) downloads automatically after the main model loads (`prepareVocabularyBoosting`). Dictation never waits on it or fails because of it. FluidAudio can't remove a vocabulary from a manager, so an emptied vocabulary rebuilds the manager.
+- Live-ish check (macOS "Rishi" en-IN voice, opt-in package test `testVocabularyBoostingOnSpokenAudio`, needs `PARAKEET_MODEL_ROOT` and `PARAKEET_BOOST=1`): plain "Vadodra … the curve EV" became "Vadodara … the Curvv EV". "Wispr Flow" stays "Whisperflow" from the spotter and is fixed by the snapper. Synthetic speech only, not the user's voice.
+- Fixed flaky `testEvaluationBeatsChanceOnlyWhenSignalExists` (unseeded permutations; asserted p > 0.01 on noise, failing ~1% of runs).
+- Open: no Settings indicator for boosting; thresholds are FluidAudio defaults (recall-favouring), not tuned on the user's real recordings; short terms (EV) are below the spotter's 3-letter minimum.
+
 ## Completed — Parakeet first live result and snapper tolerance (2026-11-25)
 
 - Parakeet Unified downloaded (595 MB) and ran live: 0.28 s for 5 s of audio, confidence 0.74. Spoken vocabulary test came back "E V C and Godara curve and Whisperflow" for EV/CNG/Vadodara/Curvv/Wispr Flow: Parakeet takes no hints, so the snapper is the only fix.

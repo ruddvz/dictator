@@ -78,6 +78,13 @@ public actor ParakeetRecognizer {
 
     private var manager: StreamingUnifiedAsrManager?
     public private(set) var loadedModel: ParakeetModel?
+    private var loadedRoot: URL?
+    private var ctcModels: CtcModels?
+    private var ctcTokenizer: CtcTokenizer?
+    /// Key of the vocabulary configured on `manager`, or nil when none is. FluidAudio can add a
+    /// vocabulary to a manager but not remove it, so clearing one rebuilds the manager.
+    private var boostedKey: String?
+    public static let maximumBoostedTerms = 100
 
     public init() {}
 
@@ -95,8 +102,8 @@ public actor ParakeetRecognizer {
 
     /// Loads the model and runs it once on silence, so the first dictation doesn't pay for
     /// Core ML's Neural Engine warm-up.
-    public func load(_ model: ParakeetModel, from root: URL) async throws {
-        if loadedModel == model, manager != nil { return }
+    public func load(_ model: ParakeetModel, from root: URL, force: Bool = false) async throws {
+        if !force, loadedModel == model, manager != nil { return }
         await unload()
         let manager = StreamingUnifiedAsrManager(config: model.configuration)
         try await manager.loadModels(to: root)
@@ -107,6 +114,67 @@ public actor ParakeetRecognizer {
         try await manager.reset()
         self.manager = manager
         loadedModel = model
+        loadedRoot = root
+        boostedKey = nil
+    }
+
+    // MARK: - Custom vocabulary
+
+    /// True when FluidAudio's small CTC model (used to spot the user's words in the audio) is on disk.
+    public static var boostingModelIsDownloaded: Bool {
+        CtcModels.modelsExist(at: CtcModels.defaultCacheDirectory())
+    }
+
+    public var isBoostingReady: Bool { ctcModels != nil && ctcTokenizer != nil }
+
+    /// Downloads (once) and loads the CTC model that lets Parakeet prefer the user's vocabulary.
+    public func loadBoosting() async throws {
+        guard !isBoostingReady else { return }
+        let models = try await CtcModels.downloadAndLoad()
+        let tokenizer = try await CtcTokenizer.load(from: CtcModels.defaultCacheDirectory())
+        ctcModels = models
+        ctcTokenizer = tokenizer
+    }
+
+    /// The terms worth boosting: trimmed, unique, at least three letters, capped.
+    public static func boostableTerms(_ terms: [String]) -> [String] {
+        var seen = Set<String>()
+        var result: [String] = []
+        for term in terms {
+            let trimmed = term.trimmingCharacters(in: .whitespacesAndNewlines)
+            let key = trimmed.lowercased()
+            guard trimmed.filter(\.isLetter).count >= 3, seen.insert(key).inserted else { continue }
+            result.append(trimmed)
+            if result.count == maximumBoostedTerms { break }
+        }
+        return result
+    }
+
+    /// Makes `manager` boost exactly `terms`. Boosting never blocks dictation: any failure leaves
+    /// the plain transcript.
+    private func applyBoosting(_ terms: [String], to manager: StreamingUnifiedAsrManager) async -> StreamingUnifiedAsrManager {
+        let terms = Self.boostableTerms(terms)
+        let key = terms.map { $0.lowercased() }.sorted().joined(separator: "\n")
+        if terms.isEmpty {
+            // A vocabulary configured earlier can't be removed; start from a fresh manager.
+            guard boostedKey != nil, let model = loadedModel, let root = loadedRoot else { return manager }
+            try? await load(model, from: root, force: true)
+            return self.manager ?? manager
+        }
+        guard key != boostedKey, let ctcModels, let ctcTokenizer else { return manager }
+        let tokenized = terms.compactMap { term -> CustomVocabularyTerm? in
+            let ids = ctcTokenizer.encode(term)
+            return ids.isEmpty ? nil : CustomVocabularyTerm(text: term, ctcTokenIds: ids)
+        }
+        guard !tokenized.isEmpty else { return manager }
+        do {
+            try await manager.configureVocabularyBoosting(
+                vocabulary: CustomVocabularyContext(terms: tokenized), ctcModels: ctcModels)
+            boostedKey = key
+        } catch {
+            boostedKey = nil
+        }
+        return manager
     }
 
     public func unload() async {
@@ -116,10 +184,12 @@ public actor ParakeetRecognizer {
     }
 
     /// Recognizes 16 kHz mono samples.
-    public func transcribe(_ samples: [Float]) async throws -> ParakeetTranscript {
-        guard let manager else { throw ParakeetRecognizerError.notLoaded }
+    /// `vocabulary` lists words and names to prefer when the audio is close to one of them.
+    public func transcribe(_ samples: [Float], vocabulary: [String] = []) async throws -> ParakeetTranscript {
+        guard let loaded = manager else { throw ParakeetRecognizerError.notLoaded }
         guard !samples.isEmpty else { throw ParakeetRecognizerError.noAudio }
         let started = ContinuousClock.now
+        let manager = await applyBoosting(vocabulary, to: loaded)
         try await manager.reset()
         try await manager.appendAudio(Self.buffer(from: samples))
         try await manager.processBufferedAudio()

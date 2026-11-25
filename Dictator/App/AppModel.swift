@@ -2448,14 +2448,14 @@ final class AppModel {
         lastParakeetPeakLevel = peakLevel
         guard !recorded.isEmpty else { return nil }
         do {
-            let transcript = try await parakeet.transcribe(recorded)
+            let vocabulary = lastDictationContextualStrings.filter { !Self.allModeHints.contains($0) }
+            let transcript = try await parakeet.transcribe(recorded, vocabulary: vocabulary)
             let model = parakeet.model.rawValue
             lastParakeetConfidence = transcript.confidence
             activeParakeetNeedsReview = ParakeetAutoInsertGate.requiresReview(
                 peakLevel: peakLevel, confidence: transcript.confidence)
             parakeetLog.info("\(model, privacy: .public): \(transcript.processingSeconds, format: .fixed(precision: 3), privacy: .public) s for \(transcript.audioSeconds, format: .fixed(precision: 2), privacy: .public) s of audio, confidence \(transcript.confidence, format: .fixed(precision: 2), privacy: .public), peak \(peakLevel, format: .fixed(precision: 2), privacy: .public), auto-insert \(!self.activeParakeetNeedsReview, privacy: .public)")
             guard !transcript.text.isEmpty else { return nil }
-            let vocabulary = lastDictationContextualStrings.filter { !Self.allModeHints.contains($0) }
             lastRecognitionUsedParakeet = true
             return DictationVocabularySnapper.apply(transcript.text, terms: vocabulary)
         } catch {

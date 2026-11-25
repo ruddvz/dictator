@@ -74,6 +74,9 @@ final class ParakeetDictationEngine {
     static let modelKey = "parakeetModel"
     nonisolated static var defaultModelRoot: URL { AppDataDirectory.url.appending(path: "ParakeetModels", directoryHint: .isDirectory) }
     private let defaults: UserDefaults
+    private var boostingTask: Task<Void, Never>?
+    /// True once the word-spotting model is loaded, so the user's vocabulary steers recognition.
+    private(set) var isVocabularyBoostingReady = false
     private static let removedByUserKey = "parakeetModelRemovedByUser"
 
     private static let legacyModelFolders = [
@@ -233,17 +236,35 @@ final class ParakeetDictationEngine {
         loadedModel = loaded ? model : nil
         guard model == self.model else { return refresh() }
         phase = failure.map(Phase.failed) ?? .ready
+        if loaded { prepareVocabularyBoosting() }
+    }
+
+    /// Loads the small CTC model that spots the user's words, fetching it the first time. Dictation
+    /// works without it, so a failure only means words aren't boosted.
+    func prepareVocabularyBoosting() {
+        guard boostingTask == nil else { return }
+        boostingTask = Task { [weak self, recognizer] in
+            do {
+                try await recognizer.loadBoosting()
+                self?.boostingTask = nil
+                self?.isVocabularyBoostingReady = true
+            } catch {
+                self?.boostingTask = nil
+                self?.isVocabularyBoostingReady = false
+            }
+        }
     }
 
     /// Recognizes recorded microphone audio. Loads the model first if it isn't loaded yet.
-    func transcribe(_ buffers: [AVAudioPCMBuffer]) async throws -> ParakeetTranscript {
+    /// `vocabulary` is the user's own words; Parakeet prefers them when the audio is close.
+    func transcribe(_ buffers: [AVAudioPCMBuffer], vocabulary: [String] = []) async throws -> ParakeetTranscript {
         activeTranscriptions += 1
         defer { activeTranscriptions -= 1 }
         let samples = try await Task.detached(priority: .userInitiated) {
             try ParakeetRecognizer.samples(from: buffers)
         }.value
         guard await warmUp().value else { throw ParakeetRecognizerError.notLoaded }
-        let transcript = try await recognizer.transcribe(samples)
+        let transcript = try await recognizer.transcribe(samples, vocabulary: vocabulary)
         lastRun = (transcript.audioSeconds, transcript.processingSeconds)
         return transcript
     }

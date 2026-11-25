@@ -62,6 +62,46 @@ final class ParakeetRecognizerTests: XCTestCase {
         }
     }
 
+    func testBoostableTermsAreTrimmedUniqueAndLongEnough() {
+        let terms = ParakeetRecognizer.boostableTerms([" Wispr Flow ", "wispr flow", "EV", "CNG", "", "Vadodara"])
+        XCTAssertEqual(terms, ["Wispr Flow", "CNG", "Vadodara"])
+        let many = (0..<150).map { "Term\($0)" }
+        XCTAssertEqual(ParakeetRecognizer.boostableTerms(many).count, ParakeetRecognizer.maximumBoostedTerms)
+    }
+
+    /// Opt-in: speaks a sentence with macOS's Indian-English voice and compares Parakeet with and
+    /// without the vocabulary. `PARAKEET_MODEL_ROOT=<folder> PARAKEET_BOOST=1 swift test --filter Boost`.
+    func testVocabularyBoostingOnSpokenAudio() async throws {
+        let env = ProcessInfo.processInfo.environment
+        guard let path = env["PARAKEET_MODEL_ROOT"], env["PARAKEET_BOOST"] == "1" else {
+            throw XCTSkip("Set PARAKEET_MODEL_ROOT and PARAKEET_BOOST=1.")
+        }
+        let root = URL(fileURLWithPath: path)
+        let model = try XCTUnwrap(ParakeetModel.allCases.first { $0.isDownloaded(in: root) })
+        let wav = FileManager.default.temporaryDirectory.appending(path: "boost-\(UUID().uuidString).wav")
+        defer { try? FileManager.default.removeItem(at: wav) }
+        let say = Process()
+        say.executableURL = URL(fileURLWithPath: "/usr/bin/say")
+        say.arguments = ["-v", env["PARAKEET_VOICE"] ?? "Rishi", "--file-format=WAVE", "--data-format=LEI16@16000",
+                         "-o", wav.path, env["PARAKEET_SENTENCE"] ?? "We compare Wispr Flow with Dictator, Vadodara, and the Curvv EV."]
+        try say.run(); say.waitUntilExit()
+        let file = try AVAudioFile(forReading: wav)
+        let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length)))
+        try file.read(into: buffer)
+        let samples = try ParakeetRecognizer.samples(from: [buffer])
+        let recognizer = ParakeetRecognizer()
+        try await recognizer.load(model, from: root)
+        let plain = try await recognizer.transcribe(samples)
+        try await recognizer.loadBoosting()
+        let terms = ["Wispr Flow", "Dictator", "Vadodara", "Curvv", "EV"]
+        let boosted = try await recognizer.transcribe(samples, vocabulary: terms)
+        let cleared = try await recognizer.transcribe(samples, vocabulary: [])
+        print("boost-plain:   \(plain.text)")
+        print("boost-boosted: \(boosted.text)")
+        print("boost-cleared: \(cleared.text)")
+        XCTAssertEqual(cleared.text, plain.text)
+    }
+
     /// Opt-in timing on a downloaded model: `PARAKEET_MODEL_ROOT=<ParakeetModels folder> swift test`.
     func testLoadAndTranscribeTimingsOnADownloadedModel() async throws {
         guard let path = ProcessInfo.processInfo.environment["PARAKEET_MODEL_ROOT"] else {
