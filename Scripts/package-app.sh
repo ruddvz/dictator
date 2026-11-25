@@ -43,12 +43,13 @@ cp "$project_root/docs/licenses/LLAMA-CPP-MIT-LICENSE.txt" "$resources/"
 # macOS ties Accessibility to the signing certificate. An ad-hoc build has none, so every
 # rebuild loses Accessibility (fn key and typing into apps) even when microphone and Speech
 # survive. Sign with the local identity from Scripts/make-signing-identity.sh when it exists.
-# Distribution builds should use a real Developer ID.
+# Distribution builds should use a real Developer ID. DICTATOR_AD_HOC=1 skips the local identity
+# (used by make-dmg.sh so a shared build never depends on this Mac's certificate).
 identity="$(security find-identity -v -p codesigning 2>/dev/null | awk '/"Dictator Local Signing"/ { print $2; exit }')"
 signed=0
 if [[ -n "${DICTATOR_SIGNING_IDENTITY:-}" ]]; then
   codesign --force --deep --sign "$DICTATOR_SIGNING_IDENTITY" --timestamp=none "$staged_app" && signed=1 || true
-elif [[ -n "$identity" ]]; then
+elif [[ -n "$identity" && -z "${DICTATOR_AD_HOC:-}" ]]; then
   codesign --force --deep --sign "$identity" --timestamp=none "$staged_app" 2>/dev/null && signed=1 || true
 fi
 

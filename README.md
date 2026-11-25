@@ -72,6 +72,8 @@ After the first launch:
 
 If macOS asks whether `codesign` may use "Dictator Local Signing", choose **Always Allow**. To update later, run `git pull && ./Scripts/install.sh`. Because the app is signed with your own local identity, Accessibility permission survives updates.
 
+Maintainers can build a shareable, **unnotarized** disk image with `./Scripts/make-dmg.sh` (ad-hoc signed, universal, macOS 14+). Downloaders must allow it once under System Settings → Privacy & Security → Open Anyway; the notes inside the DMG explain this.
+
 ## Development
 
 Generate the Xcode project and run the test suite:
