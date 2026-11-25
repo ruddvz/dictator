@@ -14,11 +14,22 @@ struct FileTranscriptionView: View {
     private var transcription: LocalFileTranscriber { model.fileTranscriber }
     private var whisper: WhisperKitFileTranscriber { model.whisperFileTranscriber }
     private var historySessions: [FileTranscriptionSession] { model.fileTranscriptionSessions }
-    private var isBusy: Bool { transcription.isTranscribing || whisper.isTranscribing || whisper.isDownloading }
-    private var currentText: String { workspace.engine == .apple ? transcription.text : whisper.text }
-    private var currentCues: [SubtitleCue] { workspace.engine == .apple ? transcription.cues : whisper.cues }
-    private var currentStatus: String? { workspace.engine == .apple ? transcription.status : whisper.status }
-    private var currentError: String? { workspace.engine == .apple ? transcription.error : whisper.error }
+    private var parakeet: ParakeetFileTranscriber { model.parakeetFileTranscriber }
+    private var isBusy: Bool {
+        transcription.isTranscribing || whisper.isTranscribing || whisper.isDownloading || parakeet.isTranscribing
+    }
+    private var currentText: String {
+        switch workspace.engine { case .parakeet: parakeet.text; case .apple: transcription.text; case .whisperKit: whisper.text }
+    }
+    private var currentCues: [SubtitleCue] {
+        switch workspace.engine { case .parakeet: parakeet.cues; case .apple: transcription.cues; case .whisperKit: whisper.cues }
+    }
+    private var currentStatus: String? {
+        switch workspace.engine { case .parakeet: parakeet.status; case .apple: transcription.status; case .whisperKit: whisper.status }
+    }
+    private var currentError: String? {
+        switch workspace.engine { case .parakeet: parakeet.error; case .apple: transcription.error; case .whisperKit: whisper.error }
+    }
     private var filteredSessions: [FileTranscriptionSession] {
         let query = historySearch.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return historySessions }
@@ -48,6 +59,10 @@ struct FileTranscriptionView: View {
                 SettingsGroup(title: "Engine") {
                     SettingsRow(title: "Speech engine",
                                 detail: !currentText.isEmpty && !isBusy ? "Clear the transcript to change engine."
+                                    : workspace.engine == .parakeet
+                                        ? (model.parakeet.isDownloaded
+                                           ? "Parakeet, the same engine as dictation. English only, text without subtitle timing."
+                                           : "Parakeet isn’t on this Mac yet. Download it in Settings → Dictation.")
                                     : workspace.engine == .apple ? "Apple Speech. Nothing to download."
                                     : "WhisperKit. Downloads a model once, then runs offline.") {
                         MenuPicker(selection: Binding(get: { workspace.engine },
@@ -56,7 +71,9 @@ struct FileTranscriptionView: View {
                             .disabled(isBusy || !currentText.isEmpty)
                     }
                     SettingsRow(title: "Language", detail: nil) {
-                        if workspace.engine == .apple {
+                        if workspace.engine == .parakeet {
+                            Text("English").font(.hkBody).foregroundStyle(Theme.ink2)
+                        } else if workspace.engine == .apple {
                             LanguageButton(selection: Binding(get: { model.dictationLanguage },
                                                               set: { model.dictationLanguage = $0 }))
                                 .disabled(isBusy)
@@ -108,6 +125,9 @@ struct FileTranscriptionView: View {
             }
         }
         .onAppear {
+            if workspace.engine == .parakeet, !model.parakeet.isDownloaded, currentText.isEmpty, !isBusy {
+                workspace.engine = .apple
+            }
             if workspace.shouldRestoreLatest(isBusy: isBusy), let latest = historySessions.first {
                 restore(latest)
             }
@@ -141,7 +161,11 @@ struct FileTranscriptionView: View {
 
     private var transcriptBinding: Binding<String> {
         Binding(get: { currentText }, set: {
-            workspace.engine == .apple ? transcription.replaceText($0) : whisper.replaceText($0)
+            switch workspace.engine {
+            case .parakeet: parakeet.replaceText($0)
+            case .apple: transcription.replaceText($0)
+            case .whisperKit: whisper.replaceText($0)
+            }
         })
     }
 
@@ -177,6 +201,9 @@ struct FileTranscriptionView: View {
             if workspace.engine == .apple && transcription.isTranscribing {
                 Button("Cancel") { transcription.cancel() }
                     .buttonStyle(SecondaryButtonStyle())
+            } else if workspace.engine == .parakeet && parakeet.isTranscribing {
+                Button("Cancel") { parakeet.cancel() }
+                    .buttonStyle(SecondaryButtonStyle())
             } else if workspace.engine == .whisperKit && whisper.isTranscribing {
                 Button("Cancel") { whisper.cancelTranscription() }
                     .buttonStyle(SecondaryButtonStyle())
@@ -191,7 +218,8 @@ struct FileTranscriptionView: View {
                 }
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(workspace.selectedURL == nil || isBusy ||
-                          (workspace.engine == .whisperKit && !whisper.selectedModelIsDownloaded))
+                          (workspace.engine == .whisperKit && !whisper.selectedModelIsDownloaded) ||
+                          (workspace.engine == .parakeet && !model.parakeet.isDownloaded))
             }
         }
         .padding(.horizontal, Theme.cardPaddingL)
@@ -213,7 +241,7 @@ struct FileTranscriptionView: View {
 
     private var transcriptCard: some View {
         PageSection("Transcript") {
-            Text("\(currentCues.count) timed segments")
+            Text(workspace.engine == .parakeet ? "No subtitle timing with Parakeet" : "\(currentCues.count) timed segments")
                 .font(.hkMeta.monospacedDigit())
                 .foregroundStyle(Theme.ink3)
         } content: {
@@ -320,12 +348,19 @@ struct FileTranscriptionView: View {
         let sessionID = UUID()
         workspace.activeSessionID = sessionID
         workspace.activeSourceName = selectedURL.lastPathComponent
-        workspace.activeLanguageIdentifier = workspace.engine == .apple ? model.dictationLanguage : whisper.selectedLanguage
+        switch workspace.engine {
+        case .parakeet: workspace.activeLanguageIdentifier = "en"
+        case .apple: workspace.activeLanguageIdentifier = model.dictationLanguage
+        case .whisperKit: workspace.activeLanguageIdentifier = whisper.selectedLanguage
+        }
         workspace.activeModelVariant = workspace.engine == .whisperKit ? whisper.selectedVariant.rawValue : nil
         let languageIdentifier = workspace.activeLanguageIdentifier
         exportMessage = nil
 
-        if workspace.engine == .apple {
+        if workspace.engine == .parakeet {
+            parakeet.transcribe(file: selectedURL, engine: model.parakeet,
+                                vocabulary: model.fileTranscriptionVocabulary, sessionID: sessionID)
+        } else if workspace.engine == .apple {
             Task {
                 await transcription.transcribe(file: selectedURL, localeIdentifier: languageIdentifier,
                                                sessionID: sessionID)
@@ -368,7 +403,9 @@ struct FileTranscriptionView: View {
         workspace.activeLanguageIdentifier = session.languageIdentifier
         workspace.activeModelVariant = session.modelVariant
         exportMessage = "Restored. The audio file itself isn’t kept."
-        if session.engine == .apple {
+        if session.engine == .parakeet {
+            parakeet.restore(session)
+        } else if session.engine == .apple {
             transcription.restore(session)
         } else {
             whisper.restore(session)
@@ -413,6 +450,7 @@ struct FileTranscriptionView: View {
                 exportMessage = nil
                 transcription.clear()
                 whisper.clear()
+                parakeet.clear()
             })
     }
 

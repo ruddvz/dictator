@@ -8,7 +8,7 @@ final class FileTranscriptionWorkspace {
     var activeSourceName: String?
     var activeLanguageIdentifier = ""
     var activeModelVariant: String?
-    var engine: FileTranscriptionEngine = .apple
+    var engine: FileTranscriptionEngine = .parakeet
 
     func shouldRestoreLatest(isBusy: Bool) -> Bool {
         !isBusy && selectedURL == nil && activeSessionID == nil && activeSourceName == nil
@@ -16,6 +16,7 @@ final class FileTranscriptionWorkspace {
 }
 
 enum FileTranscriptionEngine: String, CaseIterable, Codable, Identifiable {
+    case parakeet = "Parakeet"
     case apple = "Apple Speech"
     case whisperKit = "WhisperKit model"
 

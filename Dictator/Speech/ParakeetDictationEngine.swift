@@ -263,6 +263,13 @@ final class ParakeetDictationEngine {
         let samples = try await Task.detached(priority: .userInitiated) {
             try ParakeetRecognizer.samples(from: buffers)
         }.value
+        return try await transcribe(samples: samples, vocabulary: vocabulary)
+    }
+
+    /// Recognizes audio that is already 16 kHz mono (for example a decoded file).
+    func transcribe(samples: [Float], vocabulary: [String] = []) async throws -> ParakeetTranscript {
+        activeTranscriptions += 1
+        defer { activeTranscriptions -= 1 }
         guard await warmUp().value else { throw ParakeetRecognizerError.notLoaded }
         let transcript = try await recognizer.transcribe(samples, vocabulary: vocabulary)
         lastRun = (transcript.audioSeconds, transcript.processingSeconds)

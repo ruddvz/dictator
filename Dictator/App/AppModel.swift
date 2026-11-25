@@ -81,6 +81,7 @@ final class AppModel {
     let localTransformService = LocalTransformService()
     let fileTranscriber = LocalFileTranscriber()
     let whisperFileTranscriber = WhisperKitFileTranscriber()
+    let parakeetFileTranscriber = ParakeetFileTranscriber()
     let fileTranscriptionWorkspace = FileTranscriptionWorkspace()
     let insertion = TextInsertionService()
     let capture = CaptureController()
@@ -592,6 +593,9 @@ final class AppModel {
         whisperFileTranscriber.onSessionUpdate = { [weak self] session in
             self?.saveFileTranscriptionSession(session)
         }
+        parakeetFileTranscriber.onSessionUpdate = { [weak self] session in
+            self?.saveFileTranscriptionSession(session)
+        }
         insertion.onInsertShortcut = { [weak self] in self?.insertLatestOutput() }
         insertion.onUndoShortcut = { [weak self] in self?.undoLastInsertion() }
         rebuildClassifier()
@@ -632,11 +636,18 @@ final class AppModel {
         }
     }
 
+    /// The user's own words and built-in tech names, which Parakeet prefers when audio is close.
+    var fileTranscriptionVocabulary: [String] {
+        DictationContextHints.prioritized(customWords: DictationContextHints.builtInWords + DictationVocabulary.terms(from: dictationTerms),
+                                          modeHints: [], nearbyHints: [], learnedWords: dataset.vocabulary)
+    }
+
     @discardableResult
     func clearFileTranscriptionHistory() -> Bool {
         let activeSessionIDs = Set([
             fileTranscriber.isTranscribing ? fileTranscriber.activeSessionID : nil,
-            whisperFileTranscriber.isTranscribing ? whisperFileTranscriber.activeSessionID : nil
+            whisperFileTranscriber.isTranscribing ? whisperFileTranscriber.activeSessionID : nil,
+            parakeetFileTranscriber.isTranscribing ? parakeetFileTranscriber.activeSessionID : nil
         ].compactMap { $0 })
         return clearFileTranscriptionHistory(discardingActiveSessionIDs: activeSessionIDs)
     }
