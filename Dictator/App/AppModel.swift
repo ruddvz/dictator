@@ -596,7 +596,11 @@ final class AppModel {
         insertion.onUndoShortcut = { [weak self] in self?.undoLastInsertion() }
         rebuildClassifier()
         // Load Parakeet now, so the first dictation doesn't wait for the Neural Engine.
-        if dictationEngine == .parakeet, parakeet.isDownloaded, !AppDataDirectory.isRunningTests { parakeet.warmUp() }
+        if dictationEngine == .parakeet, !AppDataDirectory.isRunningTests {
+            // No copy yet (first run, or an upgrade replaced the old model): fetch it instead of
+            // silently falling back to Apple Speech. Progress and failures show in Settings.
+            if parakeet.isDownloaded { parakeet.warmUp() } else { parakeet.downloadIfNeeded() }
+        }
     }
 
     @discardableResult

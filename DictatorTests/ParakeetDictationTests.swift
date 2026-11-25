@@ -98,6 +98,17 @@ final class ParakeetDictationEngineTests: XCTestCase {
         XCTAssertTrue(fileManager.fileExists(atPath: marker.path))
     }
 
+    func testDownloadIfNeededSkipsAModelTheUserRemoved() throws {
+        let suite = "dictator.tests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defaults.set(true, forKey: "parakeetModelRemovedByUser")
+        let engine = ParakeetDictationEngine(modelRoot: root, model: .englishUnified, defaults: defaults)
+        XCTAssertFalse(engine.downloadIfNeeded())
+        XCTAssertEqual(engine.phase, .notDownloaded)
+    }
+
     func testBuiltInTechNamesFixCommonMisrecognitions() {
         let terms = DictationContextHints.builtInWords
         XCTAssertEqual(DictationVocabularySnapper.apply("I deploy through Vercell now", terms: terms),

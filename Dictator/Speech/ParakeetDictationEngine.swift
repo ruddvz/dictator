@@ -73,6 +73,9 @@ final class ParakeetDictationEngine {
 
     static let modelKey = "parakeetModel"
     nonisolated static var defaultModelRoot: URL { AppDataDirectory.url.appending(path: "ParakeetModels", directoryHint: .isDirectory) }
+    private let defaults: UserDefaults
+    private static let removedByUserKey = "parakeetModelRemovedByUser"
+
     private static let legacyModelFolders = [
         "parakeet-tdt-0.6b-v2", "parakeet-tdt-0.6b-v3", "parakeet-ultra",
     ]
@@ -80,6 +83,7 @@ final class ParakeetDictationEngine {
     init(modelRoot: URL = ParakeetDictationEngine.defaultModelRoot,
          model: ParakeetModel? = nil, defaults: UserDefaults = .standard) {
         self.modelRoot = modelRoot
+        self.defaults = defaults
         self.model = model ?? .englishUnified
         // Rewrite any previous v2, v3, or Ultra choice to the single model now offered.
         defaults.set(self.model.rawValue, forKey: Self.modelKey)
@@ -146,11 +150,22 @@ final class ParakeetDictationEngine {
         phase = loadedModel == model ? .ready : .downloaded
     }
 
+    /// Fetches the model once on launch for someone who chose Parakeet but has no copy, for example
+    /// after an upgrade replaced the old model. A person who removed the model themselves is left alone.
+    @discardableResult
+    func downloadIfNeeded() -> Bool {
+        guard phase == .notDownloaded, !isDownloaded, downloadTask == nil,
+              !defaults.bool(forKey: Self.removedByUserKey) else { return false }
+        download()
+        return true
+    }
+
     func download() {
         guard downloadTask == nil, !isDownloaded else {
             if isDownloaded { warmUp() }
             return
         }
+        defaults.set(false, forKey: Self.removedByUserKey)
         let model = model
         let root = modelRoot
         phase = .downloading
@@ -235,6 +250,7 @@ final class ParakeetDictationEngine {
 
     func removeModel() {
         guard !isBusy else { return }
+        defaults.set(true, forKey: Self.removedByUserKey)
         let directory = model.directory(in: modelRoot)
         loadedModel = nil
         Task { [weak self, recognizer] in

@@ -1,5 +1,9 @@
 # Dictator progress
 
+## Completed — auto-download Parakeet model (2026-11-25)
+
+- `ParakeetDictationEngine.downloadIfNeeded()` runs at launch when Parakeet is the chosen engine and no model is on disk (first run, or an upgrade that deleted v2). It downloads from Hugging Face via FluidAudio; progress and failures show in Settings. A model removed by the user (`parakeetModelRemovedByUser`) is not re-downloaded until they download it again. 401 tests, 0 failures.
+
 ## Completed — transcript-quality review from live history (2026-11-25)
 
 - Read the 50 saved dictations (Apple Speech fallback, en-US; Parakeet Unified was not downloaded). Fillers and repeats ("Uh", "I I", "as as") are cleaned correctly. Misrecognitions seen: "Vercel"→"Vercell", "Wispr Flow"→"Whisper flow" (3×), "goated"→"voted", "end-to-end"→"and to end", "EV"→"E V" (4×), "CNG"→"CN G", Indian place and product names (Vadodara, Curvv).
