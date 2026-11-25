@@ -339,6 +339,8 @@ struct FloatingPillView: View {
     @State private var showsDone = false
     @State private var doneToken = 0
     @State private var copied = false
+    /// Copy on a problem card; cleared when the card changes.
+    @State private var noticeCopied = false
     /// The start is taking longer than a blink: only then name the wait and sweep the ribbon.
     /// A normal start (about 0.3 s) goes straight from the resting line to the live ribbon.
     @State private var isSlowStart = false
@@ -357,6 +359,8 @@ struct FloatingPillView: View {
                                meetingStarting, meeting, meetingSaving }
     /// Renders one fixed phase, for snapshot reviews of the pill's spacing and icons.
     var previewPhase: Phase? = nil
+    /// With `previewPhase == .error`: the notice to show, so every problem card can be reviewed.
+    var previewNotice: DictationNotice? = nil
     var previewShowsControls = true
     private enum PillControl { case dictate, cancel, finish, notes, meeting, stopMeeting, cancelMeeting }
 
@@ -423,9 +427,10 @@ struct FloatingPillView: View {
                                   isHovering: $isHoveringCard)
                     .transition(.opacity.combined(with: .offset(y: 6)))
             }
-            if phase == .error, let notice = model.dictationNotice {
+            if phase == .error, let notice = previewNotice ?? model.dictationNotice {
                 noticeCard(notice)
                     .nudge(on: notice)
+                    .onChange(of: notice) { noticeCopied = false }
                     .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .bottom))
                         .combined(with: .offset(y: 6)))
             }
@@ -1018,6 +1023,25 @@ struct FloatingPillView: View {
             Button("Retry") { Task { await model.retryDictation() } }
                 .buttonStyle(NoticeButtonStyle(prominent: notice.missingPermission == nil))
                 .help("Transcribe the last recording again")
+        }
+        // The text is saved but wasn't typed: always offer a way to take it with you.
+        if notice.kind == .insertion || notice.isReview {
+            Button(noticeCopied ? "Copied" : "Copy") {
+                model.copyDictationText()
+                noticeCopied = true
+            }
+            .buttonStyle(NoticeButtonStyle(prominent: !notice.canPasteAgain && !notice.isReview))
+            .help("Copy the text to the clipboard")
+        }
+        if notice.isReview {
+            // The review sheet is Home's latest-dictation card, where Insert lives.
+            Button("Review in Dictator") {
+                model.screen = .dictation
+                model.openMainWindow?()
+                NSApp.activate(ignoringOtherApps: true)
+            }
+            .buttonStyle(NoticeButtonStyle(prominent: true))
+            .help("Open Dictator to read the text and choose Insert")
         }
         if let privacy = notice.missingPermission {
             Button("Open Settings") {
